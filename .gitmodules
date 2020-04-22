@@ -1,0 +1,9 @@
+[submodule "webrtc_samples/open-source/kinesis-video-pic"]
+	path = webrtc_samples/open-source/kinesis-video-pic
+	url = https://github.com/awslabs/amazon-kinesis-video-streams-pic.git
+[submodule "webrtc_samples/open-source/kinesis-video-producer-c"]
+	path = webrtc_samples/open-source/kinesis-video-producer-c
+	url = https://github.com/awslabs/amazon-kinesis-video-streams-producer-c.git
+[submodule "webrtc_samples/open-source/kinesis-video-webrtc-c"]
+	path = webrtc_samples/open-source/kinesis-video-webrtc-c
+	url = https://github.com/awslabs/amazon-kinesis-video-streams-webrtc-sdk-c.git
