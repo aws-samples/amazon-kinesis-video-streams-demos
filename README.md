@@ -1,11 +1,16 @@
-## My Project
+# Amazon Kinesis Video Stream Demos
 
-TODO: Fill this README out!
+This repository contains a list of use cases with sample codes or high level descriptions/diagrams for [Kinesis Video Stream](https://aws.amazon.com/kinesis/video-streams/).
 
-Be sure to:
+## Contents
 
-* Change the title in this README
-* Edit your repository description on GitHub
+* [Producer CPP](https://github.com/awslabs/amazon-kinesis-video-streams-producer-sdk-cpp)
+  * [Stream and persist video stream from webcam using Amazon Linux](/producer-cpp/docker-amazonlinux)
+  * [Stream and persist video stream from webcam with a Raspberry Pi](/producer-cpp/docker-raspberry-pi)
+  * [Stream and persist video stream from RTSP server](/producer-cpp/docker-rtsp)
+* [Producer C](https://github.com/awslabs/amazon-kinesis-video-streams-producer-c)
+* [WebRTC C](https://github.com/awslabs/amazon-kinesis-video-streams-webrtc-sdk-c)
+* [WebRTC JS](https://github.com/awslabs/amazon-kinesis-video-streams-webrtc-sdk-js)
 
 ## License
 
