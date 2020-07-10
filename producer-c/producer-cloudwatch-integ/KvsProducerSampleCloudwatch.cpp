@@ -237,9 +237,7 @@ CleanUp:
     // Second, it will cater to scenarios where a SIG is sent to exit the while loop above in
     // which case the clean up related logs will be captured as well.
     if(!cleanUpDone) {
-        if (STATUS_FAILED(retStatus)) {
-            DLOGE("Failed with status 0x%08x\n", retStatus);
-        }
+        CHK_LOG_ERR(retStatus);
         SAFE_MEMFREE(frame.frameData);
 
         freeDeviceInfo(&pDeviceInfo);
