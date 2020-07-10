@@ -211,17 +211,13 @@ INT32 main(INT32 argc, CHAR *argv[])
             frameIndex++;
         }
         CHK_LOG_ERR(retStatus);
-
-        if (frame.frameData != NULL) {
-            SAFE_MEMFREE(frame.frameData);
-        }
+        SAFE_MEMFREE(frame.frameData);
 
         freeDeviceInfo(&pDeviceInfo);
         freeStreamInfoProvider(&pStreamInfo);
         freeKinesisVideoStream(&streamHandle);
         freeKinesisVideoClient(&clientHandle);
         freeCallbacksProvider(&pClientCallbacks); // This will also take care of freeing canaryStreamCallbacks
-        DLOGI("Memory allocated:%llu bytes", getInstrumentedTotalAllocationSize());
         RESET_INSTRUMENTED_ALLOCATORS();
         DLOGI("CleanUp Done");
         cleanUpDone = TRUE;
@@ -244,10 +240,7 @@ CleanUp:
         if (STATUS_FAILED(retStatus)) {
             DLOGE("Failed with status 0x%08x\n", retStatus);
         }
-
-        if (frame.frameData != NULL) {
-            SAFE_MEMFREE(frame.frameData);
-        }
+        SAFE_MEMFREE(frame.frameData);
 
         freeDeviceInfo(&pDeviceInfo);
         freeStreamInfoProvider(&pStreamInfo);
