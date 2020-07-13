@@ -7,7 +7,6 @@
 #include <aws/core/Aws.h>
 #include <aws/monitoring/CloudWatchClient.h>
 #include <aws/monitoring/model/PutMetricDataRequest.h>
-#include <aws/s3/model/CreateBucketRequest.h>
 #include <aws/logs/CloudWatchLogsClient.h>
 #include <aws/logs/model/CreateLogGroupRequest.h>
 #include <aws/logs/model/CreateLogStreamRequest.h>
