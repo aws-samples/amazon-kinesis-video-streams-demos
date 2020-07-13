@@ -115,6 +115,15 @@ Currently, the following metrics are being collected on a per fragment basis:
 * FrameRate
 * CurrentViewDuration
 
+## Logging
+
+Cloudwatch logging capability is added in the samples! A call to putLogEventsAsync is made every
+minute to push the set of logs accumulated in the duration to cloudwatch. To get more information
+about Cloudwatch logging, please refer to: 
+https://sdk.amazonaws.com/cpp/api/LATEST/namespace_aws_1_1_cloud_watch_logs.html
+
+If you would like to use file logger instead, you could run `export ENABLE_FILE_LOGGER=TRUE`
+This will enable file logging and disable cloudwatch logging.
 ## Debugging
 
 1. If you encounter the following error on MacOS while building libopenssl:

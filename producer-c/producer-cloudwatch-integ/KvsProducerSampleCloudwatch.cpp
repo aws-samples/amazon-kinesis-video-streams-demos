@@ -63,7 +63,7 @@ INT32 main(INT32 argc, CHAR *argv[])
     SET_INSTRUMENTED_ALLOCATORS();
     PDeviceInfo pDeviceInfo = NULL;
     PStreamInfo pStreamInfo = NULL;
-//    PStreamCallbacks pStreamCallbacks = NULL;
+
     PClientCallbacks pClientCallbacks = NULL;
     CLIENT_HANDLE clientHandle = INVALID_CLIENT_HANDLE_VALUE;
     STREAM_HANDLE streamHandle = INVALID_STREAM_HANDLE_VALUE;
@@ -74,7 +74,12 @@ INT32 main(INT32 argc, CHAR *argv[])
     UINT32 frameIndex = 0, fileIndex = 0, canaryType = 0;
     UINT64 fragmentSizeInByte = 0;
     UINT64 lastKeyFrameTimestamp = 0;
+    CloudwatchLogsObject cloudwatchLogsObject;
     PCanaryStreamCallbacks pCanaryStreamCallbacks = NULL;
+    UINT64 currentTime;
+    BOOL cleanUpDone = FALSE;
+    BOOL fileLoggingEnabled = FALSE;
+
     initializeEndianness();
     SRAND(time(0));
     Aws::SDKOptions options;
@@ -109,9 +114,19 @@ INT32 main(INT32 argc, CHAR *argv[])
             region = (PCHAR) DEFAULT_AWS_REGION;
         }
 
-        Aws::Client::ClientConfiguration clientConfiguration;
+        ClientConfiguration clientConfiguration;
         clientConfiguration.region = region;
-        Aws::CloudWatch::CloudWatchClient cw(clientConfiguration);
+        CloudWatchClient cw(clientConfiguration);
+
+        CloudWatchLogsClient cwl(clientConfiguration);
+
+        STRCPY(cloudwatchLogsObject.logGroupName, "ProducerSDK");
+        SNPRINTF(cloudwatchLogsObject.logStreamName, MAX_STREAM_NAME_LEN + 5, "%s-log", streamName);
+        cloudwatchLogsObject.pCwl = &cwl;
+        if((retStatus = initializeCloudwatchLogger(&cloudwatchLogsObject)) != STATUS_SUCCESS) {
+            DLOGW("Cloudwatch logger failed to be initialized with 0x%08x error code. Fallback to file logging", retStatus);
+            fileLoggingEnabled = TRUE;
+        }
 
         // default storage size is 128MB. Use setDeviceInfoStorageSize after create to change storage size.
         CHK_STATUS(createDefaultDeviceInfo(&pDeviceInfo));
@@ -133,15 +148,27 @@ INT32 main(INT32 argc, CHAR *argv[])
                                                                     NULL,
                                                                     &pClientCallbacks));
 
-        if((retStatus = addFileLoggerPlatformCallbacksProvider(pClientCallbacks,
-                                                               CANARY_FILE_LOGGING_BUFFER_SIZE,
-                                                               CANARY_MAX_NUMBER_OF_LOG_FILES,
-                                                               (PCHAR) FILE_LOGGER_LOG_FILE_DIRECTORY_PATH,
-                                                               TRUE) != STATUS_SUCCESS)) {
-            printf("File logging enable option failed with 0x%08x error code\n", retStatus);
+        if(getenv(CANARY_APP_FILE_LOGGER) != NULL || fileLoggingEnabled) {
+            if((retStatus = addFileLoggerPlatformCallbacksProvider(pClientCallbacks,
+                                                                   CANARY_FILE_LOGGING_BUFFER_SIZE,
+                                                                   CANARY_MAX_NUMBER_OF_LOG_FILES,
+                                                                   (PCHAR) FILE_LOGGER_LOG_FILE_DIRECTORY_PATH,
+                                                                   TRUE) != STATUS_SUCCESS)) {
+                 DLOGE("File logging enable option failed with 0x%08x error code\n", retStatus);
+                 fileLoggingEnabled = FALSE;
+            }
+            else {
+                fileLoggingEnabled = TRUE;
+            }
         }
+
         CHK_STATUS(createCanaryStreamCallbacks(&cw, streamName, &pCanaryStreamCallbacks));
         CHK_STATUS(addStreamCallbacks(pClientCallbacks, &pCanaryStreamCallbacks->streamCallbacks));
+
+        if(!fileLoggingEnabled) {
+            pClientCallbacks->logPrintFn = cloudWatchLogger;
+        }
+
         CHK_STATUS(createKinesisVideoClient(pDeviceInfo, pClientCallbacks, &clientHandle));
         CHK_STATUS(createKinesisVideoStreamSync(clientHandle, pStreamInfo, &streamHandle));
 
@@ -153,7 +180,7 @@ INT32 main(INT32 argc, CHAR *argv[])
         frame.duration = 0;
         frame.decodingTs = GETTIME(); // current time
         frame.presentationTs = frame.decodingTs;
-
+        currentTime = GETTIME();
         while (ATOMIC_LOAD_BOOL(&sigCaptureInterrupt) != TRUE) {
             if (frameIndex < 0) {
                 frameIndex = 0;
@@ -162,13 +189,16 @@ INT32 main(INT32 argc, CHAR *argv[])
             frame.flags = frameIndex % DEFAULT_KEY_FRAME_INTERVAL == 0 ? FRAME_FLAG_KEY_FRAME : FRAME_FLAG_NONE;
 
             createCanaryFrameData(&frame);
-
             if (frame.flags == FRAME_FLAG_KEY_FRAME) {
                 if (lastKeyFrameTimestamp != 0) {
                     canaryStreamRecordFragmentEndSendTime(pCanaryStreamCallbacks, lastKeyFrameTimestamp, frame.presentationTs);
                     CHK_STATUS(computeStreamMetricsFromCanary(streamHandle, pCanaryStreamCallbacks));
                     CHK_STATUS(computeClientMetricsFromCanary(clientHandle, pCanaryStreamCallbacks));
                     currentMemoryAllocation(pCanaryStreamCallbacks);
+                    if((!fileLoggingEnabled) && (GETTIME() > currentTime + (60 * HUNDREDS_OF_NANOS_IN_A_SECOND))) {
+                        canaryStreamSendLogs(&cloudwatchLogsObject);
+                        currentTime = GETTIME();
+                    }
                 }
                 lastKeyFrameTimestamp = frame.presentationTs;
             }
@@ -180,26 +210,44 @@ INT32 main(INT32 argc, CHAR *argv[])
             frame.presentationTs = frame.decodingTs;
             frameIndex++;
         }
+        CHK_LOG_ERR(retStatus);
+        SAFE_MEMFREE(frame.frameData);
 
+        freeDeviceInfo(&pDeviceInfo);
+        freeStreamInfoProvider(&pStreamInfo);
+        freeKinesisVideoStream(&streamHandle);
+        freeKinesisVideoClient(&clientHandle);
+        freeCallbacksProvider(&pClientCallbacks); // This will also take care of freeing canaryStreamCallbacks
+        RESET_INSTRUMENTED_ALLOCATORS();
+        DLOGI("CleanUp Done");
+        cleanUpDone = TRUE;
+        if(!fileLoggingEnabled) {
+            // This is necessary to ensure that we do not lose the last set of logs
+            canaryStreamSendLogSync(&cloudwatchLogsObject);
+        }
     }
 CleanUp:
-
     Aws::ShutdownAPI(options);
+    CHK_LOG_ERR(retStatus);
 
-    if (STATUS_FAILED(retStatus)) {
-        DLOGE("Failed with status 0x%08x\n", retStatus);
+    // canaryStreamSendLogSync() will lead to segfault outside the block scope
+    // https://docs.aws.amazon.com/sdk-for-cpp/v1/developer-guide/basic-use.html
+    // The clean up related logs also need to be captured in cloudwatch logs. This flag
+    // will cater to two scenarios, one, if any of the commands fail, this clean up is invoked
+    // Second, it will cater to scenarios where a SIG is sent to exit the while loop above in
+    // which case the clean up related logs will be captured as well.
+    if(!cleanUpDone) {
+        CHK_LOG_ERR(retStatus);
+        SAFE_MEMFREE(frame.frameData);
+
+        freeDeviceInfo(&pDeviceInfo);
+        freeStreamInfoProvider(&pStreamInfo);
+        freeKinesisVideoStream(&streamHandle);
+        freeKinesisVideoClient(&clientHandle);
+        freeCallbacksProvider(&pClientCallbacks); // This will also take care of freeing canaryStreamCallbacks
+        RESET_INSTRUMENTED_ALLOCATORS();
+        DLOGI("CleanUp Done");
     }
 
-    if (frame.frameData != NULL) {
-        MEMFREE(frame.frameData);
-    }
-    freeDeviceInfo(&pDeviceInfo);
-    freeStreamInfoProvider(&pStreamInfo);
-    freeKinesisVideoStream(&streamHandle);
-    freeKinesisVideoClient(&clientHandle);
-    freeCallbacksProvider(&pClientCallbacks); // This will also take care of freeing canaryStreamCallbacks
-    DLOGI("Memory allocated:%llu bytes", getInstrumentedTotalAllocationSize());
-    RESET_INSTRUMENTED_ALLOCATORS();
-    DLOGI("CleanUp Done");
     return (INT32) retStatus;
 }

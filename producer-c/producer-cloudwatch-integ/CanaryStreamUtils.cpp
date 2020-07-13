@@ -40,6 +40,7 @@ STATUS createCanaryStreamCallbacks(Aws::CloudWatch::CloudWatchClient* cwClient,
 
     pCanaryStreamCallbacks->receivedAckDatum.AddDimensions(dimension);
     pCanaryStreamCallbacks->persistedAckDatum.AddDimensions(dimension);
+    pCanaryStreamCallbacks->bufferingAckDatum.AddDimensions(dimension);
     pCanaryStreamCallbacks->streamErrorDatum.AddDimensions(dimension);
     pCanaryStreamCallbacks->currentFrameRateDatum.AddDimensions(dimension);
     pCanaryStreamCallbacks->contentStoreAvailableSizeDatum.AddDimensions(dimension);
@@ -134,7 +135,7 @@ STATUS canaryStreamFragmentAckHandler(UINT64 customData,
     case FRAGMENT_ACK_TYPE_BUFFERING:
             pCanaryStreamCallbacks->bufferingAckDatum.SetValue((GETTIME() - timeOfFragmentEndSent) / HUNDREDS_OF_NANOS_IN_A_MILLISECOND);
             pCanaryStreamCallbacks->bufferingAckDatum.SetUnit(Aws::CloudWatch::Model::StandardUnit::Milliseconds);
-            canaryStreamSendMetrics(pCanaryStreamCallbacks, pCanaryStreamCallbacks->receivedAckDatum);
+            canaryStreamSendMetrics(pCanaryStreamCallbacks, pCanaryStreamCallbacks->bufferingAckDatum);
     break;
         case FRAGMENT_ACK_TYPE_RECEIVED:
             pCanaryStreamCallbacks->receivedAckDatum.SetValue((GETTIME() - timeOfFragmentEndSent) / HUNDREDS_OF_NANOS_IN_A_MILLISECOND);

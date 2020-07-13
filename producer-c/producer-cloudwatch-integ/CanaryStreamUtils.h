@@ -7,6 +7,12 @@
 #include <aws/core/Aws.h>
 #include <aws/monitoring/CloudWatchClient.h>
 #include <aws/monitoring/model/PutMetricDataRequest.h>
+#include <aws/logs/CloudWatchLogsClient.h>
+#include <aws/logs/model/CreateLogGroupRequest.h>
+#include <aws/logs/model/CreateLogStreamRequest.h>
+#include <aws/logs/model/PutLogEventsRequest.h>
+#include <aws/logs/model/DeleteLogStreamRequest.h>
+#include <aws/logs/model/DescribeLogStreamsRequest.h>
 
 #ifdef  __cplusplus
 extern "C" {
@@ -24,30 +30,51 @@ extern "C" {
 
 #define CANARY_FILE_LOGGING_BUFFER_SIZE     (200 * 1024)
 #define CANARY_MAX_NUMBER_OF_LOG_FILES      10
-
+#define CANARY_APP_FILE_LOGGER              (PCHAR) "ENABLE_FILE_LOGGER"
 struct __CallbackStateMachine;
 struct __CallbacksProvider;
+
+using namespace Aws::Client;
+using namespace Aws::CloudWatchLogs;
+using namespace Aws::CloudWatchLogs::Model;
+using namespace Aws::CloudWatch::Model;
+using namespace Aws::CloudWatch;
+using namespace std;
 
 ////////////////////////////////////////////////////////////////////////
 // Struct definition
 ////////////////////////////////////////////////////////////////////////
+
+typedef struct __CloudwatchLogsObject CloudwatchLogsObject;
+struct __CloudwatchLogsObject {
+    CloudWatchLogsClient* pCwl;
+    CreateLogGroupRequest canaryLogGroupRequest;
+    CreateLogStreamRequest canaryLogStreamRequest;
+    PutLogEventsRequest canaryPutLogEventRequest;
+    PutLogEventsResult canaryPutLogEventresult;
+    Aws::Vector<InputLogEvent> canaryInputLogEventVec;
+    Aws::String token;
+    CHAR logGroupName[MAX_STREAM_NAME_LEN + 1];
+    CHAR logStreamName[MAX_STREAM_NAME_LEN + 1];
+};
+typedef struct __CloudwatchLogsObject* PCloudwatchLogsObject;
 
 typedef struct __CanaryStreamCallbacks CanaryStreamCallbacks;
 struct __CanaryStreamCallbacks {
     // First member should be the stream callbacks
     StreamCallbacks streamCallbacks;
     PCHAR pStreamName;
-    Aws::CloudWatch::CloudWatchClient* pCwClient;
-    Aws::CloudWatch::Model::PutMetricDataRequest* cwRequest;
-    Aws::CloudWatch::Model::MetricDatum receivedAckDatum;
-    Aws::CloudWatch::Model::MetricDatum persistedAckDatum;
-    Aws::CloudWatch::Model::MetricDatum bufferingAckDatum;
-    Aws::CloudWatch::Model::MetricDatum streamErrorDatum;
-    Aws::CloudWatch::Model::MetricDatum currentFrameRateDatum;
-    Aws::CloudWatch::Model::MetricDatum currentViewDurationDatum;
-    Aws::CloudWatch::Model::MetricDatum contentStoreAvailableSizeDatum;
-    Aws::CloudWatch::Model::MetricDatum memoryAllocationSizeDatum;
-    std::map<UINT64, UINT64>* timeOfNextKeyFrame;
+    CloudWatchClient* pCwClient;
+    PutMetricDataRequest* cwRequest;
+    MetricDatum receivedAckDatum;
+    MetricDatum persistedAckDatum;
+    MetricDatum bufferingAckDatum;
+    MetricDatum streamErrorDatum;
+    MetricDatum currentFrameRateDatum;
+    MetricDatum currentViewDurationDatum;
+    MetricDatum contentStoreAvailableSizeDatum;
+    MetricDatum memoryAllocationSizeDatum;
+    map<UINT64, UINT64>* timeOfNextKeyFrame;
 };
 typedef struct __CanaryStreamCallbacks* PCanaryStreamCallbacks;
 
@@ -64,6 +91,14 @@ VOID canaryStreamRecordFragmentEndSendTime(PCanaryStreamCallbacks, UINT64, UINT6
 STATUS computeStreamMetricsFromCanary(STREAM_HANDLE, PCanaryStreamCallbacks);
 STATUS computeClientMetricsFromCanary(CLIENT_HANDLE, PCanaryStreamCallbacks);
 VOID currentMemoryAllocation(PCanaryStreamCallbacks);
+
+////////////////////////////////////////////////////////////////////////
+// Cloudwatch logging related functions
+////////////////////////////////////////////////////////////////////////
+VOID cloudWatchLogger(UINT32, PCHAR, PCHAR, ...);
+STATUS initializeCloudwatchLogger(PCloudwatchLogsObject);
+VOID canaryStreamSendLogs(PCloudwatchLogsObject);
+VOID canaryStreamSendLogSync(PCloudwatchLogsObject);
 
 #ifdef  __cplusplus
 }
