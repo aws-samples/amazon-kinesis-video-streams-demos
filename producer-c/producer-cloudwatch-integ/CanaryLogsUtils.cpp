@@ -83,10 +83,10 @@ VOID cloudWatchLogger(UINT32 level, PCHAR tag, PCHAR fmt, ...)
         addLogMetadata(logFmtString, (UINT32) ARRAY_SIZE(logFmtString), fmt, level);
 
         // Creating a copy to store the logFmtString for cloudwatch logging purpose
-        va_list valist;
-        va_start(valist, fmt);
-        vsprintf(cwLogFmtString, logFmtString, valist);
-        va_end(valist);
+        va_list valist, valist_cw;
+        va_start(valist_cw, fmt);
+        vsnprintf(cwLogFmtString, (SIZE_T) SIZEOF(cwLogFmtString), logFmtString, valist_cw);
+        va_end(valist_cw);
         va_start(valist, fmt);
         vprintf(logFmtString, valist);
         va_end(valist);

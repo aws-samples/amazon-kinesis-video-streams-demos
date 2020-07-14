@@ -109,7 +109,7 @@ INT32 main(INT32 argc, CHAR *argv[])
         canaryTypeStr = getCanaryStr(canaryType);
         CHK(STRCMP(canaryTypeStr, "") != 0, STATUS_INVALID_ARG);
         SNPRINTF(streamName, MAX_STREAM_NAME_LEN, "%s-canary-%s-%s", streamNamePrefix, canaryTypeStr, argv[3]);
-        DLOGD("streamName:%s\n", streamName);
+
         if ((region = getenv(DEFAULT_REGION_ENV_VAR)) == NULL) {
             region = (PCHAR) DEFAULT_AWS_REGION;
         }
