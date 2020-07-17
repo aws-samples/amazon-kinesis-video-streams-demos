@@ -1,4 +1,4 @@
-import { putMedia } from './AWS-SDKCalls.js'
+import { putMedia } from './putMediaCall.js'
 // eslint-disable-next-line no-undef
 const { createFFmpeg } = FFmpeg
 const ffmpeg = createFFmpeg({ log: true })
@@ -58,20 +58,23 @@ const getBlobFromWebcam = async function (service, region, accessKeyID, secretAc
   recorder.startRecording()
   recording = true
 
+  let uint8Array = [];
   async function getAndSendFrame () {
     recorder.stopRecording(async function () {
-      const uint8Array = new Uint8Array(await recorder.getBlob().arrayBuffer())
-      if (uint8Array.length > 0) {
-        try {
-          const videoFile = await transformVideo(uint8Array, streamName, true)
-          putMedia(videoFile, service, region, accessKeyID, secretAccessKey, sessionToken, dataEndpoint, streamName)
-        } catch (error) {
-          alert('Some eror occurred, please reload the page and try again')
-        }
-      }
+      uint8Array = new Uint8Array(await recorder.getBlob().arrayBuffer())
     })
 
     recorder.startRecording()
+
+    if (uint8Array.length > 0) {
+      try {
+        const videoFile = await transformVideo(uint8Array, streamName, true)
+        putMedia(videoFile, service, region, accessKeyID, secretAccessKey, sessionToken, dataEndpoint, streamName)
+      } catch (error) {
+        alert('Some eror occurred, please reload the page and try again')
+      }
+    }
+
   }
   // eslint-disable-next-line no-unmodified-loop-condition
   while (recording) {

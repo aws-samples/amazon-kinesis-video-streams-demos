@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html>
+    <style>
+        .wrapper {
+            width: 640px;
+            margin: 32px auto auto auto;
+        }
+
+        .operation {
+            background-color: #DDDDEF;
+            border: 1.3px solid black;
+        }
+
+        .user-information {
+            margin: 12px;
+        }
+
+        h1 {
+            margin: 32px auto auto auto;
+        }
+
+        .hide {
+            display: none;
+        }
+        p {
+            width: 600px;
+            height: 200px;
+            overflow-wrap: anywhere;
+            overflow-y: scroll;
+        }
+    </style>
+    <body>
+        <div class="wrapper">
+            <div>
+                <h1>KVS Browser-based Ingestion</h1>
+            </div>
+            <div class="operation">
+                <div class="user-information">
+                    <label>Access Key ID: </label><input type="password" id="accessKeyID" placeholder="Enter access key ID" class="user-information" required>  <br>
+                    <label>Secret Access Key: </label><input type="password" id="secretAccessKey" placeholder="Enter secret access key" class="user-information" required> <br>
+                    <label>Session Token:</label><input type="password" id="sessionToken" placeholder="Enter session token" class="user-information" required> <br>
+                    <label>Service:</label><input type="text" id="service" placeholder="Enter service" class="user-information" required> <br>
+                    <label>Region:</label><input type="text" id="region" placeholder="Enter region" class="user-information" required><br>
+                    <label>Endpoint:</label><input type="text" id="endpoint" placeholder="Enter endpoint" class="user-information" required><br>
+                    <input type="radio" id="newStream" name="streamSelection" value="new" class="user-information" checked><label>Create new stream</label>
+                    <input type="radio" id="existingStream" name="streamSelection" value="existing" class="user-information"><label>Use existing stream</label><br>
+                    <label>Stream name:</label><input type="text" id="streamName" placeholder="Enter stream name" class="user-information" required><br>
+                    <textarea rows="4" cols="50" id="streamParams" name="streamParams" class="user-information" style="resize: vertical; overflow-y: auto; height: 153.328px;">
+{"DeviceName": "foo",
+ "StreamName": "foo",
+ "MediaType": "foo",
+ "KmsKeyId": "foo",
+ "DataRetentionInHours": 1,
+ "Tags": 
+  {"key1": "foo",
+   "key2": "foo"},
+ "IngestionConfiguration": 
+  {"Rtsp": 
+    {"Uri": "foo",
+     "Protocol": "RTSP",
+     "Auth": 
+      {"Type": "BASIC",
+       "Username": "foo",
+       "Password": "foo"},
+     "VpcConfiguration": 
+      {"SecurityGroupIds": 
+        ["foo", "foo"],
+       "SubnetIds": 
+        ["foo", "foo"],
+       "DeviceCidrBlocks": 
+        ["foo", "foo"]
+      }
+    },
+   "RoleARN": "foo"}
+}
+                    </textarea><br>
+
+                    <input type="radio" id="uploadFile" name="dataFeedSelection" value="uploadFile" class="user-information"><label>Upload a file</label>
+                    <input type="radio" id="recordWebcam" name="dataFeedSelection" value="recordWebcam" class="user-information"><label>Record using Webcam</label><br>
+
+                    <div class="hide user-information" id="fileUploadRequirements" style="border:1.3px solid black; padding: 20px">                    
+                        <input type="file" name="inputFile" id = "inputFile"><br>
+                        <input type="radio" id="mkv" name="containerSelection" value="mkv-h264" class="user-information" checked><label>MKV/WebM with H264 video codec</label><br>
+                        <input type="radio" id="other" name="containerSelection" value="other" class="user-information"><label>Other</label><br>
+                        <label>Note: Other video types require transcoding of the video frames to H264 and it can be time-consuming</label>
+                    </div>
+
+                    <div class="hide user-information" id="videoRecordRequirements" style="border:1.3px solid black; padding: 20px">
+                        <input type="checkbox" id="video"  class="user-information" checked disabled><label>Video</label><br>
+                        <input type="checkbox" id="audio"  class="user-information" checked><label>Audio</label><br>
+                        <label>Height (in pixels):</label><input type="number" id="height" placeholder="Enter height" class="user-information"><br>
+                        <label>Width (in pixels):</label><input type="number" id="width" placeholder="Enter width" class="user-information"><br>
+                        <label>Frequency of putMediaAPI calls (in milliseconds):</label><input type="number" id="latency" placeholder="Enter latency" class="user-information"><br>
+                        <label>Frame rate:</label><input type="number" id="frameRate" placeholder="Enter frame rate" class="user-information"><br>
+                    </div>
+
+                    <input type="button" id="startRecord" value="Send Data to PutMedia" class="user-information">
+                    <input type="button" id="stopRecord" value="Stop Recording" class="hide user-information" disabled><br>
+                </div>
+                
+            </div>
+        </div>
+        <div class="wrapper">
+            <video id="webcam" width="640px" height="480px"></video>
+        </div>
+    </body>
+    <script src="../lib/aws-sdk-2.714.2.min.js"></script>
+    <script src="../lib/ffmpeg.min.js"></script>
+    <script src="../lib/RecordRTC.js"></script>
+    <script type="module" src="index.js"></script>
+</html>
