@@ -13,6 +13,8 @@ This repository contains a list of use cases with sample codes or high level des
 * [WebRTC C](https://github.com/awslabs/amazon-kinesis-video-streams-webrtc-sdk-c)
 * [WebRTC JS](https://github.com/awslabs/amazon-kinesis-video-streams-webrtc-sdk-js)
 
+Note: The structure for this repository, and examples contained within are defined [here](https://github.com/aws-samples/amazon-kinesis-video-streams-demos/pull/8).
+
 ## License
 
 This project is licensed under the Apache-2.0 License.
