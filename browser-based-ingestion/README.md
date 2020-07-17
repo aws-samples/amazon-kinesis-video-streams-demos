@@ -83,17 +83,10 @@ Currently available via Chrome, there four important tasks that this repository 
 ```
 
 
-<<<<<<< HEAD
 2. `getBlobFromFile(service, region, accessKeyID, secretAccessKey, sessionToken, dataEndpoint, streamName, inputFile, h264)` is an asynchronous function that accepts a file, transforms it to the expected format and sends it to the putMedia API. It can be imported as 
     `import { getBlobFromFile } from './src/getProcessedVideo.js'` 
     It accepts the following arguments:
 ```
-=======
-2. `getBlobFromFile` is an asynchronous function that accepts a file, transforms it to the expected format and sends it to the putMedia API. It can be imported as 
-    `import { getBlobFromFile } from './getProcessedVideo.js'` 
-    It accepts the following arguments:
-```javascript
->>>>>>> 963a0d6b6d15d9dd90964d8c36f77fbad695c255
         service: the service to send requests to
                 Example: kinesisvideo
         region: the region to send service requests to. See AWS.KinesisVideo.region for more information
