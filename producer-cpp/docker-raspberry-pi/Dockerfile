@@ -48,8 +48,6 @@ RUN     ln -s /opt/vc/lib/libopenmaxil.so /usr/lib/libopenmaxil.so && \
 
 WORKDIR /opt/
 RUN	git clone https://github.com/awslabs/amazon-kinesis-video-streams-producer-sdk-cpp.git
-WORKDIR /opt/amazon-kinesis-video-streams-producer-sdk-cpp/
-RUN git submodule update --init
 WORKDIR /opt/amazon-kinesis-video-streams-producer-sdk-cpp/build/
 RUN cmake .. -DBUILD_GSTREAMER_PLUGIN=ON -DCMAKE_VERBOSE_MAKEFILE:BOOL=ON -DBUILD_OPENSSL_PLATFORM=linux-armv4 && \
 	make

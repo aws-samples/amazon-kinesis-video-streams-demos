@@ -39,8 +39,6 @@ RUN yum install -y \
 
 WORKDIR /opt/
 RUN git clone https://github.com/awslabs/amazon-kinesis-video-streams-producer-sdk-cpp.git
-WORKDIR /opt/amazon-kinesis-video-streams-producer-sdk-cpp/
-RUN git submodule update --init
 WORKDIR /opt/amazon-kinesis-video-streams-producer-sdk-cpp/build/
 RUN cmake .. -DBUILD_GSTREAMER_PLUGIN=ON -DCMAKE_VERBOSE_MAKEFILE:BOOL=ON && \
     make 
