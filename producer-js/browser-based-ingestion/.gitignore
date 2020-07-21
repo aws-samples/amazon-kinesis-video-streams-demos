@@ -1,0 +1,16 @@
+# Logs
+npm-debug.log*
+
+# Dependency directories
+node_modules/
+
+# Optional npm cache directory
+.npm
+
+# Code coverage
+coverage/
+
+# Mac
+.DS_Store?
+
+.DS_Store

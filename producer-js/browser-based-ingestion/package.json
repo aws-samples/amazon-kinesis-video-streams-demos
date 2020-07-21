@@ -1,0 +1,37 @@
+{
+  "name": "KVSBrowserIngestion",
+  "version": "1.0.0",
+  "description": "Amazon Kinesis Video Streams Browser-based ingestion with JavaScript",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/niyatim23/amazon-kinesis-video-streams-demos.git"
+  },
+  "main": "index.js",
+  "scripts": {
+    "build": "webpack",
+    "test": "jest"
+  },
+  "keywords": [],
+  "author": "Niyati Maheshwari",
+  "license": "Apache-2.0",
+  "devDependencies": {
+    "eslint": "^7.5.0",
+    "eslint-config-airbnb-base": "^14.2.0",
+    "eslint-config-standard": "^14.1.1",
+    "eslint-loader": "^4.0.2",
+    "eslint-plugin-import": "^2.22.0",
+    "eslint-plugin-node": "^11.1.0",
+    "eslint-plugin-promise": "^4.2.1",
+    "eslint-plugin-standard": "^4.0.1",
+    "html-loader": "^1.1.0",
+    "jest": "^26.1.0",
+    "webpack": "^4.43.0",
+    "webpack-cli": "^3.3.11"
+  },
+  "dependencies": {
+    "@ffmpeg/ffmpeg": "^0.8.3",
+    "aws-sdk": "^2.687.0",
+    "aws4": "^1.10.0",
+    "recordrtc": "^5.6.1"
+  }
+}
