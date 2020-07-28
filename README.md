@@ -10,6 +10,8 @@ This repository contains a list of use cases with sample codes or high level des
   * [Stream and persist video stream from RTSP server](/producer-cpp/docker-rtsp)
 * [Producer C](https://github.com/awslabs/amazon-kinesis-video-streams-producer-c)
   * [Publish metrics with Cloudwatch](/producer-c/producer-cloudwatch-integ)
+* Producer JS
+  * [Browser based ingestion](/producer-js/browser-based-ingestion)
 * [WebRTC C](https://github.com/awslabs/amazon-kinesis-video-streams-webrtc-sdk-c)
 * [WebRTC JS](https://github.com/awslabs/amazon-kinesis-video-streams-webrtc-sdk-js)
 
