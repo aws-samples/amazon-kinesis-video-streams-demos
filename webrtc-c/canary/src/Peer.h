@@ -39,6 +39,9 @@ class Peer {
     std::vector<PRtcRtpTransceiver> videoTransceivers;
     STATUS status;
 
+    // metrics
+    UINT64 signalingStartTime;
+
     STATUS initSignaling();
     STATUS initRtcConfiguration();
     STATUS initPeerConnection();
