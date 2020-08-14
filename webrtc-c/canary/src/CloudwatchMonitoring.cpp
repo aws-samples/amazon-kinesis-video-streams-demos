@@ -83,4 +83,17 @@ VOID CloudwatchMonitoring::pushSignalingInitDelay(UINT64 delay, StandardUnit uni
     this->push(datum);
 }
 
+VOID CloudwatchMonitoring::pushICEHolePunchingDelay(UINT64 delay, StandardUnit unit)
+{
+    MetricDatum datum;
+
+    datum.SetMetricName("ICEHolePunchingDelay");
+    datum.SetValue(delay);
+    datum.SetUnit(unit);
+
+    datum.AddDimensions(this->channelDimension);
+
+    this->push(datum);
+}
+
 } // namespace Canary

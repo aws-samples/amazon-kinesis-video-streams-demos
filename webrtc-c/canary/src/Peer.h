@@ -41,6 +41,7 @@ class Peer {
 
     // metrics
     UINT64 signalingStartTime;
+    UINT64 iceHolePunchingStartTime;
 
     STATUS initSignaling();
     STATUS initRtcConfiguration();
