@@ -61,6 +61,31 @@ STATUS Peer::initSignaling()
     channelInfo.messageTtl = 0; // Default is 60 seconds
 
     clientCallbacks.customData = (UINT64) this;
+    clientCallbacks.stateChangeFn = [](UINT64 customData, SIGNALING_CLIENT_STATE state) -> STATUS {
+        STATUS retStatus = STATUS_SUCCESS;
+        PPeer pPeer = (PPeer) customData;
+        PCHAR pStateStr;
+
+        signalingClientGetStateString(state, &pStateStr);
+        DLOGD("Signaling client state changed to %d - '%s'", state, pStateStr);
+
+        switch (state) {
+            case SIGNALING_CLIENT_STATE_NEW:
+                pPeer->signalingStartTime = GETTIME();
+                break;
+            case SIGNALING_CLIENT_STATE_CONNECTED: {
+                auto duration = (GETTIME() - pPeer->signalingStartTime) / HUNDREDS_OF_NANOS_IN_A_MILLISECOND;
+                DLOGI("Signaling took %lu ms to connect", duration);
+                Canary::Cloudwatch::getInstance().monitoring.pushSignalingInitDelay(duration, StandardUnit::Milliseconds);
+                break;
+            }
+            default:
+                break;
+        }
+
+        // Return success to continue
+        return retStatus;
+    };
     clientCallbacks.errorReportFn = [](UINT64 customData, STATUS status, PCHAR msg, UINT32 msgLen) -> STATUS {
         PPeer pPeer = (PPeer) customData;
         DLOGW("Signaling client generated an error 0x%08x - '%.*s'", status, msgLen, msg);

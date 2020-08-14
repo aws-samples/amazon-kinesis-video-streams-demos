@@ -70,4 +70,17 @@ VOID CloudwatchMonitoring::pushExitStatus(STATUS retStatus)
     this->push(datum);
 }
 
+VOID CloudwatchMonitoring::pushSignalingInitDelay(UINT64 delay, StandardUnit unit)
+{
+    MetricDatum datum;
+
+    datum.SetMetricName("SignalingInitDelay");
+    datum.SetValue(delay);
+    datum.SetUnit(unit);
+
+    datum.AddDimensions(this->channelDimension);
+
+    this->push(datum);
+}
+
 } // namespace Canary

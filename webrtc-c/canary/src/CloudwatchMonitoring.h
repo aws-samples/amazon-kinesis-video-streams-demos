@@ -9,6 +9,7 @@ class CloudwatchMonitoring {
     VOID deinit();
     VOID push(const MetricDatum&);
     VOID pushExitStatus(STATUS);
+    VOID pushSignalingInitDelay(UINT64, StandardUnit);
 
   private:
     Dimension channelDimension;
