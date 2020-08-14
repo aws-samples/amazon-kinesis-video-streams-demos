@@ -241,6 +241,15 @@ STATUS Peer::initPeerConnection()
         DLOGI("New connection state %u", newState);
 
         switch (newState) {
+            case RTC_PEER_CONNECTION_STATE_CONNECTING:
+                pPeer->iceHolePunchingStartTime = GETTIME();
+                break;
+            case RTC_PEER_CONNECTION_STATE_CONNECTED: {
+                auto duration = (GETTIME() - pPeer->iceHolePunchingStartTime) / HUNDREDS_OF_NANOS_IN_A_MILLISECOND;
+                DLOGI("ICE hole punching took %lu ms", duration);
+                Canary::Cloudwatch::getInstance().monitoring.pushICEHolePunchingDelay(duration, StandardUnit::Milliseconds);
+                break;
+            }
             case RTC_PEER_CONNECTION_STATE_FAILED:
                 // TODO: Replace this with a proper error code. Since there's no way to get the actual error code
                 // at this moment, STATUS_PEERCONNECTION_BASE seems to be the best error code.
