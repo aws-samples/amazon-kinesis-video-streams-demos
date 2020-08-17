@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.14)
+cmake_minimum_required(VERSION 3.10.2)
 project(KVSWebRTCCanary LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 11)
@@ -22,7 +22,17 @@ FetchContent_Declare(
   GIT_TAG        1.8.17
 )
 
-FetchContent_MakeAvailable(webrtc cloudwatch)
+FetchContent_GetProperties(webrtc)
+if(NOT webrtc_POPULATED)
+  FetchContent_Populate(webrtc)
+  add_subdirectory(${webrtc_SOURCE_DIR} ${webrtc_BINARY_DIR} EXCLUDE_FROM_ALL)
+endif()
+
+FetchContent_GetProperties(cloudwatch)
+if(NOT cloudwatch_POPULATED)
+  FetchContent_Populate(cloudwatch)
+  add_subdirectory(${cloudwatch_SOURCE_DIR} ${cloudwatch_BINARY_DIR} EXCLUDE_FROM_ALL)
+endif()
 
 # pass ca cert location to sdk
 add_definitions(-DKVS_CA_CERT_PATH="${CMAKE_SOURCE_DIR}/certs/cert.pem")
