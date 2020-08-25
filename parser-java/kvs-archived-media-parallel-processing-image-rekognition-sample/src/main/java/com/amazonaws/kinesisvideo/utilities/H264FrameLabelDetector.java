@@ -53,8 +53,7 @@ public class H264FrameLabelDetector extends H264FrameDecoder {
             if (frame.isKeyFrame()) {
                 sendFrameToRekognition(bufferedImage);
             }
-        }
-        else {
+        } else {
             /* Only send to Rekognition every N frames */
             if ((frameNumber % sampleRate) == 0) {
                 sendFrameToRekognition(bufferedImage);
@@ -77,12 +76,11 @@ public class H264FrameLabelDetector extends H264FrameDecoder {
             //detectText(imageBytes); // Text Detection
             long endTime = System.nanoTime();
             long totalTime = endTime - startTime;
-            double seconds = (double)totalTime / 1_000_000_000.0;
+            double seconds = (double) totalTime / 1_000_000_000.0;
             log.info("Time to Rekognize frame: " + seconds + " seconds");
             log.info("----------------------");
             framesProcessed.getAndIncrement();
-        }
-        catch (IOException e) {
+        } catch (IOException e) {
             log.warn("Error with png conversion", e);
         }
     }
@@ -99,7 +97,7 @@ public class H264FrameLabelDetector extends H264FrameDecoder {
             List<Label> labels = result.getLabels();
 
             log.info("Detected Labels in " + Thread.currentThread().getName() + ":");
-            for (Label label: labels) {
+            for (Label label : labels) {
                 log.info(label.getName() + ": " + label.getConfidence().toString());
             }
 
@@ -118,7 +116,7 @@ public class H264FrameLabelDetector extends H264FrameDecoder {
             List<FaceDetail> faceDetails = result.getFaceDetails();
 
             log.info("Face details:");
-            for (FaceDetail faceDetail: faceDetails) {
+            for (FaceDetail faceDetail : faceDetails) {
                 log.info(faceDetail.toString());
             }
             log.info("----------------------");
@@ -139,7 +137,7 @@ public class H264FrameLabelDetector extends H264FrameDecoder {
             List<Celebrity> celebrities = result.getCelebrityFaces();
 
             log.info("Detected Celebrities:");
-            for (Celebrity celebrity: celebrities) {
+            for (Celebrity celebrity : celebrities) {
                 log.info(celebrity.getName() + ": " + celebrity.getMatchConfidence().toString());
             }
             log.info("----------------------");
@@ -159,11 +157,11 @@ public class H264FrameLabelDetector extends H264FrameDecoder {
             List<TextDetection> textDetections = result.getTextDetections();
 
             log.info("Detected Text:");
-            for (TextDetection textDetection: textDetections) {
+            for (TextDetection textDetection : textDetections) {
                 log.info(textDetection.toString());
             }
             log.info("----------------------");
-        }  catch (AmazonRekognitionException e) {
+        } catch (AmazonRekognitionException e) {
             log.error(e.getMessage());
         }
     }

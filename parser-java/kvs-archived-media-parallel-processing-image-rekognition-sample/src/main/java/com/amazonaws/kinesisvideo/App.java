@@ -1,8 +1,6 @@
 package com.amazonaws.kinesisvideo;
 
 import java.io.IOException;
-import java.sql.Time;
-import java.sql.Timestamp;
 import java.text.SimpleDateFormat;
 import java.util.concurrent.ExecutionException;
 
@@ -35,10 +33,6 @@ public class App
         sampleRate.setRequired(true);
         options.addOption(sampleRate);
 
-        Option tasks = new Option("t", "tasks", true, "number of tasks");
-        tasks.setRequired(true);
-        options.addOption(tasks);
-
         Option threads = new Option("th", "threads", true , "number of threads");
         threads.setRequired(true);
         options.addOption(threads);
@@ -59,17 +53,22 @@ public class App
         String startTimestamp = cmd.getOptionValue("startTime");
         String endTimestamp = cmd.getOptionValue("endTime");
         int inputSampleRate = Integer.parseInt(cmd.getOptionValue("sampleRate"));
-        int numTasks = Integer.parseInt(cmd.getOptionValue("tasks"));
         int numThreads = Integer.parseInt(cmd.getOptionValue("threads"));
 
         TimestampRange timestampRange = new TimestampRange();
         try {
             timestampRange.setStartTimestamp(new SimpleDateFormat("dd/MM/yyyy HH:mm:ss").parse(startTimestamp));
             timestampRange.setEndTimestamp(new SimpleDateFormat("dd/MM/yyyy HH:mm:ss").parse(endTimestamp));
+
         } catch (java.text.ParseException e) {
             log.error(e.getMessage());
             System.exit(1);
         }
+
+        long timeDuration = timestampRange.getEndTimestamp().getTime() - timestampRange.getStartTimestamp().getTime();
+        int numTasks = (int) timeDuration / 10000;
+        numTasks = Math.max(numTasks, numThreads);
+        log.info("Starting processing with {} tasks", numTasks);
 
         long start = System.nanoTime();
 
@@ -90,7 +89,7 @@ public class App
         }
         long end = System.nanoTime();
         long totalTime = end - start;
-        double seconds = (double)totalTime / 1_000_000_000.0;
+        double seconds = (double) totalTime / 1_000_000_000.0;
         log.info("Total runtime: " + seconds + " seconds");
 
     }

@@ -1,9 +1,5 @@
 package com.amazonaws.kinesisvideo;
 
-import java.io.Closeable;
-import java.io.IOException;
-import java.text.ParseException;
-import java.text.SimpleDateFormat;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.*;
@@ -15,7 +11,6 @@ import com.amazonaws.kinesisvideo.parser.examples.StreamOps;
 import com.amazonaws.kinesisvideo.parser.utilities.FragmentMetadataVisitor;
 import com.amazonaws.kinesisvideo.parser.utilities.FrameVisitor;
 import com.amazonaws.kinesisvideo.parser.utilities.H264FrameRenderer;
-import com.amazonaws.kinesisvideo.producer.KinesisVideoFrame;
 import com.amazonaws.kinesisvideo.workers.GetMediaForFragmentListBatchWorker;
 import com.amazonaws.kinesisvideo.workers.ListFragmentWorker;
 import com.amazonaws.regions.Regions;

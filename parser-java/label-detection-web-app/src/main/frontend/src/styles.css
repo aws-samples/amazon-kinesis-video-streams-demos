@@ -1,0 +1,31 @@
+#form {
+    color: black;
+    height: 100vh;
+}
+.form-group {
+    display:flex;
+    justify-content: center;
+}
+
+img {
+    max-width: 2200px;
+    height: 1100px;
+    width: 100%;
+}
+
+#dropdown-wrapper {
+    display: -webkit-box;
+    display: -moz-box;
+    display: -ms-flexbox;
+    display: -webkit-flex;
+    display: flex;
+    justify-content: center;
+}
+
+#dropdown {
+    -webkit-box-flex: 1 1 auto !important;
+    -moz-box-flex:  1 1 auto !important;
+    -webkit-flex:  1 1 auto !important;
+    -ms-flex:  1 1 auto !important;
+    flex:  1 1 auto !important;
+}

@@ -1,48 +1,56 @@
-package com.amazonaws.kinesisvideo;
+package com.amazonaws.kinesisvideo.labeldetectionwebapp.kvsservices;
 
 import java.io.IOException;
+import java.text.DateFormat;
 import java.text.ParseException;
-import java.util.ArrayList;
-import java.util.Date;
-import java.util.List;
-import java.util.Optional;
+import java.text.SimpleDateFormat;
+import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicLong;
 
 
 import com.amazonaws.auth.AWSCredentialsProvider;
+import com.amazonaws.kinesisvideo.labeldetectionwebapp.JpaFrame;
+import com.amazonaws.kinesisvideo.labeldetectionwebapp.TimestampCollection;
 import com.amazonaws.kinesisvideo.parser.examples.KinesisVideoCommon;
 import com.amazonaws.kinesisvideo.parser.examples.StreamOps;
 import com.amazonaws.kinesisvideo.parser.utilities.*;
-import com.amazonaws.kinesisvideo.utilities.H264FrameLabelDetector;
-import com.amazonaws.kinesisvideo.workers.GetMediaArchivedRekognitionWorker;
 import com.amazonaws.regions.Regions;
 import com.amazonaws.services.kinesisvideo.model.*;
 import lombok.Builder;
+import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 
 
 @Slf4j
-public class KinesisVideoArchivedParallelProcessingExample extends KinesisVideoCommon {
+public class GetArchivedMedia extends KinesisVideoCommon {
 
     private final TimestampRange timestampRange;
-
     private final StreamOps streamOps;
     private final ExecutorService executorService;
     private final int sampleRate;
     private int tasks;
-    private AtomicLong framesProcessed = new AtomicLong();
 
-    private static final int AWAIT_TERMINATION_TIME = 10800;
+    private final int awaitTerminationTime = 10800;
+    private AtomicLong playbackLength = new AtomicLong();
+
+    @Getter
+    private Set<String> labels = Collections.synchronizedSet(new HashSet<>());
+
+    @Getter
+    private Map<String, TimestampCollection> labelToTimestamps = Collections.synchronizedMap(new HashMap<>());
+
+    @Getter
+    private Map<JpaFrame, JpaFrame> frames = Collections.synchronizedMap(new HashMap<>());
 
     @Builder
-    private KinesisVideoArchivedParallelProcessingExample(Regions region,
-                                                          String streamName,
-                                                          AWSCredentialsProvider awsCredentialsProvider,
-                                                          TimestampRange timestampRange,
-                                                          int sampleRate,
-                                                          int threads,
-                                                          int tasks) {
+    private GetArchivedMedia(Regions region,
+                             String streamName,
+                             AWSCredentialsProvider awsCredentialsProvider,
+                             TimestampRange timestampRange,
+                             int sampleRate,
+                             int threads,
+                             int tasks) {
         super(region, awsCredentialsProvider, streamName);
         this.streamOps = new StreamOps(region, streamName, awsCredentialsProvider);
         this.executorService = Executors.newFixedThreadPool(threads);
@@ -51,18 +59,21 @@ public class KinesisVideoArchivedParallelProcessingExample extends KinesisVideoC
         this.tasks = tasks;
     }
 
-    public void execute() throws InterruptedException, IOException, ParseException, ExecutionException {
+    public void execute() throws InterruptedException, ParseException, ExecutionException {
 
         List<TimestampRange> timestampRanges = partitionTimeRange(timestampRange);
 
         String listFragmentsEndpoint = getListFragmentsEndpoint(getStreamName());
         String getMediaFragmentListEndpoint = getGetMediaForFragmentListEndpoint(getStreamName());
 
+        List<Future<List<JpaFrame>>> framesForEachTask = new ArrayList<>();
+
         for (TimestampRange timestampRange : timestampRanges) {
 
             log.info(timestampRange.toString());
 
-            FrameVisitor frameVisitor = FrameVisitor.create(H264FrameLabelDetector.create(sampleRate, framesProcessed), Optional.empty(), Optional.of(1L));
+            H264ImageDetectionBoundingBoxSaver h264ImageDetectionBoundingBoxSaver = H264ImageDetectionBoundingBoxSaver.create(sampleRate, getLabels(), getFrames(), getLabelToTimestamps());
+            FrameVisitor frameVisitor = FrameVisitor.create(h264ImageDetectionBoundingBoxSaver);
 
             GetMediaArchivedRekognitionWorker getMediaArchivedRekognitionWorker = GetMediaArchivedRekognitionWorker.create(getStreamName(),
                     getCredentialsProvider(),
@@ -72,22 +83,26 @@ public class KinesisVideoArchivedParallelProcessingExample extends KinesisVideoC
                             .withFragmentSelectorType(FragmentSelectorType.SERVER_TIMESTAMP)
                             .withTimestampRange(timestampRange),
                     frameVisitor,
+                    h264ImageDetectionBoundingBoxSaver,
                     listFragmentsEndpoint,
-                    getMediaFragmentListEndpoint);
+                    getMediaFragmentListEndpoint,
+                    playbackLength);
 
-            executorService.submit(getMediaArchivedRekognitionWorker);
-
+            Future<List<JpaFrame>> framesForTask = executorService.submit(getMediaArchivedRekognitionWorker);
+            framesForEachTask.add(framesForTask);
         }
 
         //Wait for the workers to finish.
         executorService.shutdown();
-        executorService.awaitTermination(AWAIT_TERMINATION_TIME, TimeUnit.SECONDS);
+        executorService.awaitTermination(awaitTerminationTime, TimeUnit.SECONDS);
         if (!executorService.isTerminated()) {
             log.warn("Shutting down executor service by force");
             executorService.shutdownNow();
         } else {
             log.info("Executor service is shutdown");
-            log.info("Total number of frames processed: {}", framesProcessed);
+            log.info("Total playback time duration: {} milliseconds", playbackLength.get());
+            log.info("Total frames processed: {}", this.frames.size());
+            updateFramePlaybackTimestamps(framesForEachTask, playbackLength, frames.size());
         }
     }
 
@@ -128,6 +143,45 @@ public class KinesisVideoArchivedParallelProcessingExample extends KinesisVideoC
         return timestampRanges;
     }
 
+    private void updateFramePlaybackTimestamps(List<Future<List<JpaFrame>>> framesForEachTask, AtomicLong playbackLength, long numFrames) throws ExecutionException, InterruptedException {
+        long timespan = playbackLength.get();
+        long msStartTimestamp = 0;
+        long timePerFrame = timespan / numFrames;
+        long frameCount = 0;
+
+        for (Future<List<JpaFrame>> listFuture : framesForEachTask) {
+            List<JpaFrame> framesForTask = listFuture.get();
+            long framesPerTask = (long) framesForTask.size();
+
+            if (framesPerTask > 0) {
+
+                for (JpaFrame f : framesForTask) {
+                    long timeAfterStart = timePerFrame * frameCount;
+                    long frameTimestampInMs = timeAfterStart + msStartTimestamp;
+                    String frameTimestamp = convertMillisecondsToTimestamp(frameTimestampInMs);
+
+                    this.frames.get(f).setPlaybackTimestampAndFrameNum(frameTimestamp, frameCount);
+
+                    for (String label : f.getLabels()) {
+                        this.labelToTimestamps.get(label).addTimestamp(frameTimestamp);
+                        this.labelToTimestamps.get(label).addTimestampAndFrame(frameTimestamp, f);
+                    }
+                    frameCount++;
+                }
+            }
+        }
+    }
+
+    private String convertMillisecondsToTimestamp(long millis) {
+        String timestamp = String.format("%02d:%02d:%02d",
+                TimeUnit.MILLISECONDS.toHours(millis),
+                TimeUnit.MILLISECONDS.toMinutes(millis) -
+                        TimeUnit.HOURS.toMinutes(TimeUnit.MILLISECONDS.toHours(millis)), // The change is in this line
+                TimeUnit.MILLISECONDS.toSeconds(millis) -
+                        TimeUnit.MINUTES.toSeconds(TimeUnit.MILLISECONDS.toMinutes(millis)));
+        return timestamp;
+    }
+
     private String getListFragmentsEndpoint(String streamName) {
         GetDataEndpointRequest listFragmentsEndpointRequest = new GetDataEndpointRequest()
                 .withAPIName(APIName.LIST_FRAGMENTS).withStreamName(streamName);
@@ -142,3 +196,4 @@ public class KinesisVideoArchivedParallelProcessingExample extends KinesisVideoC
         return getMediaForFragmentListEndpoint;
     }
 }
+

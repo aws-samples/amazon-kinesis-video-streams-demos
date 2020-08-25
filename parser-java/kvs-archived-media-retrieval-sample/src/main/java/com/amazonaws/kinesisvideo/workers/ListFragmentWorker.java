@@ -4,8 +4,6 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.Callable;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 import com.amazonaws.auth.AWSCredentialsProvider;
 import com.amazonaws.client.builder.AwsClientBuilder;
@@ -71,7 +69,7 @@ public class ListFragmentWorker extends KinesisVideoCommon implements Callable {
                     result.getSdkHttpMetadata().getHttpStatusCode(),
                     result.getSdkResponseMetadata().getRequestId());
 
-            for (Fragment f: result.getFragments()) {
+            for (Fragment f : result.getFragments()) {
                 fragmentNumbers.add(f.getFragmentNumber());
             }
             String nextToken = result.getNextToken();
@@ -82,18 +80,17 @@ public class ListFragmentWorker extends KinesisVideoCommon implements Callable {
                         .withStreamName(streamName).withNextToken(nextToken);
                 result = amazonKinesisVideoArchivedMedia.listFragments(request);
 
-                for (Fragment f: result.getFragments()) {
+                for (Fragment f : result.getFragments()) {
                     fragmentNumbers.add(f.getFragmentNumber());
                 }
                 nextToken = result.getNextToken();
             }
             Collections.sort(fragmentNumbers);
 
-            for (String f: fragmentNumbers) {
+            for (String f : fragmentNumbers) {
                 log.info("Retrieved fragment number {} ", f);
             }
-        }
-        catch (Throwable t) {
+        } catch (Throwable t) {
             log.error("Failure in ListFragmentWorker for streamName {} {}", streamName, t.toString());
             throw t;
         } finally {
