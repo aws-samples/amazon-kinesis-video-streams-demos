@@ -11,9 +11,8 @@ import java.text.SimpleDateFormat;
 import java.util.concurrent.ExecutionException;
 
 @Slf4j
-public class App 
-{
-    public static void main( String[] args ) throws InterruptedException, IOException, ExecutionException, java.text.ParseException {
+public class App {
+    public static void main(String[] args) throws InterruptedException, IOException, ExecutionException, java.text.ParseException {
 
         /* Option parsing */
         Options options = new Options();
@@ -66,8 +65,7 @@ public class App
                     .build();
 
             example.execute();
-        }
-        catch (ExecutionException e) {
+        } catch (ExecutionException e) {
             log.error(e.getMessage());
             System.exit(1);
         }

@@ -71,7 +71,7 @@ public class ListFragmentWorker extends KinesisVideoCommon implements Callable {
                     result.getSdkHttpMetadata().getHttpStatusCode(),
                     result.getSdkResponseMetadata().getRequestId());
 
-            for (Fragment f: result.getFragments()) {
+            for (Fragment f : result.getFragments()) {
                 fragmentNumbers.add(f.getFragmentNumber());
             }
             String nextToken = result.getNextToken();
@@ -82,14 +82,13 @@ public class ListFragmentWorker extends KinesisVideoCommon implements Callable {
                         .withStreamName(streamName).withNextToken(nextToken);
                 result = amazonKinesisVideoArchivedMedia.listFragments(request);
 
-                for (Fragment f: result.getFragments()) {
+                for (Fragment f : result.getFragments()) {
                     fragmentNumbers.add(f.getFragmentNumber());
                 }
                 nextToken = result.getNextToken();
             }
             Collections.sort(fragmentNumbers);
-        }
-        catch (Throwable t) {
+        } catch (Throwable t) {
             log.error("Failure in ListFragmentWorker for streamName {} {}", streamName, t.toString());
             throw t;
         } finally {

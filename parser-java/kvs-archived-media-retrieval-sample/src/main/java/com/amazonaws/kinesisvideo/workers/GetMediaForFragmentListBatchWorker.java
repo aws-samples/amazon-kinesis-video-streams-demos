@@ -24,6 +24,7 @@ public class GetMediaForFragmentListBatchWorker extends KinesisVideoCommon imple
     private final AmazonKinesisVideoArchivedMedia amazonKinesisVideoArchivedMedia;
     private final MkvElementVisitor elementVisitor;
     private final List<String> fragmentNumbers;
+    private final int MAX_CONTENT_BYTES = 16000;
 
     public GetMediaForFragmentListBatchWorker(final String streamName, final List<String> fragmentNumbers,
                                               final AWSCredentialsProvider awsCredentialsProvider, final String endPoint,
@@ -64,8 +65,11 @@ public class GetMediaForFragmentListBatchWorker extends KinesisVideoCommon imple
                     streamName,
                     result.getSdkHttpMetadata().getHttpStatusCode(),
                     result.getSdkResponseMetadata().getRequestId());
-            final StreamingMkvReader mkvStreamReader = StreamingMkvReader.createDefault(
-                    new InputStreamParserByteSource(result.getPayload()));
+            /*final StreamingMkvReader mkvStreamReader = StreamingMkvReader.createDefault(
+                    new InputStreamParserByteSource(result.getPayload()));*/
+            final StreamingMkvReader mkvStreamReader = StreamingMkvReader.createWithMaxContentSize(
+                    new InputStreamParserByteSource(result.getPayload()), MAX_CONTENT_BYTES);
+
             log.info("StreamingMkvReader created for stream {} ", streamName);
             try {
                 mkvStreamReader.apply(this.elementVisitor);

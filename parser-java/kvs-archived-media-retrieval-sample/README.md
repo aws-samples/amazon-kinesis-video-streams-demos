@@ -13,13 +13,19 @@ Using these APIs, this sample allows users to retrieve archived media from a spe
 git clone https://github.com/aws-samples/amazon-kinesis-video-streams-demos.git
 ```
 
-2. Navigate to the sample
+2. Clone the parser library
+
+```
+git clone https://github.com/aws/amazon-kinesis-video-streams-parser-library.git
+```
+
+3. Navigate to the sample
 
 ```
 cd amazon-kinesis-video-streams-demos/parser-java/kvs-archived-media-retrieval-sample
 ```
 
-3. Build the jar
+4. Build the jar
 ```
 mvn package
 ```

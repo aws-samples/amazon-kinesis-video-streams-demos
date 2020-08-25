@@ -14,13 +14,19 @@ The archived media retrieval APIs can be useful for media analysis of previously
 git clone https://github.com/aws-samples/amazon-kinesis-video-streams-demos.git
 ```
 
-2. Navigate to the sample
+2. Clone the parser library
+
+```
+git clone https://github.com/aws/amazon-kinesis-video-streams-parser-library.git
+```
+
+3. Navigate to the sample
 
 ```
 cd amazon-kinesis-video-streams-demos/parser-java/kvs-archived-media-rekognition-label-detection-sample
 ```
 
-3. Build the jar
+4. Build the jar
 ```
 mvn package
 ```

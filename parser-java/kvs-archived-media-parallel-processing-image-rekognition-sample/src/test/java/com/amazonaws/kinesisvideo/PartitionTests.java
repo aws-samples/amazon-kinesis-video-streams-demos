@@ -12,8 +12,7 @@ import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.List;
 
-public class Tests {
-    @Ignore
+public class PartitionTests {
     @Test
     public void testPartitioningExample() throws ParseException {
         TimestampRange timestampRange = new TimestampRange();
@@ -33,7 +32,6 @@ public class Tests {
         Assert.assertEquals(6, example.partitionTimeRange(timestampRange).size());
     }
 
-    @Ignore
     @Test
     public void testPartionLengthExample() throws ParseException {
         TimestampRange timestampRange = new TimestampRange();
