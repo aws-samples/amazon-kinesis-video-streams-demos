@@ -51,6 +51,8 @@ STATUS run(Canary::PConfig pConfig)
 {
     STATUS retStatus = STATUS_SUCCESS;
     BOOL initialized = FALSE;
+    TIMER_QUEUE_HANDLE timerQueueHandle = 0;
+    UINT32 timeoutTimerId;
 
     CHK_STATUS(Canary::Cloudwatch::init(pConfig));
     CHK_STATUS(initKvsWebRtc());
@@ -58,6 +60,20 @@ STATUS run(Canary::PConfig pConfig)
 
     SET_LOGGER_LOG_LEVEL(pConfig->logLevel);
     pConfig->print();
+
+    CHK_STATUS(timerQueueCreate(&timerQueueHandle));
+
+    if (pConfig->duration != 0) {
+        auto terminate = [](UINT32 timerId, UINT64 currentTime, UINT64 customData) -> STATUS {
+            UNUSED_PARAM(timerId);
+            UNUSED_PARAM(currentTime);
+            UNUSED_PARAM(customData);
+            terminated = TRUE;
+            return STATUS_TIMER_QUEUE_STOP_SCHEDULING;
+        };
+        CHK_STATUS(
+            timerQueueAddTimer(timerQueueHandle, pConfig->duration, TIMER_QUEUE_SINGLE_INVOCATION_PERIOD, terminate, (UINT64) NULL, &timeoutTimerId));
+    }
 
     {
         Canary::Peer::Callbacks callbacks;
@@ -81,6 +97,10 @@ STATUS run(Canary::PConfig pConfig)
     }
 
 CleanUp:
+
+    if (IS_VALID_TIMER_QUEUE_HANDLE(timerQueueHandle)) {
+        timerQueueFree(&timerQueueHandle);
+    }
 
     DLOGI("Exiting with 0x%08x", retStatus);
     if (initialized) {

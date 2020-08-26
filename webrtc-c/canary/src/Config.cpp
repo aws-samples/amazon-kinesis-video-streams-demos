@@ -32,6 +32,19 @@ CleanUp:
     return retStatus;
 }
 
+STATUS mustenvUint64(CHAR const* pKey, PUINT64 pResult)
+{
+    STATUS retStatus = STATUS_SUCCESS;
+    const CHAR* pValue;
+
+    CHK_STATUS(mustenv(pKey, &pValue));
+    STRTOUI64((PCHAR) pValue, NULL, 10, pResult);
+
+CleanUp:
+
+    return retStatus;
+}
+
 VOID Config::print()
 {
     DLOGD("\n\n"
@@ -44,9 +57,11 @@ VOID Config::print()
           "\tLog Level     : %u\n"
           "\tLog Group     : %s\n"
           "\tLog Stream    : %s\n"
+          "\tDuration      : %lu seconds\n"
           "\n",
           this->pChannelName, this->pRegion, this->pClientId, this->isMaster ? "Master" : "Viewer", this->trickleIce ? "True" : "False",
-          this->useTurn ? "True" : "False", this->logLevel, this->pLogGroupName, this->pLogStreamName);
+          this->useTurn ? "True" : "False", this->logLevel, this->pLogGroupName, this->pLogStreamName,
+          this->duration / HUNDREDS_OF_NANOS_IN_A_SECOND);
 }
 
 STATUS Config::init(INT32 argc, PCHAR argv[], Canary::PConfig pConfig)
@@ -59,6 +74,7 @@ STATUS Config::init(INT32 argc, PCHAR argv[], Canary::PConfig pConfig)
     STATUS retStatus = STATUS_SUCCESS;
     PCHAR pLogLevel, pLogStreamName;
     const CHAR *pLogGroupName, *pClientId;
+    UINT64 durationInSeconds;
 
     CHK(pConfig != NULL, STATUS_NULL_ARG);
 
@@ -95,6 +111,9 @@ STATUS Config::init(INT32 argc, PCHAR argv[], Canary::PConfig pConfig)
         SNPRINTF(pConfig->pLogStreamName, ARRAY_SIZE(pConfig->pLogStreamName) - 1, "%s-%s-%llu", pConfig->pChannelName,
                  pConfig->isMaster ? "master" : "viewer", GETTIME() / HUNDREDS_OF_NANOS_IN_A_MILLISECOND);
     }
+
+    CHK_STATUS(mustenvUint64(CANARY_DURATION_IN_SECONDS_ENV_VAR, &durationInSeconds));
+    pConfig->duration = durationInSeconds * HUNDREDS_OF_NANOS_IN_A_SECOND;
 
 CleanUp:
 
