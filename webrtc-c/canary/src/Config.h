@@ -26,6 +26,8 @@ class Config {
     CHAR pLogGroupName[MAX_LOG_STREAM_NAME + 1];
     CHAR pLogStreamName[MAX_LOG_STREAM_NAME + 1];
 
+    UINT64 duration;
+
     VOID print();
 };
 
