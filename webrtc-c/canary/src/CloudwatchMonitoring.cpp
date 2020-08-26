@@ -12,7 +12,6 @@ STATUS CloudwatchMonitoring::init()
 
     this->channelDimension.SetName("Channel");
     this->channelDimension.SetValue(pConfig->pChannelName);
-
     return retStatus;
 }
 
@@ -127,6 +126,78 @@ VOID CloudwatchMonitoring::pushICEHolePunchingDelay(UINT64 delay, StandardUnit u
     datum.AddDimensions(this->channelDimension);
 
     this->push(datum);
+}
+
+VOID CloudwatchMonitoring::pushOutboundRtpStats(Canary::POutgoingRTPMetricsContext pOutboundRtpStats)
+{
+    MetricDatum bytesDiscardedPercentageDatum, averageFramesRateDatum, nackRateDatum, retransmissionPercentDatum;
+
+    bytesDiscardedPercentageDatum.SetMetricName("PercentageFrameDiscarded");
+    bytesDiscardedPercentageDatum.SetValue(pOutboundRtpStats->framesPercentageDiscarded);
+    bytesDiscardedPercentageDatum.SetUnit(StandardUnit::Percent);
+    bytesDiscardedPercentageDatum.AddDimensions(this->channelDimension);
+    this->push(bytesDiscardedPercentageDatum);
+
+    averageFramesRateDatum.SetMetricName("FramesPerSecond");
+    averageFramesRateDatum.SetValue(pOutboundRtpStats->averageFramesSentPerSecond);
+    averageFramesRateDatum.SetUnit(StandardUnit::Count_Second);
+    averageFramesRateDatum.AddDimensions(this->channelDimension);
+    this->push(averageFramesRateDatum);
+
+    nackRateDatum.SetMetricName("NackPerSecond");
+    nackRateDatum.SetValue(pOutboundRtpStats->nacksPerSecond);
+    nackRateDatum.SetUnit(StandardUnit::Count_Second);
+    nackRateDatum.AddDimensions(this->channelDimension);
+    this->push(nackRateDatum);
+
+    retransmissionPercentDatum.SetMetricName("PercentageFramesRetransmitted");
+    retransmissionPercentDatum.SetValue(pOutboundRtpStats->retxBytesPercentage);
+    retransmissionPercentDatum.SetUnit(StandardUnit::Percent);
+    retransmissionPercentDatum.AddDimensions(this->channelDimension);
+    this->push(retransmissionPercentDatum);
+}
+
+VOID CloudwatchMonitoring::pushInboundRtpStats(Canary::PIncomingRTPMetricsContext pIncomingRtpStats)
+{
+    MetricDatum incomingBitrateDatum, incomingPacketRate, incomingFrameDropRateDatum;
+
+    incomingBitrateDatum.SetMetricName("IncomingBitRate");
+    incomingBitrateDatum.SetValue(pIncomingRtpStats->incomingBitRate);
+    incomingBitrateDatum.SetUnit(StandardUnit::Kilobits_Second);
+    incomingBitrateDatum.AddDimensions(this->channelDimension);
+    this->push(incomingBitrateDatum);
+
+    incomingPacketRate.SetMetricName("IncomingPacketsPerSecond");
+    incomingPacketRate.SetValue(pIncomingRtpStats->packetReceiveRate);
+    incomingPacketRate.SetUnit(StandardUnit::Count_Second);
+    incomingPacketRate.AddDimensions(this->channelDimension);
+    this->push(incomingPacketRate);
+
+    incomingFrameDropRateDatum.SetMetricName("IncomingFramesDroppedPerSecond");
+    incomingFrameDropRateDatum.SetValue(pIncomingRtpStats->framesDroppedPerSecond);
+    incomingFrameDropRateDatum.SetUnit(StandardUnit::Count_Second);
+    incomingFrameDropRateDatum.AddDimensions(this->channelDimension);
+    this->push(incomingFrameDropRateDatum);
+}
+
+VOID CloudwatchMonitoring::pushEndToEndMetrics(Canary::PEndToEndMetricsContext pEndToEndMetricsContext)
+{
+    MetricDatum endToEndLatencyDatum, sizeMatchDatum;
+
+    endToEndLatencyDatum.SetMetricName("EndToEndFrameLatency");
+    endToEndLatencyDatum.SetUnit(StandardUnit::Milliseconds);
+    endToEndLatencyDatum.AddDimensions(this->channelDimension);
+    endToEndLatencyDatum.SetValues(pEndToEndMetricsContext->frameLatency);
+    this->push(endToEndLatencyDatum);
+
+    sizeMatchDatum.SetMetricName("FrameSizeMatch");
+    sizeMatchDatum.SetUnit(StandardUnit::None);
+    sizeMatchDatum.AddDimensions(this->channelDimension);
+    sizeMatchDatum.SetValues(pEndToEndMetricsContext->sizeMatch);
+    this->push(sizeMatchDatum);
+
+    pEndToEndMetricsContext->frameLatency.clear();
+    pEndToEndMetricsContext->sizeMatch.clear();
 }
 
 } // namespace Canary
