@@ -6,7 +6,6 @@ HAS_ERROR = false
 
 def buildPeer(isMaster, params) {
     def clientID = isMaster ? "Master" : "Viewer"
-    def viewerStartupDelayInSeconds = 5
     def envs = [
       'AWS_KVS_LOG_LEVEL': params.AWS_KVS_LOG_LEVEL,
       'CANARY_USE_TURN': params.USE_TURN,
@@ -51,15 +50,12 @@ def buildPeer(isMaster, params) {
         RUNNING_NODES_IN_BUILDING == 0
     }
 
-    if (!isMaster) {
-      sleep viewerStartupDelayInSeconds
-    }
-    
     withEnv(envs) {
         withCredentials(credentials) {
             try {
                 sh """
                     cd $WORKSPACE/webrtc-c/canary/build && 
+                    ${isMaster ? "" : "sleep 5 &&"}
                     ./kvsWebrtcCanary"""
             } catch (FlowInterruptedException err) {
                 echo 'Aborted due to cancellation'
