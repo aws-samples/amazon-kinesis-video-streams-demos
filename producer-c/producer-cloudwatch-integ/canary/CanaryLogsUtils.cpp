@@ -2,50 +2,58 @@
  * Kinesis Video Producer cloudwatch logging
  */
 #define LOG_CLASS "CanaryStreamLogs"
-#include "CanaryStreamUtils.h"
+#include "CanaryUtils.h"
 
 PCloudwatchLogsObject gCloudwatchLogsObject = NULL;
 
-STATUS initializeCloudwatchLogger(PCloudwatchLogsObject pCloudwatchLogsObject) {
+STATUS initializeCloudwatchLogger(PCloudwatchLogsObject pCloudwatchLogsObject)
+{
     STATUS retStatus = STATUS_SUCCESS;
+    Aws::CloudWatchLogs::Model::CreateLogStreamOutcome createLogStreamOutcome;
     CHK(pCloudwatchLogsObject != NULL, STATUS_NULL_ARG);
     pCloudwatchLogsObject->canaryLogGroupRequest.SetLogGroupName(pCloudwatchLogsObject->logGroupName);
     pCloudwatchLogsObject->pCwl->CreateLogGroup(pCloudwatchLogsObject->canaryLogGroupRequest);
+    SNPRINTF(pCloudwatchLogsObject->logStreamName, ARRAY_SIZE(pCloudwatchLogsObject->logStreamName) - 1, "%s-%llu",
+             pCloudwatchLogsObject->logStreamName, GETTIME() / HUNDREDS_OF_NANOS_IN_A_MILLISECOND);
+
     pCloudwatchLogsObject->canaryLogStreamRequest.SetLogStreamName(pCloudwatchLogsObject->logStreamName);
     pCloudwatchLogsObject->canaryLogStreamRequest.SetLogGroupName(pCloudwatchLogsObject->logGroupName);
-    pCloudwatchLogsObject->pCwl->CreateLogStream(pCloudwatchLogsObject->canaryLogStreamRequest);
+    createLogStreamOutcome = pCloudwatchLogsObject->pCwl->CreateLogStream(pCloudwatchLogsObject->canaryLogStreamRequest);
+    CHK_ERR(createLogStreamOutcome.IsSuccess(), STATUS_INVALID_OPERATION, "Failed to create \"%s\" log stream: %s",
+            pCloudwatchLogsObject->logStreamName, createLogStreamOutcome.GetError().GetMessage().c_str());
     gCloudwatchLogsObject = pCloudwatchLogsObject;
 CleanUp:
     return retStatus;
 }
 
-VOID setUpLogEventVector(PCHAR logString) {
-    Aws::String awsCwString((Aws::String)logString);
-    auto logEvent = Aws::CloudWatchLogs::Model::InputLogEvent()
-                   .WithMessage(awsCwString)
-                   .WithTimestamp(GETTIME() / HUNDREDS_OF_NANOS_IN_A_MILLISECOND);
+VOID setUpLogEventVector(PCHAR logString)
+{
+    Aws::String awsCwString((Aws::String) logString);
+    auto logEvent =
+        Aws::CloudWatchLogs::Model::InputLogEvent().WithMessage(awsCwString).WithTimestamp(GETTIME() / HUNDREDS_OF_NANOS_IN_A_MILLISECOND);
     gCloudwatchLogsObject->canaryInputLogEventVec.push_back(logEvent);
 }
 
 VOID onPutLogEventResponseReceivedHandler(const Aws::CloudWatchLogs::CloudWatchLogsClient* cwClientLog,
                                           const Aws::CloudWatchLogs::Model::PutLogEventsRequest& request,
                                           const Aws::CloudWatchLogs::Model::PutLogEventsOutcome& outcome,
-                                          const std::shared_ptr<const Aws::Client::AsyncCallerContext>& context) {
+                                          const std::shared_ptr<const Aws::Client::AsyncCallerContext>& context)
+{
     if (!outcome.IsSuccess()) {
         DLOGE("Failed to push logs: %s", outcome.GetError().GetMessage().c_str());
-    }
-    else {
+    } else {
         DLOGS("Successfully pushed logs to cloudwatch");
         gCloudwatchLogsObject->token = outcome.GetResult().GetNextSequenceToken();
     }
 }
 
-VOID canaryStreamSendLogs(PCloudwatchLogsObject pCloudwatchLogsObject) {
+VOID canaryStreamSendLogs(PCloudwatchLogsObject pCloudwatchLogsObject)
+{
     Aws::CloudWatchLogs::Model::PutLogEventsOutcome outcome;
     auto request = Aws::CloudWatchLogs::Model::PutLogEventsRequest()
-                   .WithLogGroupName(pCloudwatchLogsObject->logGroupName)
-                   .WithLogStreamName(pCloudwatchLogsObject->logStreamName)
-                   .WithLogEvents(pCloudwatchLogsObject->canaryInputLogEventVec);
+                       .WithLogGroupName(pCloudwatchLogsObject->logGroupName)
+                       .WithLogStreamName(pCloudwatchLogsObject->logStreamName)
+                       .WithLogEvents(pCloudwatchLogsObject->canaryInputLogEventVec);
     if (pCloudwatchLogsObject->token != "") {
         request.SetSequenceToken(pCloudwatchLogsObject->token);
     }
@@ -53,24 +61,23 @@ VOID canaryStreamSendLogs(PCloudwatchLogsObject pCloudwatchLogsObject) {
     pCloudwatchLogsObject->canaryInputLogEventVec.clear();
 }
 
-VOID canaryStreamSendLogSync(PCloudwatchLogsObject pCloudwatchLogsObject) {
+VOID canaryStreamSendLogSync(PCloudwatchLogsObject pCloudwatchLogsObject)
+{
     auto request = Aws::CloudWatchLogs::Model::PutLogEventsRequest()
-                   .WithLogGroupName(pCloudwatchLogsObject->logGroupName)
-                   .WithLogStreamName(pCloudwatchLogsObject->logStreamName)
-                   .WithLogEvents(pCloudwatchLogsObject->canaryInputLogEventVec);
+                       .WithLogGroupName(pCloudwatchLogsObject->logGroupName)
+                       .WithLogStreamName(pCloudwatchLogsObject->logStreamName)
+                       .WithLogEvents(pCloudwatchLogsObject->canaryInputLogEventVec);
     if (pCloudwatchLogsObject->token != "") {
-       request.SetSequenceToken(pCloudwatchLogsObject->token);
+        request.SetSequenceToken(pCloudwatchLogsObject->token);
     }
     auto outcome = pCloudwatchLogsObject->pCwl->PutLogEvents(request);
     if (!outcome.IsSuccess()) {
-            DLOGE("Failed to push logs: %s", outcome.GetError().GetMessage().c_str());
-        }
-        else {
-            DLOGS("Successfully pushed logs to cloudwatch");
-        }
+        DLOGE("Failed to push logs: %s", outcome.GetError().GetMessage().c_str());
+    } else {
+        DLOGS("Successfully pushed logs to cloudwatch");
+    }
     pCloudwatchLogsObject->canaryInputLogEventVec.clear();
 }
-
 
 VOID cloudWatchLogger(UINT32 level, PCHAR tag, PCHAR fmt, ...)
 {

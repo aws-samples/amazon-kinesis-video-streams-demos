@@ -97,14 +97,12 @@ The cloudwatch library will now be ready to use!
 
 The demo comprises of a simple sample that uses custom constructed frames to capture certain metrics and performance parameters of the C Producer SDK and PIC. To run the sample:
 
-`./kinesis_video_cproducer_video_only_sample_cw <stream-name> <streaming-type> <fragment-size-in-bytes>`
-	where, `streaming-type` can be 0 (real-time mode) or 1 (offline mode)
-Since we use custom constructed frames and not the ones directly from the video source, there is provision to control the fragment size through `fragment-size-in-bytes`.
+`./kvsProducerSampleCloudwatch <path-to-config-file>`
 
-The application generates a stream name of the format: `<stream-name>-<realtime/offline>-<fragment-size-in-bytes>`
+The application uses a JSON file to parse some parameters that can be controlled by the application. It is necessary
+to provide the absolute path to this file to run the application. A sample config file is provided [here](https://github.com/aws-samples/amazon-kinesis-video-streams-demos/tree/master/producer-c/producer-cloudwatch-integ)
 
-On running the application, the metrics are geenrated and posted in the `KinesisVideoSDKCanary` namespace. For every new stream name/parameters the application is run with, a new dimension with the metrics are generated. If you would like to modify your namespace, you can do so here:
-`https://github.com/aws-samples/amazon-kinesis-video-streams-demos/blob/c525dc65ea543866dff6cf954617d077b1cb58d0/producer-c/producer-cloudwatch-integ/CanaryStreamCallbacks.cpp#L171`
+On running the application, the metrics are geenrated and posted in the `KinesisVideoSDKCanary` namespace with stream name format:  `<stream-name-prefix>-<realtime/offline>-<fragment-size-in-bytes>`. A cloudwatch dimension is attached to a stream name and all the metrics fall under that.
 
 
 ## Metrics being collected currently
@@ -112,8 +110,12 @@ On running the application, the metrics are geenrated and posted in the `Kinesis
 Currently, the following metrics are being collected on a per fragment basis:
 * ReceivedAckLatency
 * PersistedAckLatency
+* Buffered Ack Latency
 * FrameRate
 * CurrentViewDuration
+* Memory allocation
+* Error code through sreamError handler
+* Content store availability
 
 ## Logging
 
@@ -124,6 +126,9 @@ https://sdk.amazonaws.com/cpp/api/LATEST/namespace_aws_1_1_cloud_watch_logs.html
 
 If you would like to use file logger instead, you could run `export ENABLE_FILE_LOGGER=TRUE`
 This will enable file logging and disable cloudwatch logging.
+
+Cloudwatch log files are generated with the following name: `<stream-name-prefix-<timestamp>`
+
 ## Debugging
 
 1. If you encounter the following error on MacOS while building libopenssl:

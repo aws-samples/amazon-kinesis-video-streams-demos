@@ -72,8 +72,8 @@ endif()
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
 add_executable(kvsProducerSampleCloudwatch
-            ${CMAKE_CURRENT_SOURCE_DIR}/KvsProducerSampleCloudwatch.cpp
-            ${CMAKE_CURRENT_SOURCE_DIR}/CanaryStreamUtils.cpp
-            ${CMAKE_CURRENT_SOURCE_DIR}/CanaryLogsUtils.cpp)
+            ${CMAKE_CURRENT_SOURCE_DIR}/canary/KvsProducerSampleCloudwatch.cpp
+            ${CMAKE_CURRENT_SOURCE_DIR}/canary/CanaryStreamUtils.cpp
+            ${CMAKE_CURRENT_SOURCE_DIR}/canary/CanaryLogsUtils.cpp)
 
 target_link_libraries(kvsProducerSampleCloudwatch cproducer kvspicUtils ${AWSSDK_LINK_LIBRARIES})

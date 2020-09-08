@@ -1,5 +1,5 @@
 
-#include "CanaryStreamUtils.h"
+#include "CanaryUtils.h"
 
 volatile ATOMIC_BOOL sigCaptureInterrupt;
 
@@ -9,18 +9,20 @@ VOID sigintHandler(INT32 sigNum)
 }
 
 // add frame pts, frame index, original frame size, CRC to beginning of buffer
-VOID addCanaryMetadataToFrameData(PFrame pFrame) {
+VOID addCanaryMetadataToFrameData(PFrame pFrame)
+{
     PBYTE pCurPtr = pFrame->frameData;
-    putUnalignedInt64BigEndian((PINT64)pCurPtr, pFrame->presentationTs / HUNDREDS_OF_NANOS_IN_A_MILLISECOND);
+    putUnalignedInt64BigEndian((PINT64) pCurPtr, pFrame->presentationTs / HUNDREDS_OF_NANOS_IN_A_MILLISECOND);
     pCurPtr += SIZEOF(UINT64);
-    putUnalignedInt32BigEndian((PINT32)pCurPtr, pFrame->index);
+    putUnalignedInt32BigEndian((PINT32) pCurPtr, pFrame->index);
     pCurPtr += SIZEOF(UINT32);
-    putUnalignedInt32BigEndian((PINT32)pCurPtr, pFrame->size);
+    putUnalignedInt32BigEndian((PINT32) pCurPtr, pFrame->size);
     pCurPtr += SIZEOF(UINT32);
-    putUnalignedInt32BigEndian((PINT32)pCurPtr, COMPUTE_CRC32(pFrame->frameData, pFrame->size));
+    putUnalignedInt32BigEndian((PINT32) pCurPtr, COMPUTE_CRC32(pFrame->frameData, pFrame->size));
 }
 
-VOID createCanaryFrameData(PFrame pFrame) {
+VOID createCanaryFrameData(PFrame pFrame)
+{
     UINT32 i;
 
     for (i = CANARY_METADATA_SIZE; i < pFrame->size; i++) {
@@ -29,32 +31,66 @@ VOID createCanaryFrameData(PFrame pFrame) {
     addCanaryMetadataToFrameData(pFrame);
 }
 
-PCHAR getCanaryStr(UINT32 canaryType) {
-    switch (canaryType) {
-        case 0:
-            return (PCHAR)"realtime";
-        case 1:
-            return (PCHAR)"offline";
-        default:
-            return (PCHAR)"";
+VOID adjustStreamInfoToCanaryType(PStreamInfo pStreamInfo, PCHAR canaryType)
+{
+    if(0 == STRNCMP(canaryType, "realtime", ARRAY_SIZE("realtime") - 1)) {
+        pStreamInfo->streamCaps.streamingType = STREAMING_TYPE_REALTIME;
+    }
+    else if (0 == STRNCMP(canaryType, (PCHAR)"offline", ARRAY_SIZE("offline") - 1)) {
+        pStreamInfo->streamCaps.streamingType = STREAMING_TYPE_OFFLINE;
     }
 }
 
-VOID adjustStreamInfoToCanaryType(PStreamInfo pStreamInfo, UINT32 canaryType) {
-    switch (canaryType) {
-        case 0:
-            pStreamInfo->streamCaps.streamingType = STREAMING_TYPE_REALTIME;
-            break;
-        case 1:
-            pStreamInfo->streamCaps.streamingType = STREAMING_TYPE_OFFLINE;
-            break;
-        default:
-            break;
-    }
-
+VOID getJsonValue(PBYTE params, jsmntok_t tokens, PCHAR param_str)
+{
+    PCHAR json_key = NULL;
+    UINT32 params_val_length = 0;
+    params_val_length = (UINT32)(tokens.end - tokens.start);
+    json_key = (PCHAR) params + tokens.start;
+    SNPRINTF(param_str, params_val_length + 1, "%s\n", json_key);
 }
 
-INT32 main(INT32 argc, CHAR *argv[])
+STATUS parseConfigFile(PCanaryConfig pCanaryConfig, PCHAR filePath)
+{
+    STATUS retStatus = STATUS_SUCCESS;
+
+    UINT64 size;
+    jsmn_parser parser;
+    CHAR final_attr_str[256];
+    int r;
+    BYTE params[1024];
+
+    CHK_STATUS(readFile(filePath, TRUE, NULL, &size));
+    CHK_ERR(size < 1024, STATUS_INVALID_ARG_LEN, "File size too big. Max allowed is 1024 bytes");
+    CHK_STATUS(readFile(filePath, TRUE, params, &size));
+
+    jsmn_init(&parser);
+    jsmntok_t tokens[256];
+
+    r = jsmn_parse(&parser, (PCHAR) params, size, tokens, 256);
+
+    for (UINT32 i = 1; i < (UINT32) r; i++) {
+        if (compareJsonString((PCHAR) params, &tokens[i], JSMN_STRING, (PCHAR) "canary_stream_name")) {
+            getJsonValue(params, tokens[i + 1], pCanaryConfig->streamNamePrefix);
+            i++;
+        } else if (compareJsonString((PCHAR) params, &tokens[i], JSMN_STRING, (PCHAR) "canary_type")) {
+            getJsonValue(params, tokens[i + 1], pCanaryConfig->canaryTypeStr);
+            i++;
+        } else if (compareJsonString((PCHAR) params, &tokens[i], JSMN_STRING, (PCHAR) "fragment_size")) {
+            getJsonValue(params, tokens[i + 1], final_attr_str);
+            STRTOUI64(final_attr_str, NULL, 10, &pCanaryConfig->fragmentSizeInBytes);
+            i++;
+        } else if (compareJsonString((PCHAR) params, &tokens[i], JSMN_STRING, (PCHAR) "canary_duration_in_sec")) {
+            getJsonValue(params, tokens[i + 1], final_attr_str);
+            STRTOUI64(final_attr_str, NULL, 10, &pCanaryConfig->canaryDuration);
+            i++;
+        }
+    }
+CleanUp:
+    return retStatus;
+}
+
+INT32 main(INT32 argc, CHAR* argv[])
 {
 #ifndef _WIN32
     signal(SIGINT, sigintHandler);
@@ -67,63 +103,59 @@ INT32 main(INT32 argc, CHAR *argv[])
     CLIENT_HANDLE clientHandle = INVALID_CLIENT_HANDLE_VALUE;
     STREAM_HANDLE streamHandle = INVALID_STREAM_HANDLE_VALUE;
     STATUS retStatus = STATUS_SUCCESS;
-    PCHAR accessKey = NULL, secretKey = NULL, sessionToken = NULL, streamNamePrefix = NULL, canaryTypeStr = NULL, region = NULL, cacertPath = NULL;
+    PCHAR accessKey = NULL, secretKey = NULL, sessionToken = NULL, region = NULL, cacertPath = NULL;
     CHAR streamName[MAX_STREAM_NAME_LEN + 1];
     Frame frame;
-    UINT32 frameIndex = 0, fileIndex = 0, canaryType = 0;
+    UINT32 frameIndex = 0, fileIndex = 0;
     UINT64 fragmentSizeInByte = 0;
     UINT64 lastKeyFrameTimestamp = 0;
     CloudwatchLogsObject cloudwatchLogsObject;
     PCanaryStreamCallbacks pCanaryStreamCallbacks = NULL;
-    UINT64 currentTime;
+    UINT64 currentTime, canaryStopTime;
     BOOL cleanUpDone = FALSE;
     BOOL fileLoggingEnabled = FALSE;
+    BOOL runTillStopped = FALSE;
 
+    CanaryConfig config;
     initializeEndianness();
     SRAND(time(0));
+
     Aws::SDKOptions options;
     Aws::InitAPI(options);
     {
         frame.frameData = NULL;
-
-        if (argc < 3) {
-            DLOGE("Usage: AWS_ACCESS_KEY_ID=SAMPLEKEY AWS_SECRET_ACCESS_KEY=SAMPLESECRET %s <stream_name_prefix> <canary_type> <bandwidth>\n", argv[0]);
+        if (argc < 2) {
+            DLOGE("Usage: AWS_ACCESS_KEY_ID=SAMPLEKEY AWS_SECRET_ACCESS_KEY=SAMPLESECRET %s <path-to-config-file>\n", argv[0]);
             CHK(FALSE, STATUS_INVALID_ARG);
         }
+
+        CHK_ERR(STRLEN(argv[1]) < (MAX_PATH_LEN + 1), STATUS_INVALID_ARG_LEN, "File path length too long");
+        CHK_STATUS(parseConfigFile(&config, argv[1]));
 
         if ((accessKey = getenv(ACCESS_KEY_ENV_VAR)) == NULL || (secretKey = getenv(SECRET_KEY_ENV_VAR)) == NULL) {
             DLOGE("Error missing credentials");
             CHK(FALSE, STATUS_INVALID_ARG);
         }
 
-        if (argc < 4) {
-            fragmentSizeInByte = 1024 * 1024; // default to 1 MB
-        } else {
-            STRTOUI64(argv[3], NULL, 10, &fragmentSizeInByte);
-        }
-
         cacertPath = getenv(CACERT_PATH_ENV_VAR);
         sessionToken = getenv(SESSION_TOKEN_ENV_VAR);
-        streamNamePrefix = argv[1];
-        STRTOUI32(argv[2], NULL, 10, &canaryType);;
-        canaryTypeStr = getCanaryStr(canaryType);
-        CHK(STRCMP(canaryTypeStr, "") != 0, STATUS_INVALID_ARG);
-        SNPRINTF(streamName, MAX_STREAM_NAME_LEN, "%s-canary-%s-%s", streamNamePrefix, canaryTypeStr, argv[3]);
+
+        SNPRINTF(streamName, MAX_STREAM_NAME_LEN, "%s-canary-%s-%llu", config.streamNamePrefix, config.canaryTypeStr, config.fragmentSizeInBytes);
 
         if ((region = getenv(DEFAULT_REGION_ENV_VAR)) == NULL) {
             region = (PCHAR) DEFAULT_AWS_REGION;
         }
 
-        ClientConfiguration clientConfiguration;
+        Aws::Client::ClientConfiguration clientConfiguration;
         clientConfiguration.region = region;
-        CloudWatchClient cw(clientConfiguration);
+        Aws::CloudWatch::CloudWatchClient cw(clientConfiguration);
 
-        CloudWatchLogsClient cwl(clientConfiguration);
+        Aws::CloudWatchLogs::CloudWatchLogsClient cwl(clientConfiguration);
 
         STRCPY(cloudwatchLogsObject.logGroupName, "ProducerSDK");
         SNPRINTF(cloudwatchLogsObject.logStreamName, MAX_STREAM_NAME_LEN + 5, "%s-log", streamName);
         cloudwatchLogsObject.pCwl = &cwl;
-        if((retStatus = initializeCloudwatchLogger(&cloudwatchLogsObject)) != STATUS_SUCCESS) {
+        if ((retStatus = initializeCloudwatchLogger(&cloudwatchLogsObject)) != STATUS_SUCCESS) {
             DLOGW("Cloudwatch logger failed to be initialized with 0x%08x error code. Fallback to file logging", retStatus);
             fileLoggingEnabled = TRUE;
         }
@@ -134,30 +166,19 @@ INT32 main(INT32 argc, CHAR *argv[])
         pDeviceInfo->clientInfo.loggerLogLevel = LOG_LEVEL_DEBUG;
 
         CHK_STATUS(createRealtimeVideoStreamInfoProvider(streamName, DEFAULT_RETENTION_PERIOD, DEFAULT_BUFFER_DURATION, &pStreamInfo));
-        adjustStreamInfoToCanaryType(pStreamInfo, canaryType);
+        adjustStreamInfoToCanaryType(pStreamInfo, config.canaryTypeStr);
         // adjust members of pStreamInfo here if needed
         pStreamInfo->streamCaps.nalAdaptationFlags = NAL_ADAPTATION_FLAG_NONE;
 
-        CHK_STATUS(createDefaultCallbacksProviderWithAwsCredentials(accessKey,
-                                                                    secretKey,
-                                                                    sessionToken,
-                                                                    MAX_UINT64,
-                                                                    region,
-                                                                    cacertPath,
-                                                                    NULL,
-                                                                    NULL,
+        CHK_STATUS(createDefaultCallbacksProviderWithAwsCredentials(accessKey, secretKey, sessionToken, MAX_UINT64, region, cacertPath, NULL, NULL,
                                                                     &pClientCallbacks));
 
-        if(getenv(CANARY_APP_FILE_LOGGER) != NULL || fileLoggingEnabled) {
-            if((retStatus = addFileLoggerPlatformCallbacksProvider(pClientCallbacks,
-                                                                   CANARY_FILE_LOGGING_BUFFER_SIZE,
-                                                                   CANARY_MAX_NUMBER_OF_LOG_FILES,
-                                                                   (PCHAR) FILE_LOGGER_LOG_FILE_DIRECTORY_PATH,
-                                                                   TRUE) != STATUS_SUCCESS)) {
-                 DLOGE("File logging enable option failed with 0x%08x error code\n", retStatus);
-                 fileLoggingEnabled = FALSE;
-            }
-            else {
+        if (getenv(CANARY_APP_FILE_LOGGER) != NULL || fileLoggingEnabled) {
+            if ((retStatus = addFileLoggerPlatformCallbacksProvider(pClientCallbacks, CANARY_FILE_LOGGING_BUFFER_SIZE, CANARY_MAX_NUMBER_OF_LOG_FILES,
+                                                                    (PCHAR) FILE_LOGGER_LOG_FILE_DIRECTORY_PATH, TRUE) != STATUS_SUCCESS)) {
+                DLOGE("File logging enable option failed with 0x%08x error code\n", retStatus);
+                fileLoggingEnabled = FALSE;
+            } else {
                 fileLoggingEnabled = TRUE;
             }
         }
@@ -165,7 +186,7 @@ INT32 main(INT32 argc, CHAR *argv[])
         CHK_STATUS(createCanaryStreamCallbacks(&cw, streamName, &pCanaryStreamCallbacks));
         CHK_STATUS(addStreamCallbacks(pClientCallbacks, &pCanaryStreamCallbacks->streamCallbacks));
 
-        if(!fileLoggingEnabled) {
+        if (!fileLoggingEnabled) {
             pClientCallbacks->logPrintFn = cloudWatchLogger;
         }
 
@@ -173,7 +194,7 @@ INT32 main(INT32 argc, CHAR *argv[])
         CHK_STATUS(createKinesisVideoStreamSync(clientHandle, pStreamInfo, &streamHandle));
 
         // setup dummy frame
-        frame.size = CANARY_METADATA_SIZE + fragmentSizeInByte / DEFAULT_FPS_VALUE;
+        frame.size = CANARY_METADATA_SIZE + config.fragmentSizeInBytes / DEFAULT_FPS_VALUE;
         frame.frameData = (PBYTE) MEMALLOC(frame.size);
         frame.version = FRAME_CURRENT_VERSION;
         frame.trackId = DEFAULT_VIDEO_TRACK_ID;
@@ -181,7 +202,11 @@ INT32 main(INT32 argc, CHAR *argv[])
         frame.decodingTs = GETTIME(); // current time
         frame.presentationTs = frame.decodingTs;
         currentTime = GETTIME();
-        while (ATOMIC_LOAD_BOOL(&sigCaptureInterrupt) != TRUE) {
+        canaryStopTime = currentTime + (config.canaryDuration * HUNDREDS_OF_NANOS_IN_A_SECOND);
+
+        // Say, the canary needs to be stopped before designated canary run time, signal capture
+        // must still be supported
+        while (GETTIME() < canaryStopTime && ATOMIC_LOAD_BOOL(&sigCaptureInterrupt) != TRUE) {
             if (frameIndex < 0) {
                 frameIndex = 0;
             }
@@ -195,7 +220,7 @@ INT32 main(INT32 argc, CHAR *argv[])
                     CHK_STATUS(computeStreamMetricsFromCanary(streamHandle, pCanaryStreamCallbacks));
                     CHK_STATUS(computeClientMetricsFromCanary(clientHandle, pCanaryStreamCallbacks));
                     currentMemoryAllocation(pCanaryStreamCallbacks);
-                    if((!fileLoggingEnabled) && (GETTIME() > currentTime + (60 * HUNDREDS_OF_NANOS_IN_A_SECOND))) {
+                    if ((!fileLoggingEnabled) && (GETTIME() > currentTime + (60 * HUNDREDS_OF_NANOS_IN_A_SECOND))) {
                         canaryStreamSendLogs(&cloudwatchLogsObject);
                         currentTime = GETTIME();
                     }
@@ -221,7 +246,7 @@ INT32 main(INT32 argc, CHAR *argv[])
         RESET_INSTRUMENTED_ALLOCATORS();
         DLOGI("CleanUp Done");
         cleanUpDone = TRUE;
-        if(!fileLoggingEnabled) {
+        if (!fileLoggingEnabled) {
             // This is necessary to ensure that we do not lose the last set of logs
             canaryStreamSendLogSync(&cloudwatchLogsObject);
         }
@@ -236,7 +261,7 @@ CleanUp:
     // will cater to two scenarios, one, if any of the commands fail, this clean up is invoked
     // Second, it will cater to scenarios where a SIG is sent to exit the while loop above in
     // which case the clean up related logs will be captured as well.
-    if(!cleanUpDone) {
+    if (!cleanUpDone) {
         CHK_LOG_ERR(retStatus);
         SAFE_MEMFREE(frame.frameData);
 
@@ -248,6 +273,5 @@ CleanUp:
         RESET_INSTRUMENTED_ALLOCATORS();
         DLOGI("CleanUp Done");
     }
-
-    return (INT32) retStatus;
+    return STATUS_FAILED(retStatus) ? EXIT_FAILURE : EXIT_SUCCESS;
 }
