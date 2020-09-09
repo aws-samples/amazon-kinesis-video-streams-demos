@@ -14,45 +14,47 @@
 #include <aws/logs/model/DeleteLogStreamRequest.h>
 #include <aws/logs/model/DescribeLogStreamsRequest.h>
 
-#ifdef  __cplusplus
+#ifdef __cplusplus
 extern "C" {
 #endif
 
-#define DEFAULT_RETENTION_PERIOD            (2 * HUNDREDS_OF_NANOS_IN_AN_HOUR)
-#define DEFAULT_BUFFER_DURATION             (120 * HUNDREDS_OF_NANOS_IN_A_SECOND)
-#define DEFAULT_CALLBACK_CHAIN_COUNT        5
-#define DEFAULT_KEY_FRAME_INTERVAL          45
-#define DEFAULT_FPS_VALUE                   25
-#define DEFAULT_STREAM_DURATION             (20 * HUNDREDS_OF_NANOS_IN_A_SECOND)
+#define DEFAULT_RETENTION_PERIOD     (2 * HUNDREDS_OF_NANOS_IN_AN_HOUR)
+#define DEFAULT_BUFFER_DURATION      (120 * HUNDREDS_OF_NANOS_IN_A_SECOND)
+#define DEFAULT_CALLBACK_CHAIN_COUNT 5
+#define DEFAULT_KEY_FRAME_INTERVAL   45
+#define DEFAULT_FPS_VALUE            25
+#define DEFAULT_STREAM_DURATION      (20 * HUNDREDS_OF_NANOS_IN_A_SECOND)
 
-#define NUMBER_OF_FRAME_FILES               403
-#define CANARY_METADATA_SIZE                (SIZEOF(INT64) + SIZEOF(UINT32) + SIZEOF(UINT32) + SIZEOF(UINT64))
+#define NUMBER_OF_FRAME_FILES 403
+#define CANARY_METADATA_SIZE  (SIZEOF(INT64) + SIZEOF(UINT32) + SIZEOF(UINT32) + SIZEOF(UINT64))
 
-#define CANARY_FILE_LOGGING_BUFFER_SIZE     (200 * 1024)
-#define CANARY_MAX_NUMBER_OF_LOG_FILES      10
-#define CANARY_APP_FILE_LOGGER              (PCHAR) "ENABLE_FILE_LOGGER"
+#define CANARY_FILE_LOGGING_BUFFER_SIZE (200 * 1024)
+#define CANARY_MAX_NUMBER_OF_LOG_FILES  10
+#define CANARY_APP_FILE_LOGGER          (PCHAR) "ENABLE_FILE_LOGGER"
 struct __CallbackStateMachine;
 struct __CallbacksProvider;
-
-using namespace Aws::Client;
-using namespace Aws::CloudWatchLogs;
-using namespace Aws::CloudWatchLogs::Model;
-using namespace Aws::CloudWatch::Model;
-using namespace Aws::CloudWatch;
-using namespace std;
 
 ////////////////////////////////////////////////////////////////////////
 // Struct definition
 ////////////////////////////////////////////////////////////////////////
 
+typedef struct {
+    CHAR streamNamePrefix[200 + 1];
+    UINT64 fragmentSizeInBytes;
+    CHAR canaryTypeStr[15 + 1];
+    UINT64 canaryDuration;
+} CanaryConfig;
+
+typedef CanaryConfig* PCanaryConfig;
+
 typedef struct __CloudwatchLogsObject CloudwatchLogsObject;
 struct __CloudwatchLogsObject {
-    CloudWatchLogsClient* pCwl;
-    CreateLogGroupRequest canaryLogGroupRequest;
-    CreateLogStreamRequest canaryLogStreamRequest;
-    PutLogEventsRequest canaryPutLogEventRequest;
-    PutLogEventsResult canaryPutLogEventresult;
-    Aws::Vector<InputLogEvent> canaryInputLogEventVec;
+    Aws::CloudWatchLogs::CloudWatchLogsClient* pCwl;
+    Aws::CloudWatchLogs::Model::CreateLogGroupRequest canaryLogGroupRequest;
+    Aws::CloudWatchLogs::Model::CreateLogStreamRequest canaryLogStreamRequest;
+    Aws::CloudWatchLogs::Model::PutLogEventsRequest canaryPutLogEventRequest;
+    Aws::CloudWatchLogs::Model::PutLogEventsResult canaryPutLogEventresult;
+    Aws::Vector<Aws::CloudWatchLogs::Model::InputLogEvent> canaryInputLogEventVec;
     Aws::String token;
     CHAR logGroupName[MAX_STREAM_NAME_LEN + 1];
     CHAR logStreamName[MAX_STREAM_NAME_LEN + 1];
@@ -64,17 +66,10 @@ struct __CanaryStreamCallbacks {
     // First member should be the stream callbacks
     StreamCallbacks streamCallbacks;
     PCHAR pStreamName;
-    CloudWatchClient* pCwClient;
-    PutMetricDataRequest* cwRequest;
-    MetricDatum receivedAckDatum;
-    MetricDatum persistedAckDatum;
-    MetricDatum bufferingAckDatum;
-    MetricDatum streamErrorDatum;
-    MetricDatum currentFrameRateDatum;
-    MetricDatum currentViewDurationDatum;
-    MetricDatum contentStoreAvailableSizeDatum;
-    MetricDatum memoryAllocationSizeDatum;
-    map<UINT64, UINT64>* timeOfNextKeyFrame;
+    Aws::CloudWatch::CloudWatchClient* pCwClient;
+    Aws::CloudWatch::Model::PutMetricDataRequest* cwRequest;
+    Aws::CloudWatch::Model::Dimension dimension;
+    std::map<UINT64, UINT64>* timeOfNextKeyFrame;
 };
 typedef struct __CanaryStreamCallbacks* PCanaryStreamCallbacks;
 
@@ -100,7 +95,7 @@ STATUS initializeCloudwatchLogger(PCloudwatchLogsObject);
 VOID canaryStreamSendLogs(PCloudwatchLogsObject);
 VOID canaryStreamSendLogSync(PCloudwatchLogsObject);
 
-#ifdef  __cplusplus
+#ifdef __cplusplus
 }
 #endif
 
