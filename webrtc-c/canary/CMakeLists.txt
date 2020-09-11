@@ -44,14 +44,13 @@ include_directories(${cloudwatch_SOURCE_DIR}/aws-cpp-sdk-logs/include)
 include_directories(${webrtc_SOURCE_DIR}/src/include)
 include_directories(${webrtc_SOURCE_DIR}/open-source/include)
 link_directories(${webrtc_SOURCE_DIR}/open-source/lib)
-add_executable(
+add_library(
   kvsWebrtcCanary
   src/Config.cpp
   src/CloudwatchLogs.cpp
   src/CloudwatchMonitoring.cpp
   src/Cloudwatch.cpp
-  src/Peer.cpp
-  src/Main.cpp)
+  src/Peer.cpp)
 target_link_libraries(
   kvsWebrtcCanary
   kvsWebrtcClient
@@ -60,5 +59,19 @@ target_link_libraries(
   aws-cpp-sdk-core
   aws-cpp-sdk-monitoring
   aws-cpp-sdk-logs)
+
+add_executable(
+  kvsWebrtcCanaryWebrtc
+  src/CanaryWebrtc.cpp)
+target_link_libraries(
+  kvsWebrtcCanaryWebrtc
+  kvsWebrtcCanary)
+
+add_executable(
+  kvsWebrtcCanarySignaling
+  src/CanarySignaling.cpp)
+target_link_libraries(
+  kvsWebrtcCanarySignaling
+  kvsWebrtcCanary)
 
 file(COPY "${CMAKE_CURRENT_SOURCE_DIR}/assets" DESTINATION .)
