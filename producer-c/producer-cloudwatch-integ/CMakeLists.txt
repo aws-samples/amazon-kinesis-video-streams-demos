@@ -37,7 +37,7 @@ message(STATUS "Finished building dependencies.")
 
 find_package(Threads)
 find_package(PkgConfig REQUIRED)
-find_package(AWSSDK REQUIRED COMPONENTS monitoring events logs)
+find_package(AWSSDK REQUIRED COMPONENTS monitoring logs)
 
 if (WIN32)
   find_library(LIBKVSPIC_LIBRARIES kvspic REQUIRED)
