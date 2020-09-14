@@ -1,8 +1,5 @@
-cmake_minimum_required(VERSION 2.8)
+cmake_minimum_required(VERSION 3.10.2)
 set(CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/CMake;${CMAKE_MODULE_PATH}")
-
-# Enabling the instrumented allocators to track memory
-add_definitions(-DINSTRUMENTED_ALLOCATORS)
 
 if(APPLE AND NOT DEFINED ENV{MACOSX_DEPLOYMENT_TARGET} AND NOT DEFINED ENV{SDKROOT})
   set(CMAKE_OSX_DEPLOYMENT_TARGET ${CMAKE_SYSTEM_VERSION})
@@ -30,6 +27,7 @@ endif()
 message(STATUS "Begin building dependencies.")
 
 build_dependency(kvsProducerC)
+build_dependency(cppsdk)
 
 message(STATUS "Finished building dependencies.")
 
@@ -51,24 +49,6 @@ set(OPEN_SRC_INCLUDE_DIRS ${LIBKVSPIC_INCLUDE_DIRS})
 link_directories(${LIBKVSPIC_LIBRARY_DIRS})
 
 include_directories(${OPEN_SRC_INCLUDE_DIRS})
-
-if(CMAKE_SIZEOF_VOID_P STREQUAL 4)
-    message(STATUS "Bitness 32 bits")
-    set(KINESIS_VIDEO_BUILD_BITNESS "x86")
-    set(KINESIS_VIDEO_BUILD_BITNESS_TYPE "Win32")
-    set(KINESIS_VIDEO_BUILD_BITNESS_NAME "x86")
-elseif(CMAKE_SIZEOF_VOID_P STREQUAL 8)
-    message(STATUS "Bitness 64 bits")
-    set(KINESIS_VIDEO_BUILD_BITNESS "x64")
-    set(KINESIS_VIDEO_BUILD_BITNESS_TYPE "x64")
-    set(KINESIS_VIDEO_BUILD_BITNESS_NAME "x86_64")
-else()
-    message(FATAL_ERROR "Unknown bitness")
-endif()
-
-if(MSVC)
-  add_definitions(-D_CRT_SECURE_NO_WARNINGS -D_CRT_NONSTDC_NO_WARNINGS -D_SILENCE_TR1_NAMESPACE_DEPRECATION_WARNING)
-endif()
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
 add_executable(kvsProducerSampleCloudwatch

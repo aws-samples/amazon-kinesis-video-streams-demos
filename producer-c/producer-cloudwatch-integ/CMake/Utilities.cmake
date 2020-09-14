@@ -2,6 +2,7 @@
 function(build_dependency lib_name)
   set(supported_libs
       kvsProducerC
+      cppsdk
       )
   list(FIND supported_libs ${lib_name} index)
   if(${index} EQUAL -1)
