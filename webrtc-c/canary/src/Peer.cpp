@@ -369,7 +369,7 @@ STATUS Peer::awaitIceGathering(PRtcSessionDescriptionInit pSDPInit)
     this->cvar.wait(lock, [this]() { return this->terminated.load() || this->iceGatheringDone.load(); });
     CHK_WARN(!this->terminated.load(), STATUS_OPERATION_TIMED_OUT, "application terminated and candidate gathering still not done");
 
-    CHK_STATUS(peerConnectionGetCurrentLocalDescription(this->pPeerConnection, pSDPInit));
+    CHK_STATUS(peerConnectionGetLocalDescription(this->pPeerConnection, pSDPInit));
 
 CleanUp:
 
