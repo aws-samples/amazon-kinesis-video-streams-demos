@@ -374,6 +374,6 @@ CleanUp:
         RESET_INSTRUMENTED_ALLOCATORS();
         DLOGI("CleanUp Done");
     }
-    DLOGD("Exiting application with status code: 0x%08x", retStatus);
+    DLOGI("Exiting application with status code: 0x%08x", retStatus);
     return STATUS_FAILED(retStatus) ? EXIT_FAILURE : EXIT_SUCCESS;
 }
