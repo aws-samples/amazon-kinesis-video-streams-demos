@@ -116,6 +116,8 @@ STATUS Config::init(INT32 argc, PCHAR argv[], Canary::PConfig pConfig)
 
     CHK_STATUS(mustenvUint64(CANARY_DURATION_IN_SECONDS_ENV_VAR, &durationInSeconds));
     pConfig->duration = durationInSeconds * HUNDREDS_OF_NANOS_IN_A_SECOND;
+    CHK_STATUS(mustenvUint64(CANARY_BYTE_RATE_ENV_VAR, &pConfig->bytesPerSecond));
+    CHK_STATUS(mustenvUint64(CANARY_FRAME_RATE_ENV_VAR, &pConfig->frameRate));
 
 CleanUp:
 

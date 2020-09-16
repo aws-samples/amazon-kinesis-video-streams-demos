@@ -3,12 +3,38 @@
 STATUS onNewConnection(Canary::PPeer);
 STATUS run(Canary::PConfig);
 VOID sendLocalFrames(Canary::PPeer, MEDIA_STREAM_TRACK_KIND, const std::string&, UINT64, UINT32);
+VOID sendCustomFrames(Canary::PPeer, MEDIA_STREAM_TRACK_KIND, UINT64, UINT64);
 
 std::atomic<bool> terminated;
 VOID handleSignal(INT32 signal)
 {
     UNUSED_PARAM(signal);
     terminated = TRUE;
+}
+
+// add frame pts, original frame size, CRC to beginning of buffer after Annex-B format NALu
+VOID addCanaryMetadataToFrameData(PBYTE buffer, PFrame pFrame)
+{
+    PBYTE pCurPtr = buffer + ANNEX_B_NALU_SIZE;
+    putUnalignedInt64BigEndian((PINT64) pCurPtr, pFrame->presentationTs);
+    pCurPtr += SIZEOF(UINT64);
+    putUnalignedInt32BigEndian((PINT32) pCurPtr, pFrame->size);
+    pCurPtr += SIZEOF(UINT32);
+    putUnalignedInt32BigEndian((PINT32) pCurPtr, COMPUTE_CRC32(buffer, pFrame->size));
+}
+
+// Frame Data format: NALu (4 bytes) + Header (PTS, Size (including header), CRC (including header) + Randomly generated frameBits
+
+// TODO: Support dynamic random frame sizes to bring it closer to real time scenarios
+VOID createCanaryFrameData(PBYTE buffer, PFrame pFrame)
+{
+    UINT32 i;
+    // For decoding purposes, the first 4 bytes need to be a NALu
+    putUnalignedInt32BigEndian((PINT32) buffer, 0x00000001);
+    addCanaryMetadataToFrameData(buffer, pFrame);
+    for (i = ANNEX_B_NALU_SIZE + CANARY_METADATA_SIZE; i < pFrame->size; i++) {
+        buffer[i] = RAND();
+    }
 }
 
 INT32 main(INT32 argc, CHAR* argv[])
@@ -18,8 +44,9 @@ INT32 main(INT32 argc, CHAR* argv[])
 #endif
 
     STATUS retStatus = STATUS_SUCCESS;
+    initializeEndianness();
     SET_INSTRUMENTED_ALLOCATORS();
-
+    SRAND(time(0));
     // Make sure that all destructors have been called first before resetting the instrumented allocators
     CHK_STATUS([&]() -> STATUS {
         STATUS retStatus = STATUS_SUCCESS;
@@ -91,13 +118,10 @@ STATUS run(Canary::PConfig pConfig)
         CHK_STATUS(peer.init());
         CHK_STATUS(peer.connect());
 
-        std::thread videoThread(sendLocalFrames, &peer, MEDIA_STREAM_TRACK_KIND_VIDEO, "./assets/h264SampleFrames/frame-%04d.h264",
-                                NUMBER_OF_H264_FRAME_FILES, SAMPLE_VIDEO_FRAME_DURATION);
-        std::thread audioThread(sendLocalFrames, &peer, MEDIA_STREAM_TRACK_KIND_AUDIO, "./assets/opusSampleFrames/sample-%03d.opus",
-                                NUMBER_OF_OPUS_FRAME_FILES, SAMPLE_AUDIO_FRAME_DURATION);
-
+        // Since the goal of the canary is to test robustness of the SDK, there is not an immediate need
+        // to send audio frames as well. It can always be added in if needed in the future
+        std::thread videoThread(sendCustomFrames, &peer, MEDIA_STREAM_TRACK_KIND_VIDEO, peer.getDataRate(), peer.getFrameRate());
         videoThread.join();
-        audioThread.join();
         CHK_STATUS(peer.shutdown());
     }
 
@@ -147,6 +171,64 @@ STATUS onNewConnection(Canary::PPeer pPeer)
 CleanUp:
 
     return retStatus;
+}
+
+VOID sendCustomFrames(Canary::PPeer pPeer, MEDIA_STREAM_TRACK_KIND kind, UINT64 dataRate, UINT64 frameRate)
+{
+    STATUS retStatus = STATUS_SUCCESS;
+    Frame frame;
+    PCHAR hexStr = NULL;
+    UINT32 hexStrLen = 0;
+    UINT32 actualFrameSize = 0;
+    UINT32 frameSizeWithoutNalu = 0;
+    // This is the actual frame size that includes the metadata and the actual frame data
+    actualFrameSize = CANARY_METADATA_SIZE + (dataRate / frameRate);
+    frameSizeWithoutNalu = actualFrameSize - ANNEX_B_NALU_SIZE;
+
+    PBYTE canaryFrameData = NULL;
+    canaryFrameData = (PBYTE) MEMALLOC(actualFrameSize);
+
+    // We allocate a bigger buffer to accomodate the hex encoded string
+    frame.frameData = (PBYTE) MEMALLOC(frameSizeWithoutNalu * 2 + 1 + ANNEX_B_NALU_SIZE);
+    frame.version = FRAME_CURRENT_VERSION;
+    frame.presentationTs = GETTIME();
+
+    while (!terminated.load()) {
+        frame.size = actualFrameSize;
+        createCanaryFrameData(canaryFrameData, &frame);
+
+        // Hex encode the data (without the ANNEX-B NALu) to ensure parts of random frame data is not skipped if they
+        // are the same as the ANNEX-B NALu
+        CHK_STATUS(hexEncode(frame.frameData + ANNEX_B_NALU_SIZE, frameSizeWithoutNalu, NULL, &hexStrLen));
+
+        // This re-alloc is done in case the estimated size does not match the actual requirement.
+        // We do not want to constantly malloc within a loop. Hence, we re-allocate only if required
+        // Either ways, the realloc should not happen
+        if (hexStrLen != SIZEOF(frame.frameData)) {
+            DLOGW("Re allocating...this should not happen...something might be wrong");
+            frame.frameData = (PBYTE) REALLOC(frame.frameData, hexStrLen + ANNEX_B_NALU_SIZE);
+            CHK_ERR(frame.frameData != NULL, STATUS_NOT_ENOUGH_MEMORY, "Failed to realloc media buffer");
+        }
+        CHK_STATUS(hexEncode(canaryFrameData + ANNEX_B_NALU_SIZE, frameSizeWithoutNalu, (PCHAR)(frame.frameData + ANNEX_B_NALU_SIZE), &hexStrLen));
+        MEMCPY(frame.frameData, canaryFrameData, ANNEX_B_NALU_SIZE);
+
+        // We must update the size to reflect the original data with hex encoded data
+        frame.size = hexStrLen + ANNEX_B_NALU_SIZE;
+        pPeer->writeFrame(&frame, kind);
+        THREAD_SLEEP(HUNDREDS_OF_NANOS_IN_A_SECOND / frameRate);
+        frame.presentationTs = GETTIME();
+    }
+CleanUp:
+
+    SAFE_MEMFREE(frame.frameData);
+    SAFE_MEMFREE(canaryFrameData);
+
+    auto threadKind = kind == MEDIA_STREAM_TRACK_KIND_VIDEO ? "video" : "audio";
+    if (STATUS_FAILED(retStatus)) {
+        DLOGE("%s thread exited with 0x%08x", threadKind, retStatus);
+    } else {
+        DLOGI("%s thread exited successfully", threadKind);
+    }
 }
 
 VOID sendLocalFrames(Canary::PPeer pPeer, MEDIA_STREAM_TRACK_KIND kind, const std::string& pattern, UINT64 frameCount, UINT32 frameDuration)

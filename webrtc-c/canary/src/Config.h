@@ -28,6 +28,8 @@ class Config {
     CHAR pLogStreamName[MAX_LOG_STREAM_NAME + 1];
 
     UINT64 duration;
+    UINT64 bytesPerSecond;
+    UINT64 frameRate;
 
     VOID print();
 };
