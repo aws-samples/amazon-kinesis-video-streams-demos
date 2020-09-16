@@ -175,6 +175,10 @@ STATUS Peer::initRtcConfiguration()
     // Set this to custom callback to enable filtering of interfaces
     pConfiguration->kvsRtcConfiguration.iceSetInterfaceFilterFunc = NULL;
 
+    if(pConfig->forceTurn) {
+        pConfiguration->iceTransportPolicy = ICE_TRANSPORT_POLICY_RELAY;
+    }
+
     // Set the  STUN server
     SNPRINTF(pConfiguration->iceServers[0].urls, MAX_ICE_CONFIG_URI_LEN, KINESIS_VIDEO_STUN_URL, pConfig->pRegion);
 
