@@ -89,6 +89,8 @@ STATUS Config::init(INT32 argc, PCHAR argv[], Canary::PConfig pConfig)
     CHK_STATUS(mustenvBool(CANARY_TRICKLE_ICE_ENV_VAR, &pConfig->trickleIce));
     CHK_STATUS(mustenvBool(CANARY_USE_TURN_ENV_VAR, &pConfig->useTurn));
 
+    CHK_STATUS(mustenvBool(CANARY_FORCE_TURN_ENV_VAR, &pConfig->forceTurn));
+
     CHK_STATUS(mustenv(ACCESS_KEY_ENV_VAR, &pConfig->pAccessKey));
     CHK_STATUS(mustenv(SECRET_KEY_ENV_VAR, &pConfig->pSecretKey));
     pConfig->pSessionToken = getenv(SESSION_TOKEN_ENV_VAR);
