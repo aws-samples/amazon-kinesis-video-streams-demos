@@ -11,6 +11,7 @@
 #define SIGNALING_CANARY_ANSWER "Signaling canary answer"
 #define SIGNALING_CANARY_ROUNDTRIP_TIMEOUT (10 * HUNDREDS_OF_NANOS_IN_A_SECOND)
 #define SIGNALING_CANARY_CHANNEL_NAME (PCHAR) "ScaryTestChannel_"
+#define SIGNALING_CANARY_MAX_CONSECUTIVE_ITERATION_FAILURE_COUNT 5
 
 // Canary error definitions
 #define STATUS_SIGNALING_CANARY_BASE 0x73000000
@@ -30,6 +31,7 @@ typedef struct {
     STATUS exitStatus;
     CVAR roundtripCv;
     MUTEX roundtripLock;
+    UINT32 iterationFailCount;
     SIGNALING_CLIENT_HANDLE masterHandle;
     SIGNALING_CLIENT_HANDLE viewerHandle;
     PSignalingClientInfo pMasterClientInfo;
@@ -227,7 +229,8 @@ CleanUp:
     CHK_LOG_ERR(retStatus);
 
     if (STATUS_FAILED(retStatus)) {
-        // TODO: Log the failed message
+        DLOGW("Signaling message listener routine failed with 0x%08x", retStatus);
+        Canary::Cloudwatch::getInstance().monitoring.pushSignalingRoundtripStatus(retStatus);
     }
 
     return retStatus;
@@ -295,9 +298,22 @@ CleanUp:
     }
 
     if (STATUS_FAILED(retStatus)) {
-        // TODO: Emit metrics on failure
-        DLOGE("Sending the offer failed with 0x%08x", retStatus);
-        retStatus = STATUS_TIMER_QUEUE_STOP_SCHEDULING;
+        DLOGW("Rountrip handler failed with 0x%08x", retStatus);
+        Canary::Cloudwatch::getInstance().monitoring.pushSignalingRoundtripStatus(retStatus);
+
+        // Here, we apply a super simple box filter - if we failed N consecutive number of
+        // times in a row we quit the application. We could later decide to change the heuristics.
+        if (pCanarySessionInfo == NULL || pCanarySessionInfo->iterationFailCount++ >= SIGNALING_CANARY_MAX_CONSECUTIVE_ITERATION_FAILURE_COUNT) {
+            DLOGE("Rountrip handler failed more than %u times in a row. Exiting...", SIGNALING_CANARY_MAX_CONSECUTIVE_ITERATION_FAILURE_COUNT);
+
+            // Change the retStatus to not iterate any longer
+            retStatus = STATUS_TIMER_QUEUE_STOP_SCHEDULING;
+
+            terminateCanaryCallback(0, 0, (UINT64) pCanarySessionInfo);
+        }
+    } else {
+        // Reset the failure count
+        pCanarySessionInfo->iterationFailCount = 0;
     }
 
     return retStatus;
@@ -349,6 +365,7 @@ STATUS run(Canary::PConfig pConfig)
     CHK(IS_VALID_MUTEX_VALUE(canarySessionInfo.roundtripLock = MUTEX_CREATE(FALSE)), STATUS_NOT_ENOUGH_MEMORY);
     CHK(IS_VALID_CVAR_VALUE(canarySessionInfo.roundtripCv = CVAR_CREATE()), STATUS_NOT_ENOUGH_MEMORY);
     canarySessionInfo.exitStatus = STATUS_SUCCESS;
+    canarySessionInfo.iterationFailCount = 0;
 
     CHK_STATUS(Canary::Cloudwatch::init(pConfig));
     CHK_STATUS(initKvsWebRtc());

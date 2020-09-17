@@ -70,6 +70,26 @@ VOID CloudwatchMonitoring::pushExitStatus(STATUS retStatus)
     this->push(datum);
 }
 
+VOID CloudwatchMonitoring::pushSignalingRoundtripStatus(STATUS retStatus)
+{
+    MetricDatum datum;
+    Dimension statusDimension;
+    CHAR status[MAX_STATUS_CODE_LENGTH];
+
+    statusDimension.SetName("Code");
+    SPRINTF(status, "0x%08x", retStatus);
+    statusDimension.SetValue(status);
+
+    datum.SetMetricName("SignalingRoundtripStatus");
+    datum.SetValue(1.0);
+    datum.SetUnit(StandardUnit::Count);
+
+    datum.AddDimensions(this->channelDimension);
+    datum.AddDimensions(statusDimension);
+
+    this->push(datum);
+}
+
 VOID CloudwatchMonitoring::pushSignalingRoundtripLatency(UINT64 delay, StandardUnit unit)
 {
     MetricDatum datum;

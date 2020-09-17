@@ -126,7 +126,7 @@ STATUS Config::init(INT32 argc, PCHAR argv[])
     UNUSED_PARAM(argv);
 
     STATUS retStatus = STATUS_SUCCESS;
-    PCHAR pLogLevel, pLogStreamName;
+    PCHAR pLogStreamName;
     const CHAR *pLogGroupName;
     UINT64 logLevel64;
 
