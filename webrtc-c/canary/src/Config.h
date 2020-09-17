@@ -14,6 +14,7 @@ class Config {
     BOOL isMaster;
     BOOL trickleIce;
     BOOL useTurn;
+    BOOL forceTurn;
 
     // credentials
     const CHAR* pAccessKey;
