@@ -137,8 +137,8 @@ STATUS Config::init(INT32 argc, PCHAR argv[])
     /* This is ignored for master. Master can extract the info from offer. Viewer has to know if peer can trickle or
      * not ahead of time. */
     CHK_STATUS(optenvBool(CANARY_TRICKLE_ICE_ENV_VAR, &trickleIce, FALSE));
-    CHK_STATUS(optenvBool(CANARY_USE_TURN_ENV_VAR, &useTurn, TRUE))
-    CHK_STATUS(optenvBool(CANARY_FORCE_TURN_ENV_VAR, &pConfig->forceTurn, FALSE));
+    CHK_STATUS(optenvBool(CANARY_USE_TURN_ENV_VAR, &useTurn, TRUE));
+    CHK_STATUS(optenvBool(CANARY_FORCE_TURN_ENV_VAR, &forceTurn, FALSE));
 
     CHK_STATUS(mustenv(ACCESS_KEY_ENV_VAR, &pAccessKey));
     CHK_STATUS(mustenv(SECRET_KEY_ENV_VAR, &pSecretKey));
