@@ -23,12 +23,12 @@ INT32 main(INT32 argc, CHAR* argv[])
     // Make sure that all destructors have been called first before resetting the instrumented allocators
     CHK_STATUS([&]() -> STATUS {
         STATUS retStatus = STATUS_SUCCESS;
-        Canary::Config config;
+        auto config = Canary::Config();
 
         Aws::SDKOptions options;
         Aws::InitAPI(options);
 
-        CHK_STATUS(Canary::Config::init(argc, argv, &config));
+        CHK_STATUS(config.init(argc, argv));
         CHK_STATUS(run(&config));
 
     CleanUp:
