@@ -2,9 +2,9 @@
 
 namespace Canary {
 
-Peer::Peer(const Canary::PConfig pConfig, const Callbacks& callbacks)
-    : pConfig(pConfig), callbacks(callbacks), pAwsCredentialProvider(nullptr), terminated(FALSE), iceGatheringDone(FALSE), receivedOffer(FALSE),
-      receivedAnswer(FALSE), foundPeerId(FALSE), pPeerConnection(nullptr), status(STATUS_SUCCESS)
+Peer::Peer()
+    : pAwsCredentialProvider(nullptr), terminated(FALSE), iceGatheringDone(FALSE), receivedOffer(FALSE), receivedAnswer(FALSE), foundPeerId(FALSE),
+      pPeerConnection(nullptr), status(STATUS_SUCCESS)
 {
 }
 
@@ -15,21 +15,24 @@ Peer::~Peer()
     CHK_LOG_ERR(freeStaticCredentialProvider(&this->pAwsCredentialProvider));
 }
 
-STATUS Peer::init()
+STATUS Peer::init(const Canary::PConfig pConfig, const Callbacks& callbacks)
 {
     STATUS retStatus = STATUS_SUCCESS;
 
+    this->isMaster = pConfig->isMaster;
+    this->trickleIce = pConfig->trickleIce;
+    this->callbacks = callbacks;
     CHK_STATUS(createStaticCredentialProvider((PCHAR) pConfig->pAccessKey, 0, (PCHAR) pConfig->pSecretKey, 0, (PCHAR) pConfig->pSessionToken, 0,
                                               MAX_UINT64, &pAwsCredentialProvider));
-    CHK_STATUS(initSignaling());
-    CHK_STATUS(initRtcConfiguration());
+    CHK_STATUS(initSignaling(pConfig));
+    CHK_STATUS(initRtcConfiguration(pConfig));
 
 CleanUp:
 
     return retStatus;
 }
 
-STATUS Peer::initSignaling()
+STATUS Peer::initSignaling(const Canary::PConfig pConfig)
 {
     STATUS retStatus = STATUS_SUCCESS;
 
@@ -115,7 +118,7 @@ STATUS Peer::initSignaling()
             CHK_STATUS(pPeer->initPeerConnection());
         }
 
-        if (pPeer->pConfig->isMaster && STRCMP(pPeer->peerId.c_str(), pMsg->signalingMessage.peerClientId) != 0) {
+        if (pPeer->isMaster && STRCMP(pPeer->peerId.c_str(), pMsg->signalingMessage.peerClientId) != 0) {
             DLOGW("Unexpected receiving message from extra peer: %s", pMsg->signalingMessage.peerClientId);
             CHK(FALSE, retStatus);
         }
@@ -135,7 +138,7 @@ CleanUp:
     return retStatus;
 }
 
-STATUS Peer::initRtcConfiguration()
+STATUS Peer::initRtcConfiguration(const Canary::PConfig pConfig)
 {
     auto awaitGetIceConfigInfoCount = [](SIGNALING_CLIENT_HANDLE pSignalingClientHandle, PUINT32 pIceConfigInfoCount) -> STATUS {
         STATUS retStatus = STATUS_SUCCESS;
@@ -164,7 +167,6 @@ STATUS Peer::initRtcConfiguration()
     };
 
     STATUS retStatus = STATUS_SUCCESS;
-    auto pConfig = this->pConfig;
     auto pSignalingClientHandle = this->pSignalingClientHandle;
     UINT32 i, j, iceConfigCount, uriCount;
     PIceConfigInfo pIceConfigInfo;
@@ -175,7 +177,7 @@ STATUS Peer::initRtcConfiguration()
     // Set this to custom callback to enable filtering of interfaces
     pConfiguration->kvsRtcConfiguration.iceSetInterfaceFilterFunc = NULL;
 
-    if(pConfig->forceTurn) {
+    if (pConfig->forceTurn) {
         pConfiguration->iceTransportPolicy = ICE_TRANSPORT_POLICY_RELAY;
     }
 
@@ -228,7 +230,7 @@ STATUS Peer::initPeerConnection()
             DLOGD("ice candidate gathering finished");
             pPeer->iceGatheringDone = TRUE;
             pPeer->cvar.notify_all();
-        } else if (pPeer->pConfig->trickleIce) {
+        } else if (pPeer->trickleIce) {
             message.messageType = SIGNALING_MESSAGE_TYPE_ICE_CANDIDATE;
             STRCPY(message.payload, candidateJson);
             CHK_STATUS(pPeer->send(&message));
@@ -317,7 +319,7 @@ STATUS Peer::connect()
         CHK_STATUS(createOffer(this->pPeerConnection, &offerSDPInit));
         CHK_STATUS(setLocalDescription(this->pPeerConnection, &offerSDPInit));
 
-        if (!this->pConfig->trickleIce) {
+        if (!this->trickleIce) {
             CHK_STATUS(this->awaitIceGathering(&offerSDPInit));
         }
 
@@ -334,7 +336,7 @@ STATUS Peer::connect()
     STATUS retStatus = STATUS_SUCCESS;
     CHK_STATUS(signalingClientConnectSync(pSignalingClientHandle));
 
-    if (!this->pConfig->isMaster) {
+    if (!this->isMaster) {
         this->foundPeerId = TRUE;
         this->peerId = DEFAULT_VIEWER_PEER_ID;
         CHK_STATUS(this->initPeerConnection());
@@ -388,7 +390,7 @@ STATUS Peer::handleSignalingMsg(PReceivedSignalingMessage pMsg)
         NullableBool canTrickle;
         UINT32 buffLen;
 
-        if (!this->pConfig->isMaster) {
+        if (!this->isMaster) {
             DLOGW("Unexpected message SIGNALING_MESSAGE_TYPE_OFFER");
             CHK(FALSE, retStatus);
         }
@@ -430,7 +432,7 @@ STATUS Peer::handleSignalingMsg(PReceivedSignalingMessage pMsg)
         STATUS retStatus = STATUS_SUCCESS;
         RtcSessionDescriptionInit answerSDPInit;
 
-        if (this->pConfig->isMaster) {
+        if (this->isMaster) {
             DLOGW("Unexpected message SIGNALING_MESSAGE_TYPE_ANSWER");
         } else if (receivedAnswer.exchange(TRUE)) {
             DLOGW("Offer already received, ignore new offer from client id %s", msg.peerClientId);

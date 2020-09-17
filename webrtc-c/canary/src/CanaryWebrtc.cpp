@@ -87,8 +87,8 @@ STATUS run(Canary::PConfig pConfig)
 
         RtcMediaStreamTrack videoTrack, audioTrack;
 
-        Canary::Peer peer(pConfig, callbacks);
-        CHK_STATUS(peer.init());
+        Canary::Peer peer;
+        CHK_STATUS(peer.init(pConfig, callbacks));
         CHK_STATUS(peer.connect());
 
         std::thread videoThread(sendLocalFrames, &peer, MEDIA_STREAM_TRACK_KIND_VIDEO, "./assets/h264SampleFrames/frame-%04d.h264",
