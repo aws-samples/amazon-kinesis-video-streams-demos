@@ -19,6 +19,8 @@ class Peer {
     STATUS addTransceiver(RtcMediaStreamTrack&);
     STATUS addSupportedCodec(RTC_CODEC);
     STATUS writeFrame(PFrame, MEDIA_STREAM_TRACK_KIND);
+    UINT64 getDataRate();
+    UINT64 getFrameRate();
 
   private:
     Callbacks callbacks;

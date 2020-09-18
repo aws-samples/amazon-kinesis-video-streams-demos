@@ -543,4 +543,14 @@ CleanUp:
     return retStatus;
 }
 
+UINT64 Peer::getDataRate()
+{
+    return this->pConfig->bytesPerSecond;
+}
+
+UINT64 Peer::getFrameRate()
+{
+    return Peer::pConfig->frameRate;
+}
+
 } // namespace Canary
