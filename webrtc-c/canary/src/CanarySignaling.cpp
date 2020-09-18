@@ -40,20 +40,20 @@ INT32 main(INT32 argc, CHAR* argv[])
 
     // Make sure that all destructors have been called first before resetting the instrumented allocators
     CHK_STATUS([&]() -> STATUS {
-      STATUS retStatus = STATUS_SUCCESS;
-      auto config = Canary::Config();
+        STATUS retStatus = STATUS_SUCCESS;
+        auto config = Canary::Config();
 
-      Aws::SDKOptions options;
-      Aws::InitAPI(options);
+        Aws::SDKOptions options;
+        Aws::InitAPI(options);
 
-      CHK_STATUS(config.init(argc, argv));
-      CHK_STATUS(run(&config));
+        CHK_STATUS(config.init(argc, argv));
+        CHK_STATUS(run(&config));
 
-CleanUp:
+    CleanUp:
 
         Aws::ShutdownAPI(options);
 
-      return retStatus;
+        return retStatus;
     }());
 
 CleanUp:
@@ -111,11 +111,9 @@ STATUS signalingMessageReceived(UINT64 customData, PReceivedSignalingMessage pRe
         case SIGNALING_MESSAGE_TYPE_OFFER:
             // If we received an offer then the receiving end should be the master.
             // We need to do some validation and respond with an answer
-            CHK(0 == STRCMP(pReceivedSignalingMessage->signalingMessage.peerClientId,
-                            SIGNALING_CANARY_VIEWER_CLIENT_ID),
+            CHK(0 == STRCMP(pReceivedSignalingMessage->signalingMessage.peerClientId, SIGNALING_CANARY_VIEWER_CLIENT_ID),
                 STATUS_SIGNALING_CANARY_OFFER_CID_MISMATCH);
-            CHK(0 == STRCMP(pReceivedSignalingMessage->signalingMessage.payload,
-                            SIGNALING_CANARY_OFFER),
+            CHK(0 == STRCMP(pReceivedSignalingMessage->signalingMessage.payload, SIGNALING_CANARY_OFFER),
                 STATUS_SIGNALING_CANARY_OFFER_PAYLOAD_MISMATCH);
 
             // Respond with an answer
@@ -133,8 +131,7 @@ STATUS signalingMessageReceived(UINT64 customData, PReceivedSignalingMessage pRe
         case SIGNALING_MESSAGE_TYPE_ANSWER:
             // If we received an answer then the receiving end should be the viewer.
             // NOTE: The clientID in this case is left empty by the service
-            CHK(0 == STRCMP(pReceivedSignalingMessage->signalingMessage.payload,
-                            SIGNALING_CANARY_ANSWER),
+            CHK(0 == STRCMP(pReceivedSignalingMessage->signalingMessage.payload, SIGNALING_CANARY_ANSWER),
                 STATUS_SIGNALING_CANARY_ANSWER_PAYLOAD_MISMATCH);
 
             // All good, trigger the cond variable to wake up the awaiting thread to log and proceed
@@ -144,8 +141,7 @@ STATUS signalingMessageReceived(UINT64 customData, PReceivedSignalingMessage pRe
 
         default:
             // Unexpected message received
-            CHK_ERR(FALSE, STATUS_SIGNALING_CANARY_UNEXPECTED_MESSAGE,
-                    "Unhandled signaling message type %u",
+            CHK_ERR(FALSE, STATUS_SIGNALING_CANARY_UNEXPECTED_MESSAGE, "Unhandled signaling message type %u",
                     pReceivedSignalingMessage->signalingMessage.messageType);
     }
 
@@ -296,33 +292,30 @@ STATUS run(Canary::PConfig pConfig)
     CHK_STATUS(initKvsWebRtc());
     initialized = TRUE;
 
-    SET_LOGGER_LOG_LEVEL(pConfig->logLevel);
+    SET_LOGGER_LOG_LEVEL(pConfig->logLevel.value);
     pConfig->print();
 
     // The timer loop for iteration
     CHK_STATUS(timerQueueCreate(&timerQueueHandle));
 
     // We will create a static credential provider. We can replace it with others if needed.
-    CHK_STATUS(createStaticCredentialProvider((PCHAR) pConfig->pAccessKey, 0,
-                                              (PCHAR) pConfig->pSecretKey, 0,
-                                              (PCHAR) pConfig->pSessionToken, 0,
-                                              MAX_UINT64,
-                                              &pCredentialProvider));
+    CHK_STATUS(createStaticCredentialProvider((PCHAR) pConfig->accessKey.value, 0, (PCHAR) pConfig->secretKey.value, 0,
+                                              (PCHAR) pConfig->sessionToken.value, 0, MAX_UINT64, &pCredentialProvider));
 
     // Generate a random channel name if not specified in the config.
     // In case we generate the random name we will follow-up with deleting
     // it upon exit to prevent the account from ever increasing channel count
-    if (pConfig->pChannelName == NULL || IS_EMPTY_STRING(pConfig->pChannelName)) {
+    if (pConfig->channelName.value == NULL || IS_EMPTY_STRING(pConfig->channelName.value)) {
         generateChannelName(channelName);
         channelNameGenerated = TRUE;
     } else {
-        STRNCPY(channelName, pConfig->pChannelName, MAX_CHANNEL_NAME_LEN);
+        STRNCPY(channelName, pConfig->channelName.value, MAX_CHANNEL_NAME_LEN);
     }
 
     // Prepare the channel info structure
     masterChannelInfo.version = CHANNEL_INFO_CURRENT_VERSION;
     masterChannelInfo.pChannelName = channelName;
-    masterChannelInfo.pRegion = (PCHAR) pConfig->pRegion;
+    masterChannelInfo.pRegion = (PCHAR) pConfig->region.value;
     masterChannelInfo.pKmsKeyId = NULL;
     masterChannelInfo.tagCount = 0;
     masterChannelInfo.pTags = NULL;
@@ -343,12 +336,11 @@ STATUS run(Canary::PConfig pConfig)
     masterSignalingClientCallbacks.customData = (UINT64) &canarySessionInfo;
 
     masterClientInfo.version = SIGNALING_CLIENT_INFO_CURRENT_VERSION;
-    masterClientInfo.loggingLevel = pConfig->logLevel;
+    masterClientInfo.loggingLevel = pConfig->logLevel.value;
     STRCPY(masterClientInfo.clientId, SIGNALING_CANARY_MASTER_CLIENT_ID);
 
     // Create the master signaling client
-    CHK_STATUS(createSignalingClientSync(&masterClientInfo, &masterChannelInfo,
-                                         &masterSignalingClientCallbacks, pCredentialProvider,
+    CHK_STATUS(createSignalingClientSync(&masterClientInfo, &masterChannelInfo, &masterSignalingClientCallbacks, pCredentialProvider,
                                          &masterSignalingClientHandle));
 
     canarySessionInfo.pMasterChannelInfo = &masterChannelInfo;
@@ -366,8 +358,7 @@ STATUS run(Canary::PConfig pConfig)
     viewerClientInfo = masterClientInfo;
     STRCPY(viewerClientInfo.clientId, SIGNALING_CANARY_VIEWER_CLIENT_ID);
 
-    CHK_STATUS(createSignalingClientSync(&viewerClientInfo, &viewerChannelInfo,
-                                         &viewerSignalingClientCallbacks, pCredentialProvider,
+    CHK_STATUS(createSignalingClientSync(&viewerClientInfo, &viewerChannelInfo, &viewerSignalingClientCallbacks, pCredentialProvider,
                                          &viewerSignalingClientHandle));
 
     canarySessionInfo.pViewerChannelInfo = &viewerChannelInfo;
@@ -382,15 +373,13 @@ STATUS run(Canary::PConfig pConfig)
     CHK_STATUS(signalingClientConnectSync(canarySessionInfo.masterHandle));
     CHK_STATUS(signalingClientConnectSync(canarySessionInfo.viewerHandle));
 
-    if (pConfig->duration != 0) {
-        CHK_STATUS(timerQueueAddTimer(timerQueueHandle, pConfig->duration,
-                                      TIMER_QUEUE_SINGLE_INVOCATION_PERIOD, terminateCanaryCallback,
+    if (pConfig->duration.value != 0) {
+        CHK_STATUS(timerQueueAddTimer(timerQueueHandle, pConfig->duration.value, TIMER_QUEUE_SINGLE_INVOCATION_PERIOD, terminateCanaryCallback,
                                       (UINT64) NULL, &timeoutTimerId));
     }
 
     // Set the duration to iterate
-    CHK_STATUS(timerQueueAddTimer(timerQueueHandle, SIGNALING_CANARY_START_DELAY,
-                                  pConfig->iterationDuration, sendViewerOfferCallback,
+    CHK_STATUS(timerQueueAddTimer(timerQueueHandle, SIGNALING_CANARY_START_DELAY, pConfig->iterationDuration.value, sendViewerOfferCallback,
                                   (UINT64) &canarySessionInfo, &timeoutTimerId));
 
     MUTEX_LOCK(lock);
@@ -406,8 +395,7 @@ CleanUp:
         timerQueueFree(&timerQueueHandle);
     }
 
-    STATUS combinedStatus = STATUS_FAILED(canarySessionInfo.exitStatus) ?
-                                    canarySessionInfo.exitStatus : retStatus;
+    STATUS combinedStatus = STATUS_FAILED(canarySessionInfo.exitStatus) ? canarySessionInfo.exitStatus : retStatus;
 
     DLOGI("Exiting main with 0x%08x", combinedStatus);
     if (initialized) {

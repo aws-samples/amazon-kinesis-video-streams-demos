@@ -15,7 +15,6 @@ VOID handleSignal(INT32 signal)
     terminated = TRUE;
 }
 
-
 // add frame pts, original frame size, CRC to beginning of buffer after Annex-B format NALu
 VOID addCanaryMetadataToFrameData(PBYTE buffer, PFrame pFrame)
 {
@@ -94,12 +93,12 @@ STATUS run(Canary::PConfig pConfig)
     CHK_STATUS(initKvsWebRtc());
     initialized = TRUE;
 
-    SET_LOGGER_LOG_LEVEL(pConfig->logLevel);
+    SET_LOGGER_LOG_LEVEL(pConfig->logLevel.value);
     pConfig->print();
 
     CHK_STATUS(timerQueueCreate(&timerQueueHandle));
 
-    if (pConfig->duration != 0) {
+    if (pConfig->duration.value != 0) {
         auto terminate = [](UINT32 timerId, UINT64 currentTime, UINT64 customData) -> STATUS {
             UNUSED_PARAM(timerId);
             UNUSED_PARAM(currentTime);
@@ -107,8 +106,8 @@ STATUS run(Canary::PConfig pConfig)
             terminated = TRUE;
             return STATUS_TIMER_QUEUE_STOP_SCHEDULING;
         };
-        CHK_STATUS(
-            timerQueueAddTimer(timerQueueHandle, pConfig->duration, TIMER_QUEUE_SINGLE_INVOCATION_PERIOD, terminate, (UINT64) NULL, &timeoutTimerId));
+        CHK_STATUS(timerQueueAddTimer(timerQueueHandle, pConfig->duration.value, TIMER_QUEUE_SINGLE_INVOCATION_PERIOD, terminate, (UINT64) NULL,
+                                      &timeoutTimerId));
     }
 
     {
@@ -124,7 +123,7 @@ STATUS run(Canary::PConfig pConfig)
 
         // Since the goal of the canary is to test robustness of the SDK, there is not an immediate need
         // to send audio frames as well. It can always be added in if needed in the future
-        std::thread videoThread(sendCustomFrames, &peer, MEDIA_STREAM_TRACK_KIND_VIDEO, pConfig->bitRate, pConfig->frameRate);
+        std::thread videoThread(sendCustomFrames, &peer, MEDIA_STREAM_TRACK_KIND_VIDEO, pConfig->bitRate.value, pConfig->frameRate.value);
         // All metrics tracking will happen on a time queue to simplify handling periodicity
         CHK_STATUS(timerQueueAddTimer(timerQueueHandle, METRICS_INVOCATION_PERIOD, METRICS_INVOCATION_PERIOD, canaryRtpOutboundStats, (UINT64) &peer,
                                       &timeoutTimerId));

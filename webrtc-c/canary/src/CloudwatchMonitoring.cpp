@@ -11,7 +11,8 @@ STATUS CloudwatchMonitoring::init()
     STATUS retStatus = STATUS_SUCCESS;
 
     this->channelDimension.SetName("Channel");
-    this->channelDimension.SetValue(pConfig->pChannelName);
+    this->channelDimension.SetValue(pConfig->channelName.value);
+
     return retStatus;
 }
 

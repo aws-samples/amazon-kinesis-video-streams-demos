@@ -16,7 +16,7 @@ STATUS Cloudwatch::init(Canary::PConfig pConfig)
     Aws::CloudWatchLogs::Model::CreateLogStreamOutcome createLogStreamOutcome;
     CreateLogStreamRequest createLogStreamRequest;
 
-    clientConfig.region = pConfig->pRegion;
+    clientConfig.region = pConfig->region.value;
     auto& instance = getInstanceImpl(pConfig, &clientConfig);
 
     if (STATUS_FAILED(instance.logs.init())) {
