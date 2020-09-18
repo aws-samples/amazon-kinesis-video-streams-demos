@@ -543,14 +543,4 @@ STATUS Peer::writeFrame(PFrame pFrame, MEDIA_STREAM_TRACK_KIND kind)
     return retStatus;
 }
 
-UINT64 Peer::getDataRate()
-{
-    return bitRate;
-}
-
-UINT64 Peer::getFrameRate()
-{
-    return frameRate;
-}
-
 } // namespace Canary
