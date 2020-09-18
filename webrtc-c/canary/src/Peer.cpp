@@ -21,6 +21,8 @@ STATUS Peer::init(const Canary::PConfig pConfig, const Callbacks& callbacks)
 
     this->isMaster = pConfig->isMaster;
     this->trickleIce = pConfig->trickleIce;
+    this->bitRate = pConfig->bitRate;
+    this->frameRate = pConfig->frameRate;
     this->callbacks = callbacks;
     CHK_STATUS(createStaticCredentialProvider((PCHAR) pConfig->pAccessKey, 0, (PCHAR) pConfig->pSecretKey, 0, (PCHAR) pConfig->pSessionToken, 0,
                                               MAX_UINT64, &pAwsCredentialProvider));
@@ -537,8 +539,6 @@ STATUS Peer::writeFrame(PFrame pFrame, MEDIA_STREAM_TRACK_KIND kind)
     for (auto& transceiver : transceivers) {
         CHK_LOG_ERR(::writeFrame(transceiver, pFrame));
     }
-
-CleanUp:
 
     return retStatus;
 }

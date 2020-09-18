@@ -7,7 +7,7 @@ typedef Config* PConfig;
 
 class Config {
   public:
-    static STATUS init(INT32 argc, PCHAR argv[], PConfig);
+    STATUS init(INT32 argc, PCHAR argv[]);
 
     const CHAR* pChannelName;
     const CHAR* pClientId;
@@ -24,11 +24,12 @@ class Config {
 
     // logging
     UINT32 logLevel;
-    CHAR pLogGroupName[MAX_LOG_STREAM_NAME + 1];
-    CHAR pLogStreamName[MAX_LOG_STREAM_NAME + 1];
+    CHAR logGroupName[MAX_LOG_STREAM_NAME + 1];
+    CHAR logStreamName[MAX_LOG_STREAM_NAME + 1];
 
     UINT64 duration;
-    UINT64 bytesPerSecond;
+    UINT64 iterationDuration;
+    UINT64 bitRate;
     UINT64 frameRate;
 
     VOID print();

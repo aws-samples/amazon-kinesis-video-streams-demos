@@ -15,6 +15,21 @@ CleanUp:
     return retStatus;
 }
 
+STATUS optenv(CHAR const* pKey, const CHAR** ppValue, const CHAR* pDefault)
+{
+    STATUS retStatus = STATUS_SUCCESS;
+
+    CHK(ppValue != NULL, STATUS_NULL_ARG);
+
+    if (NULL == (*ppValue = getenv(pKey))) {
+        *ppValue = pDefault;
+    }
+
+CleanUp:
+
+    return retStatus;
+}
+
 STATUS mustenvBool(CHAR const* pKey, PBOOL pResult)
 {
     STATUS retStatus = STATUS_SUCCESS;
@@ -25,6 +40,27 @@ STATUS mustenvBool(CHAR const* pKey, PBOOL pResult)
         *pResult = TRUE;
     } else {
         *pResult = FALSE;
+    }
+
+CleanUp:
+
+    return retStatus;
+}
+
+STATUS optenvBool(CHAR const* pKey, PBOOL pResult, BOOL defVal)
+{
+    STATUS retStatus = STATUS_SUCCESS;
+    const CHAR* pValue;
+
+    CHK_STATUS(optenv(pKey, &pValue, NULL));
+    if (pValue != NULL) {
+        if (STRCMPI(pValue, "on") == 0 || STRCMPI(pValue, "true") == 0) {
+            *pResult = TRUE;
+        } else {
+            *pResult = FALSE;
+        }
+    } else {
+        *pResult = defVal;
     }
 
 CleanUp:
@@ -45,6 +81,23 @@ CleanUp:
     return retStatus;
 }
 
+STATUS optenvUint64(CHAR const* pKey, PUINT64 pResult, UINT64 defVal)
+{
+    STATUS retStatus = STATUS_SUCCESS;
+    const CHAR* pValue;
+
+    CHK_STATUS(optenv(pKey, &pValue, NULL));
+    if (pValue != NULL) {
+        STRTOUI64((PCHAR) pValue, NULL, 10, pResult);
+    } else {
+        *pResult = defVal;
+    }
+
+CleanUp:
+
+    return retStatus;
+}
+
 VOID Config::print()
 {
     DLOGD("\n\n"
@@ -58,13 +111,14 @@ VOID Config::print()
           "\tLog Group     : %s\n"
           "\tLog Stream    : %s\n"
           "\tDuration      : %lu seconds\n"
+          "\tIteration     : %lu seconds\n"
           "\n",
           this->pChannelName, this->pRegion, this->pClientId, this->isMaster ? "Master" : "Viewer", this->trickleIce ? "True" : "False",
-          this->useTurn ? "True" : "False", this->logLevel, this->pLogGroupName, this->pLogStreamName,
-          this->duration / HUNDREDS_OF_NANOS_IN_A_SECOND);
+          this->useTurn ? "True" : "False", this->logLevel, this->logGroupName, this->logStreamName,
+          this->duration / HUNDREDS_OF_NANOS_IN_A_SECOND, this->iterationDuration / HUNDREDS_OF_NANOS_IN_A_SECOND);
 }
 
-STATUS Config::init(INT32 argc, PCHAR argv[], Canary::PConfig pConfig)
+STATUS Config::init(INT32 argc, PCHAR argv[])
 {
     // TODO: Probably also support command line args to fill the config
     // TODO: Probably also support JSON format to fill the config to allow more scalable option
@@ -72,52 +126,64 @@ STATUS Config::init(INT32 argc, PCHAR argv[], Canary::PConfig pConfig)
     UNUSED_PARAM(argv);
 
     STATUS retStatus = STATUS_SUCCESS;
-    PCHAR pLogLevel, pLogStreamName;
-    const CHAR *pLogGroupName, *pClientId;
-    UINT64 durationInSeconds;
+    PCHAR pLogStreamName;
+    const CHAR *pLogGroupName;
+    UINT64 logLevel64;
 
-    CHK(pConfig != NULL, STATUS_NULL_ARG);
+    CHK(argv != NULL, STATUS_NULL_ARG);
 
-    MEMSET(pConfig, 0, SIZEOF(Config));
+    MEMSET(this, 0, SIZEOF(Config));
 
-    CHK_STATUS(mustenv(CANARY_CHANNEL_NAME_ENV_VAR, &pConfig->pChannelName));
-    CHK_STATUS(mustenv(CANARY_CLIENT_ID_ENV_VAR, &pClientId));
-    CHK_STATUS(mustenv(CANARY_CLIENT_ID_ENV_VAR, &pConfig->pClientId));
-    CHK_STATUS(mustenvBool(CANARY_IS_MASTER_ENV_VAR, &pConfig->isMaster));
     /* This is ignored for master. Master can extract the info from offer. Viewer has to know if peer can trickle or
      * not ahead of time. */
-    CHK_STATUS(mustenvBool(CANARY_TRICKLE_ICE_ENV_VAR, &pConfig->trickleIce));
-    CHK_STATUS(mustenvBool(CANARY_USE_TURN_ENV_VAR, &pConfig->useTurn));
+    CHK_STATUS(optenvBool(CANARY_TRICKLE_ICE_ENV_VAR, &trickleIce, FALSE));
+    CHK_STATUS(optenvBool(CANARY_USE_TURN_ENV_VAR, &useTurn, TRUE));
+    CHK_STATUS(optenvBool(CANARY_FORCE_TURN_ENV_VAR, &forceTurn, FALSE));
 
-    CHK_STATUS(mustenvBool(CANARY_FORCE_TURN_ENV_VAR, &pConfig->forceTurn));
-
-    CHK_STATUS(mustenv(ACCESS_KEY_ENV_VAR, &pConfig->pAccessKey));
-    CHK_STATUS(mustenv(SECRET_KEY_ENV_VAR, &pConfig->pSecretKey));
-    pConfig->pSessionToken = getenv(SESSION_TOKEN_ENV_VAR);
-    if ((pConfig->pRegion = getenv(DEFAULT_REGION_ENV_VAR)) == NULL) {
-        pConfig->pRegion = DEFAULT_AWS_REGION;
-    }
+    CHK_STATUS(mustenv(ACCESS_KEY_ENV_VAR, &pAccessKey));
+    CHK_STATUS(mustenv(SECRET_KEY_ENV_VAR, &pSecretKey));
+    CHK_STATUS(optenv(SESSION_TOKEN_ENV_VAR, &pSessionToken, NULL));
+    CHK_STATUS(optenv(DEFAULT_REGION_ENV_VAR, &pRegion, DEFAULT_AWS_REGION));
 
     // Set the logger log level
-    if (NULL == (pLogLevel = getenv(DEBUG_LOG_LEVEL_ENV_VAR)) || (STATUS_SUCCESS != STRTOUI32(pLogLevel, NULL, 10, &pConfig->logLevel))) {
-        pConfig->logLevel = LOG_LEVEL_WARN;
-    }
+    CHK_STATUS(optenvUint64(DEBUG_LOG_LEVEL_ENV_VAR, &logLevel64, LOG_LEVEL_WARN));
+    logLevel = (UINT32) logLevel64;
 
-    CHK_STATUS(mustenv(CANARY_LOG_GROUP_NAME_ENV_VAR, &pLogGroupName));
-    STRNCPY(pConfig->pLogGroupName, pLogGroupName, ARRAY_SIZE(pConfig->pLogGroupName) - 1);
+    CHK_STATUS(optenv(CANARY_CHANNEL_NAME_ENV_VAR, &pChannelName, CANARY_DEFAULT_CHANNEL_NAME));
+    CHK_STATUS(optenv(CANARY_CLIENT_ID_ENV_VAR, &pClientId, CANARY_DEFAULT_CLIENT_ID));
+    CHK_STATUS(optenvBool(CANARY_IS_MASTER_ENV_VAR, &isMaster, TRUE));
+
+    CHK_STATUS(optenv(CANARY_LOG_GROUP_NAME_ENV_VAR, &pLogGroupName, CANARY_DEFAULT_LOG_GROUP_NAME));
+    STRNCPY(logGroupName, pLogGroupName, ARRAY_SIZE(logGroupName) - 1);
 
     pLogStreamName = getenv(CANARY_LOG_STREAM_NAME_ENV_VAR);
     if (pLogStreamName != NULL) {
-        STRNCPY(pConfig->pLogStreamName, pLogStreamName, ARRAY_SIZE(pConfig->pLogStreamName) - 1);
+        STRNCPY(logStreamName, pLogStreamName, ARRAY_SIZE(logStreamName) - 1);
     } else {
-        SNPRINTF(pConfig->pLogStreamName, ARRAY_SIZE(pConfig->pLogStreamName) - 1, "%s-%s-%llu", pConfig->pChannelName,
-                 pConfig->isMaster ? "master" : "viewer", GETTIME() / HUNDREDS_OF_NANOS_IN_A_MILLISECOND);
+        SNPRINTF(logStreamName, ARRAY_SIZE(logStreamName) - 1, "%s-%s-%llu", pChannelName,
+                 isMaster ? "master" : "viewer", GETTIME() / HUNDREDS_OF_NANOS_IN_A_MILLISECOND);
     }
 
-    CHK_STATUS(mustenvUint64(CANARY_DURATION_IN_SECONDS_ENV_VAR, &durationInSeconds));
-    pConfig->duration = durationInSeconds * HUNDREDS_OF_NANOS_IN_A_SECOND;
-    CHK_STATUS(mustenvUint64(CANARY_BYTE_RATE_ENV_VAR, &pConfig->bytesPerSecond));
-    CHK_STATUS(mustenvUint64(CANARY_FRAME_RATE_ENV_VAR, &pConfig->frameRate));
+    CHK_STATUS(optenvUint64(CANARY_DURATION_IN_SECONDS_ENV_VAR, &duration, 0));
+    duration *= HUNDREDS_OF_NANOS_IN_A_SECOND;
+    // Need to impose a min duration
+    if (duration != 0 && duration < CANARY_MIN_DURATION) {
+        DLOGW("Canary duration should be at least %u seconds. Overriding with minimal duration.", CANARY_MIN_DURATION / HUNDREDS_OF_NANOS_IN_A_SECOND);
+        duration = CANARY_MIN_DURATION;
+    }
+
+    // Iteration duration is an optional param
+    CHK_STATUS(optenvUint64(CANARY_ITERATION_IN_SECONDS_ENV_VAR, &iterationDuration, CANARY_DEFAULT_ITERATION_DURATION_IN_SECONDS));
+    iterationDuration *= HUNDREDS_OF_NANOS_IN_A_SECOND;
+
+    // Need to impose a min iteration duration
+    if (iterationDuration < CANARY_MIN_ITERATION_DURATION) {
+        DLOGW("Canary iterations duration should be at least %u seconds. Overriding with minimal iterations duration.", CANARY_MIN_ITERATION_DURATION / HUNDREDS_OF_NANOS_IN_A_SECOND);
+        iterationDuration = CANARY_MIN_ITERATION_DURATION;
+    }
+
+    CHK_STATUS(optenvUint64(CANARY_BIT_RATE_ENV_VAR, &bitRate, CANARY_DEFAULT_BITRATE));
+    CHK_STATUS(optenvUint64(CANARY_FRAME_RATE_ENV_VAR, &frameRate, CANARY_DEFAULT_FRAMERATE));
 
 CleanUp:
 

@@ -9,7 +9,9 @@ class CloudwatchMonitoring {
     VOID deinit();
     VOID push(const MetricDatum&);
     VOID pushExitStatus(STATUS);
+    VOID pushSignalingRoundtripStatus(STATUS);
     VOID pushSignalingInitDelay(UINT64, StandardUnit);
+    VOID pushSignalingRoundtripLatency(UINT64, StandardUnit);
     VOID pushICEHolePunchingDelay(UINT64, StandardUnit);
 
   private:
