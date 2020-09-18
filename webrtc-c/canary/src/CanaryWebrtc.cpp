@@ -120,7 +120,7 @@ STATUS run(Canary::PConfig pConfig)
 
         // Since the goal of the canary is to test robustness of the SDK, there is not an immediate need
         // to send audio frames as well. It can always be added in if needed in the future
-        std::thread videoThread(sendCustomFrames, &peer, MEDIA_STREAM_TRACK_KIND_VIDEO, peer.getDataRate(), peer.getFrameRate());
+        std::thread videoThread(sendCustomFrames, &peer, MEDIA_STREAM_TRACK_KIND_VIDEO, pConfig->bytesPerSecond, pConfig->frameRate);
         videoThread.join();
         CHK_STATUS(peer.shutdown());
     }
