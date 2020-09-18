@@ -19,10 +19,8 @@ STATUS Peer::init(const Canary::PConfig pConfig, const Callbacks& callbacks)
 {
     STATUS retStatus = STATUS_SUCCESS;
 
-    this->isMaster = pConfig->isMaster;
-    this->trickleIce = pConfig->trickleIce;
-    this->bitRate = pConfig->bitRate;
-    this->frameRate = pConfig->frameRate;
+    this->isMaster = pConfig->isMaster.value;
+    this->trickleIce = pConfig->trickleIce.value;
     this->callbacks = callbacks;
     this->canaryOutgoingRTPMetricsContext.prevTs = GETTIME();
     this->canaryOutgoingRTPMetricsContext.prevFramesDiscardedOnSend = 0;
@@ -34,8 +32,8 @@ STATUS Peer::init(const Canary::PConfig pConfig, const Callbacks& callbacks)
     this->canaryIncomingRTPMetricsContext.prevFramesDropped = 0;
     this->canaryIncomingRTPMetricsContext.prevTs = GETTIME();
 
-    CHK_STATUS(createStaticCredentialProvider((PCHAR) pConfig->pAccessKey, 0, (PCHAR) pConfig->pSecretKey, 0, (PCHAR) pConfig->pSessionToken, 0,
-                                              MAX_UINT64, &pAwsCredentialProvider));
+    CHK_STATUS(createStaticCredentialProvider((PCHAR) pConfig->accessKey.value, 0, (PCHAR) pConfig->secretKey.value, 0,
+                                              (PCHAR) pConfig->sessionToken.value, 0, MAX_UINT64, &pAwsCredentialProvider));
     CHK_STATUS(initSignaling(pConfig));
     CHK_STATUS(initRtcConfiguration(pConfig));
 
@@ -57,16 +55,16 @@ STATUS Peer::initSignaling(const Canary::PConfig pConfig)
     MEMSET(&clientCallbacks, 0, SIZEOF(clientCallbacks));
 
     clientInfo.version = SIGNALING_CLIENT_INFO_CURRENT_VERSION;
-    clientInfo.loggingLevel = pConfig->logLevel;
-    STRCPY(clientInfo.clientId, pConfig->pClientId);
+    clientInfo.loggingLevel = pConfig->logLevel.value;
+    STRCPY(clientInfo.clientId, pConfig->clientId.value);
 
     channelInfo.version = CHANNEL_INFO_CURRENT_VERSION;
-    channelInfo.pChannelName = (PCHAR) pConfig->pChannelName;
+    channelInfo.pChannelName = (PCHAR) pConfig->channelName.value;
     channelInfo.pKmsKeyId = NULL;
     channelInfo.tagCount = 0;
     channelInfo.pTags = NULL;
     channelInfo.channelType = SIGNALING_CHANNEL_TYPE_SINGLE_MASTER;
-    channelInfo.channelRoleType = pConfig->isMaster ? SIGNALING_CHANNEL_ROLE_TYPE_MASTER : SIGNALING_CHANNEL_ROLE_TYPE_VIEWER;
+    channelInfo.channelRoleType = pConfig->isMaster.value ? SIGNALING_CHANNEL_ROLE_TYPE_MASTER : SIGNALING_CHANNEL_ROLE_TYPE_VIEWER;
     channelInfo.cachingPolicy = SIGNALING_API_CALL_CACHE_TYPE_FILE;
     channelInfo.cachingPeriod = SIGNALING_API_CALL_CACHE_TTL_SENTINEL_VALUE;
     channelInfo.asyncIceServerConfig = TRUE;
@@ -189,14 +187,14 @@ STATUS Peer::initRtcConfiguration(const Canary::PConfig pConfig)
     // Set this to custom callback to enable filtering of interfaces
     pConfiguration->kvsRtcConfiguration.iceSetInterfaceFilterFunc = NULL;
 
-    if (pConfig->forceTurn) {
+    if (pConfig->forceTurn.value) {
         pConfiguration->iceTransportPolicy = ICE_TRANSPORT_POLICY_RELAY;
     }
 
     // Set the  STUN server
-    SNPRINTF(pConfiguration->iceServers[0].urls, MAX_ICE_CONFIG_URI_LEN, KINESIS_VIDEO_STUN_URL, pConfig->pRegion);
+    SNPRINTF(pConfiguration->iceServers[0].urls, MAX_ICE_CONFIG_URI_LEN, KINESIS_VIDEO_STUN_URL, pConfig->region.value);
 
-    if (pConfig->useTurn) {
+    if (pConfig->useTurn.value) {
         // Set the URIs from the configuration
         CHK_STATUS(awaitGetIceConfigInfoCount(pSignalingClientHandle, &iceConfigCount));
 
@@ -505,7 +503,7 @@ STATUS Peer::addTransceiver(RtcMediaStreamTrack& track)
     };
 
     auto handleVideoFrame = [](UINT64 customData, PFrame pFrame) -> VOID {
-        PPeer pPeer = (Canary::PPeer) (customData);
+        PPeer pPeer = (Canary::PPeer)(customData);
         std::unique_lock<std::recursive_mutex> lock(pPeer->mutex);
         PBYTE frameDataPtr = pFrame->frameData + ANNEX_B_NALU_SIZE;
         UINT32 rawPacketSize = 0;

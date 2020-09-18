@@ -8,29 +8,40 @@ typedef Config* PConfig;
 class Config {
   public:
     STATUS init(INT32 argc, PCHAR argv[]);
+    template <typename T> class Value {
+      public:
+        Value() : initialized(FALSE)
+        {
+        }
 
-    const CHAR* pChannelName;
-    const CHAR* pClientId;
-    BOOL isMaster;
-    BOOL trickleIce;
-    BOOL useTurn;
-    BOOL forceTurn;
+        T value;
+        BOOL initialized;
+    };
+
+    static STATUS init(INT32 argc, PCHAR argv[], PConfig);
+
+    Value<const CHAR*> channelName;
+    Value<const CHAR*> clientId;
+    Value<BOOL> isMaster;
+    Value<BOOL> trickleIce;
+    Value<BOOL> useTurn;
+    Value<BOOL> forceTurn;
 
     // credentials
-    const CHAR* pAccessKey;
-    const CHAR* pSecretKey;
-    const CHAR* pSessionToken;
-    const CHAR* pRegion;
+    Value<const CHAR*> accessKey;
+    Value<const CHAR*> secretKey;
+    Value<const CHAR*> sessionToken;
+    Value<const CHAR*> region;
 
     // logging
-    UINT32 logLevel;
-    CHAR logGroupName[MAX_LOG_STREAM_NAME + 1];
-    CHAR logStreamName[MAX_LOG_STREAM_NAME + 1];
+    Value<UINT32> logLevel;
+    Value<CHAR[MAX_LOG_STREAM_NAME + 1]> logGroupName;
+    Value<CHAR[MAX_LOG_STREAM_NAME + 1]> logStreamName;
 
-    UINT64 duration;
-    UINT64 iterationDuration;
-    UINT64 bitRate;
-    UINT64 frameRate;
+    Value<UINT64> duration;
+    Value<UINT64> iterationDuration;
+    Value<UINT64> bitRate;
+    Value<UINT64> frameRate;
 
     VOID print();
 };

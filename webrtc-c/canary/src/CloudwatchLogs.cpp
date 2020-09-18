@@ -13,16 +13,16 @@ STATUS CloudwatchLogs::init()
     Aws::CloudWatchLogs::Model::CreateLogStreamOutcome createLogStreamOutcome;
     CreateLogStreamRequest createLogStreamRequest;
 
-    createLogGroupRequest.SetLogGroupName(pConfig->logGroupName);
+    createLogGroupRequest.SetLogGroupName(pConfig->logGroupName.value);
     // ignore error since if this operation fails, CreateLogStream should fail as well.
     // There might be some errors that can lead to successfull CreateLogStream, e.g. log group already exists.
     this->client.CreateLogGroup(createLogGroupRequest);
 
-    createLogStreamRequest.SetLogGroupName(pConfig->logGroupName);
-    createLogStreamRequest.SetLogStreamName(pConfig->logStreamName);
+    createLogStreamRequest.SetLogGroupName(pConfig->logGroupName.value);
+    createLogStreamRequest.SetLogStreamName(pConfig->logStreamName.value);
     createLogStreamOutcome = this->client.CreateLogStream(createLogStreamRequest);
 
-    CHK_ERR(createLogStreamOutcome.IsSuccess(), STATUS_INVALID_OPERATION, "Failed to create \"%s\" log stream: %s", pConfig->logStreamName,
+    CHK_ERR(createLogStreamOutcome.IsSuccess(), STATUS_INVALID_OPERATION, "Failed to create \"%s\" log stream: %s", pConfig->logStreamName.value,
             createLogStreamOutcome.GetError().GetMessage().c_str());
 
 CleanUp:
@@ -63,8 +63,8 @@ VOID CloudwatchLogs::flush(BOOL sync)
     this->sync.await.wait(lock, waitUntilFlushed);
 
     auto request = Aws::CloudWatchLogs::Model::PutLogEventsRequest()
-                       .WithLogGroupName(this->pConfig->logGroupName)
-                       .WithLogStreamName(this->pConfig->logStreamName)
+                       .WithLogGroupName(this->pConfig->logGroupName.value)
+                       .WithLogStreamName(this->pConfig->logStreamName.value)
                        .WithLogEvents(pendingLogs);
 
     if (this->token != "") {
