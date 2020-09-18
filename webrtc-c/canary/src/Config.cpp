@@ -166,10 +166,21 @@ STATUS Config::init(INT32 argc, PCHAR argv[])
 
     CHK_STATUS(optenvUint64(CANARY_DURATION_IN_SECONDS_ENV_VAR, &duration, 0));
     duration *= HUNDREDS_OF_NANOS_IN_A_SECOND;
+    // Need to impose a min duration
+    if (duration != 0 && duration < CANARY_MIN_DURATION) {
+        DLOGW("Canary duration should be at least %u seconds. Overriding with minimal duration.", CANARY_MIN_DURATION / HUNDREDS_OF_NANOS_IN_A_SECOND);
+        duration = CANARY_MIN_DURATION;
+    }
 
     // Iteration duration is an optional param
     CHK_STATUS(optenvUint64(CANARY_ITERATION_IN_SECONDS_ENV_VAR, &iterationDuration, CANARY_DEFAULT_ITERATION_DURATION_IN_SECONDS));
     iterationDuration *= HUNDREDS_OF_NANOS_IN_A_SECOND;
+
+    // Need to impose a min iteration duration
+    if (iterationDuration < CANARY_MIN_ITERATION_DURATION) {
+        DLOGW("Canary iterations duration should be at least %u seconds. Overriding with minimal iterations duration.", CANARY_MIN_ITERATION_DURATION / HUNDREDS_OF_NANOS_IN_A_SECOND);
+        iterationDuration = CANARY_MIN_ITERATION_DURATION;
+    }
 
 CleanUp:
 

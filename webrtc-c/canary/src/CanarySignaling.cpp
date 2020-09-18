@@ -2,25 +2,6 @@
 
 #undef ENABLE_DATA_CHANNEL
 
-#define CA_CERT_PEM_FILE_EXTENSION ".pem"
-#define SIGNALING_CANARY_MASTER_CLIENT_ID "CANARY_MASTER"
-#define SIGNALING_CANARY_VIEWER_CLIENT_ID "CANARY_VIEWER"
-#define SIGNALING_CANARY_START_DELAY (100 * HUNDREDS_OF_NANOS_IN_A_MILLISECOND)
-#define SIGNALING_CANARY_MIN_SESSION_PERIOD (20 * HUNDREDS_OF_NANOS_IN_A_SECOND)
-#define SIGNALING_CANARY_OFFER "Signaling canary offer"
-#define SIGNALING_CANARY_ANSWER "Signaling canary answer"
-#define SIGNALING_CANARY_ROUNDTRIP_TIMEOUT (10 * HUNDREDS_OF_NANOS_IN_A_SECOND)
-#define SIGNALING_CANARY_CHANNEL_NAME (PCHAR) "ScaryTestChannel_"
-#define SIGNALING_CANARY_MAX_CONSECUTIVE_ITERATION_FAILURE_COUNT 5
-
-// Canary error definitions
-#define STATUS_SIGNALING_CANARY_BASE 0x73000000
-#define STATUS_SIGNALING_CANARY_UNEXPECTED_MESSAGE STATUS_SIGNALING_CANARY_BASE + 0x00000001
-#define STATUS_SIGNALING_CANARY_ANSWER_CID_MISMATCH STATUS_SIGNALING_CANARY_BASE + 0x00000002
-#define STATUS_SIGNALING_CANARY_OFFER_CID_MISMATCH STATUS_SIGNALING_CANARY_BASE + 0x00000003
-#define STATUS_SIGNALING_CANARY_ANSWER_PAYLOAD_MISMATCH STATUS_SIGNALING_CANARY_BASE + 0x00000004
-#define STATUS_SIGNALING_CANARY_OFFER_PAYLOAD_MISMATCH STATUS_SIGNALING_CANARY_BASE + 0x00000005
-
 ATOMIC_BOOL gExitCanary;
 
 STATUS run(Canary::PConfig);
@@ -46,62 +27,6 @@ VOID handleSignal(INT32 signal)
 {
     UNUSED_PARAM(signal);
     ATOMIC_STORE_BOOL(&gExitCanary, TRUE);
-}
-
-STATUS traverseDirectoryPEMFileScan(UINT64 customData, DIR_ENTRY_TYPES entryType, PCHAR fullPath, PCHAR fileName)
-{
-    UNUSED_PARAM(entryType);
-    UNUSED_PARAM(fullPath);
-
-    PCHAR certName = (PCHAR) customData;
-    UINT32 fileNameLen = STRLEN(fileName);
-
-    if (fileNameLen > ARRAY_SIZE(CA_CERT_PEM_FILE_EXTENSION) + 1 &&
-        (STRCMPI(CA_CERT_PEM_FILE_EXTENSION, &fileName[fileNameLen - ARRAY_SIZE(CA_CERT_PEM_FILE_EXTENSION) + 1]) == 0)) {
-        certName[0] = FPATHSEPARATOR;
-        certName++;
-        STRCPY(certName, fileName);
-    }
-
-    return STATUS_SUCCESS;
-}
-
-STATUS lookForCaCert(PChannelInfo pChannelInfo)
-{
-    STATUS retStatus = STATUS_SUCCESS;
-    struct stat pathStat = {0};
-    CHAR certName[MAX_PATH_LEN];
-
-    MEMSET(certName, 0x0, ARRAY_SIZE(certName));
-    pChannelInfo->pCertPath = getenv(CACERT_PATH_ENV_VAR);
-
-    // if ca cert path is not set from the environment, try to use the one that cmake detected
-    if (pChannelInfo->pCertPath == NULL) {
-        CHK_ERR(STRNLEN(DEFAULT_KVS_CACERT_PATH, MAX_PATH_LEN) > 0, STATUS_INVALID_OPERATION, "No ca cert path given (error:%s)", strerror(errno));
-        pChannelInfo->pCertPath = (PCHAR) DEFAULT_KVS_CACERT_PATH;
-    } else {
-        // Check if the environment variable is a path
-        CHK(0 == FSTAT(pChannelInfo->pCertPath, &pathStat), STATUS_DIRECTORY_ENTRY_STAT_ERROR);
-
-        if (S_ISDIR(pathStat.st_mode)) {
-            CHK_STATUS(traverseDirectory(pChannelInfo->pCertPath, (UINT64) &certName, /* iterate */ FALSE, traverseDirectoryPEMFileScan));
-
-            if (certName[0] != 0x0) {
-                STRCAT(pChannelInfo->pCertPath, certName);
-            } else {
-                DLOGW("Cert not found in path set...checking if CMake detected a path\n");
-                CHK_ERR(STRNLEN(DEFAULT_KVS_CACERT_PATH, MAX_PATH_LEN) > 0, STATUS_INVALID_OPERATION, "No ca cert path given (error:%s)",
-                        strerror(errno));
-                DLOGI("CMake detected cert path\n");
-                pChannelInfo->pCertPath = (PCHAR) DEFAULT_KVS_CACERT_PATH;
-            }
-        }
-    }
-
-CleanUp:
-
-    CHK_LOG_ERR(retStatus);
-    return retStatus;
 }
 
 INT32 main(INT32 argc, CHAR* argv[])
@@ -153,7 +78,7 @@ STATUS signalingClientStateChanged(UINT64 customData, SIGNALING_CLIENT_STATE sta
 
     signalingClientGetStateString(state, &pStateStr);
 
-    DLOGV("Signaling client state changed to %d - '%s'", state, pStateStr);
+    DLOGD("Signaling client state changed to %d - '%s'", state, pStateStr);
 
     // Return success to continue
     return retStatus;
@@ -339,7 +264,7 @@ VOID generateChannelName(PCHAR pChannelName)
 STATUS run(Canary::PConfig pConfig)
 {
     STATUS retStatus = STATUS_SUCCESS;
-    BOOL initialized = FALSE;
+    BOOL initialized = FALSE, channelNameGenerated = FALSE;
     TIMER_QUEUE_HANDLE timerQueueHandle = 0;
     UINT32 timeoutTimerId;
     ChannelInfo masterChannelInfo = {0};
@@ -384,8 +309,15 @@ STATUS run(Canary::PConfig pConfig)
                                               MAX_UINT64,
                                               &pCredentialProvider));
 
-    // Generate a random channel name
-    generateChannelName(channelName);
+    // Generate a random channel name if not specified in the config.
+    // In case we generate the random name we will follow-up with deleting
+    // it upon exit to prevent the account from ever increasing channel count
+    if (pConfig->pChannelName == NULL || IS_EMPTY_STRING(pConfig->pChannelName)) {
+        generateChannelName(channelName);
+        channelNameGenerated = TRUE;
+    } else {
+        STRNCPY(channelName, pConfig->pChannelName, MAX_CHANNEL_NAME_LEN);
+    }
 
     // Prepare the channel info structure
     masterChannelInfo.version = CHANNEL_INFO_CURRENT_VERSION;
@@ -401,7 +333,7 @@ STATUS run(Canary::PConfig pConfig)
     masterChannelInfo.asyncIceServerConfig = TRUE;
     masterChannelInfo.retry = TRUE;
     masterChannelInfo.reconnect = TRUE;
-    masterChannelInfo.pCertPath = NULL; // Will be set by lookForCaCert
+    masterChannelInfo.pCertPath = (PCHAR) DEFAULT_KVS_CACERT_PATH;
     masterChannelInfo.messageTtl = 0; // Default is 60 seconds
 
     masterSignalingClientCallbacks.version = SIGNALING_CLIENT_CALLBACKS_CURRENT_VERSION;
@@ -414,13 +346,10 @@ STATUS run(Canary::PConfig pConfig)
     masterClientInfo.loggingLevel = pConfig->logLevel;
     STRCPY(masterClientInfo.clientId, SIGNALING_CANARY_MASTER_CLIENT_ID);
 
-    // Populate the ca cert
-    lookForCaCert(&masterChannelInfo);
-
     // Create the master signaling client
-    createSignalingClientSync(&masterClientInfo, &masterChannelInfo,
-                              &masterSignalingClientCallbacks, pCredentialProvider,
-                              &masterSignalingClientHandle);
+    CHK_STATUS(createSignalingClientSync(&masterClientInfo, &masterChannelInfo,
+                                         &masterSignalingClientCallbacks, pCredentialProvider,
+                                         &masterSignalingClientHandle));
 
     canarySessionInfo.pMasterChannelInfo = &masterChannelInfo;
     canarySessionInfo.pMasterClientInfo = &masterClientInfo;
@@ -437,9 +366,9 @@ STATUS run(Canary::PConfig pConfig)
     viewerClientInfo = masterClientInfo;
     STRCPY(viewerClientInfo.clientId, SIGNALING_CANARY_VIEWER_CLIENT_ID);
 
-    createSignalingClientSync(&viewerClientInfo, &viewerChannelInfo,
-                              &viewerSignalingClientCallbacks, pCredentialProvider,
-                              &viewerSignalingClientHandle);
+    CHK_STATUS(createSignalingClientSync(&viewerClientInfo, &viewerChannelInfo,
+                                         &viewerSignalingClientCallbacks, pCredentialProvider,
+                                         &viewerSignalingClientHandle));
 
     canarySessionInfo.pViewerChannelInfo = &viewerChannelInfo;
     canarySessionInfo.pViewerClientInfo = &viewerClientInfo;
@@ -486,12 +415,17 @@ CleanUp:
     }
 
     if (IS_VALID_SIGNALING_CLIENT_HANDLE(masterSignalingClientHandle)) {
-        // Need to try to free the signaling channel first
-        signalingClientDeleteSync(masterSignalingClientHandle);
         freeSignalingClient(&masterSignalingClientHandle);
     }
 
     if (IS_VALID_SIGNALING_CLIENT_HANDLE(viewerSignalingClientHandle)) {
+        // As we are freeing the viewer (the last of the clients),
+        // we need to check whether we generated the
+        // channel name and if so delete it
+        if (channelNameGenerated) {
+            signalingClientDeleteSync(masterSignalingClientHandle);
+        }
+
         freeSignalingClient(&viewerSignalingClientHandle);
     }
 
