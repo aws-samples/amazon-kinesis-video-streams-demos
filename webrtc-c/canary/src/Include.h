@@ -69,6 +69,13 @@
 #define STATUS_SIGNALING_CANARY_ANSWER_PAYLOAD_MISMATCH STATUS_SIGNALING_CANARY_BASE + 0x00000004
 #define STATUS_SIGNALING_CANARY_OFFER_PAYLOAD_MISMATCH  STATUS_SIGNALING_CANARY_BASE + 0x00000005
 
+#define CANARY_VIDEO_FRAMES_PATH (PCHAR) "./assets/h264SampleFrames/frame-%04d.h264"
+#define CANARY_AUDIO_FRAMES_PATH (PCHAR) "./assets/opusSampleFrames/sample-%03d.opus"
+
+#define METRICS_INVOCATION_PERIOD            (60 * HUNDREDS_OF_NANOS_IN_A_SECOND)
+#define END_TO_END_METRICS_INVOCATION_PERIOD (30 * HUNDREDS_OF_NANOS_IN_A_SECOND)
+#define CANARY_METADATA_SIZE                 (SIZEOF(UINT64) + SIZEOF(UINT32) + SIZEOF(UINT32))
+
 #include <aws/core/Aws.h>
 #include <aws/monitoring/CloudWatchClient.h>
 #include <aws/monitoring/model/PutMetricDataRequest.h>
@@ -90,6 +97,6 @@ using namespace std;
 
 #include "Config.h"
 #include "CloudwatchLogs.h"
+#include "Peer.h"
 #include "CloudwatchMonitoring.h"
 #include "Cloudwatch.h"
-#include "Peer.h"

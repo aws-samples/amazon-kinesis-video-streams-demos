@@ -4,6 +4,9 @@ STATUS onNewConnection(Canary::PPeer);
 STATUS run(Canary::PConfig);
 VOID sendLocalFrames(Canary::PPeer, MEDIA_STREAM_TRACK_KIND, const std::string&, UINT64, UINT32);
 VOID sendCustomFrames(Canary::PPeer, MEDIA_STREAM_TRACK_KIND, UINT64, UINT64);
+STATUS canaryRtpOutboundStats(UINT32, UINT64, UINT64);
+STATUS canaryRtpInboundStats(UINT32, UINT64, UINT64);
+STATUS canaryEndToEndStats(UINT32, UINT64, UINT64);
 
 std::atomic<bool> terminated;
 VOID handleSignal(INT32 signal)
@@ -11,6 +14,7 @@ VOID handleSignal(INT32 signal)
     UNUSED_PARAM(signal);
     terminated = TRUE;
 }
+
 
 // add frame pts, original frame size, CRC to beginning of buffer after Annex-B format NALu
 VOID addCanaryMetadataToFrameData(PBYTE buffer, PFrame pFrame)
@@ -23,7 +27,7 @@ VOID addCanaryMetadataToFrameData(PBYTE buffer, PFrame pFrame)
     putUnalignedInt32BigEndian((PINT32) pCurPtr, COMPUTE_CRC32(buffer, pFrame->size));
 }
 
-// Frame Data format: NALu (4 bytes) + Header (PTS, Size (including header), CRC (including header) + Randomly generated frameBits
+// Frame Data format: NALu (4 bytes) + Header (PTS, Size (including header), CRC (frame data) + Randomly generated frameBits
 
 // TODO: Support dynamic random frame sizes to bring it closer to real time scenarios
 VOID createCanaryFrameData(PBYTE buffer, PFrame pFrame)
@@ -31,10 +35,10 @@ VOID createCanaryFrameData(PBYTE buffer, PFrame pFrame)
     UINT32 i;
     // For decoding purposes, the first 4 bytes need to be a NALu
     putUnalignedInt32BigEndian((PINT32) buffer, 0x00000001);
-    addCanaryMetadataToFrameData(buffer, pFrame);
     for (i = ANNEX_B_NALU_SIZE + CANARY_METADATA_SIZE; i < pFrame->size; i++) {
         buffer[i] = RAND();
     }
+    addCanaryMetadataToFrameData(buffer, pFrame);
 }
 
 INT32 main(INT32 argc, CHAR* argv[])
@@ -120,7 +124,14 @@ STATUS run(Canary::PConfig pConfig)
 
         // Since the goal of the canary is to test robustness of the SDK, there is not an immediate need
         // to send audio frames as well. It can always be added in if needed in the future
-        std::thread videoThread(sendCustomFrames, &peer, MEDIA_STREAM_TRACK_KIND_VIDEO, pConfig->bytesPerSecond, pConfig->frameRate);
+        std::thread videoThread(sendCustomFrames, &peer, MEDIA_STREAM_TRACK_KIND_VIDEO, pConfig->bitRate, pConfig->frameRate);
+        // All metrics tracking will happen on a time queue to simplify handling periodicity
+        CHK_STATUS(timerQueueAddTimer(timerQueueHandle, METRICS_INVOCATION_PERIOD, METRICS_INVOCATION_PERIOD, canaryRtpOutboundStats, (UINT64) &peer,
+                                      &timeoutTimerId));
+        CHK_STATUS(timerQueueAddTimer(timerQueueHandle, METRICS_INVOCATION_PERIOD, METRICS_INVOCATION_PERIOD, canaryRtpInboundStats, (UINT64) &peer,
+                                      &timeoutTimerId));
+        CHK_STATUS(timerQueueAddTimer(timerQueueHandle, END_TO_END_METRICS_INVOCATION_PERIOD, END_TO_END_METRICS_INVOCATION_PERIOD,
+                                      canaryEndToEndStats, (UINT64) &peer, &timeoutTimerId));
         videoThread.join();
         CHK_STATUS(peer.shutdown());
     }
@@ -204,7 +215,7 @@ VOID sendCustomFrames(Canary::PPeer pPeer, MEDIA_STREAM_TRACK_KIND kind, UINT64 
         // This re-alloc is done in case the estimated size does not match the actual requirement.
         // We do not want to constantly malloc within a loop. Hence, we re-allocate only if required
         // Either ways, the realloc should not happen
-        if (hexStrLen != SIZEOF(frame.frameData)) {
+        if (hexStrLen != (frameSizeWithoutNalu * 2 + 1)) {
             DLOGW("Re allocating...this should not happen...something might be wrong");
             frame.frameData = (PBYTE) REALLOC(frame.frameData, hexStrLen + ANNEX_B_NALU_SIZE);
             CHK_ERR(frame.frameData != NULL, STATUS_NOT_ENOUGH_MEMORY, "Failed to realloc media buffer");
@@ -229,6 +240,45 @@ CleanUp:
     } else {
         DLOGI("%s thread exited successfully", threadKind);
     }
+}
+
+STATUS canaryRtpOutboundStats(UINT32 timerId, UINT64 currentTime, UINT64 customData)
+{
+    STATUS retStatus = STATUS_SUCCESS;
+    if (!terminated.load()) {
+        Canary::PPeer pPeer = (Canary::PPeer) customData;
+        pPeer->publishStatsForCanary(RTC_STATS_TYPE_OUTBOUND_RTP);
+    } else {
+        retStatus = STATUS_TIMER_QUEUE_STOP_SCHEDULING;
+    }
+CleanUp:
+    return retStatus;
+}
+
+STATUS canaryRtpInboundStats(UINT32 timerId, UINT64 currentTime, UINT64 customData)
+{
+    STATUS retStatus = STATUS_SUCCESS;
+    if (!terminated.load()) {
+        Canary::PPeer pPeer = (Canary::PPeer) customData;
+        pPeer->publishStatsForCanary(RTC_STATS_TYPE_INBOUND_RTP);
+    } else {
+        retStatus = STATUS_TIMER_QUEUE_STOP_SCHEDULING;
+    }
+CleanUp:
+    return retStatus;
+}
+
+STATUS canaryEndToEndStats(UINT32 timerId, UINT64 currentTime, UINT64 customData)
+{
+    STATUS retStatus = STATUS_SUCCESS;
+    if (!terminated.load()) {
+        Canary::PPeer pPeer = (Canary::PPeer) customData;
+        pPeer->publishEndToEndMetrics();
+    } else {
+        retStatus = STATUS_TIMER_QUEUE_STOP_SCHEDULING;
+    }
+CleanUp:
+    return retStatus;
 }
 
 VOID sendLocalFrames(Canary::PPeer pPeer, MEDIA_STREAM_TRACK_KIND kind, const std::string& pattern, UINT64 frameCount, UINT32 frameDuration)

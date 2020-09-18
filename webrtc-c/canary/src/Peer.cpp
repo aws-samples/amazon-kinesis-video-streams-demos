@@ -24,6 +24,16 @@ STATUS Peer::init(const Canary::PConfig pConfig, const Callbacks& callbacks)
     this->bitRate = pConfig->bitRate;
     this->frameRate = pConfig->frameRate;
     this->callbacks = callbacks;
+    this->canaryOutgoingRTPMetricsContext.prevTs = GETTIME();
+    this->canaryOutgoingRTPMetricsContext.prevFramesDiscardedOnSend = 0;
+    this->canaryOutgoingRTPMetricsContext.prevNackCount = 0;
+    this->canaryOutgoingRTPMetricsContext.prevRetxBytesSent = 0;
+    this->canaryOutgoingRTPMetricsContext.prevFramesSent = 0;
+    this->canaryIncomingRTPMetricsContext.prevPacketsReceived = 0;
+    this->canaryIncomingRTPMetricsContext.prevBytesReceived = 0;
+    this->canaryIncomingRTPMetricsContext.prevFramesDropped = 0;
+    this->canaryIncomingRTPMetricsContext.prevTs = GETTIME();
+
     CHK_STATUS(createStaticCredentialProvider((PCHAR) pConfig->pAccessKey, 0, (PCHAR) pConfig->pSecretKey, 0, (PCHAR) pConfig->pSessionToken, 0,
                                               MAX_UINT64, &pAwsCredentialProvider));
     CHK_STATUS(initSignaling(pConfig));
@@ -278,7 +288,6 @@ STATUS Peer::initPeerConnection()
 
     STATUS retStatus = STATUS_SUCCESS;
     CHK(this->pPeerConnection == NULL, STATUS_INVALID_OPERATION);
-
     CHK_STATUS(createPeerConnection(&this->rtcConfiguration, &this->pPeerConnection));
     CHK_STATUS(peerConnectionOnIceCandidate(this->pPeerConnection, (UINT64) this, handleOnIceCandidate));
     CHK_STATUS(peerConnectionOnConnectionStateChange(this->pPeerConnection, (UINT64) this, onConnectionStateChange));
@@ -489,16 +498,35 @@ CleanUp:
 
 STATUS Peer::addTransceiver(RtcMediaStreamTrack& track)
 {
-    auto handleFrame = [](UINT64 customData, PFrame pFrame) -> VOID {
-        UNUSED_PARAM(customData);
-        // TODO: Probably reexpose or add metrics here directly
-        DLOGV("Frame received. TrackId: %" PRIu64 ", Size: %u, Flags %u", pFrame->trackId, pFrame->size, pFrame->flags);
-    };
-
     auto handleBandwidthEstimation = [](UINT64 customData, DOUBLE maxiumBitrate) -> VOID {
         UNUSED_PARAM(customData);
         // TODO: Probably reexpose or add metrics here directly
         DLOGV("received bitrate suggestion: %f", maxiumBitrate);
+    };
+
+    auto handleVideoFrame = [](UINT64 customData, PFrame pFrame) -> VOID {
+        PPeer pPeer = (Canary::PPeer) (customData);
+        std::unique_lock<std::recursive_mutex> lock(pPeer->mutex);
+        PBYTE frameDataPtr = pFrame->frameData + ANNEX_B_NALU_SIZE;
+        UINT32 rawPacketSize = 0;
+
+        // Get size of hex encoded data
+        hexDecode((PCHAR) frameDataPtr, pFrame->size - ANNEX_B_NALU_SIZE, NULL, &rawPacketSize);
+        PBYTE rawPacket = (PBYTE) MEMCALLOC(1, (rawPacketSize * SIZEOF(BYTE)));
+        hexDecode((PCHAR) frameDataPtr, pFrame->size - ANNEX_B_NALU_SIZE, rawPacket, &rawPacketSize);
+
+        // Extract the timestamp field from raw packet
+        frameDataPtr = rawPacket;
+        UINT64 receivedTs = getUnalignedInt64BigEndian((PINT64)(frameDataPtr));
+        frameDataPtr += SIZEOF(UINT64);
+        UINT32 receivedSize = getUnalignedInt32BigEndian((PINT32)(frameDataPtr));
+
+        pPeer->endToEndMetricsContext.frameLatency.push_back((DOUBLE)(GETTIME() - receivedTs) / HUNDREDS_OF_NANOS_IN_A_MILLISECOND);
+
+        // Do a size match of the raw packet. Since raw packet does not contain the NALu, the
+        // comparison would be rawPacketSize + ANNEX_B_NALU_SIZE and the received size
+        pPeer->endToEndMetricsContext.sizeMatch.push_back((rawPacketSize + ANNEX_B_NALU_SIZE) == receivedSize ? 0.0 : 1.0);
+        SAFE_MEMFREE(rawPacket);
     };
 
     PRtcRtpTransceiver pTransceiver;
@@ -507,11 +535,13 @@ STATUS Peer::addTransceiver(RtcMediaStreamTrack& track)
     CHK_STATUS(::addTransceiver(pPeerConnection, &track, NULL, &pTransceiver));
     if (track.kind == MEDIA_STREAM_TRACK_KIND_VIDEO) {
         this->videoTransceivers.push_back(pTransceiver);
+
+        // As part of canaries, we will only be monitoring video transceiver as we do for every other metrics
+        CHK_STATUS(transceiverOnFrame(pTransceiver, (UINT64) this, handleVideoFrame));
     } else {
         this->audioTransceivers.push_back(pTransceiver);
     }
 
-    CHK_STATUS(transceiverOnFrame(pTransceiver, (UINT64) this, handleFrame));
     CHK_STATUS(transceiverOnBandwidthEstimation(pTransceiver, (UINT64) this, handleBandwidthEstimation));
 
 CleanUp:
@@ -535,11 +565,132 @@ STATUS Peer::writeFrame(PFrame pFrame, MEDIA_STREAM_TRACK_KIND kind)
     STATUS retStatus = STATUS_SUCCESS;
 
     auto& transceivers = kind == MEDIA_STREAM_TRACK_KIND_VIDEO ? this->videoTransceivers : this->audioTransceivers;
-
+    if (kind == MEDIA_STREAM_TRACK_KIND_VIDEO) {
+        std::lock_guard<std::mutex> lock(this->countUpdateMutex);
+        if (this->recorded.load()) {
+            this->canaryOutgoingRTPMetricsContext.videoFramesGenerated = 0;
+            this->canaryOutgoingRTPMetricsContext.videoBytesGenerated = 0;
+            this->recorded = FALSE;
+        }
+        this->canaryOutgoingRTPMetricsContext.videoFramesGenerated++;
+        this->canaryOutgoingRTPMetricsContext.videoBytesGenerated += pFrame->size;
+    }
     for (auto& transceiver : transceivers) {
-        CHK_LOG_ERR(::writeFrame(transceiver, pFrame));
+        retStatus = ::writeFrame(transceiver, pFrame);
+        if (retStatus == STATUS_SRTP_NOT_READY_YET || retStatus == STATUS_SUCCESS) {
+            // do nothing
+        }
     }
 
+CleanUp:
+
+    return retStatus;
+}
+
+STATUS Peer::populateOutgoingRtpMetricsContext()
+{
+    STATUS retStatus = STATUS_SUCCESS;
+    DOUBLE currentDuration = 0;
+    DOUBLE videoFramesGenerated = 0;
+    DOUBLE videoBytesGenerated = 0;
+
+    currentDuration = (DOUBLE)(this->canaryMetrics.timestamp - this->canaryOutgoingRTPMetricsContext.prevTs) / HUNDREDS_OF_NANOS_IN_A_SECOND;
+    DLOGD("duration:%lf", currentDuration);
+    {
+        std::lock_guard<std::mutex> lock(this->countUpdateMutex);
+        this->canaryOutgoingRTPMetricsContext.framesPercentageDiscarded =
+            ((DOUBLE)(this->canaryMetrics.rtcStatsObject.outboundRtpStreamStats.framesDiscardedOnSend -
+                      this->canaryOutgoingRTPMetricsContext.prevFramesDiscardedOnSend) /
+             (DOUBLE) this->canaryOutgoingRTPMetricsContext.videoFramesGenerated) *
+            100.0;
+        this->canaryOutgoingRTPMetricsContext.retxBytesPercentage =
+            (((DOUBLE) this->canaryMetrics.rtcStatsObject.outboundRtpStreamStats.retransmittedBytesSent -
+              (DOUBLE)(this->canaryOutgoingRTPMetricsContext.prevRetxBytesSent)) /
+             (DOUBLE) this->canaryOutgoingRTPMetricsContext.videoBytesGenerated) *
+            100.0;
+    }
+
+    // This flag ensures the reset of video bytes count is done only when this flag is set
+    this->recorded = TRUE;
+    this->canaryOutgoingRTPMetricsContext.averageFramesSentPerSecond =
+        ((DOUBLE)(this->canaryMetrics.rtcStatsObject.outboundRtpStreamStats.framesSent -
+                  (DOUBLE) this->canaryOutgoingRTPMetricsContext.prevFramesSent)) /
+        currentDuration;
+    this->canaryOutgoingRTPMetricsContext.nacksPerSecond =
+        ((DOUBLE) this->canaryMetrics.rtcStatsObject.outboundRtpStreamStats.nackCount - this->canaryOutgoingRTPMetricsContext.prevNackCount) /
+        currentDuration;
+    this->canaryOutgoingRTPMetricsContext.prevFramesSent = this->canaryMetrics.rtcStatsObject.outboundRtpStreamStats.framesSent;
+    this->canaryOutgoingRTPMetricsContext.prevTs = this->canaryMetrics.timestamp;
+    this->canaryOutgoingRTPMetricsContext.prevFramesDiscardedOnSend = this->canaryMetrics.rtcStatsObject.outboundRtpStreamStats.framesDiscardedOnSend;
+    this->canaryOutgoingRTPMetricsContext.prevNackCount = this->canaryMetrics.rtcStatsObject.outboundRtpStreamStats.nackCount;
+    this->canaryOutgoingRTPMetricsContext.prevRetxBytesSent = this->canaryMetrics.rtcStatsObject.outboundRtpStreamStats.retransmittedBytesSent;
+
+    DLOGD("Frames discard percent: %lf", this->canaryOutgoingRTPMetricsContext.framesPercentageDiscarded);
+    DLOGD("Average frame rate: %lf", this->canaryOutgoingRTPMetricsContext.averageFramesSentPerSecond);
+    DLOGD("Nack rate: %lf", this->canaryOutgoingRTPMetricsContext.nacksPerSecond);
+    DLOGD("Retransmission percent: %lf", this->canaryOutgoingRTPMetricsContext.retxBytesPercentage);
+CleanUp:
+    return retStatus;
+}
+
+STATUS Peer::populateIncomingRtpMetricsContext()
+{
+    STATUS retStatus;
+    DOUBLE currentDuration = 0;
+    currentDuration = (DOUBLE)(this->canaryMetrics.timestamp - this->canaryIncomingRTPMetricsContext.prevTs) / HUNDREDS_OF_NANOS_IN_A_SECOND;
+    DLOGD("duration:%lf", currentDuration);
+    this->canaryIncomingRTPMetricsContext.packetReceiveRate =
+        (DOUBLE)(this->canaryMetrics.rtcStatsObject.inboundRtpStreamStats.received.packetsReceived -
+                 this->canaryIncomingRTPMetricsContext.prevPacketsReceived) /
+        currentDuration;
+    this->canaryIncomingRTPMetricsContext.incomingBitRate =
+        ((DOUBLE)(this->canaryMetrics.rtcStatsObject.inboundRtpStreamStats.bytesReceived - this->canaryIncomingRTPMetricsContext.prevBytesReceived) /
+         currentDuration) /
+        0.008;
+    this->canaryIncomingRTPMetricsContext.framesDroppedPerSecond =
+        ((DOUBLE) this->canaryMetrics.rtcStatsObject.inboundRtpStreamStats.received.framesDropped -
+         this->canaryIncomingRTPMetricsContext.prevFramesDropped) /
+        currentDuration;
+
+    this->canaryIncomingRTPMetricsContext.prevPacketsReceived = this->canaryMetrics.rtcStatsObject.inboundRtpStreamStats.received.packetsReceived;
+    this->canaryIncomingRTPMetricsContext.prevBytesReceived = this->canaryMetrics.rtcStatsObject.inboundRtpStreamStats.bytesReceived;
+    this->canaryIncomingRTPMetricsContext.prevFramesDropped = this->canaryMetrics.rtcStatsObject.inboundRtpStreamStats.received.framesDropped;
+    this->canaryIncomingRTPMetricsContext.prevTs = this->canaryMetrics.timestamp;
+
+    DLOGD("Packet receive rate: %lf", this->canaryIncomingRTPMetricsContext.packetReceiveRate);
+    DLOGD("Incoming bit rate: %lf", this->canaryIncomingRTPMetricsContext.incomingBitRate / 1024.0);
+    DLOGD("Frame drop rate: %lf", this->canaryIncomingRTPMetricsContext.framesDroppedPerSecond);
+CleanUp:
+    return retStatus;
+}
+STATUS Peer::publishStatsForCanary(RTC_STATS_TYPE statsType)
+{
+    STATUS retStatus = STATUS_SUCCESS;
+    this->canaryMetrics.requestedTypeOfStats = statsType;
+    switch (statsType) {
+        case RTC_STATS_TYPE_OUTBOUND_RTP:
+            CHK_LOG_ERR(::rtcPeerConnectionGetMetrics(this->pPeerConnection, this->videoTransceivers.back(), &this->canaryMetrics));
+            this->populateOutgoingRtpMetricsContext();
+            Canary::Cloudwatch::getInstance().monitoring.pushOutboundRtpStats(&this->canaryOutgoingRTPMetricsContext);
+            break;
+        case RTC_STATS_TYPE_INBOUND_RTP:
+            CHK_LOG_ERR(::rtcPeerConnectionGetMetrics(this->pPeerConnection, this->videoTransceivers.back(), &this->canaryMetrics));
+            this->populateIncomingRtpMetricsContext();
+            Canary::Cloudwatch::getInstance().monitoring.pushInboundRtpStats(&this->canaryIncomingRTPMetricsContext);
+
+            break;
+        default:
+            CHK(FALSE, STATUS_NOT_IMPLEMENTED);
+    }
+CleanUp:
+    return retStatus;
+}
+
+STATUS Peer::publishEndToEndMetrics()
+{
+    STATUS retStatus = STATUS_SUCCESS;
+    Canary::Cloudwatch::getInstance().monitoring.pushEndToEndMetrics(&this->endToEndMetricsContext);
+CleanUp:
     return retStatus;
 }
 
