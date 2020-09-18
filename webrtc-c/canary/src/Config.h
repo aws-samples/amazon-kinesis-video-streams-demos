@@ -29,7 +29,7 @@ class Config {
 
     UINT64 duration;
     UINT64 iterationDuration;
-    UINT64 bitrate;
+    UINT64 bitRate;
     UINT64 frameRate;
 
     VOID print();
