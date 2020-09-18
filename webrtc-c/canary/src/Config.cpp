@@ -182,6 +182,9 @@ STATUS Config::init(INT32 argc, PCHAR argv[])
         iterationDuration = CANARY_MIN_ITERATION_DURATION;
     }
 
+    CHK_STATUS(optenvUint64(CANARY_BIT_RATE_ENV_VAR, &bitrate, CANARY_DEFAULT_BITRATE));
+    CHK_STATUS(optenvUint64(CANARY_FRAME_RATE_ENV_VAR, &frameRate, CANARY_DEFAULT_FRAMERATE));
+
 CleanUp:
 
     return retStatus;

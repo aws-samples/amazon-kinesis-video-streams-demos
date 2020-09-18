@@ -11,18 +11,19 @@ class Peer {
         std::function<STATUS(PPeer)> onNewConnection;
     };
 
-    Peer(const Canary::PConfig, const Callbacks&);
+    Peer();
     ~Peer();
-    STATUS init();
+    STATUS init(const Canary::PConfig, const Callbacks&);
     STATUS shutdown();
     STATUS connect();
     STATUS addTransceiver(RtcMediaStreamTrack&);
     STATUS addSupportedCodec(RTC_CODEC);
     STATUS writeFrame(PFrame, MEDIA_STREAM_TRACK_KIND);
+    UINT64 getDataRate();
+    UINT64 getFrameRate();
 
   private:
-    const Canary::PConfig pConfig;
-    const Callbacks callbacks;
+    Callbacks callbacks;
     PAwsCredentialProvider pAwsCredentialProvider;
     SIGNALING_CLIENT_HANDLE pSignalingClientHandle;
     std::recursive_mutex mutex;
@@ -37,14 +38,16 @@ class Peer {
     PRtcPeerConnection pPeerConnection;
     std::vector<PRtcRtpTransceiver> audioTransceivers;
     std::vector<PRtcRtpTransceiver> videoTransceivers;
+    BOOL isMaster;
+    BOOL trickleIce;
     STATUS status;
 
     // metrics
     UINT64 signalingStartTime;
     UINT64 iceHolePunchingStartTime;
 
-    STATUS initSignaling();
-    STATUS initRtcConfiguration();
+    STATUS initSignaling(const Canary::PConfig);
+    STATUS initRtcConfiguration(const Canary::PConfig);
     STATUS initPeerConnection();
     STATUS awaitIceGathering(PRtcSessionDescriptionInit);
     STATUS handleSignalingMsg(PReceivedSignalingMessage);
