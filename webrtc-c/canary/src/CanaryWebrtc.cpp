@@ -182,7 +182,7 @@ VOID sendCustomFrames(Canary::PPeer pPeer, MEDIA_STREAM_TRACK_KIND kind, UINT64 
     UINT32 actualFrameSize = 0;
     UINT32 frameSizeWithoutNalu = 0;
     // This is the actual frame size that includes the metadata and the actual frame data
-    actualFrameSize = CANARY_METADATA_SIZE + (dataRate / frameRate);
+    actualFrameSize = CANARY_METADATA_SIZE + ((dataRate / 8) / frameRate);
     frameSizeWithoutNalu = actualFrameSize - ANNEX_B_NALU_SIZE;
 
     PBYTE canaryFrameData = NULL;
