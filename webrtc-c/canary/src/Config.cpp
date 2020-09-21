@@ -183,6 +183,7 @@ STATUS Config::initWithEnvVars()
     CHK_STATUS(optenv(CANARY_CHANNEL_NAME_ENV_VAR, &channelName, CANARY_DEFAULT_CHANNEL_NAME));
     CHK_STATUS(optenv(CANARY_CLIENT_ID_ENV_VAR, &clientId, CANARY_DEFAULT_CLIENT_ID));
     CHK_STATUS(optenvBool(CANARY_IS_MASTER_ENV_VAR, &isMaster, TRUE));
+    CHK_STATUS(optenvBool(CANARY_RUN_BOTH_PEERS_ENV_VAR, &runBothPeers, FALSE));
 
     if (!this->logGroupName.initialized) {
         CHK_STATUS(optenv(CANARY_LOG_GROUP_NAME_ENV_VAR, &logGroupName, CANARY_DEFAULT_LOG_GROUP_NAME));
@@ -233,11 +234,12 @@ VOID Config::print()
           "\tLog Stream    : %s\n"
           "\tDuration      : %lu seconds\n"
           "\tIteration     : %lu seconds\n"
+          "\tRun both peers: %s\n"
           "\n",
           this->channelName.value, this->region.value, this->clientId.value, this->isMaster.value ? "Master" : "Viewer",
           this->trickleIce.value ? "True" : "False", this->useTurn.value ? "True" : "False", this->logLevel.value, this->logGroupName.value,
           this->logStreamName.value, this->duration.value / HUNDREDS_OF_NANOS_IN_A_SECOND,
-          this->iterationDuration.value / HUNDREDS_OF_NANOS_IN_A_SECOND);
+          this->iterationDuration.value / HUNDREDS_OF_NANOS_IN_A_SECOND, this->runBothPeers.value ? "True" : "False");
 }
 
 VOID jsonString(PBYTE pRaw, jsmntok_t token, Config::Value<Config::String>* pResult)
@@ -310,6 +312,8 @@ STATUS Config::initWithJSON(PCHAR filePath)
             jsonUint64(raw, tokens[++i], &bitRate);
         } else if (compareJsonString((PCHAR) raw, &tokens[i], JSMN_STRING, (PCHAR) CANARY_FRAME_RATE_ENV_VAR)) {
             jsonUint64(raw, tokens[++i], &frameRate);
+        } else if (compareJsonString((PCHAR) raw, &tokens[i], JSMN_STRING, (PCHAR) CANARY_RUN_BOTH_PEERS_ENV_VAR)) {
+            jsonBool(raw, tokens[++i], &runBothPeers);
         } else if (compareJsonString((PCHAR) raw, &tokens[i], JSMN_STRING, (PCHAR) DEFAULT_REGION_ENV_VAR)) {
             jsonString(raw, tokens[++i], &region);
         } else if (compareJsonString((PCHAR) raw, &tokens[i], JSMN_STRING, (PCHAR) DEBUG_LOG_LEVEL_ENV_VAR)) {

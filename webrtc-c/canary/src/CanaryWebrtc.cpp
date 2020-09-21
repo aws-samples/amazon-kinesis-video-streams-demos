@@ -2,6 +2,7 @@
 
 STATUS onNewConnection(Canary::PPeer);
 STATUS run(Canary::PConfig);
+VOID runPeer(Canary::PConfig, TIMER_QUEUE_HANDLE, STATUS*);
 VOID sendLocalFrames(Canary::PPeer, MEDIA_STREAM_TRACK_KIND, const std::string&, UINT64, UINT32);
 VOID sendCustomFrames(Canary::PPeer, MEDIA_STREAM_TRACK_KIND, UINT64, UINT64);
 STATUS canaryRtpOutboundStats(UINT32, UINT64, UINT64);
@@ -94,7 +95,6 @@ STATUS run(Canary::PConfig pConfig)
     initialized = TRUE;
 
     SET_LOGGER_LOG_LEVEL(pConfig->logLevel.value);
-    pConfig->print();
 
     CHK_STATUS(timerQueueCreate(&timerQueueHandle));
 
@@ -110,27 +110,30 @@ STATUS run(Canary::PConfig pConfig)
                                       &timeoutTimerId));
     }
 
-    {
-        Canary::Peer::Callbacks callbacks;
-        callbacks.onNewConnection = onNewConnection;
-        callbacks.onDisconnected = []() { terminated = TRUE; };
+    if (!pConfig->runBothPeers.value) {
+        runPeer(pConfig, timerQueueHandle, &retStatus);
+    } else {
+        // Modify config to differentiate master and viewer
+        UINT64 timestamp = GETTIME() / HUNDREDS_OF_NANOS_IN_A_SECOND;
+        STATUS masterRetStatus;
 
-        Canary::Peer peer;
-        CHK_STATUS(peer.init(pConfig, callbacks));
-        CHK_STATUS(peer.connect());
+        Canary::Config masterConfig = *pConfig;
+        masterConfig.isMaster.value = TRUE;
+        SNPRINTF(masterConfig.clientId.value, ARRAY_SIZE(masterConfig.clientId.value), "%sMaster", pConfig->clientId.value);
+        SNPRINTF(masterConfig.logStreamName.value, ARRAY_SIZE(masterConfig.logStreamName.value), "%s-master-%llu", pConfig->channelName.value,
+                 timestamp);
 
-        // Since the goal of the canary is to test robustness of the SDK, there is not an immediate need
-        // to send audio frames as well. It can always be added in if needed in the future
-        std::thread videoThread(sendCustomFrames, &peer, MEDIA_STREAM_TRACK_KIND_VIDEO, pConfig->bitRate.value, pConfig->frameRate.value);
-        // All metrics tracking will happen on a time queue to simplify handling periodicity
-        CHK_STATUS(timerQueueAddTimer(timerQueueHandle, METRICS_INVOCATION_PERIOD, METRICS_INVOCATION_PERIOD, canaryRtpOutboundStats, (UINT64) &peer,
-                                      &timeoutTimerId));
-        CHK_STATUS(timerQueueAddTimer(timerQueueHandle, METRICS_INVOCATION_PERIOD, METRICS_INVOCATION_PERIOD, canaryRtpInboundStats, (UINT64) &peer,
-                                      &timeoutTimerId));
-        CHK_STATUS(timerQueueAddTimer(timerQueueHandle, END_TO_END_METRICS_INVOCATION_PERIOD, END_TO_END_METRICS_INVOCATION_PERIOD,
-                                      canaryEndToEndStats, (UINT64) &peer, &timeoutTimerId));
-        videoThread.join();
-        CHK_STATUS(peer.shutdown());
+        Canary::Config viewerConfig = *pConfig;
+        viewerConfig.isMaster.value = FALSE;
+        SNPRINTF(viewerConfig.clientId.value, ARRAY_SIZE(viewerConfig.clientId.value), "%sViewer", pConfig->clientId.value);
+        SNPRINTF(viewerConfig.logStreamName.value, ARRAY_SIZE(viewerConfig.logStreamName.value), "%s-viewer-%llu", pConfig->channelName.value,
+                 timestamp);
+
+        std::thread masterThread(runPeer, &masterConfig, timerQueueHandle, &masterRetStatus);
+        runPeer(&viewerConfig, timerQueueHandle, &retStatus);
+        masterThread.join();
+
+        retStatus = STATUS_FAILED(retStatus) ? retStatus : masterRetStatus;
     }
 
 CleanUp:
@@ -148,6 +151,44 @@ CleanUp:
     Canary::Cloudwatch::deinit();
 
     return retStatus;
+}
+
+VOID runPeer(Canary::PConfig pConfig, TIMER_QUEUE_HANDLE timerQueueHandle, STATUS* pRetStatus)
+{
+    STATUS retStatus = STATUS_SUCCESS;
+    UINT32 timeoutTimerId;
+
+    Canary::Peer::Callbacks callbacks;
+    callbacks.onNewConnection = onNewConnection;
+    callbacks.onDisconnected = []() { terminated = TRUE; };
+
+    Canary::Peer peer;
+
+    CHK(pConfig != NULL, STATUS_NULL_ARG);
+
+    pConfig->print();
+    CHK_STATUS(peer.init(pConfig, callbacks));
+    CHK_STATUS(peer.connect());
+
+    {
+        // Since the goal of the canary is to test robustness of the SDK, there is not an immediate need
+        // to send audio frames as well. It can always be added in if needed in the future
+        std::thread videoThread(sendCustomFrames, &peer, MEDIA_STREAM_TRACK_KIND_VIDEO, pConfig->bitRate.value, pConfig->frameRate.value);
+        // All metrics tracking will happen on a time queue to simplify handling periodicity
+        CHK_STATUS(timerQueueAddTimer(timerQueueHandle, METRICS_INVOCATION_PERIOD, METRICS_INVOCATION_PERIOD, canaryRtpOutboundStats, (UINT64) &peer,
+                                      &timeoutTimerId));
+        CHK_STATUS(timerQueueAddTimer(timerQueueHandle, METRICS_INVOCATION_PERIOD, METRICS_INVOCATION_PERIOD, canaryRtpInboundStats, (UINT64) &peer,
+                                      &timeoutTimerId));
+        CHK_STATUS(timerQueueAddTimer(timerQueueHandle, END_TO_END_METRICS_INVOCATION_PERIOD, END_TO_END_METRICS_INVOCATION_PERIOD,
+                                      canaryEndToEndStats, (UINT64) &peer, &timeoutTimerId));
+        videoThread.join();
+    }
+
+    CHK_STATUS(peer.shutdown());
+
+CleanUp:
+
+    *pRetStatus = retStatus;
 }
 
 STATUS onNewConnection(Canary::PPeer pPeer)

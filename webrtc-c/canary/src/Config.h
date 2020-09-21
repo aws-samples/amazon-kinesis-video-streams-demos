@@ -24,6 +24,7 @@ class Config {
     Value<String> channelName;
     Value<String> clientId;
     Value<BOOL> isMaster;
+    Value<BOOL> runBothPeers;
     Value<BOOL> trickleIce;
     Value<BOOL> useTurn;
     Value<BOOL> forceTurn;
