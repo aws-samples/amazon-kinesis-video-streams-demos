@@ -35,5 +35,5 @@ You can also run this with the label and latest tag:
 `sudo docker run -it --device=/dev/video0 --device=/dev/vchiq -v /opt/vc:/opt/vc rtspdockertest:latest /bin/bash`
 
 #### Run the gstreamer sample app with the requisite arguments
-`<AWS_ACCESS_KEY_ID> <AWS_SECRET_ACCESS_KEY> ./kinesis_video_gstreamer_sample_app <STREAM_NAME> <RTSP_URL>` 
+`AWS_ACCESS_KEY_ID=<AWS_ACCESS_KEY_ID> AWS_SECRET_ACCESS_KEY=<AWS_SECRET_ACCESS_KEY> ./kvs_gstreamer_sample <STREAM_NAME> <RTSP_URL>` 
 
