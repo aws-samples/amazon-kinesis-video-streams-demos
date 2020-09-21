@@ -45,6 +45,10 @@ class Config {
     Value<UINT64> frameRate;
 
     VOID print();
+
+  private:
+    STATUS initWithJSON(PCHAR);
+    STATUS initWithEnvVars();
 };
 
 } // namespace Canary
