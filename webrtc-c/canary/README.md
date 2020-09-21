@@ -19,6 +19,26 @@ To build the library and the provided samples run make in the build directory yo
 
 `make`
 
+### Run
+
+```sh
+./kvsWebrtcCanaryWebrtc [path/to/your/config.json]
+```
+
+JSON config example:
+
+```json
+{
+  "AWS_KVS_LOG_LEVEL": 2,
+  "CANARY_USE_TURN": true,
+  "CANARY_TRICKLE_ICE": true,
+  "CANARY_CLIENT_ID": "LoadTesting",
+  "CANARY_IS_MASTER": false,
+  "CANARY_CHANNEL_NAME": "ScaryTestChannel",
+  "CANARY_LOG_GROUP_NAME": "canary"
+}
+```
+
 ## Jenkins
 
 ### Prerequisites
