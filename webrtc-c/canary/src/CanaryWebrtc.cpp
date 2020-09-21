@@ -115,8 +115,6 @@ STATUS run(Canary::PConfig pConfig)
         callbacks.onNewConnection = onNewConnection;
         callbacks.onDisconnected = []() { terminated = TRUE; };
 
-        RtcMediaStreamTrack videoTrack, audioTrack;
-
         Canary::Peer peer;
         CHK_STATUS(peer.init(pConfig, callbacks));
         CHK_STATUS(peer.connect());
@@ -187,7 +185,6 @@ VOID sendCustomFrames(Canary::PPeer pPeer, MEDIA_STREAM_TRACK_KIND kind, UINT64 
 {
     STATUS retStatus = STATUS_SUCCESS;
     Frame frame;
-    PCHAR hexStr = NULL;
     UINT32 hexStrLen = 0;
     UINT32 actualFrameSize = 0;
     UINT32 frameSizeWithoutNalu = 0;
@@ -243,6 +240,8 @@ CleanUp:
 
 STATUS canaryRtpOutboundStats(UINT32 timerId, UINT64 currentTime, UINT64 customData)
 {
+    UNUSED_PARAM(timerId);
+    UNUSED_PARAM(currentTime);
     STATUS retStatus = STATUS_SUCCESS;
     if (!terminated.load()) {
         Canary::PPeer pPeer = (Canary::PPeer) customData;
@@ -250,12 +249,14 @@ STATUS canaryRtpOutboundStats(UINT32 timerId, UINT64 currentTime, UINT64 customD
     } else {
         retStatus = STATUS_TIMER_QUEUE_STOP_SCHEDULING;
     }
-CleanUp:
+
     return retStatus;
 }
 
 STATUS canaryRtpInboundStats(UINT32 timerId, UINT64 currentTime, UINT64 customData)
 {
+    UNUSED_PARAM(timerId);
+    UNUSED_PARAM(currentTime);
     STATUS retStatus = STATUS_SUCCESS;
     if (!terminated.load()) {
         Canary::PPeer pPeer = (Canary::PPeer) customData;
@@ -263,12 +264,14 @@ STATUS canaryRtpInboundStats(UINT32 timerId, UINT64 currentTime, UINT64 customDa
     } else {
         retStatus = STATUS_TIMER_QUEUE_STOP_SCHEDULING;
     }
-CleanUp:
+
     return retStatus;
 }
 
 STATUS canaryEndToEndStats(UINT32 timerId, UINT64 currentTime, UINT64 customData)
 {
+    UNUSED_PARAM(timerId);
+    UNUSED_PARAM(currentTime);
     STATUS retStatus = STATUS_SUCCESS;
     if (!terminated.load()) {
         Canary::PPeer pPeer = (Canary::PPeer) customData;
@@ -276,7 +279,7 @@ STATUS canaryEndToEndStats(UINT32 timerId, UINT64 currentTime, UINT64 customData
     } else {
         retStatus = STATUS_TIMER_QUEUE_STOP_SCHEDULING;
     }
-CleanUp:
+
     return retStatus;
 }
 

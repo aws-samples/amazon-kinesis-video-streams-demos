@@ -84,8 +84,6 @@ class Peer {
     BOOL isMaster;
     BOOL trickleIce;
     STATUS status;
-    UINT64 bitRate;
-    UINT64 frameRate;
 
     // metrics
     UINT64 signalingStartTime;
