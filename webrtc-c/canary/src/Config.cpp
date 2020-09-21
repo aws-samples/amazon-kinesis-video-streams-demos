@@ -2,6 +2,15 @@
 
 namespace Canary {
 
+BOOL strtobool(const CHAR* value)
+{
+    if (STRCMPI(value, "on") == 0 || STRCMPI(value, "true") == 0) {
+        return TRUE;
+    }
+
+    return FALSE;
+}
+
 STATUS mustenv(CHAR const* pKey, Config::Value<Config::String>* pResult)
 {
     STATUS retStatus = STATUS_SUCCESS;
@@ -42,11 +51,7 @@ STATUS mustenvBool(CHAR const* pKey, Config::Value<BOOL>* pResult)
     Config::Value<Config::String> raw;
 
     CHK_STATUS(mustenv(pKey, &raw));
-    if (STRCMPI(raw.value, "on") == 0 || STRCMPI(raw.value, "true") == 0) {
-        pResult->value = TRUE;
-    } else {
-        pResult->value = FALSE;
-    }
+    pResult->value = strtobool(raw.value);
     pResult->initialized = TRUE;
 
 CleanUp:
@@ -61,11 +66,7 @@ STATUS optenvBool(CHAR const* pKey, Config::Value<BOOL>* pResult, BOOL defVal)
 
     CHK_STATUS(optenv(pKey, &raw, ""));
     if (!IS_EMPTY_STRING(raw.value)) {
-        if (STRCMPI(raw.value, "on") == 0 || STRCMPI(raw.value, "true") == 0) {
-            pResult->value = TRUE;
-        } else {
-            pResult->value = FALSE;
-        }
+        pResult->value = strtobool(raw.value);
     } else {
         pResult->value = defVal;
     }
