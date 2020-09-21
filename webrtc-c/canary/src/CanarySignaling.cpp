@@ -103,7 +103,7 @@ STATUS signalingMessageReceived(UINT64 customData, PReceivedSignalingMessage pRe
 {
     STATUS retStatus = STATUS_SUCCESS;
     PCanarySessionInfo pCanarySessionInfo = (PCanarySessionInfo) customData;
-    SignalingMessage message = {0};
+    SignalingMessage message = {};
 
     CHK(pCanarySessionInfo != NULL, STATUS_INTERNAL_ERROR);
 
@@ -177,7 +177,7 @@ STATUS sendViewerOfferCallback(UINT32 timerId, UINT64 time, UINT64 customData)
 {
     STATUS retStatus = STATUS_SUCCESS;
     UNUSED_PARAM(timerId);
-    SignalingMessage message = {0};
+    SignalingMessage message = {};
     PCanarySessionInfo pCanarySessionInfo = (PCanarySessionInfo) customData;
     BOOL locked = FALSE;
     UINT64 curTime, latency;
@@ -263,16 +263,16 @@ STATUS run(Canary::PConfig pConfig)
     BOOL initialized = FALSE, channelNameGenerated = FALSE;
     TIMER_QUEUE_HANDLE timerQueueHandle = 0;
     UINT32 timeoutTimerId;
-    ChannelInfo masterChannelInfo = {0};
-    ChannelInfo viewerChannelInfo = {0};
-    SignalingClientInfo masterClientInfo = {0};
-    SignalingClientInfo viewerClientInfo = {0};
-    SignalingClientCallbacks masterSignalingClientCallbacks = {0};
-    SignalingClientCallbacks viewerSignalingClientCallbacks = {0};
+    ChannelInfo masterChannelInfo = {};
+    ChannelInfo viewerChannelInfo = {};
+    SignalingClientInfo masterClientInfo = {};
+    SignalingClientInfo viewerClientInfo = {};
+    SignalingClientCallbacks masterSignalingClientCallbacks = {};
+    SignalingClientCallbacks viewerSignalingClientCallbacks = {};
     PAwsCredentialProvider pCredentialProvider = NULL;
     SIGNALING_CLIENT_HANDLE masterSignalingClientHandle = INVALID_SIGNALING_CLIENT_HANDLE_VALUE;
     SIGNALING_CLIENT_HANDLE viewerSignalingClientHandle = INVALID_SIGNALING_CLIENT_HANDLE_VALUE;
-    CanarySessionInfo canarySessionInfo = {0};
+    CanarySessionInfo canarySessionInfo = {};
     MUTEX lock = INVALID_MUTEX_VALUE;
     CVAR terminateCv = INVALID_CVAR_VALUE;
     CHAR channelName[MAX_CHANNEL_NAME_LEN + 1];

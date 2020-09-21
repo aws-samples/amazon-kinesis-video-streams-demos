@@ -575,22 +575,22 @@ STATUS Peer::writeFrame(PFrame pFrame, MEDIA_STREAM_TRACK_KIND kind)
     }
     for (auto& transceiver : transceivers) {
         retStatus = ::writeFrame(transceiver, pFrame);
-        if (retStatus == STATUS_SRTP_NOT_READY_YET || retStatus == STATUS_SUCCESS) {
+        if (retStatus == STATUS_SRTP_NOT_READY_YET) {
             // do nothing
+            retStatus = STATUS_SUCCESS;
         }
+
+        CHK_STATUS(retStatus);
     }
 
 CleanUp:
 
-    return retStatus;
+    return STATUS_SUCCESS;
 }
 
 STATUS Peer::populateOutgoingRtpMetricsContext()
 {
-    STATUS retStatus = STATUS_SUCCESS;
     DOUBLE currentDuration = 0;
-    DOUBLE videoFramesGenerated = 0;
-    DOUBLE videoBytesGenerated = 0;
 
     currentDuration = (DOUBLE)(this->canaryMetrics.timestamp - this->canaryOutgoingRTPMetricsContext.prevTs) / HUNDREDS_OF_NANOS_IN_A_SECOND;
     DLOGD("duration:%lf", currentDuration);
@@ -627,13 +627,12 @@ STATUS Peer::populateOutgoingRtpMetricsContext()
     DLOGD("Average frame rate: %lf", this->canaryOutgoingRTPMetricsContext.averageFramesSentPerSecond);
     DLOGD("Nack rate: %lf", this->canaryOutgoingRTPMetricsContext.nacksPerSecond);
     DLOGD("Retransmission percent: %lf", this->canaryOutgoingRTPMetricsContext.retxBytesPercentage);
-CleanUp:
-    return retStatus;
+
+    return STATUS_SUCCESS;
 }
 
 STATUS Peer::populateIncomingRtpMetricsContext()
 {
-    STATUS retStatus;
     DOUBLE currentDuration = 0;
     currentDuration = (DOUBLE)(this->canaryMetrics.timestamp - this->canaryIncomingRTPMetricsContext.prevTs) / HUNDREDS_OF_NANOS_IN_A_SECOND;
     DLOGD("duration:%lf", currentDuration);
@@ -658,8 +657,8 @@ STATUS Peer::populateIncomingRtpMetricsContext()
     DLOGD("Packet receive rate: %lf", this->canaryIncomingRTPMetricsContext.packetReceiveRate);
     DLOGD("Incoming bit rate: %lf", this->canaryIncomingRTPMetricsContext.incomingBitRate / 1024.0);
     DLOGD("Frame drop rate: %lf", this->canaryIncomingRTPMetricsContext.framesDroppedPerSecond);
-CleanUp:
-    return retStatus;
+
+    return STATUS_SUCCESS;
 }
 STATUS Peer::publishStatsForCanary(RTC_STATS_TYPE statsType)
 {
@@ -686,10 +685,9 @@ CleanUp:
 
 STATUS Peer::publishEndToEndMetrics()
 {
-    STATUS retStatus = STATUS_SUCCESS;
     Canary::Cloudwatch::getInstance().monitoring.pushEndToEndMetrics(&this->endToEndMetricsContext);
-CleanUp:
-    return retStatus;
+
+    return STATUS_SUCCESS;
 }
 
 } // namespace Canary
