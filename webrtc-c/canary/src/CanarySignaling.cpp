@@ -305,7 +305,7 @@ STATUS run(Canary::PConfig pConfig)
     // Generate a random channel name if not specified in the config.
     // In case we generate the random name we will follow-up with deleting
     // it upon exit to prevent the account from ever increasing channel count
-    if (pConfig->channelName.value == NULL || IS_EMPTY_STRING(pConfig->channelName.value)) {
+    if (IS_EMPTY_STRING(pConfig->channelName.value)) {
         generateChannelName(channelName);
         channelNameGenerated = TRUE;
     } else {

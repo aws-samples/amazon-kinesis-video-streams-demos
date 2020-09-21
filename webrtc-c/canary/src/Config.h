@@ -17,26 +17,27 @@ class Config {
         T value;
         BOOL initialized;
     };
+    typedef CHAR String[MAX_CONFIG_STRING_LENGTH + 1];
 
     static STATUS init(INT32 argc, PCHAR argv[], PConfig);
 
-    Value<const CHAR*> channelName;
-    Value<const CHAR*> clientId;
+    Value<String> channelName;
+    Value<String> clientId;
     Value<BOOL> isMaster;
     Value<BOOL> trickleIce;
     Value<BOOL> useTurn;
     Value<BOOL> forceTurn;
 
     // credentials
-    Value<const CHAR*> accessKey;
-    Value<const CHAR*> secretKey;
-    Value<const CHAR*> sessionToken;
-    Value<const CHAR*> region;
+    Value<String> accessKey;
+    Value<String> secretKey;
+    Value<String> sessionToken;
+    Value<String> region;
 
     // logging
     Value<UINT32> logLevel;
-    Value<CHAR[MAX_LOG_STREAM_NAME + 1]> logGroupName;
-    Value<CHAR[MAX_LOG_STREAM_NAME + 1]> logStreamName;
+    Value<String> logGroupName;
+    Value<String> logStreamName;
 
     Value<UINT64> duration;
     Value<UINT64> iterationDuration;

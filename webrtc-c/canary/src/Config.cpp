@@ -2,13 +2,15 @@
 
 namespace Canary {
 
-STATUS mustenv(CHAR const* pKey, Config::Value<const CHAR*>* pResult)
+STATUS mustenv(CHAR const* pKey, Config::Value<Config::String>* pResult)
 {
     STATUS retStatus = STATUS_SUCCESS;
+    const CHAR* value;
 
     CHK(pResult != NULL, STATUS_NULL_ARG);
 
-    CHK_ERR((pResult->value = getenv(pKey)) != NULL, STATUS_INVALID_OPERATION, "%s must be set", pKey);
+    CHK_ERR((value = getenv(pKey)) != NULL, STATUS_INVALID_OPERATION, "%s must be set", pKey);
+    SNPRINTF(pResult->value, ARRAY_SIZE(pResult->value), "%s", value);
     pResult->initialized = TRUE;
 
 CleanUp:
@@ -16,15 +18,17 @@ CleanUp:
     return retStatus;
 }
 
-STATUS optenv(CHAR const* pKey, Config::Value<const CHAR*>* pResult, const CHAR* pDefault)
+STATUS optenv(CHAR const* pKey, Config::Value<Config::String>* pResult, const CHAR* pDefault)
 {
     STATUS retStatus = STATUS_SUCCESS;
+    const CHAR* value;
 
     CHK(pResult != NULL, STATUS_NULL_ARG);
 
-    if (NULL == (pResult->value = getenv(pKey))) {
-        pResult->value = pDefault;
+    if (NULL == (value = getenv(pKey))) {
+        value = pDefault;
     }
+    SNPRINTF(pResult->value, ARRAY_SIZE(pResult->value), "%s", value);
     pResult->initialized = TRUE;
 
 CleanUp:
@@ -35,7 +39,7 @@ CleanUp:
 STATUS mustenvBool(CHAR const* pKey, Config::Value<BOOL>* pResult)
 {
     STATUS retStatus = STATUS_SUCCESS;
-    Config::Value<const CHAR*> raw;
+    Config::Value<Config::String> raw;
 
     CHK_STATUS(mustenv(pKey, &raw));
     if (STRCMPI(raw.value, "on") == 0 || STRCMPI(raw.value, "true") == 0) {
@@ -53,10 +57,10 @@ CleanUp:
 STATUS optenvBool(CHAR const* pKey, Config::Value<BOOL>* pResult, BOOL defVal)
 {
     STATUS retStatus = STATUS_SUCCESS;
-    Config::Value<const CHAR*> raw;
+    Config::Value<Config::String> raw;
 
-    CHK_STATUS(optenv(pKey, &raw, NULL));
-    if (raw.value != NULL) {
+    CHK_STATUS(optenv(pKey, &raw, ""));
+    if (!IS_EMPTY_STRING(raw.value)) {
         if (STRCMPI(raw.value, "on") == 0 || STRCMPI(raw.value, "true") == 0) {
             pResult->value = TRUE;
         } else {
@@ -75,7 +79,7 @@ CleanUp:
 STATUS mustenvUint64(CHAR const* pKey, Config::Value<UINT64>* pResult)
 {
     STATUS retStatus = STATUS_SUCCESS;
-    Config::Value<const CHAR*> raw;
+    Config::Value<Config::String> raw;
 
     CHK_STATUS(mustenv(pKey, &raw));
     STRTOUI64((PCHAR) raw.value, NULL, 10, &pResult->value);
@@ -89,10 +93,10 @@ CleanUp:
 STATUS optenvUint64(CHAR const* pKey, Config::Value<UINT64>* pResult, UINT64 defVal)
 {
     STATUS retStatus = STATUS_SUCCESS;
-    Config::Value<const CHAR*> raw;
+    Config::Value<Config::String> raw;
 
-    CHK_STATUS(optenv(pKey, &raw, NULL));
-    if (raw.value != NULL) {
+    CHK_STATUS(optenv(pKey, &raw, ""));
+    if (!IS_EMPTY_STRING(raw.value)) {
         STRTOUI64((PCHAR) raw.value, NULL, 10, &pResult->value);
     } else {
         pResult->value = defVal;
@@ -135,7 +139,7 @@ STATUS Config::init(INT32 argc, PCHAR argv[])
     STATUS retStatus = STATUS_SUCCESS;
     Config::Value<UINT64> logLevel64;
     PCHAR pLogStreamName;
-    Config::Value<const CHAR*> logGroupName;
+    Config::Value<Config::String> logGroupName;
 
     CHK(argv != NULL, STATUS_NULL_ARG);
 
@@ -149,7 +153,7 @@ STATUS Config::init(INT32 argc, PCHAR argv[])
 
     CHK_STATUS(mustenv(ACCESS_KEY_ENV_VAR, &accessKey));
     CHK_STATUS(mustenv(SECRET_KEY_ENV_VAR, &secretKey));
-    CHK_STATUS(optenv(SESSION_TOKEN_ENV_VAR, &sessionToken, NULL));
+    CHK_STATUS(optenv(SESSION_TOKEN_ENV_VAR, &sessionToken, ""));
     CHK_STATUS(optenv(DEFAULT_REGION_ENV_VAR, &region, DEFAULT_AWS_REGION));
 
     // Set the logger log level
@@ -162,14 +166,14 @@ STATUS Config::init(INT32 argc, PCHAR argv[])
     CHK_STATUS(optenvBool(CANARY_IS_MASTER_ENV_VAR, &isMaster, TRUE));
 
     CHK_STATUS(optenv(CANARY_LOG_GROUP_NAME_ENV_VAR, &logGroupName, CANARY_DEFAULT_LOG_GROUP_NAME));
-    STRNCPY(this->logGroupName.value, logGroupName.value, ARRAY_SIZE(this->logGroupName.value) - 1);
+    SNPRINTF(this->logGroupName.value, ARRAY_SIZE(this->logGroupName.value), "%s", logGroupName.value);
     this->logGroupName.initialized = TRUE;
 
     pLogStreamName = getenv(CANARY_LOG_STREAM_NAME_ENV_VAR);
     if (pLogStreamName != NULL) {
-        STRNCPY(this->logStreamName.value, pLogStreamName, ARRAY_SIZE(this->logStreamName.value) - 1);
+        SNPRINTF(this->logStreamName.value, ARRAY_SIZE(this->logStreamName.value), "%s", logStreamName.value);
     } else {
-        SNPRINTF(this->logStreamName.value, ARRAY_SIZE(this->logStreamName.value) - 1, "%s-%s-%llu", channelName.value,
+        SNPRINTF(this->logStreamName.value, ARRAY_SIZE(this->logStreamName.value), "%s-%s-%llu", channelName.value,
                  isMaster.value ? "master" : "viewer", GETTIME() / HUNDREDS_OF_NANOS_IN_A_MILLISECOND);
     }
 
