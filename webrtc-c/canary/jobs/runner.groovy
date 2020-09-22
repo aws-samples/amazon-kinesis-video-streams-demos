@@ -41,7 +41,7 @@ def buildPeer(isMaster, params) {
             mkdir -p build && 
             cd build && 
             cmake .. -DCMAKE_INSTALL_PREFIX=$WORKSPACE/webrtc-c/canary/build && 
-            make -j kvsWebrtcCanary"""
+            make -j kvsWebrtcCanaryWebrtc"""
     }
 
     RUNNING_NODES_IN_BUILDING--
@@ -56,7 +56,7 @@ def buildPeer(isMaster, params) {
                 sh """
                     cd $WORKSPACE/webrtc-c/canary/build && 
                     ${isMaster ? "" : "sleep 5 &&"}
-                    ./kvsWebrtcCanary"""
+                    ./kvsWebrtcCanaryWebrtc"""
             } catch (FlowInterruptedException err) {
                 echo 'Aborted due to cancellation'
                 throw err
