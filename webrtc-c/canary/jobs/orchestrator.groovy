@@ -96,8 +96,8 @@ pipeline {
                                 booleanParam(name: 'USE_TURN', value: true),
                                 booleanParam(name: 'TRICKLE_ICE', value: true),
                                 string(name: 'DURATION_IN_SECONDS', value: DURATION_IN_SECONDS.toString()),
-                                string(name: 'MASTER_NODE_LABEL', value: "personal"),
-                                string(name: 'VIEWER_NODE_LABEL', value: "personal"),
+                                string(name: 'MASTER_NODE_LABEL', value: "ec2-us-west-2"),
+                                string(name: 'VIEWER_NODE_LABEL', value: "ec2-us-west-2"),
                                 string(name: 'RUNNER_LABEL', value: "Default"),
                             ],
                             wait: false
