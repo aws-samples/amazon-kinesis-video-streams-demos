@@ -1,7 +1,34 @@
+import java.lang.reflect.*;
+import jenkins.model.*;
+import org.jenkinsci.plugins.scriptsecurity.scripts.*;
+import org.jenkinsci.plugins.scriptsecurity.sandbox.whitelists.*;
+
 NAMESPACE="webrtc-canary"
 WORKSPACE="webrtc-c/canary"
 JOBS_DIR="$WORKSPACE/jobs"
 NUM_LOGS=20
+
+void approveSignatures(ArrayList<String> signatures) {
+    scriptApproval = ScriptApproval.get()
+    alreadyApproved = new HashSet<>(Arrays.asList(scriptApproval.getApprovedSignatures()))
+    signatures.each {
+      if (!alreadyApproved.contains(it)) {
+        scriptApproval.approveSignature(it)
+      }
+    }
+}
+
+approveSignatures([
+    "method hudson.model.ItemGroup getAllItems java.lang.Class",
+    "method hudson.model.Job getBuilds",
+    "method hudson.model.Job isBuilding",
+    "method hudson.model.Run isBuilding",
+    "method jenkins.model.Jenkins getItemByFullName java.lang.String",
+    "method jenkins.model.ParameterizedJobMixIn\$ParameterizedJob isDisabled",
+    "method jenkins.model.ParameterizedJobMixIn\$ParameterizedJob setDisabled boolean",
+    "method org.jenkinsci.plugins.workflow.job.WorkflowRun doKill",
+    "staticMethod jenkins.model.Jenkins getInstance"
+])
 
 pipelineJob("${NAMESPACE}-orchestrator") {
     throttleConcurrentBuilds {
