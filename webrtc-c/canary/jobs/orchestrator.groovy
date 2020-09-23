@@ -1,7 +1,8 @@
 import jenkins.model.*
 
 RUNNER_JOB_NAME_PREFIX = "webrtc-canary-runner"
-DURATION_IN_SECONDS = 30
+PERIODIC_DURATION_IN_SECONDS = 30
+LONG_RUNNING_DURATION_IN_SECONDS = 0
 MIN_RETRY_DELAY_IN_SECONDS = 60
 COLD_STARTUP_DELAY_IN_SECONDS = 60 * 60
 GIT_URL = 'https://github.com/aws-samples/amazon-kinesis-video-streams-demos.git'
@@ -116,10 +117,23 @@ pipeline {
                             parameters: COMMON_PARAMS + [
                                 booleanParam(name: 'USE_TURN', value: true),
                                 booleanParam(name: 'TRICKLE_ICE', value: true),
-                                string(name: 'DURATION_IN_SECONDS', value: DURATION_IN_SECONDS.toString()),
+                                string(name: 'DURATION_IN_SECONDS', value: PERIODIC_DURATION_IN_SECONDS.toString()),
                                 string(name: 'MASTER_NODE_LABEL', value: "ec2-us-west-2"),
                                 string(name: 'VIEWER_NODE_LABEL', value: "ec2-us-west-2"),
-                                string(name: 'RUNNER_LABEL', value: "Default"),
+                                string(name: 'RUNNER_LABEL', value: "Periodic"),
+                            ],
+                            wait: false
+                        )
+
+                        build(
+                            job: NEXT_AVAILABLE_RUNNER,
+                            parameters: COMMON_PARAMS + [
+                                booleanParam(name: 'USE_TURN', value: true),
+                                booleanParam(name: 'TRICKLE_ICE', value: true),
+                                string(name: 'DURATION_IN_SECONDS', value: LONG_RUNNING_DURATION_IN_SECONDS.toString()),
+                                string(name: 'MASTER_NODE_LABEL', value: "ec2-us-west-2"),
+                                string(name: 'VIEWER_NODE_LABEL', value: "ec2-us-west-2"),
+                                string(name: 'RUNNER_LABEL', value: "LongRunning"),
                             ],
                             wait: false
                         )
