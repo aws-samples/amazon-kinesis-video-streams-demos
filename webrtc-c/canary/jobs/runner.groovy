@@ -37,11 +37,11 @@ def buildPeer(isMaster, params) {
                   userRemoteConfigs: [[url: params.GIT_URL]]])
 
         sh """
-            cd $WORKSPACE/webrtc-c/canary && 
+            cd ./webrtc-c/canary && 
             mkdir -p build && 
             cd build && 
-            cmake .. -DCMAKE_INSTALL_PREFIX=$WORKSPACE/webrtc-c/canary/build && 
-            make -j kvsWebrtcCanaryWebrtc"""
+            cmake .. -DCMAKE_INSTALL_PREFIX="\$PWD" && 
+            make -j"""
     }
 
     RUNNING_NODES_IN_BUILDING--
@@ -54,7 +54,7 @@ def buildPeer(isMaster, params) {
         withCredentials(credentials) {
             try {
                 sh """
-                    cd $WORKSPACE/webrtc-c/canary/build && 
+                    cd ./webrtc-c/canary/build && 
                     ${isMaster ? "" : "sleep 5 &&"}
                     ./kvsWebrtcCanaryWebrtc"""
             } catch (FlowInterruptedException err) {
