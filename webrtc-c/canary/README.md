@@ -55,13 +55,16 @@ Required Credentials:
 Required Script Signature Approvals:
 * method hudson.model.ItemGroup getAllItems java.lang.Class
 * method hudson.model.Job getBuilds
+* method hudson.model.Job getLastBuild
 * method hudson.model.Job isBuilding
+* method hudson.model.Run getTimeInMillis
 * method hudson.model.Run isBuilding
 * method jenkins.model.Jenkins getItemByFullName java.lang.String
 * method jenkins.model.ParameterizedJobMixIn$ParameterizedJob isDisabled
 * method jenkins.model.ParameterizedJobMixIn$ParameterizedJob setDisabled boolean
 * method org.jenkinsci.plugins.workflow.job.WorkflowRun doKill
 * staticMethod jenkins.model.Jenkins getInstance
+* staticField java.lang.Long MAX_VALUE
 
 Create Nodes with the following labels:
 

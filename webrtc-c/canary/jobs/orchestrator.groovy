@@ -14,6 +14,17 @@ COMMON_PARAMS = [
     string(name: 'LOG_GROUP_NAME', value: "canary"),
 ]
 
+def getJobLastBuildTimestamp(job) {
+    def timestamp = 0
+    def lastBuild = job.getLastBuild()
+
+    if (lastBuild != null) {
+        timestamp = lastBuild.getTimeInMillis()
+    }
+
+    return timestamp
+}
+
 def cancelJob(jobName) {
     def job = Jenkins.instance.getItemByFullName(jobName)
 
@@ -66,7 +77,17 @@ pipeline {
                     steps {
                         script {
                             def runners = findRunners()
-                            def nextRunner = runners.find({ item -> item.isDisabled() || !item.isBuilding() })
+                            def nextRunner = null 
+                            def oldestTimestamp = Long.MAX_VALUE
+
+                            // find the least active runner
+                            runners.each {
+                                def timestamp = getJobLastBuildTimestamp(it)
+                                if ((it.isDisabled() || !it.isBuilding()) && timestamp < oldestTimestamp) {
+                                    nextRunner = it
+                                    oldestTimestamp = timestamp
+                                }
+                            }
 
                             if (nextRunner == null) {
                                 error "There's no available runner"
@@ -75,8 +96,8 @@ pipeline {
                             NEXT_AVAILABLE_RUNNER = nextRunner.getDisplayName()
                             echo "Found next available runner: ${NEXT_AVAILABLE_RUNNER}"
 
-                            ACTIVE_RUNNERS = runners.findAll({ item -> item != nextRunner && item.isBuilding() })
-                                                          .collect({ item -> item.getDisplayName() })
+                            ACTIVE_RUNNERS = runners.findAll({ item -> item != nextRunner && (!item.isDisabled() || item.isBuilding()) })
+                                                    .collect({ item -> item.getDisplayName() })
                             echo "Found current active runners: ${ACTIVE_RUNNERS}"
                         }
                     }
