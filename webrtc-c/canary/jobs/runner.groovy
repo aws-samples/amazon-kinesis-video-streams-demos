@@ -30,8 +30,7 @@ def buildPeer(isMaster, params) {
 
     // TODO: get the branch and version from orchestrator
     if (params.FIRST_ITERATION) {
-        // TODO: uncomment this when this is stable
-        // deleteDir()
+        deleteDir()
 
         checkout([$class: 'GitSCM', branches: [[name: params.GIT_HASH ]],
                   userRemoteConfigs: [[url: params.GIT_URL]]])
