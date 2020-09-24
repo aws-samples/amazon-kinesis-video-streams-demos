@@ -13,8 +13,6 @@ CREDENTIALS = [
 ]
 
 def buildProject() {
-    deleteDir()
-
     checkout([$class: 'GitSCM', branches: [[name: params.GIT_HASH ]],
               userRemoteConfigs: [[url: params.GIT_URL]]])
 
@@ -61,8 +59,9 @@ def buildPeer(isMaster, params) {
 
     // TODO: get the branch and version from orchestrator
     if (params.FIRST_ITERATION) {
-        buildProject()
+        deleteDir()
     }
+    buildProject()
 
     RUNNING_NODES_IN_BUILDING--
     
@@ -89,8 +88,9 @@ def buildSignaling(params) {
     
     // TODO: get the branch and version from orchestrator
     if (params.FIRST_ITERATION) {
-        buildProject()
+        deleteDir()
     }
+    buildProject()
 
     withRunnerWrapper(envs) {
         sh """
