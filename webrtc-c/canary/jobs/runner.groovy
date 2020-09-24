@@ -3,6 +3,45 @@ import org.jenkinsci.plugins.workflow.steps.FlowInterruptedException
 START_TIMESTAMP = new Date().getTime()
 RUNNING_NODES_IN_BUILDING = 0
 HAS_ERROR = false
+CREDENTIALS = [
+    [
+        $class: 'AmazonWebServicesCredentialsBinding', 
+        accessKeyVariable: 'AWS_ACCESS_KEY_ID',
+        credentialsId: 'CANARY_CREDENTIALS',
+        secretKeyVariable: 'AWS_SECRET_ACCESS_KEY'
+    ]
+]
+
+def buildProject() {
+    deleteDir()
+
+    checkout([$class: 'GitSCM', branches: [[name: params.GIT_HASH ]],
+              userRemoteConfigs: [[url: params.GIT_URL]]])
+
+    sh """
+        cd ./webrtc-c/canary && 
+        mkdir -p build && 
+        cd build && 
+        cmake .. -DCMAKE_INSTALL_PREFIX="\$PWD" && 
+        make -j"""
+}
+
+def withRunnerWrapper(envs, fn) {
+    withEnv(envs) {
+        withCredentials(CREDENTIALS) {
+            try {
+                fn()
+            } catch (FlowInterruptedException err) {
+                echo 'Aborted due to cancellation'
+                throw err
+            } catch (err) {
+                HAS_ERROR = true
+                // Ignore errors so that we can auto recover by retrying
+                unstable err.toString()
+            }
+        }
+    }
+}
 
 def buildPeer(isMaster, params) {
     def clientID = isMaster ? "Master" : "Viewer"
@@ -17,30 +56,12 @@ def buildPeer(isMaster, params) {
       'CANARY_IS_MASTER': isMaster,
       'CANARY_DURATION_IN_SECONDS': params.DURATION_IN_SECONDS
     ].collect({ k, v -> "${k}=${v}" })
-    def credentials = [
-        [
-            $class: 'AmazonWebServicesCredentialsBinding', 
-            accessKeyVariable: 'AWS_ACCESS_KEY_ID',
-            credentialsId: 'CANARY_CREDENTIALS',
-            secretKeyVariable: 'AWS_SECRET_ACCESS_KEY'
-        ]
-    ]
     
     RUNNING_NODES_IN_BUILDING++
 
     // TODO: get the branch and version from orchestrator
     if (params.FIRST_ITERATION) {
-        deleteDir()
-
-        checkout([$class: 'GitSCM', branches: [[name: params.GIT_HASH ]],
-                  userRemoteConfigs: [[url: params.GIT_URL]]])
-
-        sh """
-            cd ./webrtc-c/canary && 
-            mkdir -p build && 
-            cd build && 
-            cmake .. -DCMAKE_INSTALL_PREFIX="\$PWD" && 
-            make -j"""
+        buildProject()
     }
 
     RUNNING_NODES_IN_BUILDING--
@@ -49,22 +70,32 @@ def buildPeer(isMaster, params) {
         RUNNING_NODES_IN_BUILDING == 0
     }
 
-    withEnv(envs) {
-        withCredentials(credentials) {
-            try {
-                sh """
-                    cd ./webrtc-c/canary/build && 
-                    ${isMaster ? "" : "sleep 5 &&"}
-                    ./kvsWebrtcCanaryWebrtc"""
-            } catch (FlowInterruptedException err) {
-                echo 'Aborted due to cancellation'
-                throw err
-            } catch (err) {
-                HAS_ERROR = true
-                // Ignore errors so that we can auto recover by retrying
-                unstable err.toString()
-            }
-        }
+    withRunnerWrapper(envs) {
+        sh """
+            cd ./webrtc-c/canary/build && 
+            ${isMaster ? "" : "sleep 5 &&"}
+            ./kvsWebrtcCanaryWebrtc"""
+    }
+}
+
+def buildSignaling(params) {
+    def envs = [
+      'AWS_KVS_LOG_LEVEL': params.AWS_KVS_LOG_LEVEL,
+      'CANARY_LOG_GROUP_NAME': params.LOG_GROUP_NAME,
+      'CANARY_LOG_STREAM_NAME': "${params.RUNNER_LABEL}-Signaling-${START_TIMESTAMP}",
+      'CANARY_CHANNEL_NAME': "${env.JOB_NAME}-${params.RUNNER_LABEL}",
+      'CANARY_DURATION_IN_SECONDS': params.DURATION_IN_SECONDS
+    ].collect({ k, v -> "${k}=${v}" })
+    
+    // TODO: get the branch and version from orchestrator
+    if (params.FIRST_ITERATION) {
+        buildProject()
+    }
+
+    withRunnerWrapper(envs) {
+        sh """
+            cd ./webrtc-c/canary/build && 
+            ./kvsWebrtcCanarySignaling"""
     }
 }
 
@@ -75,6 +106,7 @@ pipeline {
 
     parameters {
         choice(name: 'AWS_KVS_LOG_LEVEL', choices: ["1", "2", "3", "4", "5"])
+        booleanParam(name: 'IS_SIGNALING')
         booleanParam(name: 'USE_TURN')
         booleanParam(name: 'TRICKLE_ICE')
         string(name: 'LOG_GROUP_NAME')
@@ -95,8 +127,11 @@ pipeline {
             }
         }
 
-        stage('Build and Run') {
+        stage('Build and Run Webrtc Canary') {
             failFast true
+            when {
+                equals expected: false, actual: params.IS_SIGNALING
+            }
 
             parallel {
                 stage('Master') {
@@ -121,6 +156,19 @@ pipeline {
             }
         }
 
+        stage('Build and Run Signaling Canary') {
+            failFast true
+            when {
+                equals expected: true, actual: params.IS_SIGNALING
+            }
+
+            steps {
+                script {
+                    buildSignaling(params)
+                }
+            }
+        }
+
         // In case of failures, we should add some delays so that we don't get into a tight loop of retrying
         stage('Throttling Retry') {
             when {
@@ -139,6 +187,7 @@ pipeline {
                     job: env.JOB_NAME,
                     parameters: [
                       string(name: 'AWS_KVS_LOG_LEVEL', value: params.AWS_KVS_LOG_LEVEL),
+                      booleanParam(name: 'IS_SIGNALING', value: params.IS_SIGNALING),
                       booleanParam(name: 'USE_TURN', value: params.USE_TURN),
                       booleanParam(name: 'TRICKLE_ICE', value: params.TRICKLE_ICE),
                       string(name: 'LOG_GROUP_NAME', value: params.LOG_GROUP_NAME),
