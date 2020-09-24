@@ -1,6 +1,6 @@
 {
-	"canary_stream_name": "test", 
-	"canary_type": "realtime", # Allowed values: realtime, offline
-	"fragment_size": "1048576", # Preferrably multiples of 1024 bytes
-	"canary_duration_in_sec": "60",
+	"CANARY_STREAM_NAME": "test", 
+	"CANARY_TYPE": "realtime", # Allowed values: realtime, offline
+	"FRAGMENT_SIZE_IN_BYTES": "1048576", # Preferrably multiples of 1024 bytes
+	"CANARY_DURATION_IN_SECONDS": "60",
 }
