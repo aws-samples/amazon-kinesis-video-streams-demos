@@ -31,6 +31,22 @@ extern "C" {
 #define CANARY_FILE_LOGGING_BUFFER_SIZE (200 * 1024)
 #define CANARY_MAX_NUMBER_OF_LOG_FILES  10
 #define CANARY_APP_FILE_LOGGER          (PCHAR) "ENABLE_FILE_LOGGER"
+
+#define CANARY_TYPE_REALTIME       (PCHAR) "realtime"
+#define CANARY_TYPE_OFFLINE        (PCHAR) "offline"
+#define CANARY_STREAM_NAME_ENV_VAR (PCHAR) "CANARY_STREAM_NAME"
+#define CANARY_TYPE_ENV_VAR        (PCHAR) "CANARY_TYPE"
+#define FRAGMENT_SIZE_ENV_VAR      (PCHAR) "FRAGMENT_SIZE_IN_BYTES"
+#define CANARY_DURATION_ENV_VAR    (PCHAR) "CANARY_DURATION_IN_SECONDS"
+
+#define CANARY_DEFAULT_STREAM_NAME         (PCHAR) "TestStream"
+#define CANARY_DEFAULT_CANARY_TYPE         CANARY_TYPE_REALTIME
+#define CANARY_DEFAULT_DURATION_IN_SECONDS 60
+#define CANARY_DEFAULT_FRAGMENT_SIZE       (25 * 1024)
+
+#define CANARY_TYPE_STR_LEN        10
+#define CANARY_STREAM_NAME_STR_LEN 200
+
 struct __CallbackStateMachine;
 struct __CallbacksProvider;
 
@@ -39,9 +55,9 @@ struct __CallbacksProvider;
 ////////////////////////////////////////////////////////////////////////
 
 typedef struct {
-    CHAR streamNamePrefix[200 + 1];
+    CHAR streamNamePrefix[CANARY_STREAM_NAME_STR_LEN + 1];
+    CHAR canaryTypeStr[CANARY_TYPE_STR_LEN + 1];
     UINT64 fragmentSizeInBytes;
-    CHAR canaryTypeStr[15 + 1];
     UINT64 canaryDuration;
 } CanaryConfig;
 
@@ -94,6 +110,16 @@ VOID cloudWatchLogger(UINT32, PCHAR, PCHAR, ...);
 STATUS initializeCloudwatchLogger(PCloudwatchLogsObject);
 VOID canaryStreamSendLogs(PCloudwatchLogsObject);
 VOID canaryStreamSendLogSync(PCloudwatchLogsObject);
+
+////////////////////////////////////////////////////////////////////////
+// Initial canary setup
+////////////////////////////////////////////////////////////////////////
+VOID getJsonValue(PBYTE, jsmntok_t, PCHAR);
+STATUS parseConfigFile(PCanaryConfig, PCHAR);
+STATUS optenv(PCHAR, PCHAR, PCHAR);
+STATUS optenvUint64(PCHAR, PUINT64, UINT64);
+STATUS printConfig(PCanaryConfig);
+STATUS initWithEnvVars(PCanaryConfig);
 
 #ifdef __cplusplus
 }

@@ -33,14 +33,12 @@ VOID createCanaryFrameData(PFrame pFrame)
 
 VOID adjustStreamInfoToCanaryType(PStreamInfo pStreamInfo, PCHAR canaryType)
 {
-    if(0 == STRNCMP(canaryType, "realtime", ARRAY_SIZE("realtime") - 1)) {
+    if (0 == STRNCMP(canaryType, CANARY_TYPE_REALTIME, STRLEN(CANARY_TYPE_REALTIME))) {
         pStreamInfo->streamCaps.streamingType = STREAMING_TYPE_REALTIME;
-    }
-    else if (0 == STRNCMP(canaryType, (PCHAR)"offline", ARRAY_SIZE("offline") - 1)) {
+    } else if (0 == STRNCMP(canaryType, CANARY_TYPE_OFFLINE, STRLEN(CANARY_TYPE_OFFLINE))) {
         pStreamInfo->streamCaps.streamingType = STREAMING_TYPE_OFFLINE;
     }
 }
-
 VOID getJsonValue(PBYTE params, jsmntok_t tokens, PCHAR param_str)
 {
     PCHAR json_key = NULL;
@@ -60,6 +58,7 @@ STATUS parseConfigFile(PCanaryConfig pCanaryConfig, PCHAR filePath)
     int r;
     BYTE params[1024];
 
+    CHK(pCanaryConfig != NULL, STATUS_NULL_ARG);
     CHK_STATUS(readFile(filePath, TRUE, NULL, &size));
     CHK_ERR(size < 1024, STATUS_INVALID_ARG_LEN, "File size too big. Max allowed is 1024 bytes");
     CHK_STATUS(readFile(filePath, TRUE, params, &size));
@@ -70,22 +69,80 @@ STATUS parseConfigFile(PCanaryConfig pCanaryConfig, PCHAR filePath)
     r = jsmn_parse(&parser, (PCHAR) params, size, tokens, 256);
 
     for (UINT32 i = 1; i < (UINT32) r; i++) {
-        if (compareJsonString((PCHAR) params, &tokens[i], JSMN_STRING, (PCHAR) "canary_stream_name")) {
+        if (compareJsonString((PCHAR) params, &tokens[i], JSMN_STRING, CANARY_STREAM_NAME_ENV_VAR)) {
             getJsonValue(params, tokens[i + 1], pCanaryConfig->streamNamePrefix);
             i++;
-        } else if (compareJsonString((PCHAR) params, &tokens[i], JSMN_STRING, (PCHAR) "canary_type")) {
+        } else if (compareJsonString((PCHAR) params, &tokens[i], JSMN_STRING, CANARY_TYPE_ENV_VAR)) {
             getJsonValue(params, tokens[i + 1], pCanaryConfig->canaryTypeStr);
             i++;
-        } else if (compareJsonString((PCHAR) params, &tokens[i], JSMN_STRING, (PCHAR) "fragment_size")) {
+        } else if (compareJsonString((PCHAR) params, &tokens[i], JSMN_STRING, FRAGMENT_SIZE_ENV_VAR)) {
             getJsonValue(params, tokens[i + 1], final_attr_str);
             STRTOUI64(final_attr_str, NULL, 10, &pCanaryConfig->fragmentSizeInBytes);
             i++;
-        } else if (compareJsonString((PCHAR) params, &tokens[i], JSMN_STRING, (PCHAR) "canary_duration_in_sec")) {
+        } else if (compareJsonString((PCHAR) params, &tokens[i], JSMN_STRING, CANARY_DURATION_ENV_VAR)) {
             getJsonValue(params, tokens[i + 1], final_attr_str);
             STRTOUI64(final_attr_str, NULL, 10, &pCanaryConfig->canaryDuration);
             i++;
         }
     }
+CleanUp:
+    return retStatus;
+}
+
+STATUS optenv(PCHAR pKey, PCHAR pResult, PCHAR pDefault)
+{
+    STATUS retStatus = STATUS_SUCCESS;
+    if (NULL == getenv(pKey)) {
+        STRCPY(pResult, pDefault);
+    } else {
+        STRCPY(pResult, getenv(pKey));
+    }
+CleanUp:
+    return retStatus;
+}
+
+STATUS optenvUint64(PCHAR pKey, PUINT64 val, UINT64 defVal)
+{
+    STATUS retStatus = STATUS_SUCCESS;
+    PCHAR raw;
+    UINT64 intVal;
+    if (NULL == getenv(pKey)) {
+        *val = defVal;
+    } else {
+        STRTOUI64((PCHAR) getenv(pKey), NULL, 10, val);
+    }
+
+CleanUp:
+    return retStatus;
+}
+
+STATUS printConfig(PCanaryConfig pCanaryConfig)
+{
+    STATUS retStatus = STATUS_SUCCESS;
+    DLOGD("Canary Stream name prefix: %s", pCanaryConfig->streamNamePrefix);
+    DLOGD("Canary type: %s", pCanaryConfig->canaryTypeStr);
+    DLOGD("Fragment size in bytes: %llu bytes", pCanaryConfig->fragmentSizeInBytes);
+    DLOGD("Canary duration: %llu seconds", pCanaryConfig->canaryDuration);
+CleanUp:
+    return retStatus;
+}
+
+STATUS initWithEnvVars(PCanaryConfig pCanaryConfig)
+{
+    STATUS retStatus = STATUS_SUCCESS;
+    PCHAR type;
+    CHAR canaryType[CANARY_TYPE_STR_LEN + 1];
+    CHAR streamName[CANARY_STREAM_NAME_STR_LEN + 1];
+    CHK(pCanaryConfig != NULL, STATUS_NULL_ARG);
+
+    CHK_STATUS(optenv(CANARY_STREAM_NAME_ENV_VAR, streamName, CANARY_DEFAULT_STREAM_NAME));
+    STRCPY(pCanaryConfig->streamNamePrefix, streamName);
+    CHK_STATUS(optenv(CANARY_TYPE_ENV_VAR, canaryType, CANARY_DEFAULT_CANARY_TYPE));
+    STRCPY(pCanaryConfig->canaryTypeStr, canaryType);
+    CHK_STATUS(optenvUint64(FRAGMENT_SIZE_ENV_VAR, &pCanaryConfig->fragmentSizeInBytes, CANARY_DEFAULT_FRAGMENT_SIZE));
+    CHK_STATUS(optenvUint64(CANARY_DURATION_ENV_VAR, &pCanaryConfig->canaryDuration, CANARY_DEFAULT_DURATION_IN_SECONDS));
+
+    printConfig(pCanaryConfig);
 CleanUp:
     return retStatus;
 }
@@ -125,12 +182,18 @@ INT32 main(INT32 argc, CHAR* argv[])
     {
         frame.frameData = NULL;
         if (argc < 2) {
-            DLOGE("Usage: AWS_ACCESS_KEY_ID=SAMPLEKEY AWS_SECRET_ACCESS_KEY=SAMPLESECRET %s <path-to-config-file>\n", argv[0]);
-            CHK(FALSE, STATUS_INVALID_ARG);
+            DLOGW("Optional Usage: %s <path-to-config-file>\n", argv[0]);
+            DLOGD("Using environment variables now");
+            DLOGD("Usage pattern:\n"
+                  "\t\texport CANARY_STREAM_NAME=<val>\n"
+                  "\t\texport CANARY_STREAM_TYPE=<realtime/offline>\n"
+                  "\t\texport FRAGMENT_SIZE_IN_BYTES=<Size of fragment in bytes>\n"
+                  "\t\texport CANARY_DURATION_IN_SECONDS=<duration in seconds>");
+            CHK_STATUS(initWithEnvVars(&config));
+        } else {
+            CHK_ERR(STRLEN(argv[1]) < (MAX_PATH_LEN + 1), STATUS_INVALID_ARG_LEN, "File path length too long");
+            CHK_STATUS(parseConfigFile(&config, argv[1]));
         }
-
-        CHK_ERR(STRLEN(argv[1]) < (MAX_PATH_LEN + 1), STATUS_INVALID_ARG_LEN, "File path length too long");
-        CHK_STATUS(parseConfigFile(&config, argv[1]));
 
         if ((accessKey = getenv(ACCESS_KEY_ENV_VAR)) == NULL || (secretKey = getenv(SECRET_KEY_ENV_VAR)) == NULL) {
             DLOGE("Error missing credentials");
