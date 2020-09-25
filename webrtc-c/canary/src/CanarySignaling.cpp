@@ -375,7 +375,7 @@ STATUS run(Canary::PConfig pConfig)
 
     if (pConfig->duration.value != 0) {
         CHK_STATUS(timerQueueAddTimer(timerQueueHandle, pConfig->duration.value, TIMER_QUEUE_SINGLE_INVOCATION_PERIOD, terminateCanaryCallback,
-                                      (UINT64) NULL, &timeoutTimerId));
+                                      (UINT64) &canarySessionInfo, &timeoutTimerId));
     }
 
     // Set the duration to iterate
