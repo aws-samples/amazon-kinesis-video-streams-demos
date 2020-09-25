@@ -194,7 +194,7 @@ STATUS Config::initWithEnvVars()
     if (!this->logStreamName.initialized) {
         pLogStreamName = getenv(CANARY_LOG_STREAM_NAME_ENV_VAR);
         if (pLogStreamName != NULL) {
-            SNPRINTF(this->logStreamName.value, ARRAY_SIZE(this->logStreamName.value), "%s", logStreamName.value);
+            SNPRINTF(this->logStreamName.value, ARRAY_SIZE(this->logStreamName.value), "%s", pLogStreamName);
         } else {
             SNPRINTF(this->logStreamName.value, ARRAY_SIZE(this->logStreamName.value), "%s-%s-%llu", channelName.value,
                      isMaster.value ? "master" : "viewer", GETTIME() / HUNDREDS_OF_NANOS_IN_A_MILLISECOND);
