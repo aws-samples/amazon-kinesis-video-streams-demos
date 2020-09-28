@@ -20,19 +20,22 @@ import lombok.extern.slf4j.Slf4j;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Optional;
+import java.util.Timer;
+import java.util.TimerTask;
 
 @Slf4j
 public class ProducerSdkCanaryConsumer {
     public static void main(final String[] args) throws Exception {
-        if (args.length < 2) {
-            throw new RuntimeException(
-                    "Usage: Input stream name and region like my-stream and us-west-2");
-        }
-        final Integer canaryType = Integer.parseInt(args[1]);
-        final String canaryFragmentSizeStr = args[2];
-        final String streamName = String.format("%s-canary-%s-%s", args[0], getCanaryStr(canaryType),
-                canaryFragmentSizeStr);
-        final String region = args[3];
+        String streamNamePrefix = System.getenv("CANARY_STREAM_NAME");
+        String canaryType = System.getenv("CANARY_TYPE");
+        String canaryFragmentSizeStr = System.getenv("FRAGMENT_SIZE_IN_BYTES");
+        String region = System.getenv("AWS_DEFAULT_REGION");
+        final String streamName = String.format("%s-canary-%s-%s", streamNamePrefix, canaryType,
+                    canaryFragmentSizeStr);
+        Integer canaryRunTime = Integer.parseInt(System.getenv("CANARY_DURATION_IN_SECONDS"));
+        
+        log.info("Stream name {}", streamName);
+
         final SystemPropertiesCredentialsProvider credentialsProvider = new SystemPropertiesCredentialsProvider();
         final AmazonKinesisVideo amazonKinesisVideo = AmazonKinesisVideoClientBuilder.standard()
                 .withRegion(region)
@@ -60,18 +63,24 @@ public class ProducerSdkCanaryConsumer {
                 credentialsProvider, streamName, new StartSelector().withStartSelectorType(StartSelectorType.NOW),
                 amazonKinesisVideo,
                 consumerFactory);
-        getMediaWorker.run();
-    }
 
-    private static String getCanaryStr(int canaryType) {
-        switch (canaryType) {
-            case 0:
-                return "realtime";
-            case 1:
-                return "offline";
-            default:
-                return "";
-        }
+        TimerTask task = new TimerTask() {
+            public void run() {
+                getMediaWorker.stop();
+            }
+        };
+        Timer timer = new Timer("Timer");
+        
+        long delay = canaryRunTime * 1000;
+        timer.schedule(task, delay);
+
+        getMediaWorker.run();
+        timer.cancel(); 
+
+        // Using System.exit(0) to exit from application. 
+        // The application does not exit on its own. Need to inspect what the issue
+        // is
+        System.exit(0);
     }
 }
 
