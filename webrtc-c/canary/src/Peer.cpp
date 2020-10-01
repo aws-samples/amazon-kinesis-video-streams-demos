@@ -313,6 +313,10 @@ STATUS Peer::shutdown()
         CHK_LOG_ERR(closePeerConnection(this->pPeerConnection));
     }
 
+    if (!this->isMaster && IS_VALID_SIGNALING_CLIENT_HANDLE(this->pSignalingClientHandle)) {
+        CHK_LOG_ERR(signalingClientDeleteSync(this->pSignalingClientHandle));
+    }
+
     return this->status;
 }
 
