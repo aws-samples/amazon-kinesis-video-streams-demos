@@ -127,7 +127,7 @@ STATUS canaryStreamFragmentAckHandler(UINT64 customData, STREAM_HANDLE streamHan
             break;
 
         case FRAGMENT_ACK_TYPE_PERSISTED:
-            ackDatum.SetMetricName("ReceivedAckLatency");
+            ackDatum.SetMetricName("PersistedAckLatency");
             ackDatum.AddDimensions(pCanaryStreamCallbacks->dimension);
             ackDatum.SetValue((GETTIME() - timeOfFragmentEndSent) / HUNDREDS_OF_NANOS_IN_A_MILLISECOND);
             ackDatum.SetUnit(Aws::CloudWatch::Model::StandardUnit::Milliseconds);
