@@ -8,7 +8,6 @@ STATUS Config::init(INT32 argc, PCHAR argv[])
     STATUS retStatus = STATUS_SUCCESS;
 
     CHK(argv != NULL, STATUS_NULL_ARG);
-    MEMSET(this, 0, SIZEOF(Config));
 
     if (argc == 2) {
         DLOGI("Reading configuration from %s\n", argv[1]);
@@ -45,7 +44,7 @@ BOOL strtobool(const CHAR* value)
     return FALSE;
 }
 
-STATUS mustenv(CHAR const* pKey, Config::Value<Config::String>* pResult)
+STATUS mustenv(CHAR const* pKey, Config::Value<std::string>* pResult)
 {
     STATUS retStatus = STATUS_SUCCESS;
     const CHAR* value;
@@ -54,7 +53,7 @@ STATUS mustenv(CHAR const* pKey, Config::Value<Config::String>* pResult)
     CHK(!pResult->initialized, retStatus);
 
     CHK_ERR((value = getenv(pKey)) != NULL, STATUS_INVALID_OPERATION, "%s must be set", pKey);
-    SNPRINTF(pResult->value, ARRAY_SIZE(pResult->value), "%s", value);
+    pResult->value = value;
     pResult->initialized = TRUE;
 
 CleanUp:
@@ -62,7 +61,7 @@ CleanUp:
     return retStatus;
 }
 
-STATUS optenv(CHAR const* pKey, Config::Value<Config::String>* pResult, const CHAR* pDefault)
+STATUS optenv(CHAR const* pKey, Config::Value<std::string>* pResult, std::string defaultValue)
 {
     STATUS retStatus = STATUS_SUCCESS;
     const CHAR* value;
@@ -70,10 +69,11 @@ STATUS optenv(CHAR const* pKey, Config::Value<Config::String>* pResult, const CH
     CHK(pResult != NULL, STATUS_NULL_ARG);
     CHK(!pResult->initialized, retStatus);
 
-    if (NULL == (value = getenv(pKey))) {
-        value = pDefault;
+    if (NULL != (value = getenv(pKey))) {
+        pResult->value = value;
+    } else {
+        pResult->value = defaultValue;
     }
-    SNPRINTF(pResult->value, ARRAY_SIZE(pResult->value), "%s", value);
     pResult->initialized = TRUE;
 
 CleanUp:
@@ -84,13 +84,13 @@ CleanUp:
 STATUS mustenvBool(CHAR const* pKey, Config::Value<BOOL>* pResult)
 {
     STATUS retStatus = STATUS_SUCCESS;
-    Config::Value<Config::String> raw;
+    Config::Value<std::string> raw;
 
     CHK(pResult != NULL, STATUS_NULL_ARG);
     CHK(!pResult->initialized, retStatus);
     CHK_STATUS(mustenv(pKey, &raw));
 
-    pResult->value = strtobool(raw.value);
+    pResult->value = strtobool(raw.value.c_str());
     pResult->initialized = TRUE;
 
 CleanUp:
@@ -101,13 +101,13 @@ CleanUp:
 STATUS optenvBool(CHAR const* pKey, Config::Value<BOOL>* pResult, BOOL defVal)
 {
     STATUS retStatus = STATUS_SUCCESS;
-    Config::Value<Config::String> raw;
+    Config::Value<std::string> raw;
 
     CHK(pResult != NULL, STATUS_NULL_ARG);
     CHK(!pResult->initialized, retStatus);
     CHK_STATUS(optenv(pKey, &raw, ""));
-    if (!IS_EMPTY_STRING(raw.value)) {
-        pResult->value = strtobool(raw.value);
+    if (!raw.value.empty()) {
+        pResult->value = strtobool(raw.value.c_str());
     } else {
         pResult->value = defVal;
     }
@@ -121,13 +121,13 @@ CleanUp:
 STATUS mustenvUint64(CHAR const* pKey, Config::Value<UINT64>* pResult)
 {
     STATUS retStatus = STATUS_SUCCESS;
-    Config::Value<Config::String> raw;
+    Config::Value<std::string> raw;
 
     CHK(pResult != NULL, STATUS_NULL_ARG);
     CHK(!pResult->initialized, retStatus);
     CHK_STATUS(mustenv(pKey, &raw));
 
-    STRTOUI64((PCHAR) raw.value, NULL, 10, &pResult->value);
+    STRTOUI64((PCHAR) raw.value.c_str(), NULL, 10, &pResult->value);
     pResult->initialized = TRUE;
 
 CleanUp:
@@ -138,13 +138,13 @@ CleanUp:
 STATUS optenvUint64(CHAR const* pKey, Config::Value<UINT64>* pResult, UINT64 defVal)
 {
     STATUS retStatus = STATUS_SUCCESS;
-    Config::Value<Config::String> raw;
+    Config::Value<std::string> raw;
 
     CHK(pResult != NULL, STATUS_NULL_ARG);
     CHK(!pResult->initialized, retStatus);
     CHK_STATUS(optenv(pKey, &raw, ""));
-    if (!IS_EMPTY_STRING(raw.value)) {
-        STRTOUI64((PCHAR) raw.value, NULL, 10, &pResult->value);
+    if (!raw.value.empty()) {
+        STRTOUI64((PCHAR) raw.value.c_str(), NULL, 10, &pResult->value);
     } else {
         pResult->value = defVal;
     }
@@ -159,8 +159,7 @@ STATUS Config::initWithEnvVars()
 {
     STATUS retStatus = STATUS_SUCCESS;
     Config::Value<UINT64> logLevel64;
-    PCHAR pLogStreamName;
-    Config::Value<Config::String> logGroupName;
+    std::stringstream defaultLogStreamName;
 
     /* This is ignored for master. Master can extract the info from offer. Viewer has to know if peer can trickle or
      * not ahead of time. */
@@ -185,21 +184,10 @@ STATUS Config::initWithEnvVars()
     CHK_STATUS(optenvBool(CANARY_IS_MASTER_ENV_VAR, &isMaster, TRUE));
     CHK_STATUS(optenvBool(CANARY_RUN_BOTH_PEERS_ENV_VAR, &runBothPeers, FALSE));
 
-    if (!this->logGroupName.initialized) {
-        CHK_STATUS(optenv(CANARY_LOG_GROUP_NAME_ENV_VAR, &logGroupName, CANARY_DEFAULT_LOG_GROUP_NAME));
-        SNPRINTF(this->logGroupName.value, ARRAY_SIZE(this->logGroupName.value), "%s", logGroupName.value);
-        this->logGroupName.initialized = TRUE;
-    }
-
-    if (!this->logStreamName.initialized) {
-        pLogStreamName = getenv(CANARY_LOG_STREAM_NAME_ENV_VAR);
-        if (pLogStreamName != NULL) {
-            SNPRINTF(this->logStreamName.value, ARRAY_SIZE(this->logStreamName.value), "%s", pLogStreamName);
-        } else {
-            SNPRINTF(this->logStreamName.value, ARRAY_SIZE(this->logStreamName.value), "%s-%s-%llu", channelName.value,
-                     isMaster.value ? "master" : "viewer", GETTIME() / HUNDREDS_OF_NANOS_IN_A_MILLISECOND);
-        }
-    }
+    CHK_STATUS(optenv(CANARY_LOG_GROUP_NAME_ENV_VAR, &this->logGroupName, CANARY_DEFAULT_LOG_GROUP_NAME));
+    defaultLogStreamName << channelName.value << '-' << (isMaster.value ? "master" : "viewer") << '-'
+                         << GETTIME() / HUNDREDS_OF_NANOS_IN_A_MILLISECOND;
+    CHK_STATUS(optenv(CANARY_LOG_STREAM_NAME_ENV_VAR, &this->logStreamName, defaultLogStreamName.str()));
 
     if (!duration.initialized) {
         CHK_STATUS(optenvUint64(CANARY_DURATION_IN_SECONDS_ENV_VAR, &duration, 0));
@@ -236,35 +224,35 @@ VOID Config::print()
           "\tIteration     : %lu seconds\n"
           "\tRun both peers: %s\n"
           "\n",
-          this->channelName.value, this->region.value, this->clientId.value, this->isMaster.value ? "Master" : "Viewer",
-          this->trickleIce.value ? "True" : "False", this->useTurn.value ? "True" : "False", this->logLevel.value, this->logGroupName.value,
-          this->logStreamName.value, this->duration.value / HUNDREDS_OF_NANOS_IN_A_SECOND,
+          this->channelName.value.c_str(), this->region.value.c_str(), this->clientId.value.c_str(), this->isMaster.value ? "Master" : "Viewer",
+          this->trickleIce.value ? "True" : "False", this->useTurn.value ? "True" : "False", this->logLevel.value, this->logGroupName.value.c_str(),
+          this->logStreamName.value.c_str(), this->duration.value / HUNDREDS_OF_NANOS_IN_A_SECOND,
           this->iterationDuration.value / HUNDREDS_OF_NANOS_IN_A_SECOND, this->runBothPeers.value ? "True" : "False");
 }
 
-VOID jsonString(PBYTE pRaw, jsmntok_t token, Config::Value<Config::String>* pResult)
+VOID jsonString(PBYTE pRaw, jsmntok_t token, Config::Value<std::string>* pResult)
 {
     UINT32 tokenLength = (UINT32)(token.end - token.start);
 
-    SNPRINTF(pResult->value, MIN(tokenLength + 1, ARRAY_SIZE(pResult->value)), "%s", (const CHAR*) pRaw + token.start);
+    pResult->value = std::string(reinterpret_cast<PCHAR>(pRaw + token.start), tokenLength);
     pResult->initialized = TRUE;
 }
 
 VOID jsonBool(PBYTE pRaw, jsmntok_t token, Config::Value<BOOL>* pResult)
 {
-    Config::Value<Config::String> raw;
+    Config::Value<std::string> raw;
 
     jsonString(pRaw, token, &raw);
-    pResult->value = strtobool((const CHAR*) &raw.value);
+    pResult->value = strtobool(raw.value.c_str());
     pResult->initialized = TRUE;
 }
 
 VOID jsonUint64(PBYTE pRaw, jsmntok_t token, Config::Value<UINT64>* pResult)
 {
-    Config::Value<Config::String> raw;
+    Config::Value<std::string> raw;
 
     jsonString(pRaw, token, &raw);
-    STRTOUI64((PCHAR) raw.value, NULL, 10, &pResult->value);
+    STRTOUI64((PCHAR) raw.value.c_str(), NULL, 10, &pResult->value);
     pResult->initialized = TRUE;
 }
 

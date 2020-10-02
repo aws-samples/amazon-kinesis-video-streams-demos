@@ -32,8 +32,8 @@ STATUS Peer::init(const Canary::PConfig pConfig, const Callbacks& callbacks)
     this->canaryIncomingRTPMetricsContext.prevFramesDropped = 0;
     this->canaryIncomingRTPMetricsContext.prevTs = GETTIME();
 
-    CHK_STATUS(createStaticCredentialProvider((PCHAR) pConfig->accessKey.value, 0, (PCHAR) pConfig->secretKey.value, 0,
-                                              (PCHAR) pConfig->sessionToken.value, 0, MAX_UINT64, &pAwsCredentialProvider));
+    CHK_STATUS(createStaticCredentialProvider((PCHAR) pConfig->accessKey.value.c_str(), 0, (PCHAR) pConfig->secretKey.value.c_str(), 0,
+                                              (PCHAR) pConfig->sessionToken.value.c_str(), 0, MAX_UINT64, &pAwsCredentialProvider));
     CHK_STATUS(initSignaling(pConfig));
     CHK_STATUS(initRtcConfiguration(pConfig));
 
@@ -56,10 +56,10 @@ STATUS Peer::initSignaling(const Canary::PConfig pConfig)
 
     clientInfo.version = SIGNALING_CLIENT_INFO_CURRENT_VERSION;
     clientInfo.loggingLevel = pConfig->logLevel.value;
-    STRCPY(clientInfo.clientId, pConfig->clientId.value);
+    STRCPY(clientInfo.clientId, pConfig->clientId.value.c_str());
 
     channelInfo.version = CHANNEL_INFO_CURRENT_VERSION;
-    channelInfo.pChannelName = (PCHAR) pConfig->channelName.value;
+    channelInfo.pChannelName = (PCHAR) pConfig->channelName.value.c_str();
     channelInfo.pKmsKeyId = NULL;
     channelInfo.tagCount = 0;
     channelInfo.pTags = NULL;
