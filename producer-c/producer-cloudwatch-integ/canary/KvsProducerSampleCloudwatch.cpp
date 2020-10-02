@@ -83,6 +83,15 @@ STATUS parseConfigFile(PCanaryConfig pCanaryConfig, PCHAR filePath)
             getJsonValue(params, tokens[i + 1], final_attr_str);
             STRTOUI64(final_attr_str, NULL, 10, &pCanaryConfig->canaryDuration);
             i++;
+        } else if (compareJsonString((PCHAR) params, &tokens[i], JSMN_STRING, CANARY_BUFFER_DURATION_ENV_VAR)) {
+            getJsonValue(params, tokens[i + 1], final_attr_str);
+            STRTOUI64(final_attr_str, NULL, 10, &pCanaryConfig->bufferDuration);
+            pCanaryConfig->bufferDuration = pCanaryConfig->bufferDuration * HUNDREDS_OF_NANOS_IN_A_SECOND;
+            i++;
+        } else if (compareJsonString((PCHAR) params, &tokens[i], JSMN_STRING, CANARY_STORAGE_SIZE_ENV_VAR)) {
+            getJsonValue(params, tokens[i + 1], final_attr_str);
+            STRTOUI64(final_attr_str, NULL, 10, &pCanaryConfig->storageSizeInBytes);
+            i++;
         }
     }
 CleanUp:
@@ -119,10 +128,12 @@ CleanUp:
 STATUS printConfig(PCanaryConfig pCanaryConfig)
 {
     STATUS retStatus = STATUS_SUCCESS;
-    DLOGD("Canary Stream name prefix: %s", pCanaryConfig->streamNamePrefix);
-    DLOGD("Canary type: %s", pCanaryConfig->canaryTypeStr);
-    DLOGD("Fragment size in bytes: %llu bytes", pCanaryConfig->fragmentSizeInBytes);
-    DLOGD("Canary duration: %llu seconds", pCanaryConfig->canaryDuration);
+    DLOGI("Canary Stream name prefix: %s", pCanaryConfig->streamNamePrefix);
+    DLOGI("Canary type: %s", pCanaryConfig->canaryTypeStr);
+    DLOGI("Fragment size in bytes: %llu bytes", pCanaryConfig->fragmentSizeInBytes);
+    DLOGI("Canary duration: %llu seconds", pCanaryConfig->canaryDuration);
+    DLOGI("Canary buffer duration: %llu seconds", pCanaryConfig->bufferDuration);
+    DLOGI("Canary storage size: %llu bytes", pCanaryConfig->storageSizeInBytes);
 CleanUp:
     return retStatus;
 }
@@ -137,12 +148,18 @@ STATUS initWithEnvVars(PCanaryConfig pCanaryConfig)
 
     CHK_STATUS(optenv(CANARY_STREAM_NAME_ENV_VAR, streamName, CANARY_DEFAULT_STREAM_NAME));
     STRCPY(pCanaryConfig->streamNamePrefix, streamName);
+
     CHK_STATUS(optenv(CANARY_TYPE_ENV_VAR, canaryType, CANARY_DEFAULT_CANARY_TYPE));
     STRCPY(pCanaryConfig->canaryTypeStr, canaryType);
+
     CHK_STATUS(optenvUint64(FRAGMENT_SIZE_ENV_VAR, &pCanaryConfig->fragmentSizeInBytes, CANARY_DEFAULT_FRAGMENT_SIZE));
     CHK_STATUS(optenvUint64(CANARY_DURATION_ENV_VAR, &pCanaryConfig->canaryDuration, CANARY_DEFAULT_DURATION_IN_SECONDS));
 
+    CHK_STATUS(optenvUint64(CANARY_BUFFER_DURATION_ENV_VAR, &pCanaryConfig->bufferDuration, DEFAULT_BUFFER_DURATION));
+    CHK_STATUS(optenvUint64(CANARY_STORAGE_SIZE_ENV_VAR, &pCanaryConfig->storageSizeInBytes, 0));
     printConfig(pCanaryConfig);
+
+    pCanaryConfig->bufferDuration = pCanaryConfig->bufferDuration * HUNDREDS_OF_NANOS_IN_A_SECOND;
 CleanUp:
     return retStatus;
 }
@@ -225,10 +242,15 @@ INT32 main(INT32 argc, CHAR* argv[])
 
         // default storage size is 128MB. Use setDeviceInfoStorageSize after create to change storage size.
         CHK_STATUS(createDefaultDeviceInfo(&pDeviceInfo));
+
+        if (config.storageSizeInBytes != 0) {
+            CHK_STATUS(setDeviceInfoStorageSize(pDeviceInfo, config.storageSizeInBytes));
+        }
+
         // adjust members of pDeviceInfo here if needed
         pDeviceInfo->clientInfo.loggerLogLevel = LOG_LEVEL_DEBUG;
 
-        CHK_STATUS(createRealtimeVideoStreamInfoProvider(streamName, DEFAULT_RETENTION_PERIOD, DEFAULT_BUFFER_DURATION, &pStreamInfo));
+        CHK_STATUS(createRealtimeVideoStreamInfoProvider(streamName, DEFAULT_RETENTION_PERIOD, config.bufferDuration, &pStreamInfo));
         adjustStreamInfoToCanaryType(pStreamInfo, config.canaryTypeStr);
         // adjust members of pStreamInfo here if needed
         pStreamInfo->streamCaps.nalAdaptationFlags = NAL_ADAPTATION_FLAG_NONE;
