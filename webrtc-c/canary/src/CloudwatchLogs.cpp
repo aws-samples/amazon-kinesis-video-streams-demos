@@ -22,8 +22,8 @@ STATUS CloudwatchLogs::init()
     createLogStreamRequest.SetLogStreamName(pConfig->logStreamName.value);
     createLogStreamOutcome = this->client.CreateLogStream(createLogStreamRequest);
 
-    CHK_ERR(createLogStreamOutcome.IsSuccess(), STATUS_INVALID_OPERATION, "Failed to create \"%s\" log stream: %s", pConfig->logStreamName.value,
-            createLogStreamOutcome.GetError().GetMessage().c_str());
+    CHK_ERR(createLogStreamOutcome.IsSuccess(), STATUS_INVALID_OPERATION, "Failed to create \"%s\" log stream: %s",
+            pConfig->logStreamName.value.c_str(), createLogStreamOutcome.GetError().GetMessage().c_str());
 
 CleanUp:
 
