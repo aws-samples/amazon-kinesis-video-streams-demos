@@ -6,14 +6,16 @@ set(CMAKE_CXX_STANDARD 11)
 include(FetchContent)
 
 # AWS SDK options
-set(CUSTOM_MEMORY_MANAGEMENT OFF)
-set(ENABLE_TESTING OFF)
-set(BUILD_ONLY "monitoring;logs")
+set(CUSTOM_MEMORY_MANAGEMENT OFF CACHE BOOL "Tell AWS SDK to not use custom memory management" FORCE)
+set(ENABLE_TESTING OFF CACHE BOOL "Disable building tests for AWS SDK" FORCE)
+set(BUILD_ONLY "monitoring;logs" CACHE STRING "Tell AWS SDK to only build monitoring and logs" FORCE)
+set(BUILD_SHARED_LIBS OFF CACHE BOOL "Enable static build for AWS SDK" FORCE)
+set(BUILD_STATIC_LIBS ON CACHE BOOL "Enable static build for KVS Webrtc SDK" FORCE)
 
 FetchContent_Declare(
   webrtc
   GIT_REPOSITORY https://github.com/awslabs/amazon-kinesis-video-streams-webrtc-sdk-c
-  GIT_TAG        master
+  GIT_TAG        35fc3ea5f2132613a8439da41fdfc1b5c052c858
 )
 
 FetchContent_Declare(
@@ -46,6 +48,7 @@ include_directories(${webrtc_SOURCE_DIR}/open-source/include)
 link_directories(${webrtc_SOURCE_DIR}/open-source/lib)
 add_library(
   kvsWebrtcCanary
+  STATIC
   src/Config.cpp
   src/CloudwatchLogs.cpp
   src/CloudwatchMonitoring.cpp
