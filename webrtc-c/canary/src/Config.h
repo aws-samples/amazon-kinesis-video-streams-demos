@@ -10,19 +10,12 @@ class Config {
     STATUS init(INT32 argc, PCHAR argv[]);
     template <typename T> class Value {
       public:
-        Value() : initialized(FALSE)
-        {
-        }
-
         T value;
-        BOOL initialized;
+        BOOL initialized = FALSE;
     };
-    typedef CHAR String[MAX_CONFIG_STRING_LENGTH + 1];
 
-    static STATUS init(INT32 argc, PCHAR argv[], PConfig);
-
-    Value<String> channelName;
-    Value<String> clientId;
+    Value<std::string> channelName;
+    Value<std::string> clientId;
     Value<BOOL> isMaster;
     Value<BOOL> runBothPeers;
     Value<BOOL> trickleIce;
@@ -30,15 +23,15 @@ class Config {
     Value<BOOL> forceTurn;
 
     // credentials
-    Value<String> accessKey;
-    Value<String> secretKey;
-    Value<String> sessionToken;
-    Value<String> region;
+    Value<std::string> accessKey;
+    Value<std::string> secretKey;
+    Value<std::string> sessionToken;
+    Value<std::string> region;
 
     // logging
     Value<UINT32> logLevel;
-    Value<String> logGroupName;
-    Value<String> logStreamName;
+    Value<std::string> logGroupName;
+    Value<std::string> logStreamName;
 
     Value<UINT64> duration;
     Value<UINT64> iterationDuration;

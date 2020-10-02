@@ -299,23 +299,23 @@ STATUS run(Canary::PConfig pConfig)
     CHK_STATUS(timerQueueCreate(&timerQueueHandle));
 
     // We will create a static credential provider. We can replace it with others if needed.
-    CHK_STATUS(createStaticCredentialProvider((PCHAR) pConfig->accessKey.value, 0, (PCHAR) pConfig->secretKey.value, 0,
-                                              (PCHAR) pConfig->sessionToken.value, 0, MAX_UINT64, &pCredentialProvider));
+    CHK_STATUS(createStaticCredentialProvider((PCHAR) pConfig->accessKey.value.c_str(), 0, (PCHAR) pConfig->secretKey.value.c_str(), 0,
+                                              (PCHAR) pConfig->sessionToken.value.c_str(), 0, MAX_UINT64, &pCredentialProvider));
 
     // Generate a random channel name if not specified in the config.
     // In case we generate the random name we will follow-up with deleting
     // it upon exit to prevent the account from ever increasing channel count
-    if (IS_EMPTY_STRING(pConfig->channelName.value)) {
+    if (pConfig->channelName.value.empty()) {
         generateChannelName(channelName);
         channelNameGenerated = TRUE;
     } else {
-        STRNCPY(channelName, pConfig->channelName.value, MAX_CHANNEL_NAME_LEN);
+        STRNCPY(channelName, pConfig->channelName.value.c_str(), MAX_CHANNEL_NAME_LEN);
     }
 
     // Prepare the channel info structure
     masterChannelInfo.version = CHANNEL_INFO_CURRENT_VERSION;
     masterChannelInfo.pChannelName = channelName;
-    masterChannelInfo.pRegion = (PCHAR) pConfig->region.value;
+    masterChannelInfo.pRegion = (PCHAR) pConfig->region.value.c_str();
     masterChannelInfo.pKmsKeyId = NULL;
     masterChannelInfo.tagCount = 0;
     masterChannelInfo.pTags = NULL;

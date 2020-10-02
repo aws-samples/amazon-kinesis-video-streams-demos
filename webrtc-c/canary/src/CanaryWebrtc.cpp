@@ -116,18 +116,29 @@ STATUS run(Canary::PConfig pConfig)
         // Modify config to differentiate master and viewer
         UINT64 timestamp = GETTIME() / HUNDREDS_OF_NANOS_IN_A_SECOND;
         STATUS masterRetStatus;
+        std::stringstream ss;
 
         Canary::Config masterConfig = *pConfig;
         masterConfig.isMaster.value = TRUE;
-        SNPRINTF(masterConfig.clientId.value, ARRAY_SIZE(masterConfig.clientId.value), "%sMaster", pConfig->clientId.value);
-        SNPRINTF(masterConfig.logStreamName.value, ARRAY_SIZE(masterConfig.logStreamName.value), "%s-master-%llu", pConfig->channelName.value,
-                 timestamp);
+
+        ss << pConfig->clientId.value << "Master";
+        masterConfig.clientId.value = ss.str();
+        ss.str("");
+
+        ss << pConfig->channelName.value << "-master-" << timestamp;
+        masterConfig.logStreamName.value = ss.str();
+        ss.str("");
 
         Canary::Config viewerConfig = *pConfig;
         viewerConfig.isMaster.value = FALSE;
-        SNPRINTF(viewerConfig.clientId.value, ARRAY_SIZE(viewerConfig.clientId.value), "%sViewer", pConfig->clientId.value);
-        SNPRINTF(viewerConfig.logStreamName.value, ARRAY_SIZE(viewerConfig.logStreamName.value), "%s-viewer-%llu", pConfig->channelName.value,
-                 timestamp);
+
+        ss << pConfig->clientId.value << "Viewer";
+        masterConfig.clientId.value = ss.str();
+        ss.str("");
+
+        ss << pConfig->channelName.value << "-viewer-" << timestamp;
+        masterConfig.logStreamName.value = ss.str();
+        ss.str("");
 
         std::thread masterThread(runPeer, &masterConfig, timerQueueHandle, &masterRetStatus);
         runPeer(&viewerConfig, timerQueueHandle, &retStatus);
