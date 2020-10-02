@@ -192,7 +192,7 @@ STATUS Peer::initRtcConfiguration(const Canary::PConfig pConfig)
     }
 
     // Set the  STUN server
-    SNPRINTF(pConfiguration->iceServers[0].urls, MAX_ICE_CONFIG_URI_LEN, KINESIS_VIDEO_STUN_URL, pConfig->region.value);
+    SNPRINTF(pConfiguration->iceServers[0].urls, MAX_ICE_CONFIG_URI_LEN, KINESIS_VIDEO_STUN_URL, pConfig->region.value.c_str());
 
     if (pConfig->useTurn.value) {
         // Set the URIs from the configuration
