@@ -21,8 +21,7 @@ def buildProject() {
         mkdir -p build && 
         cd build && 
         cmake .. -DCMAKE_INSTALL_PREFIX="\$PWD" && 
-        make -j &&
-        rm -rf \$(ls | grep -v 'kvsWebrtc*')"""
+        make -j"""
 }
 
 def withRunnerWrapper(envs, fn) {

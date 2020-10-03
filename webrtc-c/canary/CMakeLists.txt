@@ -9,8 +9,6 @@ include(FetchContent)
 set(CUSTOM_MEMORY_MANAGEMENT OFF CACHE BOOL "Tell AWS SDK to not use custom memory management" FORCE)
 set(ENABLE_TESTING OFF CACHE BOOL "Disable building tests for AWS SDK" FORCE)
 set(BUILD_ONLY "monitoring;logs" CACHE STRING "Tell AWS SDK to only build monitoring and logs" FORCE)
-set(BUILD_SHARED_LIBS OFF CACHE BOOL "Enable static build for AWS SDK" FORCE)
-set(BUILD_STATIC_LIBS ON CACHE BOOL "Enable static build for KVS Webrtc SDK" FORCE)
 
 FetchContent_Declare(
   webrtc
@@ -48,7 +46,6 @@ include_directories(${webrtc_SOURCE_DIR}/open-source/include)
 link_directories(${webrtc_SOURCE_DIR}/open-source/lib)
 add_library(
   kvsWebrtcCanary
-  STATIC
   src/Config.cpp
   src/CloudwatchLogs.cpp
   src/CloudwatchMonitoring.cpp
