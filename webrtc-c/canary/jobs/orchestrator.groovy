@@ -11,7 +11,6 @@ COMMON_PARAMS = [
     string(name: 'AWS_KVS_LOG_LEVEL', value: "2"),
     string(name: 'MIN_RETRY_DELAY_IN_SECONDS', value: MIN_RETRY_DELAY_IN_SECONDS.toString()),
     string(name: 'GIT_URL', value: GIT_URL),
-    string(name: 'GIT_HASH', value: GIT_HASH),
     string(name: 'LOG_GROUP_NAME', value: "canary"),
 ]
 
@@ -109,6 +108,10 @@ pipeline {
                         script {
                             echo "New runner: ${NEXT_AVAILABLE_RUNNER}"
                             Jenkins.instance.getItemByFullName(NEXT_AVAILABLE_RUNNER).setDisabled(false)
+
+                            // Lock in current commit hash to avoid inconsistent version across runners
+                            def gitHash = sh(returnStdout: true, script: 'git rev-parse HEAD')
+                            COMMON_PARAMS << string(name: 'GIT_HASH', value: gitHash)
                         }
 
                         // TODO: Use matrix to spawn runners
