@@ -670,15 +670,18 @@ STATUS Peer::publishStatsForCanary(RTC_STATS_TYPE statsType)
     this->canaryMetrics.requestedTypeOfStats = statsType;
     switch (statsType) {
         case RTC_STATS_TYPE_OUTBOUND_RTP:
-            CHK_LOG_ERR(::rtcPeerConnectionGetMetrics(this->pPeerConnection, this->videoTransceivers.back(), &this->canaryMetrics));
-            this->populateOutgoingRtpMetricsContext();
-            Canary::Cloudwatch::getInstance().monitoring.pushOutboundRtpStats(&this->canaryOutgoingRTPMetricsContext);
+            if(!this->videoTransceivers.empty()) {
+                CHK_LOG_ERR(::rtcPeerConnectionGetMetrics(this->pPeerConnection, this->videoTransceivers.back(), &this->canaryMetrics));
+                this->populateOutgoingRtpMetricsContext();
+                Canary::Cloudwatch::getInstance().monitoring.pushOutboundRtpStats(&this->canaryOutgoingRTPMetricsContext);
+            }
             break;
         case RTC_STATS_TYPE_INBOUND_RTP:
-            CHK_LOG_ERR(::rtcPeerConnectionGetMetrics(this->pPeerConnection, this->videoTransceivers.back(), &this->canaryMetrics));
-            this->populateIncomingRtpMetricsContext();
-            Canary::Cloudwatch::getInstance().monitoring.pushInboundRtpStats(&this->canaryIncomingRTPMetricsContext);
-
+            if(!this->videoTransceivers.empty()) {
+                CHK_LOG_ERR(::rtcPeerConnectionGetMetrics(this->pPeerConnection, this->videoTransceivers.back(), &this->canaryMetrics));
+                this->populateIncomingRtpMetricsContext();
+                Canary::Cloudwatch::getInstance().monitoring.pushInboundRtpStats(&this->canaryIncomingRTPMetricsContext);
+            }
             break;
         default:
             CHK(FALSE, STATUS_NOT_IMPLEMENTED);
