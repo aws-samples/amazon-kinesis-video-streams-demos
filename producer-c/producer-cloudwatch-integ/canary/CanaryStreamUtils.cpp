@@ -24,8 +24,8 @@ STATUS createCanaryStreamCallbacks(Aws::CloudWatch::CloudWatchClient* cwClient, 
 
     pCanaryStreamCallbacks->pCwClient = cwClient;
 
-    pCanaryStreamCallbacks->dimension.SetName(pStreamName);
-    pCanaryStreamCallbacks->dimension.SetValue("ProducerSDK");
+    pCanaryStreamCallbacks->dimension.SetName("ProducerSDKCanary");
+    pCanaryStreamCallbacks->dimension.SetValue(pStreamName);
 
     // Set callbacks
     pCanaryStreamCallbacks->streamCallbacks.fragmentAckReceivedFn = canaryStreamFragmentAckHandler;
