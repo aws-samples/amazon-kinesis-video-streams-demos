@@ -11,7 +11,7 @@ COMMON_PARAMS = [
     string(name: 'AWS_KVS_LOG_LEVEL', value: "2"),
     string(name: 'MIN_RETRY_DELAY_IN_SECONDS', value: MIN_RETRY_DELAY_IN_SECONDS.toString()),
     string(name: 'GIT_URL', value: GIT_URL),
-    string(name: 'LOG_GROUP_NAME', value: "canary"),
+    string(name: 'LOG_GROUP_NAME', value: "WebrtcSDK"),
 ]
 
 def getJobLastBuildTimestamp(job) {
