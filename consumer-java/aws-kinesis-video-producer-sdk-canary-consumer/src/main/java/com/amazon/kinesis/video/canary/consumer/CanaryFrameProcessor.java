@@ -28,8 +28,8 @@ public class CanaryFrameProcessor implements FrameVisitor.FrameProcessor {
     public CanaryFrameProcessor(AmazonCloudWatchAsync cwClient, String streamName) {
         this.cwClient = cwClient;
         dimension = new Dimension()
-                .withName(streamName)
-                .withValue("Consumer");
+                .withName("ProducerSDKCanary")
+                .withValue(streamName);
     }
 
     @Override
