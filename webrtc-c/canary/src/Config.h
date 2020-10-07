@@ -14,6 +14,7 @@ class Config {
         BOOL initialized = FALSE;
     };
 
+    Value<std::string> label;
     Value<std::string> channelName;
     Value<std::string> clientId;
     Value<BOOL> isMaster;

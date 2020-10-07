@@ -10,8 +10,11 @@ STATUS CloudwatchMonitoring::init()
 {
     STATUS retStatus = STATUS_SUCCESS;
 
-    this->channelDimension.SetName("Channel");
+    this->channelDimension.SetName("WebRTCSDKCanaryChannelName");
     this->channelDimension.SetValue(pConfig->channelName.value);
+
+    this->labelDimension.SetName("WebRTCSDKCanaryLabel");
+    this->labelDimension.SetValue(pConfig->label.value);
 
     return retStatus;
 }
@@ -29,8 +32,16 @@ VOID CloudwatchMonitoring::deinit()
 VOID CloudwatchMonitoring::push(const MetricDatum& datum)
 {
     Aws::CloudWatch::Model::PutMetricDataRequest cwRequest;
+    MetricDatum single = datum;
+    MetricDatum aggregated = datum;
+
+    single.AddDimensions(this->channelDimension);
+    single.AddDimensions(this->labelDimension);
+    aggregated.AddDimensions(this->labelDimension);
+
     cwRequest.SetNamespace(DEFAULT_CLOUDWATCH_NAMESPACE);
-    cwRequest.AddMetricData(datum);
+    cwRequest.AddMetricData(single);
+    cwRequest.AddMetricData(aggregated);
 
     auto asyncHandler = [this](const Aws::CloudWatch::CloudWatchClient* cwClient, const Aws::CloudWatch::Model::PutMetricDataRequest& request,
                                const Aws::CloudWatch::Model::PutMetricDataOutcome& outcome,
@@ -64,7 +75,6 @@ VOID CloudwatchMonitoring::pushExitStatus(STATUS retStatus)
     datum.SetValue(1.0);
     datum.SetUnit(StandardUnit::Count);
 
-    datum.AddDimensions(this->channelDimension);
     datum.AddDimensions(statusDimension);
 
     this->push(datum);
@@ -84,7 +94,6 @@ VOID CloudwatchMonitoring::pushSignalingRoundtripStatus(STATUS retStatus)
     datum.SetValue(1.0);
     datum.SetUnit(StandardUnit::Count);
 
-    datum.AddDimensions(this->channelDimension);
     datum.AddDimensions(statusDimension);
 
     this->push(datum);
@@ -98,8 +107,6 @@ VOID CloudwatchMonitoring::pushSignalingRoundtripLatency(UINT64 delay, StandardU
     datum.SetValue(delay);
     datum.SetUnit(unit);
 
-    datum.AddDimensions(this->channelDimension);
-
     this->push(datum);
 }
 
@@ -110,8 +117,6 @@ VOID CloudwatchMonitoring::pushSignalingInitDelay(UINT64 delay, StandardUnit uni
     datum.SetMetricName("SignalingInitDelay");
     datum.SetValue(delay);
     datum.SetUnit(unit);
-
-    datum.AddDimensions(this->channelDimension);
 
     this->push(datum);
 }
@@ -124,8 +129,6 @@ VOID CloudwatchMonitoring::pushICEHolePunchingDelay(UINT64 delay, StandardUnit u
     datum.SetValue(delay);
     datum.SetUnit(unit);
 
-    datum.AddDimensions(this->channelDimension);
-
     this->push(datum);
 }
 
@@ -136,25 +139,21 @@ VOID CloudwatchMonitoring::pushOutboundRtpStats(Canary::POutgoingRTPMetricsConte
     bytesDiscardedPercentageDatum.SetMetricName("PercentageFrameDiscarded");
     bytesDiscardedPercentageDatum.SetValue(pOutboundRtpStats->framesPercentageDiscarded);
     bytesDiscardedPercentageDatum.SetUnit(StandardUnit::Percent);
-    bytesDiscardedPercentageDatum.AddDimensions(this->channelDimension);
     this->push(bytesDiscardedPercentageDatum);
 
     averageFramesRateDatum.SetMetricName("FramesPerSecond");
     averageFramesRateDatum.SetValue(pOutboundRtpStats->averageFramesSentPerSecond);
     averageFramesRateDatum.SetUnit(StandardUnit::Count_Second);
-    averageFramesRateDatum.AddDimensions(this->channelDimension);
     this->push(averageFramesRateDatum);
 
     nackRateDatum.SetMetricName("NackPerSecond");
     nackRateDatum.SetValue(pOutboundRtpStats->nacksPerSecond);
     nackRateDatum.SetUnit(StandardUnit::Count_Second);
-    nackRateDatum.AddDimensions(this->channelDimension);
     this->push(nackRateDatum);
 
     retransmissionPercentDatum.SetMetricName("PercentageFramesRetransmitted");
     retransmissionPercentDatum.SetValue(pOutboundRtpStats->retxBytesPercentage);
     retransmissionPercentDatum.SetUnit(StandardUnit::Percent);
-    retransmissionPercentDatum.AddDimensions(this->channelDimension);
     this->push(retransmissionPercentDatum);
 }
 
@@ -165,19 +164,16 @@ VOID CloudwatchMonitoring::pushInboundRtpStats(Canary::PIncomingRTPMetricsContex
     incomingBitrateDatum.SetMetricName("IncomingBitRate");
     incomingBitrateDatum.SetValue(pIncomingRtpStats->incomingBitRate);
     incomingBitrateDatum.SetUnit(StandardUnit::Kilobits_Second);
-    incomingBitrateDatum.AddDimensions(this->channelDimension);
     this->push(incomingBitrateDatum);
 
     incomingPacketRate.SetMetricName("IncomingPacketsPerSecond");
     incomingPacketRate.SetValue(pIncomingRtpStats->packetReceiveRate);
     incomingPacketRate.SetUnit(StandardUnit::Count_Second);
-    incomingPacketRate.AddDimensions(this->channelDimension);
     this->push(incomingPacketRate);
 
     incomingFrameDropRateDatum.SetMetricName("IncomingFramesDroppedPerSecond");
     incomingFrameDropRateDatum.SetValue(pIncomingRtpStats->framesDroppedPerSecond);
     incomingFrameDropRateDatum.SetUnit(StandardUnit::Count_Second);
-    incomingFrameDropRateDatum.AddDimensions(this->channelDimension);
     this->push(incomingFrameDropRateDatum);
 }
 
@@ -187,13 +183,11 @@ VOID CloudwatchMonitoring::pushEndToEndMetrics(Canary::PEndToEndMetricsContext p
 
     endToEndLatencyDatum.SetMetricName("EndToEndFrameLatency");
     endToEndLatencyDatum.SetUnit(StandardUnit::Milliseconds);
-    endToEndLatencyDatum.AddDimensions(this->channelDimension);
     endToEndLatencyDatum.SetValues(pEndToEndMetricsContext->frameLatency);
     this->push(endToEndLatencyDatum);
 
     sizeMatchDatum.SetMetricName("FrameSizeMatch");
     sizeMatchDatum.SetUnit(StandardUnit::None);
-    sizeMatchDatum.AddDimensions(this->channelDimension);
     sizeMatchDatum.SetValues(pEndToEndMetricsContext->sizeMatch);
     this->push(sizeMatchDatum);
 

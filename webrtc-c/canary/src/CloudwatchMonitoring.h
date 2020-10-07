@@ -19,6 +19,7 @@ class CloudwatchMonitoring {
 
   private:
     Dimension channelDimension;
+    Dimension labelDimension;
     PConfig pConfig;
     CloudWatchClient client;
     std::atomic<UINT64> pendingMetrics;
