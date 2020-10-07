@@ -1,8 +1,9 @@
 {
 	"CANARY_STREAM_NAME": "test", 
-	"CANARY_TYPE": "realtime", # Allowed values: realtime, offline
+	"CANARY_TYPE": "Realtime", # Allowed values: Realtime, Offline
 	"FRAGMENT_SIZE_IN_BYTES": "1048576", # Preferrably multiples of 1024 bytes
 	"CANARY_DURATION_IN_SECONDS": "60",
 	"CANARY_STORAGE_SIZE_IN_BYTES": "134217728", 
 	"CANARY_BUFFER_DURATION_IN_SECONDS": "120",
+	"CANARY_LABEL": "Longrun" # Allowed 20 characters
 }

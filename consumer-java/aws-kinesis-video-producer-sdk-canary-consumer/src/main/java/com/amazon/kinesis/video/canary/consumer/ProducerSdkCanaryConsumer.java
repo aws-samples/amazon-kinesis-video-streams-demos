@@ -29,11 +29,11 @@ public class ProducerSdkCanaryConsumer {
         String streamNamePrefix = System.getenv("CANARY_STREAM_NAME");
         String canaryType = System.getenv("CANARY_TYPE");
         String canaryFragmentSizeStr = System.getenv("FRAGMENT_SIZE_IN_BYTES");
+        String canaryLabel = System.getenv("CANARY_LABEL");
         String region = System.getenv("AWS_DEFAULT_REGION");
-        final String streamName = String.format("%s-canary-%s-%s", streamNamePrefix, canaryType,
-                    canaryFragmentSizeStr);
+        final String streamName = String.format("%s-%s-%s", streamNamePrefix, canaryType,
+                    canaryLabel);
         Integer canaryRunTime = Integer.parseInt(System.getenv("CANARY_DURATION_IN_SECONDS"));
-        
         log.info("Stream name {}", streamName);
 
         final SystemPropertiesCredentialsProvider credentialsProvider = new SystemPropertiesCredentialsProvider();
@@ -53,7 +53,7 @@ public class ProducerSdkCanaryConsumer {
                     @Override
                     public void process(InputStream inputStream, FragmentMetadataCallback fragmentMetadataCallback) throws MkvElementVisitException, IOException {
                         processWithFragmentEndCallbacks(inputStream, fragmentMetadataCallback,
-                                FrameVisitor.create(new CanaryFrameProcessor(amazonCloudWatch, streamName),
+                                FrameVisitor.create(new CanaryFrameProcessor(amazonCloudWatch, streamName, canaryLabel),
                                         Optional.of(new FragmentMetadataVisitor.BasicMkvTagProcessor())));
                     }
                 };

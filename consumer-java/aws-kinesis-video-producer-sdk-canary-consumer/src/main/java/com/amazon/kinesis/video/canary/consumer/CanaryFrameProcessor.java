@@ -23,13 +23,17 @@ import java.util.zip.CRC32;
 public class CanaryFrameProcessor implements FrameVisitor.FrameProcessor {
     int lastFrameIndex = -1;
     final AmazonCloudWatchAsync cwClient;
-    final Dimension dimension;
+    final Dimension dimensionPerStream;
+    final Dimension aggregatedDimension;
 
-    public CanaryFrameProcessor(AmazonCloudWatchAsync cwClient, String streamName) {
+    public CanaryFrameProcessor(AmazonCloudWatchAsync cwClient, String streamName, String canaryLabel) {
         this.cwClient = cwClient;
-        dimension = new Dimension()
-                .withName("ProducerSDKCanary")
+        dimensionPerStream = new Dimension()
+                .withName("ProducerSDKCanaryStreamName")
                 .withValue(streamName);
+        aggregatedDimension = new Dimension()
+                .withName("ProducerSDKCanaryType")
+                .withValue(canaryLabel);
     }
 
     @Override
@@ -61,8 +65,14 @@ public class CanaryFrameProcessor implements FrameVisitor.FrameProcessor {
                 .withMetricName("FrameSizeMatch")
                 .withUnit(StandardUnit.None)
                 .withValue(frameSize == data.length ? 1.0 : 0)
-                .withDimensions(dimension);
+                .withDimensions(dimensionPerStream);
         datumList.add(datum);
+        MetricDatum aggDatum = new MetricDatum()
+                .withMetricName("FrameSizeMatch")
+                .withUnit(StandardUnit.None)
+                .withValue(frameSize == data.length ? 1.0 : 0)
+                .withDimensions(aggregatedDimension);
+        datumList.add(aggDatum);
 
         byte[] crcData = new byte[Long.BYTES];
         System.arraycopy(data, offset, crcData, 0, crcData.length);
@@ -76,8 +86,14 @@ public class CanaryFrameProcessor implements FrameVisitor.FrameProcessor {
                 .withMetricName("FrameDataMatches")
                 .withUnit(StandardUnit.None)
                 .withValue(crc32.getValue() == crcValue ? 1.0 : 0)
-                .withDimensions(dimension);
+                .withDimensions(dimensionPerStream);
         datumList.add(datum);
+        aggDatum = new MetricDatum()
+                .withMetricName("FrameDataMatches")
+                .withUnit(StandardUnit.None)
+                .withValue(crc32.getValue() == crcValue ? 1.0 : 0)
+                .withDimensions(aggregatedDimension);
+        datumList.add(aggDatum);
 
 
         // frameTimestampInsideData == producerTimestamp + frame timecode
@@ -85,8 +101,14 @@ public class CanaryFrameProcessor implements FrameVisitor.FrameProcessor {
                 .withMetricName("FrameTimeMatchesProducerTimestamp")
                 .withUnit(StandardUnit.None)
                 .withValue(frameTimeInsideData == fragmentStartTime + frameTimeDelta ? 1.0 : 0)
-                .withDimensions(dimension);
+                .withDimensions(dimensionPerStream);
         datumList.add(datum);
+        aggDatum = new MetricDatum()
+                .withMetricName("FrameTimeMatchesProducerTimestamp")
+                .withUnit(StandardUnit.None)
+                .withValue(frameTimeInsideData == fragmentStartTime + frameTimeDelta ? 1.0 : 0)
+                .withDimensions(aggregatedDimension);
+        datumList.add(aggDatum);
 
         // frameIndex == lastFrameIndex + 1 except lastFrameIndex is not initialized
         if (lastFrameIndex >= 0) {
@@ -94,8 +116,14 @@ public class CanaryFrameProcessor implements FrameVisitor.FrameProcessor {
                     .withMetricName("FrameDropped")
                     .withUnit(StandardUnit.None)
                     .withValue(frameIndex != lastFrameIndex + 1 ? 1.0 : 0)
-                    .withDimensions(dimension);
+                    .withDimensions(dimensionPerStream);
             datumList.add(datum);
+            aggDatum = new MetricDatum()
+                    .withMetricName("FrameDropped")
+                    .withUnit(StandardUnit.None)
+                    .withValue(frameIndex != lastFrameIndex + 1 ? 1.0 : 0)
+                    .withDimensions(aggregatedDimension);
+            datumList.add(aggDatum);
         }
         lastFrameIndex = frameIndex;
 
@@ -104,8 +132,14 @@ public class CanaryFrameProcessor implements FrameVisitor.FrameProcessor {
                 .withMetricName("EndToEndFrameLatency")
                 .withUnit(StandardUnit.Milliseconds)
                 .withValue((double) System.currentTimeMillis() - frameTimeInsideData)
-                .withDimensions(dimension);
+                .withDimensions(dimensionPerStream);
         datumList.add(datum);
+        aggDatum = new MetricDatum()
+                .withMetricName("EndToEndFrameLatency")
+                .withUnit(StandardUnit.Milliseconds)
+                .withValue((double) System.currentTimeMillis() - frameTimeInsideData)
+                .withDimensions(aggregatedDimension);
+        datumList.add(aggDatum);
 
         sendMetrics(datumList);
     }
