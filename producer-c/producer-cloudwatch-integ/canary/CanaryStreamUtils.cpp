@@ -191,7 +191,7 @@ STATUS computeStreamMetricsFromCanary(STREAM_HANDLE streamHandle, PCanaryStreamC
     STATUS retStatus = STATUS_SUCCESS;
     StreamMetrics canaryStreamMetrics;
     canaryStreamMetrics.version = STREAM_METRICS_CURRENT_VERSION;
-    Aws::CloudWatch::Model::MetricDatum streamDatum, aggStreamDatum;
+    Aws::CloudWatch::Model::MetricDatum streamDatum, aggStreamDatum, currentViewDatum, aggCurrentViewDatum;
     CHK_STATUS(getKinesisVideoStreamMetrics(streamHandle, &canaryStreamMetrics));
 
     streamDatum.SetMetricName("FrameRate");
@@ -203,13 +203,13 @@ STATUS computeStreamMetricsFromCanary(STREAM_HANDLE streamHandle, PCanaryStreamC
     aggStreamDatum.AddDimensions(pCanaryStreamCallbacks->aggregatedDimension);
     pushUint64Metric(pCanaryStreamCallbacks, aggStreamDatum, Aws::CloudWatch::Model::StandardUnit::Count_Second, canaryStreamMetrics.currentFrameRate);
 
-    streamDatum.SetMetricName("CurrentViewDuration");
-    streamDatum.AddDimensions(pCanaryStreamCallbacks->dimensionPerStream);
-    pushUint64Metric(pCanaryStreamCallbacks, streamDatum, Aws::CloudWatch::Model::StandardUnit::Count_Second, canaryStreamMetrics.currentViewDuration / HUNDREDS_OF_NANOS_IN_A_MILLISECOND);
+    currentViewDatum.SetMetricName("CurrentViewDuration");
+    currentViewDatum.AddDimensions(pCanaryStreamCallbacks->dimensionPerStream);
+    pushUint64Metric(pCanaryStreamCallbacks, currentViewDatum, Aws::CloudWatch::Model::StandardUnit::Milliseconds, canaryStreamMetrics.currentViewDuration / HUNDREDS_OF_NANOS_IN_A_MILLISECOND);
 
-    aggStreamDatum.SetMetricName("CurrentViewDuration");
-    aggStreamDatum.AddDimensions(pCanaryStreamCallbacks->aggregatedDimension);
-    pushUint64Metric(pCanaryStreamCallbacks, aggStreamDatum, Aws::CloudWatch::Model::StandardUnit::Count_Second, canaryStreamMetrics.currentViewDuration / HUNDREDS_OF_NANOS_IN_A_MILLISECOND);
+    aggCurrentViewDatum.SetMetricName("CurrentViewDuration");
+    aggCurrentViewDatum.AddDimensions(pCanaryStreamCallbacks->aggregatedDimension);
+    pushUint64Metric(pCanaryStreamCallbacks, aggCurrentViewDatum, Aws::CloudWatch::Model::StandardUnit::Milliseconds, canaryStreamMetrics.currentViewDuration / HUNDREDS_OF_NANOS_IN_A_MILLISECOND);
 CleanUp:
     return retStatus;
 }
