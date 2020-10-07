@@ -50,6 +50,7 @@ def buildPeer(isMaster, params) {
       'CANARY_LOG_GROUP_NAME': params.LOG_GROUP_NAME,
       'CANARY_LOG_STREAM_NAME': "${params.RUNNER_LABEL}-${clientID}-${START_TIMESTAMP}",
       'CANARY_CHANNEL_NAME': "${env.JOB_NAME}-${params.RUNNER_LABEL}",
+      'CANARY_LABEL': params.SCENARIO_LABEL,
       'CANARY_CLIENT_ID': clientID,
       'CANARY_IS_MASTER': isMaster,
       'CANARY_DURATION_IN_SECONDS': params.DURATION_IN_SECONDS
@@ -83,6 +84,7 @@ def buildSignaling(params) {
       'CANARY_LOG_GROUP_NAME': params.LOG_GROUP_NAME,
       'CANARY_LOG_STREAM_NAME': "${params.RUNNER_LABEL}-Signaling-${START_TIMESTAMP}",
       'CANARY_CHANNEL_NAME': "${env.JOB_NAME}-${params.RUNNER_LABEL}",
+      'CANARY_LABEL': params.SCENARIO_LABEL,
       'CANARY_DURATION_IN_SECONDS': params.DURATION_IN_SECONDS
     ].collect({ k, v -> "${k}=${v}" })
     
@@ -113,6 +115,7 @@ pipeline {
         string(name: 'MASTER_NODE_LABEL')
         string(name: 'VIEWER_NODE_LABEL')
         string(name: 'RUNNER_LABEL')
+        string(name: 'SCENARIO_LABEL')
         string(name: 'DURATION_IN_SECONDS')
         string(name: 'MIN_RETRY_DELAY_IN_SECONDS')
         string(name: 'GIT_URL')
@@ -194,6 +197,7 @@ pipeline {
                       string(name: 'MASTER_NODE_LABEL', value: params.MASTER_NODE_LABEL),
                       string(name: 'VIEWER_NODE_LABEL', value: params.VIEWER_NODE_LABEL),
                       string(name: 'RUNNER_LABEL', value: params.RUNNER_LABEL),
+                      string(name: 'SCENARIO_LABEL', value: params.SCENARIO_LABEL),
                       string(name: 'DURATION_IN_SECONDS', value: params.DURATION_IN_SECONDS),
                       string(name: 'MIN_RETRY_DELAY_IN_SECONDS', value: params.MIN_RETRY_DELAY_IN_SECONDS),
                       string(name: 'GIT_URL', value: params.GIT_URL),
