@@ -32,22 +32,25 @@ extern "C" {
 #define CANARY_MAX_NUMBER_OF_LOG_FILES  10
 #define CANARY_APP_FILE_LOGGER          (PCHAR) "ENABLE_FILE_LOGGER"
 
-#define CANARY_TYPE_REALTIME           (PCHAR) "realtime"
-#define CANARY_TYPE_OFFLINE            (PCHAR) "offline"
+#define CANARY_TYPE_REALTIME           (PCHAR) "Realtime"
+#define CANARY_TYPE_OFFLINE            (PCHAR) "Offline"
 #define CANARY_STREAM_NAME_ENV_VAR     (PCHAR) "CANARY_STREAM_NAME"
 #define CANARY_TYPE_ENV_VAR            (PCHAR) "CANARY_TYPE"
 #define FRAGMENT_SIZE_ENV_VAR          (PCHAR) "FRAGMENT_SIZE_IN_BYTES"
 #define CANARY_DURATION_ENV_VAR        (PCHAR) "CANARY_DURATION_IN_SECONDS"
 #define CANARY_BUFFER_DURATION_ENV_VAR (PCHAR) "CANARY_BUFFER_DURATION_IN_SECONDS"
 #define CANARY_STORAGE_SIZE_ENV_VAR    (PCHAR) "CANARY_STORAGE_SIZE_IN_BYTES"
+#define CANARY_LABEL_ENV_VAR           (PCHAR) "CANARY_LABEL"
 
 #define CANARY_DEFAULT_STREAM_NAME         (PCHAR) "TestStream"
 #define CANARY_DEFAULT_CANARY_TYPE         CANARY_TYPE_REALTIME
 #define CANARY_DEFAULT_DURATION_IN_SECONDS 60
 #define CANARY_DEFAULT_FRAGMENT_SIZE       (25 * 1024)
+#define CANARY_DEFAULT_CANARY_LABEL        (PCHAR)"Longrun"
 
 #define CANARY_TYPE_STR_LEN        10
 #define CANARY_STREAM_NAME_STR_LEN 200
+#define CANARY_LABEL_LEN           40
 
 struct __CallbackStateMachine;
 struct __CallbacksProvider;
@@ -59,6 +62,7 @@ struct __CallbacksProvider;
 typedef struct {
     CHAR streamNamePrefix[CANARY_STREAM_NAME_STR_LEN + 1];
     CHAR canaryTypeStr[CANARY_TYPE_STR_LEN + 1];
+    CHAR canaryLabel[CANARY_LABEL_LEN + 1];
     UINT64 fragmentSizeInBytes;
     UINT64 canaryDuration;
     UINT64 bufferDuration;
@@ -88,7 +92,8 @@ struct __CanaryStreamCallbacks {
     PCHAR pStreamName;
     Aws::CloudWatch::CloudWatchClient* pCwClient;
     Aws::CloudWatch::Model::PutMetricDataRequest* cwRequest;
-    Aws::CloudWatch::Model::Dimension dimension;
+    Aws::CloudWatch::Model::Dimension dimensionPerStream;
+    Aws::CloudWatch::Model::Dimension aggregatedDimension;
     std::map<UINT64, UINT64>* timeOfNextKeyFrame;
 };
 typedef struct __CanaryStreamCallbacks* PCanaryStreamCallbacks;
@@ -96,7 +101,7 @@ typedef struct __CanaryStreamCallbacks* PCanaryStreamCallbacks;
 ////////////////////////////////////////////////////////////////////////
 // Callback function implementations
 ////////////////////////////////////////////////////////////////////////
-STATUS createCanaryStreamCallbacks(Aws::CloudWatch::CloudWatchClient*, PCHAR, PCanaryStreamCallbacks*);
+STATUS createCanaryStreamCallbacks(Aws::CloudWatch::CloudWatchClient*, PCHAR, PCHAR, PCanaryStreamCallbacks*);
 STATUS freeCanaryStreamCallbacks(PStreamCallbacks*);
 STATUS canaryStreamFragmentAckHandler(UINT64, STREAM_HANDLE, UPLOAD_HANDLE, PFragmentAck);
 STATUS canaryStreamErrorReportHandler(UINT64, STREAM_HANDLE, UPLOAD_HANDLE, UINT64, STATUS);
@@ -106,6 +111,8 @@ VOID canaryStreamRecordFragmentEndSendTime(PCanaryStreamCallbacks, UINT64, UINT6
 STATUS computeStreamMetricsFromCanary(STREAM_HANDLE, PCanaryStreamCallbacks);
 STATUS computeClientMetricsFromCanary(CLIENT_HANDLE, PCanaryStreamCallbacks);
 VOID currentMemoryAllocation(PCanaryStreamCallbacks);
+VOID pushUint64Metric(PCanaryStreamCallbacks pCanaryStreamCallback, Aws::CloudWatch::Model::MetricDatum&, Aws::CloudWatch::Model::StandardUnit, UINT64);
+
 
 ////////////////////////////////////////////////////////////////////////
 // Cloudwatch logging related functions

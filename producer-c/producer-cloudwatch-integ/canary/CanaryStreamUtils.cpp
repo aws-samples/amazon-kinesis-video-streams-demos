@@ -4,7 +4,7 @@
 #define LOG_CLASS "CanaryStreamCallbacks"
 #include "CanaryUtils.h"
 
-STATUS createCanaryStreamCallbacks(Aws::CloudWatch::CloudWatchClient* cwClient, PCHAR pStreamName, PCanaryStreamCallbacks* ppCanaryStreamCallbacks)
+STATUS createCanaryStreamCallbacks(Aws::CloudWatch::CloudWatchClient* cwClient, PCHAR pStreamName, PCHAR canaryLabel, PCanaryStreamCallbacks* ppCanaryStreamCallbacks)
 {
     ENTERS();
     STATUS retStatus = STATUS_SUCCESS;
@@ -24,8 +24,11 @@ STATUS createCanaryStreamCallbacks(Aws::CloudWatch::CloudWatchClient* cwClient, 
 
     pCanaryStreamCallbacks->pCwClient = cwClient;
 
-    pCanaryStreamCallbacks->dimension.SetName("ProducerSDKCanary");
-    pCanaryStreamCallbacks->dimension.SetValue(pStreamName);
+    pCanaryStreamCallbacks->dimensionPerStream.SetName("ProducerSDKCanaryStreamName");
+    pCanaryStreamCallbacks->dimensionPerStream.SetValue(pStreamName);
+
+    pCanaryStreamCallbacks->aggregatedDimension.SetName("ProducerSDKCanaryType");
+    pCanaryStreamCallbacks->aggregatedDimension.SetValue(canaryLabel);
 
     // Set callbacks
     pCanaryStreamCallbacks->streamCallbacks.fragmentAckReceivedFn = canaryStreamFragmentAckHandler;
@@ -93,46 +96,65 @@ STATUS canaryStreamErrorReportHandler(UINT64 customData, STREAM_HANDLE streamHan
                                       STATUS statusCode)
 {
     PCanaryStreamCallbacks pCanaryStreamCallbacks = (PCanaryStreamCallbacks) customData;
-    Aws::CloudWatch::Model::MetricDatum streamErrorDatum;
+    Aws::CloudWatch::Model::MetricDatum streamErrorDatum, aggstreamErrorDatum;
     DLOGE("CanaryStreamErrorReportHandler got error %lu at time %" PRIu64 " for stream % " PRIu64 " for upload handle %" PRIu64, statusCode,
           erroredTimecode, streamHandle, uploadHandle);
     streamErrorDatum.SetMetricName("StreamError");
-    streamErrorDatum.AddDimensions(pCanaryStreamCallbacks->dimension);
-    streamErrorDatum.SetValue(statusCode);
-    streamErrorDatum.SetUnit(Aws::CloudWatch::Model::StandardUnit::None);
-    canaryStreamSendMetrics(pCanaryStreamCallbacks, streamErrorDatum);
+    streamErrorDatum.AddDimensions(pCanaryStreamCallbacks->dimensionPerStream);
+    pushUint64Metric(pCanaryStreamCallbacks, streamErrorDatum, Aws::CloudWatch::Model::StandardUnit::None, statusCode);
+
+    aggstreamErrorDatum.SetMetricName("StreamError");
+    aggstreamErrorDatum.AddDimensions(pCanaryStreamCallbacks->aggregatedDimension);
+    pushUint64Metric(pCanaryStreamCallbacks, aggstreamErrorDatum, Aws::CloudWatch::Model::StandardUnit::None, statusCode);
 
     return STATUS_SUCCESS;
+}
+
+VOID pushUint64Metric(PCanaryStreamCallbacks pCanaryStreamCallback, Aws::CloudWatch::Model::MetricDatum& metricDatum, Aws::CloudWatch::Model::StandardUnit unit, UINT64 data)
+{
+    metricDatum.SetValue(data);
+    metricDatum.SetUnit(unit);
+    canaryStreamSendMetrics(pCanaryStreamCallback, metricDatum);
 }
 
 STATUS canaryStreamFragmentAckHandler(UINT64 customData, STREAM_HANDLE streamHandle, UPLOAD_HANDLE uploadHandle, PFragmentAck pFragmentAck)
 {
     PCanaryStreamCallbacks pCanaryStreamCallbacks = (PCanaryStreamCallbacks) customData;
     UINT64 timeOfFragmentEndSent = pCanaryStreamCallbacks->timeOfNextKeyFrame->find(pFragmentAck->timestamp)->second;
-    Aws::CloudWatch::Model::MetricDatum ackDatum;
+    Aws::CloudWatch::Model::MetricDatum ackDatum, aggAckDatum;
     switch (pFragmentAck->ackType) {
         case FRAGMENT_ACK_TYPE_BUFFERING:
             ackDatum.SetMetricName("BufferedAckLatency");
-            ackDatum.AddDimensions(pCanaryStreamCallbacks->dimension);
-            ackDatum.SetValue((GETTIME() - timeOfFragmentEndSent) / HUNDREDS_OF_NANOS_IN_A_MILLISECOND);
-            ackDatum.SetUnit(Aws::CloudWatch::Model::StandardUnit::Milliseconds);
-            canaryStreamSendMetrics(pCanaryStreamCallbacks, ackDatum);
+            ackDatum.AddDimensions(pCanaryStreamCallbacks->dimensionPerStream);
+            pushUint64Metric(pCanaryStreamCallbacks, ackDatum, Aws::CloudWatch::Model::StandardUnit::Milliseconds, (GETTIME() - timeOfFragmentEndSent) / HUNDREDS_OF_NANOS_IN_A_MILLISECOND);
+
+            aggAckDatum.SetMetricName("BufferedAckLatency");
+            aggAckDatum.AddDimensions(pCanaryStreamCallbacks->aggregatedDimension);
+            pushUint64Metric(pCanaryStreamCallbacks, aggAckDatum, Aws::CloudWatch::Model::StandardUnit::Milliseconds, (GETTIME() - timeOfFragmentEndSent) / HUNDREDS_OF_NANOS_IN_A_MILLISECOND);
+
             break;
         case FRAGMENT_ACK_TYPE_RECEIVED:
             ackDatum.SetMetricName("ReceivedAckLatency");
-            ackDatum.AddDimensions(pCanaryStreamCallbacks->dimension);
-            ackDatum.SetValue((GETTIME() - timeOfFragmentEndSent) / HUNDREDS_OF_NANOS_IN_A_MILLISECOND);
-            ackDatum.SetUnit(Aws::CloudWatch::Model::StandardUnit::Milliseconds);
-            canaryStreamSendMetrics(pCanaryStreamCallbacks, ackDatum);
+            ackDatum.AddDimensions(pCanaryStreamCallbacks->dimensionPerStream);
+            pushUint64Metric(pCanaryStreamCallbacks, ackDatum, Aws::CloudWatch::Model::StandardUnit::Milliseconds, (GETTIME() - timeOfFragmentEndSent) / HUNDREDS_OF_NANOS_IN_A_MILLISECOND);
+
+            aggAckDatum.SetMetricName("ReceivedAckLatency");
+            aggAckDatum.AddDimensions(pCanaryStreamCallbacks->aggregatedDimension);
+            pushUint64Metric(pCanaryStreamCallbacks, aggAckDatum, Aws::CloudWatch::Model::StandardUnit::Milliseconds, (GETTIME() - timeOfFragmentEndSent) / HUNDREDS_OF_NANOS_IN_A_MILLISECOND);
+
             break;
 
         case FRAGMENT_ACK_TYPE_PERSISTED:
             ackDatum.SetMetricName("PersistedAckLatency");
-            ackDatum.AddDimensions(pCanaryStreamCallbacks->dimension);
-            ackDatum.SetValue((GETTIME() - timeOfFragmentEndSent) / HUNDREDS_OF_NANOS_IN_A_MILLISECOND);
-            ackDatum.SetUnit(Aws::CloudWatch::Model::StandardUnit::Milliseconds);
-            canaryStreamSendMetrics(pCanaryStreamCallbacks, ackDatum);
+            ackDatum.AddDimensions(pCanaryStreamCallbacks->dimensionPerStream);
+            pushUint64Metric(pCanaryStreamCallbacks, ackDatum, Aws::CloudWatch::Model::StandardUnit::Milliseconds, (GETTIME() - timeOfFragmentEndSent) / HUNDREDS_OF_NANOS_IN_A_MILLISECOND);
+
+            aggAckDatum.SetMetricName("PersistedAckLatency");
+            aggAckDatum.AddDimensions(pCanaryStreamCallbacks->aggregatedDimension);
+            pushUint64Metric(pCanaryStreamCallbacks, aggAckDatum, Aws::CloudWatch::Model::StandardUnit::Milliseconds, (GETTIME() - timeOfFragmentEndSent) / HUNDREDS_OF_NANOS_IN_A_MILLISECOND);
+
             pCanaryStreamCallbacks->timeOfNextKeyFrame->erase(pFragmentAck->timestamp);
+
             break;
         case FRAGMENT_ACK_TYPE_ERROR:
             DLOGE("Received Error Ack timestamp %" PRIu64 " fragment number %s error code %lu", pFragmentAck->timestamp, pFragmentAck->sequenceNumber,
@@ -169,20 +191,25 @@ STATUS computeStreamMetricsFromCanary(STREAM_HANDLE streamHandle, PCanaryStreamC
     STATUS retStatus = STATUS_SUCCESS;
     StreamMetrics canaryStreamMetrics;
     canaryStreamMetrics.version = STREAM_METRICS_CURRENT_VERSION;
-    Aws::CloudWatch::Model::MetricDatum currentFrameRateDatum, currentViewDurationDatum;
+    Aws::CloudWatch::Model::MetricDatum streamDatum, aggStreamDatum;
     CHK_STATUS(getKinesisVideoStreamMetrics(streamHandle, &canaryStreamMetrics));
 
-    currentFrameRateDatum.SetMetricName("FrameRate");
-    currentFrameRateDatum.AddDimensions(pCanaryStreamCallbacks->dimension);
-    currentFrameRateDatum.SetValue(canaryStreamMetrics.currentFrameRate);
-    currentFrameRateDatum.SetUnit(Aws::CloudWatch::Model::StandardUnit::Count_Second);
-    canaryStreamSendMetrics(pCanaryStreamCallbacks, currentFrameRateDatum);
+    streamDatum.SetMetricName("FrameRate");
+    streamDatum.AddDimensions(pCanaryStreamCallbacks->dimensionPerStream);
+    pushUint64Metric(pCanaryStreamCallbacks, streamDatum, Aws::CloudWatch::Model::StandardUnit::Count_Second, canaryStreamMetrics.currentFrameRate);
 
-    currentViewDurationDatum.SetMetricName("CurrentViewDuration");
-    currentViewDurationDatum.AddDimensions(pCanaryStreamCallbacks->dimension);
-    currentViewDurationDatum.SetValue(canaryStreamMetrics.currentViewDuration / HUNDREDS_OF_NANOS_IN_A_MILLISECOND);
-    currentViewDurationDatum.SetUnit(Aws::CloudWatch::Model::StandardUnit::Milliseconds);
-    canaryStreamSendMetrics(pCanaryStreamCallbacks, currentViewDurationDatum);
+
+    aggStreamDatum.SetMetricName("FrameRate");
+    aggStreamDatum.AddDimensions(pCanaryStreamCallbacks->aggregatedDimension);
+    pushUint64Metric(pCanaryStreamCallbacks, aggStreamDatum, Aws::CloudWatch::Model::StandardUnit::Count_Second, canaryStreamMetrics.currentFrameRate);
+
+    streamDatum.SetMetricName("CurrentViewDuration");
+    streamDatum.AddDimensions(pCanaryStreamCallbacks->dimensionPerStream);
+    pushUint64Metric(pCanaryStreamCallbacks, streamDatum, Aws::CloudWatch::Model::StandardUnit::Count_Second, canaryStreamMetrics.currentViewDuration / HUNDREDS_OF_NANOS_IN_A_MILLISECOND);
+
+    aggStreamDatum.SetMetricName("CurrentViewDuration");
+    aggStreamDatum.AddDimensions(pCanaryStreamCallbacks->aggregatedDimension);
+    pushUint64Metric(pCanaryStreamCallbacks, aggStreamDatum, Aws::CloudWatch::Model::StandardUnit::Count_Second, canaryStreamMetrics.currentViewDuration / HUNDREDS_OF_NANOS_IN_A_MILLISECOND);
 CleanUp:
     return retStatus;
 }
@@ -192,26 +219,30 @@ STATUS computeClientMetricsFromCanary(CLIENT_HANDLE clientHandle, PCanaryStreamC
     STATUS retStatus = STATUS_SUCCESS;
     ClientMetrics canaryClientMetrics;
     canaryClientMetrics.version = CLIENT_METRICS_CURRENT_VERSION;
-    Aws::CloudWatch::Model::MetricDatum contentStoreAvailableSizeDatum;
+    Aws::CloudWatch::Model::MetricDatum clientDatum, aggClientDatum;
     CHK_STATUS(getKinesisVideoMetrics(clientHandle, &canaryClientMetrics));
 
-    contentStoreAvailableSizeDatum.SetMetricName("StorageSizeAvailable");
-    contentStoreAvailableSizeDatum.AddDimensions(pCanaryStreamCallbacks->dimension);
-    contentStoreAvailableSizeDatum.SetValue(canaryClientMetrics.contentStoreAvailableSize);
-    contentStoreAvailableSizeDatum.SetUnit(Aws::CloudWatch::Model::StandardUnit::Bytes);
-    canaryStreamSendMetrics(pCanaryStreamCallbacks, contentStoreAvailableSizeDatum);
+    clientDatum.SetMetricName("StorageSizeAvailable");
+    clientDatum.AddDimensions(pCanaryStreamCallbacks->dimensionPerStream);
+    pushUint64Metric(pCanaryStreamCallbacks, clientDatum, Aws::CloudWatch::Model::StandardUnit::Bytes, canaryClientMetrics.contentStoreAvailableSize);
+
+    aggClientDatum.SetMetricName("StorageSizeAvailable");
+    aggClientDatum.AddDimensions(pCanaryStreamCallbacks->aggregatedDimension);
+    pushUint64Metric(pCanaryStreamCallbacks, aggClientDatum, Aws::CloudWatch::Model::StandardUnit::Bytes, canaryClientMetrics.contentStoreAvailableSize);
 CleanUp:
     return retStatus;
 }
 
 VOID currentMemoryAllocation(PCanaryStreamCallbacks pCanaryStreamCallbacks)
 {
-    Aws::CloudWatch::Model::MetricDatum memoryAllocationSizeDatum;
-    memoryAllocationSizeDatum.SetMetricName("MemoryAllocation");
-    memoryAllocationSizeDatum.AddDimensions(pCanaryStreamCallbacks->dimension);
-    memoryAllocationSizeDatum.SetValue(getInstrumentedTotalAllocationSize());
-    memoryAllocationSizeDatum.SetUnit(Aws::CloudWatch::Model::StandardUnit::Bytes);
-    canaryStreamSendMetrics(pCanaryStreamCallbacks, memoryAllocationSizeDatum);
+    Aws::CloudWatch::Model::MetricDatum memoryDatum, aggMemoryDatum;
+    memoryDatum.SetMetricName("MemoryAllocation");
+    memoryDatum.AddDimensions(pCanaryStreamCallbacks->dimensionPerStream);
+    pushUint64Metric(pCanaryStreamCallbacks, memoryDatum, Aws::CloudWatch::Model::StandardUnit::Bytes, getInstrumentedTotalAllocationSize());
+
+    aggMemoryDatum.SetMetricName("MemoryAllocation");
+    aggMemoryDatum.AddDimensions(pCanaryStreamCallbacks->aggregatedDimension);
+    pushUint64Metric(pCanaryStreamCallbacks, aggMemoryDatum, Aws::CloudWatch::Model::StandardUnit::Bytes, getInstrumentedTotalAllocationSize());
 }
 VOID canaryStreamRecordFragmentEndSendTime(PCanaryStreamCallbacks pCanaryStreamCallbacks, UINT64 lastKeyFrameTime, UINT64 curKeyFrameTime)
 {

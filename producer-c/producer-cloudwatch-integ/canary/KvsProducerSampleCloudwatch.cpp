@@ -93,6 +93,10 @@ STATUS parseConfigFile(PCanaryConfig pCanaryConfig, PCHAR filePath)
             STRTOUI64(final_attr_str, NULL, 10, &pCanaryConfig->storageSizeInBytes);
             i++;
         }
+        else if(compareJsonString((PCHAR) params, &tokens[i], JSMN_STRING, CANARY_LABEL_ENV_VAR)) {
+            getJsonValue(params, tokens[i + 1], pCanaryConfig->canaryLabel);
+            i++;
+        }
     }
 CleanUp:
     return retStatus;
@@ -144,6 +148,7 @@ STATUS initWithEnvVars(PCanaryConfig pCanaryConfig)
     PCHAR type;
     CHAR canaryType[CANARY_TYPE_STR_LEN + 1];
     CHAR streamName[CANARY_STREAM_NAME_STR_LEN + 1];
+    CHAR canaryLabel[CANARY_LABEL_LEN + 1];
     CHK(pCanaryConfig != NULL, STATUS_NULL_ARG);
 
     CHK_STATUS(optenv(CANARY_STREAM_NAME_ENV_VAR, streamName, CANARY_DEFAULT_STREAM_NAME));
@@ -151,6 +156,9 @@ STATUS initWithEnvVars(PCanaryConfig pCanaryConfig)
 
     CHK_STATUS(optenv(CANARY_TYPE_ENV_VAR, canaryType, CANARY_DEFAULT_CANARY_TYPE));
     STRCPY(pCanaryConfig->canaryTypeStr, canaryType);
+
+    CHK_STATUS(optenv(CANARY_LABEL_ENV_VAR, canaryLabel, CANARY_DEFAULT_CANARY_LABEL));
+    STRCPY(pCanaryConfig->canaryLabel, canaryLabel);
 
     CHK_STATUS(optenvUint64(FRAGMENT_SIZE_ENV_VAR, &pCanaryConfig->fragmentSizeInBytes, CANARY_DEFAULT_FRAGMENT_SIZE));
     CHK_STATUS(optenvUint64(CANARY_DURATION_ENV_VAR, &pCanaryConfig->canaryDuration, CANARY_DEFAULT_DURATION_IN_SECONDS));
@@ -198,6 +206,7 @@ INT32 main(INT32 argc, CHAR* argv[])
     Aws::InitAPI(options);
     {
         frame.frameData = NULL;
+
         if (argc < 2) {
             DLOGW("Optional Usage: %s <path-to-config-file>\n", argv[0]);
             DLOGD("Using environment variables now");
@@ -220,7 +229,7 @@ INT32 main(INT32 argc, CHAR* argv[])
         cacertPath = getenv(CACERT_PATH_ENV_VAR);
         sessionToken = getenv(SESSION_TOKEN_ENV_VAR);
 
-        SNPRINTF(streamName, MAX_STREAM_NAME_LEN, "%s-canary-%s-%llu", config.streamNamePrefix, config.canaryTypeStr, config.fragmentSizeInBytes);
+        SNPRINTF(streamName, MAX_STREAM_NAME_LEN, "%s-%s-%s", config.streamNamePrefix, config.canaryTypeStr, config.canaryLabel);
 
         if ((region = getenv(DEFAULT_REGION_ENV_VAR)) == NULL) {
             region = (PCHAR) DEFAULT_AWS_REGION;
@@ -268,7 +277,7 @@ INT32 main(INT32 argc, CHAR* argv[])
             }
         }
 
-        CHK_STATUS(createCanaryStreamCallbacks(&cw, streamName, &pCanaryStreamCallbacks));
+        CHK_STATUS(createCanaryStreamCallbacks(&cw, streamName, config.canaryLabel, &pCanaryStreamCallbacks));
         CHK_STATUS(addStreamCallbacks(pClientCallbacks, &pCanaryStreamCallbacks->streamCallbacks));
 
         if (!fileLoggingEnabled) {
