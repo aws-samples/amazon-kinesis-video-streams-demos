@@ -323,7 +323,7 @@ STATUS run(Canary::PConfig pConfig)
     masterChannelInfo.channelRoleType = SIGNALING_CHANNEL_ROLE_TYPE_MASTER;
     masterChannelInfo.cachingPolicy = SIGNALING_API_CALL_CACHE_TYPE_FILE;
     masterChannelInfo.cachingPeriod = SIGNALING_API_CALL_CACHE_TTL_SENTINEL_VALUE;
-    masterChannelInfo.asyncIceServerConfig = TRUE;
+    masterChannelInfo.asyncIceServerConfig = FALSE;
     masterChannelInfo.retry = TRUE;
     masterChannelInfo.reconnect = TRUE;
     masterChannelInfo.pCertPath = (PCHAR) DEFAULT_KVS_CACERT_PATH;
