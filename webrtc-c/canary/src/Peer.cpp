@@ -87,9 +87,12 @@ STATUS Peer::initSignaling(const Canary::PConfig pConfig)
                 pPeer->signalingStartTime = GETTIME();
                 break;
             case SIGNALING_CLIENT_STATE_CONNECTED: {
-                auto duration = (GETTIME() - pPeer->signalingStartTime) / HUNDREDS_OF_NANOS_IN_A_MILLISECOND;
-                DLOGI("Signaling took %lu ms to connect", duration);
-                Canary::Cloudwatch::getInstance().monitoring.pushSignalingInitDelay(duration, StandardUnit::Milliseconds);
+                if (!pPeer->initializedSignaling) {
+                    auto duration = (GETTIME() - pPeer->signalingStartTime) / HUNDREDS_OF_NANOS_IN_A_MILLISECOND;
+                    DLOGI("Signaling took %lu ms to connect", duration);
+                    Canary::Cloudwatch::getInstance().monitoring.pushSignalingInitDelay(duration, StandardUnit::Milliseconds);
+                    pPeer->initializedSignaling = TRUE;
+                }
                 break;
             }
             default:
@@ -670,14 +673,14 @@ STATUS Peer::publishStatsForCanary(RTC_STATS_TYPE statsType)
     this->canaryMetrics.requestedTypeOfStats = statsType;
     switch (statsType) {
         case RTC_STATS_TYPE_OUTBOUND_RTP:
-            if(!this->videoTransceivers.empty()) {
+            if (!this->videoTransceivers.empty()) {
                 CHK_LOG_ERR(::rtcPeerConnectionGetMetrics(this->pPeerConnection, this->videoTransceivers.back(), &this->canaryMetrics));
                 this->populateOutgoingRtpMetricsContext();
                 Canary::Cloudwatch::getInstance().monitoring.pushOutboundRtpStats(&this->canaryOutgoingRTPMetricsContext);
             }
             break;
         case RTC_STATS_TYPE_INBOUND_RTP:
-            if(!this->videoTransceivers.empty()) {
+            if (!this->videoTransceivers.empty()) {
                 CHK_LOG_ERR(::rtcPeerConnectionGetMetrics(this->pPeerConnection, this->videoTransceivers.back(), &this->canaryMetrics));
                 this->populateIncomingRtpMetricsContext();
                 Canary::Cloudwatch::getInstance().monitoring.pushInboundRtpStats(&this->canaryIncomingRTPMetricsContext);
