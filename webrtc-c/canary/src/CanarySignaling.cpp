@@ -397,7 +397,7 @@ CleanUp:
 
     STATUS combinedStatus = STATUS_FAILED(canarySessionInfo.exitStatus) ? canarySessionInfo.exitStatus : retStatus;
 
-    DLOGI("Exiting main with 0x%08x", combinedStatus);
+    DLOGI("Exiting with 0x%08x", combinedStatus);
     if (initialized) {
         Canary::Cloudwatch::getInstance().monitoring.pushExitStatus(combinedStatus);
     }
