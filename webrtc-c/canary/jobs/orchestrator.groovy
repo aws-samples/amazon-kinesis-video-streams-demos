@@ -143,7 +143,6 @@ pipeline {
                             wait: false
                         )
 
-                        /* TODO: Signaling canary is still unstable. Uncomment below when the software is stable.
                         build(
                             job: NEXT_AVAILABLE_RUNNER,
                             parameters: COMMON_PARAMS + [
@@ -173,7 +172,6 @@ pipeline {
                             ],
                             wait: false
                         )
-                        */
                     }
                 }
 
