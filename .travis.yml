@@ -1,0 +1,19 @@
+language: generic
+sudo: true
+
+os: linux
+dist: bionic
+
+branches:
+  only:
+  - master
+
+cache:
+- directories:
+  - $HOME/.cache
+
+matrix:
+    include:
+        - env: TARGET=webrtc-c/canary
+
+script: if .travis/build-condition.sh $TRAVIS_COMMIT_RANGE $TARGET; then echo "$TARGET is being built" && cd "$TARGET" && make test; else echo "$TARGET is NOT being built"; fi
