@@ -76,6 +76,7 @@ class Peer {
     std::atomic<BOOL> receivedAnswer;
     std::atomic<BOOL> foundPeerId;
     std::atomic<BOOL> recorded;
+    BOOL initializedSignaling = FALSE;
     std::string peerId;
     RtcConfiguration rtcConfiguration;
     PRtcPeerConnection pPeerConnection;
