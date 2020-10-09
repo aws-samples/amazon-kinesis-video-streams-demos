@@ -211,7 +211,7 @@ CleanUp:
 
 VOID Config::print()
 {
-    DLOGD("\n\n"
+    DLOGD("Applied configuration:\n\n"
           "\tLabel         : %s\n"
           "\tChannel Name  : %s\n"
           "\tRegion        : %s\n"
