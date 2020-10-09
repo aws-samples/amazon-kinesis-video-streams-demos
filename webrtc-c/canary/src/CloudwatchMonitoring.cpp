@@ -239,12 +239,16 @@ VOID CloudwatchMonitoring::pushEndToEndMetrics(Canary::PEndToEndMetricsContext p
 
     endToEndLatencyDatum.SetMetricName("EndToEndFrameLatency");
     endToEndLatencyDatum.SetUnit(StandardUnit::Milliseconds);
-    endToEndLatencyDatum.SetValues(pEndToEndMetricsContext->frameLatency);
+    auto& latencies = pEndToEndMetricsContext->frameLatency;
+    auto averageLatency = std::accumulate(latencies.begin(), latencies.end(), 0.0) / latencies.size();
+    endToEndLatencyDatum.SetValue(averageLatency);
     this->push(endToEndLatencyDatum);
 
     sizeMatchDatum.SetMetricName("FrameSizeMatch");
     sizeMatchDatum.SetUnit(StandardUnit::None);
-    sizeMatchDatum.SetValues(pEndToEndMetricsContext->sizeMatch);
+    auto& sizeMatches = pEndToEndMetricsContext->sizeMatch;
+    auto averageSizeMatch = std::accumulate(sizeMatches.begin(), sizeMatches.end(), 0.0) / sizeMatches.size();
+    sizeMatchDatum.SetValue(averageSizeMatch);
     this->push(sizeMatchDatum);
 
     pEndToEndMetricsContext->frameLatency.clear();
