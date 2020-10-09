@@ -39,6 +39,40 @@ JSON config example:
 }
 ```
 
+## Cloudwatch Metrics
+
+The default Cloudwatch namespace is **KinesisVideoSDKCanary**. Each metric listed below will be emitted twice, 
+one with a label dimension and the other with label and channel dimensions. By omitting the channel dimension, 
+metrics that come from different channel names by with the same label will be aggregated. This can be really 
+useful for a scenario where we want to logically group metrics from different runs, e.g. we have a periodic 
+start/stop scenario and we want to run this scenario with different sets of devices. While it's useful to 
+aggregate these metrics, it's also equally important to keep metrics with the channel dimension to keep
+the granular access to these metrics.
+
+### Webrtc
+
+| Category           | Metric                         | Unit            | Dimensions | Frequency (seconds) | Description                                                                                                                                                                      |
+|--------------------|--------------------------------|-----------------|------------|---------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Shutdown           | ExitStatus                     | Count           | Code       | -                   | Every time the Canary runs, it'll post exactly once. If successfull, the code will be 0x00000000.                                                                                |
+| Initialization     | SignalingInitDelay             | Miliseconds     | -          | -                   | Measure the time it takes for Signaling from creation to connected.                                                                                                              |
+| Initialization     | ICEHolePunchingDelay           | Miliseconds     | -          | -                   | Measure the time it takes for ICE agent to successfully connect to the other peer.                                                                                               |
+| End to End         | EndToEndFrameLatency           | Milliseconds    | -          | 30                  | The delay from sending the frame to when the frame is received on the other end                                                                                                  |
+| End to End         | FrameSizeMatch                 | None            | -          | 30                  | The decoded canary data (header + frame data) at the receiver end is compared with the received size as part of header). If equal, 0.0 is pushed as a metric, else 1.0 is pushed |
+| Outbound RTP Stats | FramesPerSecond                | Count_Second    | -          | 60                  | Measures the rate at which frames are sent out from the master. This is calculated using outboundRtpStats                                                                        |
+| Outbound RTP Stats | PercentageFrameDiscarded       | Percent         | -          | 60                  | This expresses the percentage of frames that dropped on the sending path within a given time interval. This is calculated using outboundRtpStats                                 |
+| Outbound RTP Stats | PercentageFramesRetransmitted  | Percent         | -          | 60                  | This expresses the percentage of frames that are retransmitted on the sending path within a given time interval.  This is calculated using outboundRtpStats                      |
+| Outbound RTP Stats | NackPerSecond                  | Count_Second    | -          | 60                  | Rate at which Nacks are received by master. This is calculated using outboundRtpStats                                                                                            |
+| Inbound RTP Stats  | IncomingBitRate                | Kilobits_Second | -          | 60                  | Measures the rate at which frame bits are received by master. This is calculated using inboundRtpStats                                                                           |
+| Inbound RTP Stats  | IncomingPacketsPerSecond       | Count_Second    | -          | 60                  | Measures the rate at which packets are received by the master. This is calculated using inboundRtpStats                                                                          |
+| Inbound RTP Stats  | IncomingFramesDroppedPerSecond | Count_Second    | -          | 60                  | Rate at which the incoming frames are dropped. This is calculated using inboundRtpStats                                                                                          |
+
+### Signaling
+
+| Category   | Metric                    | Unit        | Dimensions | Frequency (seconds) | Description                                                                                       |
+|------------|---------------------------|-------------|------------|---------------------|---------------------------------------------------------------------------------------------------|
+| Shutdown   | ExitStatus                | Count       | Code       | -                   | Every time the Canary runs, it'll post exactly once. If successfull, the code will be 0x00000000. |
+| End to End | SignalingRoundtripLatency | Miliseconds | -          | 15                  | Measure the roundtrip latency from sending an offer to receive an answer                          |
+
 ## Jenkins
 
 ### Prerequisites
