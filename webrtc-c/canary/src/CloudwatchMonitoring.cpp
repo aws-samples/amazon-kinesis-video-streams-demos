@@ -245,7 +245,7 @@ VOID CloudwatchMonitoring::pushEndToEndMetrics(Canary::PEndToEndMetricsContext p
     this->push(endToEndLatencyDatum);
 
     sizeMatchDatum.SetMetricName("FrameSizeMatch");
-    sizeMatchDatum.SetUnit(StandardUnit::None);
+    sizeMatchDatum.SetUnit(StandardUnit::Count);
     auto& sizeMatches = pEndToEndMetricsContext->sizeMatch;
     auto averageSizeMatch = std::accumulate(sizeMatches.begin(), sizeMatches.end(), 0.0) / sizeMatches.size();
     sizeMatchDatum.SetValue(averageSizeMatch);
