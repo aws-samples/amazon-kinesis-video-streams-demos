@@ -29,6 +29,26 @@ VOID CloudwatchMonitoring::deinit()
     }
 }
 
+static const CHAR* unitToString(const StandardUnit& unit)
+{
+    switch (unit) {
+        case StandardUnit::Count:
+            return "Count";
+        case StandardUnit::Count_Second:
+            return "Count_Second";
+        case StandardUnit::Milliseconds:
+            return "Milliseconds";
+        case StandardUnit::Percent:
+            return "Percent";
+        case StandardUnit::None:
+            return "None";
+        case StandardUnit::Kilobits_Second:
+            return "Kilobits_Second";
+        default:
+            return "Unknown unit";
+    }
+}
+
 VOID CloudwatchMonitoring::push(const MetricDatum& datum)
 {
     Aws::CloudWatch::Model::PutMetricDataRequest cwRequest;
@@ -59,6 +79,42 @@ VOID CloudwatchMonitoring::push(const MetricDatum& datum)
     };
     this->pendingMetrics++;
     this->client.PutMetricDataAsync(cwRequest, asyncHandler);
+
+    std::stringstream ss;
+
+    ss << "Emitted the following metric:\n\n";
+    ss << "  Name       : " << datum.GetMetricName() << '\n';
+    ss << "  Unit       : " << unitToString(datum.GetUnit()) << '\n';
+
+    ss << "  Values     : ";
+    auto& values = datum.GetValues();
+    // If the datum uses single value, GetValues will be empty and the data will be accessible
+    // from GetValue
+    if (values.empty()) {
+        ss << datum.GetValue();
+    } else {
+        for (auto i = 0; i < values.size(); i++) {
+            ss << values[i];
+            if (i != values.size() - 1) {
+                ss << ", ";
+            }
+        }
+    }
+    ss << '\n';
+
+    ss << "  Dimensions : ";
+    auto& dimensions = datum.GetDimensions();
+    if (dimensions.empty()) {
+        ss << "N/A";
+    } else {
+        ss << '\n';
+        for (auto& dimension : dimensions) {
+            ss << "    - " << dimension.GetName() << "\t: " << dimension.GetValue() << '\n';
+        }
+    }
+    ss << '\n';
+
+    DLOGD("%s", ss.str().c_str());
 }
 
 VOID CloudwatchMonitoring::pushExitStatus(STATUS retStatus)

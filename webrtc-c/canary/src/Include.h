@@ -81,6 +81,8 @@
 #define END_TO_END_METRICS_INVOCATION_PERIOD (30 * HUNDREDS_OF_NANOS_IN_A_SECOND)
 #define CANARY_METADATA_SIZE                 (SIZEOF(UINT64) + SIZEOF(UINT32) + SIZEOF(UINT32))
 
+#include <numeric>
+
 #include <aws/core/Aws.h>
 #include <aws/monitoring/CloudWatchClient.h>
 #include <aws/monitoring/model/PutMetricDataRequest.h>
