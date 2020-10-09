@@ -600,7 +600,6 @@ STATUS Peer::populateOutgoingRtpMetricsContext()
     DOUBLE currentDuration = 0;
 
     currentDuration = (DOUBLE)(this->canaryMetrics.timestamp - this->canaryOutgoingRTPMetricsContext.prevTs) / HUNDREDS_OF_NANOS_IN_A_SECOND;
-    DLOGD("duration:%lf", currentDuration);
     {
         std::lock_guard<std::mutex> lock(this->countUpdateMutex);
         this->canaryOutgoingRTPMetricsContext.framesPercentageDiscarded =
@@ -630,11 +629,6 @@ STATUS Peer::populateOutgoingRtpMetricsContext()
     this->canaryOutgoingRTPMetricsContext.prevNackCount = this->canaryMetrics.rtcStatsObject.outboundRtpStreamStats.nackCount;
     this->canaryOutgoingRTPMetricsContext.prevRetxBytesSent = this->canaryMetrics.rtcStatsObject.outboundRtpStreamStats.retransmittedBytesSent;
 
-    DLOGD("Frames discard percent: %lf", this->canaryOutgoingRTPMetricsContext.framesPercentageDiscarded);
-    DLOGD("Average frame rate: %lf", this->canaryOutgoingRTPMetricsContext.averageFramesSentPerSecond);
-    DLOGD("Nack rate: %lf", this->canaryOutgoingRTPMetricsContext.nacksPerSecond);
-    DLOGD("Retransmission percent: %lf", this->canaryOutgoingRTPMetricsContext.retxBytesPercentage);
-
     return STATUS_SUCCESS;
 }
 
@@ -642,7 +636,6 @@ STATUS Peer::populateIncomingRtpMetricsContext()
 {
     DOUBLE currentDuration = 0;
     currentDuration = (DOUBLE)(this->canaryMetrics.timestamp - this->canaryIncomingRTPMetricsContext.prevTs) / HUNDREDS_OF_NANOS_IN_A_SECOND;
-    DLOGD("duration:%lf", currentDuration);
     this->canaryIncomingRTPMetricsContext.packetReceiveRate =
         (DOUBLE)(this->canaryMetrics.rtcStatsObject.inboundRtpStreamStats.received.packetsReceived -
                  this->canaryIncomingRTPMetricsContext.prevPacketsReceived) /
@@ -660,10 +653,6 @@ STATUS Peer::populateIncomingRtpMetricsContext()
     this->canaryIncomingRTPMetricsContext.prevBytesReceived = this->canaryMetrics.rtcStatsObject.inboundRtpStreamStats.bytesReceived;
     this->canaryIncomingRTPMetricsContext.prevFramesDropped = this->canaryMetrics.rtcStatsObject.inboundRtpStreamStats.received.framesDropped;
     this->canaryIncomingRTPMetricsContext.prevTs = this->canaryMetrics.timestamp;
-
-    DLOGD("Packet receive rate: %lf", this->canaryIncomingRTPMetricsContext.packetReceiveRate);
-    DLOGD("Incoming bit rate: %lf", this->canaryIncomingRTPMetricsContext.incomingBitRate / 1024.0);
-    DLOGD("Frame drop rate: %lf", this->canaryIncomingRTPMetricsContext.framesDroppedPerSecond);
 
     return STATUS_SUCCESS;
 }
