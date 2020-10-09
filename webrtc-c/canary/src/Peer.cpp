@@ -530,7 +530,7 @@ STATUS Peer::addTransceiver(RtcMediaStreamTrack& track)
 
         // Do a size match of the raw packet. Since raw packet does not contain the NALu, the
         // comparison would be rawPacketSize + ANNEX_B_NALU_SIZE and the received size
-        pPeer->endToEndMetricsContext.sizeMatch.push_back((rawPacketSize + ANNEX_B_NALU_SIZE) == receivedSize ? 0.0 : 1.0);
+        pPeer->endToEndMetricsContext.sizeMatch.push_back((rawPacketSize + ANNEX_B_NALU_SIZE) == receivedSize ? 1.0 : 0.0);
         SAFE_MEMFREE(rawPacket);
     };
 
