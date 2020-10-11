@@ -85,6 +85,11 @@ struct __CloudwatchLogsObject {
 };
 typedef struct __CloudwatchLogsObject* PCloudwatchLogsObject;
 
+typedef struct {
+    UINT64 prevErrorAckCount;
+    UINT64 prevPutFrameErrorCount;
+} HistoricStreamMetric;
+
 typedef struct __CanaryStreamCallbacks CanaryStreamCallbacks;
 struct __CanaryStreamCallbacks {
     // First member should be the stream callbacks
@@ -94,6 +99,7 @@ struct __CanaryStreamCallbacks {
     Aws::CloudWatch::Model::PutMetricDataRequest* cwRequest;
     Aws::CloudWatch::Model::Dimension dimensionPerStream;
     Aws::CloudWatch::Model::Dimension aggregatedDimension;
+    HistoricStreamMetric historicStreamMetric;
     std::map<UINT64, UINT64>* timeOfNextKeyFrame;
 };
 typedef struct __CanaryStreamCallbacks* PCanaryStreamCallbacks;
@@ -111,8 +117,8 @@ VOID canaryStreamRecordFragmentEndSendTime(PCanaryStreamCallbacks, UINT64, UINT6
 STATUS computeStreamMetricsFromCanary(STREAM_HANDLE, PCanaryStreamCallbacks);
 STATUS computeClientMetricsFromCanary(CLIENT_HANDLE, PCanaryStreamCallbacks);
 VOID currentMemoryAllocation(PCanaryStreamCallbacks);
-VOID pushUint64Metric(PCanaryStreamCallbacks pCanaryStreamCallback, Aws::CloudWatch::Model::MetricDatum&, Aws::CloudWatch::Model::StandardUnit, UINT64);
-
+VOID pushMetric(PCanaryStreamCallbacks pCanaryStreamCallback, Aws::CloudWatch::Model::MetricDatum&, Aws::CloudWatch::Model::StandardUnit, DOUBLE);
+STATUS publishErrorRate(STREAM_HANDLE, PCanaryStreamCallbacks, UINT64);
 
 ////////////////////////////////////////////////////////////////////////
 // Cloudwatch logging related functions
