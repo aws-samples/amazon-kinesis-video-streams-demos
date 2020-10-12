@@ -51,6 +51,7 @@ extern "C" {
 #define CANARY_TYPE_STR_LEN        10
 #define CANARY_STREAM_NAME_STR_LEN 200
 #define CANARY_LABEL_LEN           40
+#define MAX_LOG_FILE_NAME_LEN      300
 
 struct __CallbackStateMachine;
 struct __CallbacksProvider;
@@ -81,7 +82,7 @@ struct __CloudwatchLogsObject {
     Aws::Vector<Aws::CloudWatchLogs::Model::InputLogEvent> canaryInputLogEventVec;
     Aws::String token;
     CHAR logGroupName[MAX_STREAM_NAME_LEN + 1];
-    CHAR logStreamName[MAX_STREAM_NAME_LEN + 1];
+    CHAR logStreamName[MAX_LOG_FILE_NAME_LEN + 1];
 };
 typedef struct __CloudwatchLogsObject* PCloudwatchLogsObject;
 

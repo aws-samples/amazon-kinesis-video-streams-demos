@@ -13,8 +13,6 @@ STATUS initializeCloudwatchLogger(PCloudwatchLogsObject pCloudwatchLogsObject)
     CHK(pCloudwatchLogsObject != NULL, STATUS_NULL_ARG);
     pCloudwatchLogsObject->canaryLogGroupRequest.SetLogGroupName(pCloudwatchLogsObject->logGroupName);
     pCloudwatchLogsObject->pCwl->CreateLogGroup(pCloudwatchLogsObject->canaryLogGroupRequest);
-    SNPRINTF(pCloudwatchLogsObject->logStreamName, ARRAY_SIZE(pCloudwatchLogsObject->logStreamName) - 1, "%s-%llu",
-             pCloudwatchLogsObject->logStreamName, GETTIME() / HUNDREDS_OF_NANOS_IN_A_MILLISECOND);
 
     pCloudwatchLogsObject->canaryLogStreamRequest.SetLogStreamName(pCloudwatchLogsObject->logStreamName);
     pCloudwatchLogsObject->canaryLogStreamRequest.SetLogGroupName(pCloudwatchLogsObject->logGroupName);
