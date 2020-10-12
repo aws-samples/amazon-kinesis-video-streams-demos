@@ -133,14 +133,16 @@ STATUS run(Canary::PConfig pConfig)
         viewerConfig.isMaster.value = FALSE;
 
         ss << pConfig->clientId.value << "Viewer";
-        masterConfig.clientId.value = ss.str();
+        viewerConfig.clientId.value = ss.str();
         ss.str("");
 
         ss << pConfig->channelName.value << "-viewer-" << timestamp;
-        masterConfig.logStreamName.value = ss.str();
+        viewerConfig.logStreamName.value = ss.str();
         ss.str("");
 
         std::thread masterThread(runPeer, &masterConfig, timerQueueHandle, &masterRetStatus);
+        THREAD_SLEEP(CANARY_DEFAULT_VIEWER_INIT_DELAY);
+
         runPeer(&viewerConfig, timerQueueHandle, &retStatus);
         masterThread.join();
 
