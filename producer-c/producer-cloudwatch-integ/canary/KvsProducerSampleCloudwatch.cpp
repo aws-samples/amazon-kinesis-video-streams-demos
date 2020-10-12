@@ -242,7 +242,7 @@ INT32 main(INT32 argc, CHAR* argv[])
         Aws::CloudWatchLogs::CloudWatchLogsClient cwl(clientConfiguration);
 
         STRCPY(cloudwatchLogsObject.logGroupName, "ProducerSDK");
-        SNPRINTF(cloudwatchLogsObject.logStreamName, MAX_STREAM_NAME_LEN + 5, "%s-log", streamName);
+        SNPRINTF(cloudwatchLogsObject.logStreamName, MAX_LOG_FILE_NAME_LEN, "%s-log-%llu", streamName, GETTIME() / HUNDREDS_OF_NANOS_IN_A_MILLISECOND);
         cloudwatchLogsObject.pCwl = &cwl;
         if ((retStatus = initializeCloudwatchLogger(&cloudwatchLogsObject)) != STATUS_SUCCESS) {
             DLOGW("Cloudwatch logger failed to be initialized with 0x%08x error code. Fallback to file logging", retStatus);
