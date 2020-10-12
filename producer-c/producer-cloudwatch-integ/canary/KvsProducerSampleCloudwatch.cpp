@@ -297,6 +297,7 @@ INT32 main(INT32 argc, CHAR* argv[])
         frame.presentationTs = frame.decodingTs;
         currentTime = GETTIME();
         canaryStopTime = currentTime + (config.canaryDuration * HUNDREDS_OF_NANOS_IN_A_SECOND);
+        UINT64 duration;
 
         // Say, the canary needs to be stopped before designated canary run time, signal capture
         // must still be supported
@@ -314,9 +315,14 @@ INT32 main(INT32 argc, CHAR* argv[])
                     CHK_STATUS(computeStreamMetricsFromCanary(streamHandle, pCanaryStreamCallbacks));
                     CHK_STATUS(computeClientMetricsFromCanary(clientHandle, pCanaryStreamCallbacks));
                     currentMemoryAllocation(pCanaryStreamCallbacks);
-                    if ((!fileLoggingEnabled) && (GETTIME() > currentTime + (60 * HUNDREDS_OF_NANOS_IN_A_SECOND))) {
+                    duration = GETTIME() - currentTime;
+                    if ((!fileLoggingEnabled) && (duration > (60 * HUNDREDS_OF_NANOS_IN_A_SECOND))) {
                         canaryStreamSendLogs(&cloudwatchLogsObject);
                         currentTime = GETTIME();
+                        retStatus = publishErrorRate(streamHandle, pCanaryStreamCallbacks, duration);
+                        if(STATUS_FAILED(retStatus)) {
+                            DLOGW("Could not publish error rate. Failed with %08x", retStatus);
+                        }
                     }
                 }
                 lastKeyFrameTimestamp = frame.presentationTs;
