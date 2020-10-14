@@ -96,6 +96,7 @@ struct __CanaryStreamCallbacks {
     // First member should be the stream callbacks
     StreamCallbacks streamCallbacks;
     PCHAR pStreamName;
+    UINT64 totalNumberOfErrors;
     Aws::CloudWatch::CloudWatchClient* pCwClient;
     Aws::CloudWatch::Model::PutMetricDataRequest* cwRequest;
     Aws::CloudWatch::Model::Dimension dimensionPerStream;
