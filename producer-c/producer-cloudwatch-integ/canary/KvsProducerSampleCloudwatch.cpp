@@ -299,6 +299,7 @@ INT32 main(INT32 argc, CHAR* argv[])
         canaryStopTime = currentTime + (config.canaryDuration * HUNDREDS_OF_NANOS_IN_A_SECOND);
         UINT64 duration;
 
+        DLOGD("Producer SDK Log file name: %s", cloudwatchLogsObject.logStreamName);
         // Say, the canary needs to be stopped before designated canary run time, signal capture
         // must still be supported
         while (GETTIME() < canaryStopTime && ATOMIC_LOAD_BOOL(&sigCaptureInterrupt) != TRUE) {
@@ -373,5 +374,6 @@ CleanUp:
         RESET_INSTRUMENTED_ALLOCATORS();
         DLOGI("CleanUp Done");
     }
+    DLOGD("Exiting application with status code: 0x%08x", retStatus);
     return STATUS_FAILED(retStatus) ? EXIT_FAILURE : EXIT_SUCCESS;
 }
