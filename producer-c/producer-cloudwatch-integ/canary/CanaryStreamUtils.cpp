@@ -101,12 +101,13 @@ STATUS canaryStreamErrorReportHandler(UINT64 customData, STREAM_HANDLE streamHan
           erroredTimecode, streamHandle, uploadHandle);
     streamErrorDatum.SetMetricName("StreamError");
     streamErrorDatum.AddDimensions(pCanaryStreamCallbacks->dimensionPerStream);
-    pushMetric(pCanaryStreamCallbacks, streamErrorDatum, Aws::CloudWatch::Model::StandardUnit::None, statusCode);
+    pushMetric(pCanaryStreamCallbacks, streamErrorDatum, Aws::CloudWatch::Model::StandardUnit::None, 1.0);
 
     aggstreamErrorDatum.SetMetricName("StreamError");
     aggstreamErrorDatum.AddDimensions(pCanaryStreamCallbacks->aggregatedDimension);
-    pushMetric(pCanaryStreamCallbacks, aggstreamErrorDatum, Aws::CloudWatch::Model::StandardUnit::None, statusCode);
+    pushMetric(pCanaryStreamCallbacks, aggstreamErrorDatum, Aws::CloudWatch::Model::StandardUnit::None, 1.0);
 
+    pCanaryStreamCallbacks->totalNumberOfErrors++;
     return STATUS_SUCCESS;
 }
 
@@ -191,31 +192,49 @@ STATUS publishErrorRate(STREAM_HANDLE streamHandle, PCanaryStreamCallbacks pCana
     STATUS retStatus = STATUS_SUCCESS;
     StreamMetrics canaryStreamMetrics;
     canaryStreamMetrics.version = STREAM_METRICS_CURRENT_VERSION;
-    Aws::CloudWatch::Model::MetricDatum putFrameErrorRateDatum, aggputFrameErrorRateDatum, errorAckDatum, aggErrorAckDatum;
+    Aws::CloudWatch::Model::MetricDatum putFrameErrorRateDatum, aggputFrameErrorRateDatum, errorAckDatum, aggErrorAckDatum, totalErrorDatum, aggTotalErrorDatum;
+    DOUBLE putFrameErrorRate, errorAckRate;
+    UINT64 numberOfPutFrameErrors, numberOfErrorAcks;
     CHK(pCanaryStreamCallbacks != NULL, STATUS_NULL_ARG);
     CHK_STATUS(getKinesisVideoStreamMetrics(streamHandle, &canaryStreamMetrics));
-    DOUBLE putFrameErrorRate, errorAckRate;
-    putFrameErrorRate = (DOUBLE) (canaryStreamMetrics.putFrameErrors - pCanaryStreamCallbacks->historicStreamMetric.prevPutFrameErrorCount) / (DOUBLE) duration;
+
+    numberOfPutFrameErrors = canaryStreamMetrics.putFrameErrors - pCanaryStreamCallbacks->historicStreamMetric.prevPutFrameErrorCount;
+    numberOfErrorAcks = canaryStreamMetrics.errorAcks - pCanaryStreamCallbacks->historicStreamMetric.prevErrorAckCount;
+    putFrameErrorRate = (DOUBLE) (numberOfPutFrameErrors) / (DOUBLE) (duration / HUNDREDS_OF_NANOS_IN_A_SECOND);
+
     pCanaryStreamCallbacks->historicStreamMetric.prevPutFrameErrorCount = canaryStreamMetrics.putFrameErrors;
     putFrameErrorRateDatum.SetMetricName("PutFrameErrorRate");
     putFrameErrorRateDatum.AddDimensions(pCanaryStreamCallbacks->dimensionPerStream);
     pushMetric(pCanaryStreamCallbacks, putFrameErrorRateDatum, Aws::CloudWatch::Model::StandardUnit::Count_Second, putFrameErrorRate);
 
     aggputFrameErrorRateDatum.SetMetricName("PutFrameErrorRate");
-    aggputFrameErrorRateDatum.AddDimensions(pCanaryStreamCallbacks->dimensionPerStream);
+    aggputFrameErrorRateDatum.AddDimensions(pCanaryStreamCallbacks->aggregatedDimension);
     pushMetric(pCanaryStreamCallbacks, aggputFrameErrorRateDatum, Aws::CloudWatch::Model::StandardUnit::Count_Second, putFrameErrorRate);
 
-    errorAckRate = (DOUBLE) (canaryStreamMetrics.errorAcks - pCanaryStreamCallbacks->historicStreamMetric.prevErrorAckCount) / (DOUBLE) duration;
+    errorAckRate = (DOUBLE) (numberOfErrorAcks) / (DOUBLE) (duration / HUNDREDS_OF_NANOS_IN_A_SECOND);
     pCanaryStreamCallbacks->historicStreamMetric.prevErrorAckCount = canaryStreamMetrics.errorAcks;
     errorAckDatum.SetMetricName("ErrorAckRate");
     errorAckDatum.AddDimensions(pCanaryStreamCallbacks->dimensionPerStream);
     pushMetric(pCanaryStreamCallbacks, errorAckDatum, Aws::CloudWatch::Model::StandardUnit::Count_Second, putFrameErrorRate);
 
     aggErrorAckDatum.SetMetricName("ErrorAckRate");
-    aggErrorAckDatum.AddDimensions(pCanaryStreamCallbacks->dimensionPerStream);
+    aggErrorAckDatum.AddDimensions(pCanaryStreamCallbacks->aggregatedDimension);
     pushMetric(pCanaryStreamCallbacks, aggErrorAckDatum, Aws::CloudWatch::Model::StandardUnit::Count_Second, putFrameErrorRate);
 
-    DLOGD("Error ack rate: %lf, putFrame error rate: %lf", errorAckRate, putFrameErrorRate);
+    pCanaryStreamCallbacks->totalNumberOfErrors += numberOfPutFrameErrors + numberOfErrorAcks;
+
+    totalErrorDatum.SetMetricName("NumberOfErrors");
+    totalErrorDatum.AddDimensions(pCanaryStreamCallbacks->dimensionPerStream);
+    pushMetric(pCanaryStreamCallbacks, totalErrorDatum, Aws::CloudWatch::Model::StandardUnit::Count, pCanaryStreamCallbacks->totalNumberOfErrors);
+
+    aggTotalErrorDatum.SetMetricName("NumberOfErrors");
+    aggTotalErrorDatum.AddDimensions(pCanaryStreamCallbacks->aggregatedDimension);
+    pushMetric(pCanaryStreamCallbacks, aggTotalErrorDatum, Aws::CloudWatch::Model::StandardUnit::Count, pCanaryStreamCallbacks->totalNumberOfErrors);
+    DLOGD("Total number of errors in %lf seconds : %d", (DOUBLE)(duration/HUNDREDS_OF_NANOS_IN_A_SECOND), pCanaryStreamCallbacks->totalNumberOfErrors);
+    pCanaryStreamCallbacks->totalNumberOfErrors = 0;
+
+    DLOGD("Error ack rate: %lf", errorAckRate);
+    DLOGD("PutFrame error rate: %lf", putFrameErrorRate);
 CleanUp:
     return retStatus;
 }
