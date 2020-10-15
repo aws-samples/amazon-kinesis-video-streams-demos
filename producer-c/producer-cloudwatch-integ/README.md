@@ -28,94 +28,99 @@ Create a build directory in the newly checked out repository, and execute CMake 
 2. `cd amazon-kinesis-video-streams-demos/build`
 3. `cmake ..`
 
-The file installs the C Producer SDK libraries and PIC libraries for you.
+The file installs the C Producer SDK libraries, PIC libraries for you and CPP SDK components for you.
 
 NOTE: This project requires setting up of AWS SDK CPP Libraries. The specific components being used are:
 1. `events`
 2. `monitoring`
 3. `logs`
 
-You can refer to the build steps here: `https://github.com/aws/aws-sdk-cpp` . The synopsis of the build steps utlized to get this project working is summarized below:
-
-1. Create a directory that will store all the AWS SDK required libraries:
-`mkdir aws-libs`
-
-2. Install AWS Common Library
-```
-git clone https://github.com/awslabs/aws-c-common
-cd aws-c-common
-mkdir build && cd build
-cmake .. -DBUILD_SHARED_LIBS=ON -DCMAKE_INSTALL_PREFIX=<path/to/aws-libs> 
-make 
-sudo make install
-cmake .. -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX=<path/to/aws-libs> 
-make 
-sudo make install
-```
-
-3. Install AWS Checksums Library
-```
-git clone https://github.com/awslabs/aws-checksums
-cd aws-checksums
-mkdir build && cd build
-cmake .. -DBUILD_SHARED_LIBS=ON -DCMAKE_INSTALL_PREFIX=<path/to/aws-libs> 
-make 
-sudo make install
-cmake .. -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX=<path/to/aws-libs> 
-make 
-sudo make install
-```
-
-4. Install AWS Event Streams Library
-```
-git clone https://github.com/awslabs/aws-c-event-stream
-cd aws-c-event-stream
-mkdir build && cd build
-cmake .. -DBUILD_SHARED_LIBS=ON  -DCMAKE_MODULE_PATH=<path/to/aws-libs>/lib/cmake -DCMAKE_INSTALL_PREFIX=<path/to/aws-libs> 
-make 
-sudo make install
-cmake .. -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX=<path/to/aws-libs> 
-make 
-sudo make install
-```
-
-5. Finally, install the AWS CPP SDK library. This step takes some time. 
-```
-git clone https://github.com/aws/aws-sdk-cpp.git
-cd aws-sdk-cpp
-mkdir build && cd build
-export LD_LIBRARY_PATH=<path/to/aws-libs>/lib/
-cmake .. -DBUILD_ONLY="monitoring;events;logs" -DBUILD_DEPS=OFF -DCMAKE_MODULE_PATH=<path/to/aws-libs>/lib/cmake/ -DCMAKE_PREFIX_PATH="<path/to/aws-libs>/lib/aws-c-event-stream/cmake/;<path/to/aws-libs>/lib/aws-c-common/cmake/;<path/to/aws-libs>/lib/aws-checksums/cmake/;<path/to/aws-libs>/lib/cmake/"
-make 
-sudo make install
-```
-
-The cloudwatch library will now be ready to use!
-
-
 ## Running the application
 
 The demo comprises of a simple sample that uses custom constructed frames to capture certain metrics and performance parameters of the C Producer SDK and PIC. To run the sample:
 
-`./kvsProducerSampleCloudwatch <path-to-config-file>`
+`./kvsProducerSampleCloudwatch <path-to-config-file>`, or
+`./kvsProducerSampleCloudwatch`	
 
-The application uses a JSON file to parse some parameters that can be controlled by the application. It is necessary
-to provide the absolute path to this file to run the application. A sample config file is provided [here](https://github.com/aws-samples/amazon-kinesis-video-streams-demos/tree/master/producer-c/producer-cloudwatch-integ)
+Note that if config file is provided and environment variables are exported, JSON file is used to configure the canary app
 
-On running the application, the metrics are geenrated and posted in the `KinesisVideoSDKCanary` namespace with stream name format:  `<stream-name-prefix>-<realtime/offline>-<fragment-size-in-bytes>`. A cloudwatch dimension is attached to a stream name and all the metrics fall under that.
+The application uses a JSON file or environment variables to parse some parameters that can be controlled by the application. It is necessary to provide the absolute path to the JSON file to run the application. A sample config file is provided [here](https://github.com/aws-samples/amazon-kinesis-video-streams-demos/tree/master/producer-c/producer-cloudwatch-integ). If using environment variables, take a look at the [sample shell script](https://github.com/aws-samples/amazon-kinesis-video-streams-demos/tree/master/producer-c/producer-cloudwatch-integ).
 
+On running the application, the metrics are geenrated and posted in the `KinesisVideoSDKCanary` namespace with stream name format:  `<stream-name-prefix>-<Realtime/Offline>-<canary-type>`, where `canary-type` is signifies the type of run of the application, for example, `periodic`, `longrun`, etc.
 
 ## Metrics being collected currently
 
 Currently, the following metrics are being collected on a per fragment basis:
-* ReceivedAckLatency
-* PersistedAckLatency
-* Buffered Ack Latency
-* FrameRate
-* CurrentViewDuration
-* Memory allocation
-* Error code through sreamError handler
-* Content store availability
+
+| Metric	                 | Frequency	    | Unit         | Description	           
+|--------------------|:-------------:|:-------------:|:-------------|
+| Outgoing frame rate  | Every key frame	      | Count_Second | Measures the rate at which frames are sent out from the producer. The value is computed in the PIC and the application just emits the metric when requested	
+| CurrentViewDuration  | Every key frame	      | Milliseconds | Measures the number of frames in the buffer that have not been sent out in timescale. For example, a current view duration of 2 seconds would indicate that 2 seconds worth of frames are yet to be sent out.
+| PutFrameErrorRate	   | 60 seconds	              | Count_Second | Indicates the number of put Frame errors in a fixed duration.	
+| ErrorAckRate		   | 60 seconds	              | Count_Second | Rate at which error acks are received
+| StorageSizeAvailable | Every key frame	      | Bytes        | Measures the storage size available out of the overall allocated content store. A decrease in this would indicate frames being produced that are not being sent out.
+| Persisted Ack Latency| Every callback invocation| Milliseconds | Measures the time between when the frame is sent out to when the ACK is received after persisting
+| Received Ack Latency | Every callback invocation| Milliseconds | Measures the time between when the frame is sent out to when the ACK is received after receiving the frame
+| Stream error		   | Every callback invocation| None         | This metric emits a 1.0 when the streamErrorReportHandler is invoked. Note that this metric would not show up on Cloudwatch console if no error is encountered
+| Total error count    | 60 seconds               | None         | This includes the put frame error count, error ack count and stream error handler invocation count
+ 
+## Jenkins
+
+### Prerequisites
+
+Required Jenkins plugins:
+* [Job DSL](https://plugins.jenkins.io/job-dsl/)
+* [Blue Ocean](https://plugins.jenkins.io/blueocean/)
+* [CloudBees AWS Credentials](https://plugins.jenkins.io/aws-credentials/)
+* [Throttle Concurrents](https://plugins.jenkins.io/throttle-concurrents/)
+
+Required Credentials:
+* AWS Credentials access key and secret key
+
+Required Script Signature Approvals:
+* method hudson.model.ItemGroup getAllItems java.lang.Class
+* method hudson.model.Job getBuilds
+* method hudson.model.Job getLastBuild
+* method hudson.model.Job isBuilding
+* method hudson.model.Run getTimeInMillis
+* method hudson.model.Run isBuilding
+* method jenkins.model.Jenkins getItemByFullName java.lang.String
+* method jenkins.model.ParameterizedJobMixIn$ParameterizedJob isDisabled
+* method jenkins.model.ParameterizedJobMixIn$ParameterizedJob setDisabled boolean
+* method org.jenkinsci.plugins.workflow.job.WorkflowRun doKill
+* staticMethod jenkins.model.Jenkins getInstance
+* staticField java.lang.Long MAX_VALUE
+
+### Architecture
+
+#### Seeding
+
+Seeding is a meta job that its sole job is to bootstrap other jobs, orchestrator and runners. 
+When there's a new change to the seed or the other jobs that were created from the seed, the change will automatically propagate to the other jobs. 
+
+The concept is very similar to [AWS CloudFormation](https://aws.amazon.com/cloudformation/)
+
+![seeding](./docs/seeding.png)
+Seed script can be found [here](https://github.com/aws-samples/amazon-kinesis-video-streams-demos/blob/master/producer-c/producer-cloudwatch-integ/jobs/canary_seed.groovy)
+
+#### Orchestration
+
+Orchestration is a process of permuting a set of the canary configuration and delegate the works to the runner. The permutation can be ranging from streaming duration, bitrate, device types, regions, etc.
+
+![orchestrator](./docs/orchestrator.png)
+
+Note that here, the jobs run an end to end scenario from producer SDK to [java parser based consumer SDK](https://github.com/aws-samples/amazon-kinesis-video-streams-demos/tree/master/consumer-java/aws-kinesis-video-producer-sdk-canary-consumer). 
+Orchestrator script can be found [here](https://github.com/aws-samples/amazon-kinesis-video-streams-demos/blob/master/producer-c/producer-cloudwatch-integ/jobs/orchestrator.groovy)
+
+#### Update Flow
+
+Finally, our canary is up and running. But, now, we want to make changes to the canary or update the SDK version without shutting down the whole canary.
+
+To achieve this, the update process uses the rolling update technique:
+
+![updater](./docs/update-flow.png)
+Rolling update and runner script can be found [here](https://github.com/aws-samples/amazon-kinesis-video-streams-demos/blob/master/producer-c/producer-cloudwatch-integ/jobs/runner.groovy)
+
 
 ## Logging
 
@@ -127,25 +132,13 @@ https://sdk.amazonaws.com/cpp/api/LATEST/namespace_aws_1_1_cloud_watch_logs.html
 If you would like to use file logger instead, you could run `export ENABLE_FILE_LOGGER=TRUE`
 This will enable file logging and disable cloudwatch logging.
 
-Cloudwatch log files are generated with the following name: `<stream-name-prefix-<timestamp>`
+Cloudwatch log files are generated with the following name: `<stream-name-prefix>-<Realtime/Offline>-<canary-type>-<timestamp>`
 
-## Debugging
+## Cloudwatch Metrics
 
-1. If you encounter the following error on MacOS while building libopenssl:
-```
-/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/clang/11.0.0/include/inttypes.h:30:15: fatal error: 'inttypes.h' file not found
-#include_next <inttypes.h>
-```
-
-Please run the following command:
-`export MACOSX_DEPLOYMENT_TARGET=<version>`
-
-For example, for MacOS version 10.14.x, run this command and re-run `cmake`:
-`export MACOSX_DEPLOYMENT_TARGET=10.14`
-
-If the above does not work, update xcode and retry
-
-2. For any issues related to setting up the AWS CPP SDK, please refer to the repository `https://github.com/aws/aws-sdk-cpp`
+Every metric is available in two dimensions:
+1. Per stream: This will be available under `KinesisVideoSDKCanary->ProducerSDKCanaryStreamName` in cloudwatch console
+2. Aggregated over all streams based on `canary-type`. `canary-type` is set by running `export CANARY_LABEL=value`. This will be available under `KinesisVideoSDKCanary->ProducerSDKCanaryType` in cloudwatch console
 
 
 ## References
