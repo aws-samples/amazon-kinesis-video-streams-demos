@@ -108,7 +108,30 @@ STATUS canaryStreamErrorReportHandler(UINT64 customData, STREAM_HANDLE streamHan
     pushMetric(pCanaryStreamCallbacks, aggstreamErrorDatum, Aws::CloudWatch::Model::StandardUnit::None, 1.0);
 
     pCanaryStreamCallbacks->totalNumberOfErrors++;
+
     return STATUS_SUCCESS;
+}
+
+static const CHAR* unitToString(const Aws::CloudWatch::Model::StandardUnit& unit)
+{
+    switch (unit) {
+        case Aws::CloudWatch::Model::StandardUnit::Count:
+            return "Count";
+        case Aws::CloudWatch::Model::StandardUnit::Count_Second:
+            return "Count_Second";
+        case Aws::CloudWatch::Model::StandardUnit::Milliseconds:
+            return "Milliseconds";
+        case Aws::CloudWatch::Model::StandardUnit::Percent:
+            return "Percent";
+        case Aws::CloudWatch::Model::StandardUnit::None:
+            return "None";
+        case Aws::CloudWatch::Model::StandardUnit::Kilobits_Second:
+            return "Kilobits_Second";
+        case Aws::CloudWatch::Model::StandardUnit::Kilobytes:
+             return "Kilobytes";
+        default:
+            return "Unknown unit";
+    }
 }
 
 VOID pushMetric(PCanaryStreamCallbacks pCanaryStreamCallback, Aws::CloudWatch::Model::MetricDatum& metricDatum, Aws::CloudWatch::Model::StandardUnit unit, DOUBLE data)
@@ -116,6 +139,41 @@ VOID pushMetric(PCanaryStreamCallbacks pCanaryStreamCallback, Aws::CloudWatch::M
     metricDatum.SetValue(data);
     metricDatum.SetUnit(unit);
     canaryStreamSendMetrics(pCanaryStreamCallback, metricDatum);
+    std::stringstream ss;
+
+    ss << "Emitted the following metric:\n\n";
+    ss << "  Name       : " << metricDatum.GetMetricName() << '\n';
+    ss << "  Unit       : " << unitToString(metricDatum.GetUnit()) << '\n';
+
+    ss << "  Values     : ";
+    auto& values = metricDatum.GetValues();
+    // If the datum uses single value, GetValues will be empty and the data will be accessible
+    // from GetValue
+    if (values.empty()) {
+        ss << metricDatum.GetValue();
+    } else {
+        for (auto i = 0; i < values.size(); i++) {
+            ss << values[i];
+            if (i != values.size() - 1) {
+                ss << ", ";
+            }
+        }
+    }
+    ss << '\n';
+
+    ss << "  Dimensions : ";
+    auto& dimensions = metricDatum.GetDimensions();
+    if (dimensions.empty()) {
+        ss << "N/A";
+    } else {
+        ss << '\n';
+        for (auto& dimension : dimensions) {
+            ss << "    - " << dimension.GetName() << "\t: " << dimension.GetValue() << '\n';
+        }
+    }
+    ss << '\n';
+
+    DLOGD("%s", ss.str().c_str());
 }
 
 STATUS canaryStreamFragmentAckHandler(UINT64 customData, STREAM_HANDLE streamHandle, UPLOAD_HANDLE uploadHandle, PFragmentAck pFragmentAck)
@@ -277,11 +335,11 @@ STATUS computeClientMetricsFromCanary(CLIENT_HANDLE clientHandle, PCanaryStreamC
 
     clientDatum.SetMetricName("StorageSizeAvailable");
     clientDatum.AddDimensions(pCanaryStreamCallbacks->dimensionPerStream);
-    pushMetric(pCanaryStreamCallbacks, clientDatum, Aws::CloudWatch::Model::StandardUnit::Bytes, canaryClientMetrics.contentStoreAvailableSize);
+    pushMetric(pCanaryStreamCallbacks, clientDatum, Aws::CloudWatch::Model::StandardUnit::Kilobytes, canaryClientMetrics.contentStoreAvailableSize / 1024);
 
     aggClientDatum.SetMetricName("StorageSizeAvailable");
     aggClientDatum.AddDimensions(pCanaryStreamCallbacks->aggregatedDimension);
-    pushMetric(pCanaryStreamCallbacks, aggClientDatum, Aws::CloudWatch::Model::StandardUnit::Bytes, canaryClientMetrics.contentStoreAvailableSize);
+    pushMetric(pCanaryStreamCallbacks, aggClientDatum, Aws::CloudWatch::Model::StandardUnit::Kilobytes, canaryClientMetrics.contentStoreAvailableSize / 1024);
 CleanUp:
     return retStatus;
 }
@@ -291,11 +349,11 @@ VOID currentMemoryAllocation(PCanaryStreamCallbacks pCanaryStreamCallbacks)
     Aws::CloudWatch::Model::MetricDatum memoryDatum, aggMemoryDatum;
     memoryDatum.SetMetricName("MemoryAllocation");
     memoryDatum.AddDimensions(pCanaryStreamCallbacks->dimensionPerStream);
-    pushMetric(pCanaryStreamCallbacks, memoryDatum, Aws::CloudWatch::Model::StandardUnit::Bytes, getInstrumentedTotalAllocationSize());
+    pushMetric(pCanaryStreamCallbacks, memoryDatum, Aws::CloudWatch::Model::StandardUnit::Kilobytes, getInstrumentedTotalAllocationSize() / 1024);
 
     aggMemoryDatum.SetMetricName("MemoryAllocation");
     aggMemoryDatum.AddDimensions(pCanaryStreamCallbacks->aggregatedDimension);
-    pushMetric(pCanaryStreamCallbacks, aggMemoryDatum, Aws::CloudWatch::Model::StandardUnit::Bytes, getInstrumentedTotalAllocationSize());
+    pushMetric(pCanaryStreamCallbacks, aggMemoryDatum, Aws::CloudWatch::Model::StandardUnit::Kilobytes, getInstrumentedTotalAllocationSize() / 1024);
 }
 VOID canaryStreamRecordFragmentEndSendTime(PCanaryStreamCallbacks pCanaryStreamCallbacks, UINT64 lastKeyFrameTime, UINT64 curKeyFrameTime)
 {
