@@ -5,6 +5,7 @@
 #include "CanaryUtils.h"
 
 PCloudwatchLogsObject gCloudwatchLogsObject = NULL;
+std::mutex gLogLock; // Protect access to gCloudwatchLogsObject
 
 STATUS initializeCloudwatchLogger(PCloudwatchLogsObject pCloudwatchLogsObject)
 {
@@ -26,10 +27,14 @@ CleanUp:
 
 VOID setUpLogEventVector(PCHAR logString)
 {
-    Aws::String awsCwString((Aws::String) logString);
-    auto logEvent =
-        Aws::CloudWatchLogs::Model::InputLogEvent().WithMessage(awsCwString).WithTimestamp(GETTIME() / HUNDREDS_OF_NANOS_IN_A_MILLISECOND);
-    gCloudwatchLogsObject->canaryInputLogEventVec.push_back(logEvent);
+    std::lock_guard<std::mutex> lock(gLogLock);
+    if(gCloudwatchLogsObject != NULL) {
+        std::unique_lock<std::recursive_mutex> lock(gCloudwatchLogsObject->mutex);
+        Aws::String awsCwString((Aws::String) logString);
+        auto logEvent =
+            Aws::CloudWatchLogs::Model::InputLogEvent().WithMessage(awsCwString).WithTimestamp(GETTIME() / HUNDREDS_OF_NANOS_IN_A_MILLISECOND);
+        gCloudwatchLogsObject->canaryInputLogEventVec.push_back(logEvent);
+    }
 }
 
 VOID onPutLogEventResponseReceivedHandler(const Aws::CloudWatchLogs::CloudWatchLogsClient* cwClientLog,
@@ -47,6 +52,7 @@ VOID onPutLogEventResponseReceivedHandler(const Aws::CloudWatchLogs::CloudWatchL
 
 VOID canaryStreamSendLogs(PCloudwatchLogsObject pCloudwatchLogsObject)
 {
+    std::unique_lock<std::recursive_mutex> lock(pCloudwatchLogsObject->mutex);
     Aws::CloudWatchLogs::Model::PutLogEventsOutcome outcome;
     auto request = Aws::CloudWatchLogs::Model::PutLogEventsRequest()
                        .WithLogGroupName(pCloudwatchLogsObject->logGroupName)
@@ -61,6 +67,7 @@ VOID canaryStreamSendLogs(PCloudwatchLogsObject pCloudwatchLogsObject)
 
 VOID canaryStreamSendLogSync(PCloudwatchLogsObject pCloudwatchLogsObject)
 {
+    std::unique_lock<std::recursive_mutex> lock(pCloudwatchLogsObject->mutex);
     auto request = Aws::CloudWatchLogs::Model::PutLogEventsRequest()
                        .WithLogGroupName(pCloudwatchLogsObject->logGroupName)
                        .WithLogStreamName(pCloudwatchLogsObject->logStreamName)

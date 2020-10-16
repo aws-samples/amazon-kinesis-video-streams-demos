@@ -83,6 +83,7 @@ struct __CloudwatchLogsObject {
     Aws::String token;
     CHAR logGroupName[MAX_STREAM_NAME_LEN + 1];
     CHAR logStreamName[MAX_LOG_FILE_NAME_LEN + 1];
+    std::recursive_mutex mutex;
 };
 typedef struct __CloudwatchLogsObject* PCloudwatchLogsObject;
 

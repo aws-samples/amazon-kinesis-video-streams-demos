@@ -290,6 +290,7 @@ INT32 main(INT32 argc, CHAR* argv[])
         // setup dummy frame
         frame.size = CANARY_METADATA_SIZE + config.fragmentSizeInBytes / DEFAULT_FPS_VALUE;
         frame.frameData = (PBYTE) MEMALLOC(frame.size);
+        CHK(frame.frameData != NULL, STATUS_NOT_ENOUGH_MEMORY);
         frame.version = FRAME_CURRENT_VERSION;
         frame.trackId = DEFAULT_VIDEO_TRACK_ID;
         frame.duration = 0;
