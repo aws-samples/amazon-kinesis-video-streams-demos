@@ -12,7 +12,7 @@ You will also need to install `pkg-config` and `CMake` and a build enviroment
 ### Configure
 Create a build directory in the newly checked out repository, and execute CMake from it.
 
-`mkdir -p amazon-kinesis-video-streams-demos/build; cd amazon-kinesis-video-streams-demo/build; cmake .. `
+`mkdir -p amazon-kinesis-video-streams-demos/canary/webrtc-c/build; cd amazon-kinesis-video-streams-demo/canary/webrtc-c/build; cmake .. `
 
 ### Build
 To build the library and the provided samples run make in the build directory you executed CMake.

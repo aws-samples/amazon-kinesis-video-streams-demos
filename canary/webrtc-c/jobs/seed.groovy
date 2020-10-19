@@ -4,7 +4,7 @@ import org.jenkinsci.plugins.scriptsecurity.scripts.*;
 import org.jenkinsci.plugins.scriptsecurity.sandbox.whitelists.*;
 
 NAMESPACE="webrtc-canary"
-WORKSPACE="webrtc-c/canary"
+WORKSPACE="canary/webrtc-c"
 JOBS_DIR="$WORKSPACE/jobs"
 NUM_LOGS=20
 

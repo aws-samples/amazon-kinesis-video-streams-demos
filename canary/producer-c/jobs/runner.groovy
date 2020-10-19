@@ -17,7 +17,7 @@ CREDENTIALS = [
 
 def buildProducer() {
   sh  """
-    cd $WORKSPACE/producer-c/producer-cloudwatch-integ && 
+    cd $WORKSPACE/canary/producer-c && 
     mkdir -p build
     cd build && 
     cmake .. && 
@@ -30,7 +30,7 @@ def buildConsumer(envs) {
     sh '''
         PATH="$JAVA_HOME/bin:$PATH"
         export PATH="$M2_HOME/bin:$PATH"
-        cd $WORKSPACE/consumer-java/aws-kinesis-video-producer-sdk-canary-consumer
+        cd $WORKSPACE/canary/consumer-java
         make
     '''
   }
@@ -110,7 +110,7 @@ def runClient(isProducer, params) {
         // Run consumer
         withRunnerWrapper(envs) {
             sh '''
-                cd $WORKSPACE/consumer-java/aws-kinesis-video-producer-sdk-canary-consumer
+                cd $WORKSPACE/canary/consumer-java
                 # Create a temporary filename in /tmp directory
                 java -classpath target/aws-kinesisvideo-producer-sdk-canary-consumer-1.0-SNAPSHOT.jar:$(cat tmp_jar) -Daws.accessKeyId=${AWS_ACCESS_KEY_ID} -Daws.secretKey=${AWS_SECRET_ACCESS_KEY} com.amazon.kinesis.video.canary.consumer.ProducerSdkCanaryConsumer
                 rm tmp_jar
@@ -121,7 +121,7 @@ def runClient(isProducer, params) {
         withRunnerWrapper(envs) {
             sh """
                 echo "Running producer"
-                cd $WORKSPACE/producer-c/producer-cloudwatch-integ/build && 
+                cd $WORKSPACE/canary/producer-c/build && 
                 ./kvsProducerSampleCloudwatch
             """
         }

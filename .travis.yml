@@ -14,6 +14,6 @@ cache:
 
 matrix:
     include:
-        - env: TARGET=webrtc-c/canary
+        - env: TARGET=canary/webrtc-c
 
 script: if .travis/build-condition.sh $TRAVIS_COMMIT_RANGE $TARGET; then echo "$TARGET is being built" && cd "$TARGET" && make test; else echo "$TARGET is NOT being built"; fi

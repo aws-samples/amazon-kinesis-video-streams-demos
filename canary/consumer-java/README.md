@@ -16,13 +16,13 @@ To download run the following command:
 
 Move to the directory containing the `pom.xml` file:
 
-`cd consumer-java/aws-kinesis-video-producer-sdk-canary-consumer`
+`cd canary/consumer-java`
 
 Next, run `make`. This will take of the build steps and generate the necessary classpath string of dependencies
 
 ## Running the application
 
-Since this is developed keeping in mind the end to end scenario with producer SDK, the following environment variables need to be exported to generate the same stream name that is generated in the producer SDK. Take a look at [this](https://github.com/aws-samples/amazon-kinesis-video-streams-demos/blob/master/producer-c/producer-cloudwatch-integ/init.sh) to check out the exports. Additionally, you also need to export the following:
+Since this is developed keeping in mind the end to end scenario with producer SDK, the following environment variables need to be exported to generate the same stream name that is generated in the producer SDK. Take a look at [this](https://github.com/aws-samples/amazon-kinesis-video-streams-demos/blob/master/canary/producer-c/init.sh) to check out the exports. Additionally, you also need to export the following:
 
 1. `AWS_ACCESS_KEY_ID` 
 2. `AWS_SECRET_ACCESS_KEY`
@@ -54,7 +54,7 @@ Every metric is available in two dimensions:
 
 ## References
 
-1. To checkout how this is integrated with the producer SDK, look [here](https://github.com/aws-samples/amazon-kinesis-video-streams-demos/tree/master/producer-c)
+1. To checkout how this is integrated with the producer SDK, look [here](https://github.com/aws-samples/amazon-kinesis-video-streams-demos/tree/master/canary/producer-c)
 2. [Parser library](https://github.com/aws/amazon-kinesis-video-streams-parser-library)
 
 

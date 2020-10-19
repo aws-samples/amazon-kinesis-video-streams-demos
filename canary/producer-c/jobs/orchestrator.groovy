@@ -1,7 +1,7 @@
 import jenkins.model.*
 
-WORKSPACE_PRODUCER="producer-c/producer-cloudwatch-integ"
-WORKSPACE_CONSUMER="consumer-java/aws-kinesis-video-producer-sdk-canary-consumer"
+WORKSPACE_PRODUCER="canary/producer-c"
+WORKSPACE_CONSUMER="canary/consumer-java"
 GIT_URL='https://github.com/aws-samples/amazon-kinesis-video-streams-demos.git'
 GIT_HASH='master'
 RUNNER_JOB_NAME_PREFIX = "producer-runner"
