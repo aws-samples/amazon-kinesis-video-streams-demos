@@ -17,7 +17,7 @@ def buildProject() {
               userRemoteConfigs: [[url: params.GIT_URL]]])
 
     sh """
-        cd ./webrtc-c/canary && 
+        cd ./canary/webrtc-c && 
         mkdir -p build && 
         cd build && 
         cmake .. -DCMAKE_INSTALL_PREFIX="\$PWD" && 
@@ -72,7 +72,7 @@ def buildPeer(isMaster, params) {
 
     withRunnerWrapper(envs) {
         sh """
-            cd ./webrtc-c/canary/build && 
+            cd ./canary/webrtc-c/build && 
             ${isMaster ? "" : "sleep 5 &&"}
             ./kvsWebrtcCanaryWebrtc"""
     }
@@ -96,7 +96,7 @@ def buildSignaling(params) {
 
     withRunnerWrapper(envs) {
         sh """
-            cd ./webrtc-c/canary/build && 
+            cd ./canary/webrtc-c/build && 
             ./kvsWebrtcCanarySignaling"""
     }
 }

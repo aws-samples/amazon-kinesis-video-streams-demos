@@ -24,8 +24,8 @@ To download run the following command:
 Configure
 Create a build directory in the newly checked out repository, and execute CMake from it.
 
-1. `mkdir -p amazon-kinesis-video-streams-demos/build` 
-2. `cd amazon-kinesis-video-streams-demos/build`
+1. `mkdir -p amazon-kinesis-video-streams-demos/canary/producer-c/build` 
+2. `cd amazon-kinesis-video-streams-demos/canary/producer-c/build`
 3. `cmake ..`
 
 The file installs the C Producer SDK libraries, PIC libraries for you and CPP SDK components for you.
@@ -44,7 +44,7 @@ The demo comprises of a simple sample that uses custom constructed frames to cap
 
 Note that if config file is provided and environment variables are exported, JSON file is used to configure the canary app
 
-The application uses a JSON file or environment variables to parse some parameters that can be controlled by the application. It is necessary to provide the absolute path to the JSON file to run the application. A sample config file is provided [here](https://github.com/aws-samples/amazon-kinesis-video-streams-demos/tree/master/producer-c/producer-cloudwatch-integ). If using environment variables, take a look at the [sample shell script](https://github.com/aws-samples/amazon-kinesis-video-streams-demos/tree/master/producer-c/producer-cloudwatch-integ).
+The application uses a JSON file or environment variables to parse some parameters that can be controlled by the application. It is necessary to provide the absolute path to the JSON file to run the application. A sample config file is provided [here](https://github.com/aws-samples/amazon-kinesis-video-streams-demos/tree/master/canary/producer-c). If using environment variables, take a look at the [sample shell script](https://github.com/aws-samples/amazon-kinesis-video-streams-demos/tree/master/canary/producer-c).
 
 On running the application, the metrics are geenrated and posted in the `KinesisVideoSDKCanary` namespace with stream name format:  `<stream-name-prefix>-<Realtime/Offline>-<canary-type>`, where `canary-type` is signifies the type of run of the application, for example, `periodic`, `longrun`, etc.
 
@@ -101,7 +101,7 @@ When there's a new change to the seed or the other jobs that were created from t
 The concept is very similar to [AWS CloudFormation](https://aws.amazon.com/cloudformation/)
 
 ![seeding](./docs/seeding.png)
-Seed script can be found [here](https://github.com/aws-samples/amazon-kinesis-video-streams-demos/blob/master/producer-c/producer-cloudwatch-integ/jobs/canary_seed.groovy)
+Seed script can be found [here](https://github.com/aws-samples/amazon-kinesis-video-streams-demos/blob/master/canary/producer-c/jobs/canary_seed.groovy)
 
 #### Orchestration
 
@@ -109,8 +109,8 @@ Orchestration is a process of permuting a set of the canary configuration and de
 
 ![orchestrator](./docs/orchestrator.png)
 
-Note that here, the jobs run an end to end scenario from producer SDK to [java parser based consumer SDK](https://github.com/aws-samples/amazon-kinesis-video-streams-demos/tree/master/consumer-java/aws-kinesis-video-producer-sdk-canary-consumer). 
-Orchestrator script can be found [here](https://github.com/aws-samples/amazon-kinesis-video-streams-demos/blob/master/producer-c/producer-cloudwatch-integ/jobs/orchestrator.groovy)
+Note that here, the jobs run an end to end scenario from producer SDK to [java parser based consumer SDK](https://github.com/aws-samples/amazon-kinesis-video-streams-demos/tree/master/canary/consumer-java). 
+Orchestrator script can be found [here](https://github.com/aws-samples/amazon-kinesis-video-streams-demos/blob/master/canary/producer-c/jobs/orchestrator.groovy)
 
 #### Update Flow
 
@@ -119,7 +119,7 @@ Finally, our canary is up and running. But, now, we want to make changes to the 
 To achieve this, the update process uses the rolling update technique:
 
 ![updater](./docs/update-flow.png)
-Rolling update and runner script can be found [here](https://github.com/aws-samples/amazon-kinesis-video-streams-demos/blob/master/producer-c/producer-cloudwatch-integ/jobs/runner.groovy)
+Rolling update and runner script can be found [here](https://github.com/aws-samples/amazon-kinesis-video-streams-demos/blob/master/canary/producer-c/jobs/runner.groovy)
 
 
 ## Logging
