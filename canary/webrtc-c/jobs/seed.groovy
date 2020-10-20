@@ -6,7 +6,7 @@ import org.jenkinsci.plugins.scriptsecurity.sandbox.whitelists.*;
 NAMESPACE="webrtc-canary"
 WORKSPACE="canary/webrtc-c"
 JOBS_DIR="$WORKSPACE/jobs"
-NUM_LOGS=20
+NUM_LOGS=1
 
 void approveSignatures(ArrayList<String> signatures) {
     scriptApproval = ScriptApproval.get()
