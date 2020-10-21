@@ -49,6 +49,7 @@ STATUS Peer::initSignaling(const Canary::PConfig pConfig)
     SignalingClientInfo clientInfo;
     ChannelInfo channelInfo;
     SignalingClientCallbacks clientCallbacks;
+    CHAR controlPlaneUrl[MAX_CONTROL_PLANE_URI_CHAR_LEN];
 
     MEMSET(&clientInfo, 0, SIZEOF(clientInfo));
     MEMSET(&channelInfo, 0, SIZEOF(channelInfo));
@@ -59,7 +60,12 @@ STATUS Peer::initSignaling(const Canary::PConfig pConfig)
     STRCPY(clientInfo.clientId, pConfig->clientId.value.c_str());
 
     channelInfo.version = CHANNEL_INFO_CURRENT_VERSION;
+    if (!pConfig->endpoint.value.empty()) {
+        SNPRINTF(controlPlaneUrl, MAX_CONTROL_PLANE_URI_CHAR_LEN, "%s%s", CONTROL_PLANE_URI_PREFIX, pConfig->endpoint.value.c_str());
+        channelInfo.pControlPlaneUrl = (PCHAR) controlPlaneUrl;
+    }
     channelInfo.pChannelName = (PCHAR) pConfig->channelName.value.c_str();
+    channelInfo.pRegion = (PCHAR) pConfig->region.value.c_str();
     channelInfo.pKmsKeyId = NULL;
     channelInfo.tagCount = 0;
     channelInfo.pTags = NULL;
@@ -195,7 +201,11 @@ STATUS Peer::initRtcConfiguration(const Canary::PConfig pConfig)
     }
 
     // Set the  STUN server
-    SNPRINTF(pConfiguration->iceServers[0].urls, MAX_ICE_CONFIG_URI_LEN, KINESIS_VIDEO_STUN_URL, pConfig->region.value.c_str());
+    if (pConfig->endpoint.value.empty()) {
+        SNPRINTF(pConfiguration->iceServers[0].urls, MAX_ICE_CONFIG_URI_LEN, KINESIS_VIDEO_STUN_URL, pConfig->region.value.c_str());
+    } else {
+        SNPRINTF(pConfiguration->iceServers[0].urls, MAX_ICE_CONFIG_URI_LEN, "stun:stun.%s:443", pConfig->endpoint.value.c_str());
+    }
 
     if (pConfig->useTurn.value) {
         // Set the URIs from the configuration
