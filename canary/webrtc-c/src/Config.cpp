@@ -179,6 +179,7 @@ STATUS Config::initWithEnvVars()
         logLevel.initialized = TRUE;
     }
 
+    CHK_STATUS(optenv(CANARY_ENDPOINT_ENV_VAR, &endpoint, ""));
     CHK_STATUS(optenv(CANARY_LABEL_ENV_VAR, &label, CANARY_DEFAULT_LABEL));
     CHK_STATUS(optenv(CANARY_CHANNEL_NAME_ENV_VAR, &channelName, CANARY_DEFAULT_CHANNEL_NAME));
     CHK_STATUS(optenv(CANARY_CLIENT_ID_ENV_VAR, &clientId, CANARY_DEFAULT_CLIENT_ID));
@@ -212,9 +213,10 @@ CleanUp:
 VOID Config::print()
 {
     DLOGD("Applied configuration:\n\n"
+          "\tEndpoint      : %s\n"
+          "\tRegion        : %s\n"
           "\tLabel         : %s\n"
           "\tChannel Name  : %s\n"
-          "\tRegion        : %s\n"
           "\tClient ID     : %s\n"
           "\tRole          : %s\n"
           "\tTrickle ICE   : %s\n"
@@ -226,9 +228,9 @@ VOID Config::print()
           "\tIteration     : %lu seconds\n"
           "\tRun both peers: %s\n"
           "\n",
-          this->label.value.c_str(), this->channelName.value.c_str(), this->region.value.c_str(), this->clientId.value.c_str(),
-          this->isMaster.value ? "Master" : "Viewer", this->trickleIce.value ? "True" : "False", this->useTurn.value ? "True" : "False",
-          this->logLevel.value, this->logGroupName.value.c_str(), this->logStreamName.value.c_str(),
+          this->endpoint.value.c_str(), this->region.value.c_str(), this->label.value.c_str(), this->channelName.value.c_str(),
+          this->clientId.value.c_str(), this->isMaster.value ? "Master" : "Viewer", this->trickleIce.value ? "True" : "False",
+          this->useTurn.value ? "True" : "False", this->logLevel.value, this->logGroupName.value.c_str(), this->logStreamName.value.c_str(),
           this->duration.value / HUNDREDS_OF_NANOS_IN_A_SECOND, this->iterationDuration.value / HUNDREDS_OF_NANOS_IN_A_SECOND,
           this->runBothPeers.value ? "True" : "False");
 }
@@ -277,7 +279,9 @@ STATUS Config::initWithJSON(PCHAR filePath)
 
     r = jsmn_parse(&parser, (PCHAR) raw, size, tokens, MAX_CONFIG_JSON_TOKENS);
     for (UINT32 i = 0; i < (UINT32) r; i++) {
-        if (compareJsonString((PCHAR) raw, &tokens[i], JSMN_STRING, (PCHAR) CANARY_LABEL_ENV_VAR)) {
+        if (compareJsonString((PCHAR) raw, &tokens[i], JSMN_STRING, (PCHAR) CANARY_ENDPOINT_ENV_VAR)) {
+            jsonString(raw, tokens[++i], &endpoint);
+        } else if (compareJsonString((PCHAR) raw, &tokens[i], JSMN_STRING, (PCHAR) CANARY_LABEL_ENV_VAR)) {
             jsonString(raw, tokens[++i], &label);
         } else if (compareJsonString((PCHAR) raw, &tokens[i], JSMN_STRING, (PCHAR) CANARY_CHANNEL_NAME_ENV_VAR)) {
             jsonString(raw, tokens[++i], &channelName);

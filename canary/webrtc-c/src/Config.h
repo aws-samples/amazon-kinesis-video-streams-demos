@@ -14,6 +14,7 @@ class Config {
         BOOL initialized = FALSE;
     };
 
+    Value<std::string> endpoint;
     Value<std::string> label;
     Value<std::string> channelName;
     Value<std::string> clientId;
