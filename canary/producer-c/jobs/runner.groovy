@@ -10,7 +10,7 @@ CREDENTIALS = [
     [
         $class: 'AmazonWebServicesCredentialsBinding', 
         accessKeyVariable: 'AWS_ACCESS_KEY_ID',
-        credentialsId: 'SDK_CANARY_CREDS',
+        credentialsId: 'CANARY_CREDENTIALS',
         secretKeyVariable: 'AWS_SECRET_ACCESS_KEY'
     ]
 ]
