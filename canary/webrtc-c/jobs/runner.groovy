@@ -12,15 +12,20 @@ CREDENTIALS = [
     ]
 ]
 
-def buildProject() {
+def buildProject(useMbedTLS) {
     checkout([$class: 'GitSCM', branches: [[name: params.GIT_HASH ]],
               userRemoteConfigs: [[url: params.GIT_URL]]])
+
+    def configureCmd = "cmake .. -DCMAKE_INSTALL_PREFIX=\"\$PWD\""
+    if (useMbedTLS) {
+      configureCmd += " -DUSE_OPENSSL=OFF -DUSE_MBEDTLS=ON"
+    }     
 
     sh """
         cd ./canary/webrtc-c && 
         mkdir -p build && 
         cd build && 
-        cmake .. -DCMAKE_INSTALL_PREFIX="\$PWD" && 
+        ${configureCmd} && 
         make -j"""
 }
 
@@ -62,7 +67,7 @@ def buildPeer(isMaster, params) {
     if (params.FIRST_ITERATION) {
         deleteDir()
     }
-    buildProject()
+    buildProject(params.USE_MBEDTLS)
 
     RUNNING_NODES_IN_BUILDING--
     
@@ -92,7 +97,7 @@ def buildSignaling(params) {
     if (params.FIRST_ITERATION) {
         deleteDir()
     }
-    buildProject()
+    buildProject(params.USE_MBEDTLS)
 
     withRunnerWrapper(envs) {
         sh """
@@ -111,6 +116,7 @@ pipeline {
         booleanParam(name: 'IS_SIGNALING')
         booleanParam(name: 'USE_TURN')
         booleanParam(name: 'TRICKLE_ICE')
+        booleanParam(name: 'USE_MBEDTLS', defaultValue: false)
         string(name: 'LOG_GROUP_NAME')
         string(name: 'MASTER_NODE_LABEL')
         string(name: 'VIEWER_NODE_LABEL')
@@ -193,6 +199,7 @@ pipeline {
                       booleanParam(name: 'IS_SIGNALING', value: params.IS_SIGNALING),
                       booleanParam(name: 'USE_TURN', value: params.USE_TURN),
                       booleanParam(name: 'TRICKLE_ICE', value: params.TRICKLE_ICE),
+                      booleanParam(name: 'USE_MBEDTLS', value: params.USE_MBEDTLS),
                       string(name: 'LOG_GROUP_NAME', value: params.LOG_GROUP_NAME),
                       string(name: 'MASTER_NODE_LABEL', value: params.MASTER_NODE_LABEL),
                       string(name: 'VIEWER_NODE_LABEL', value: params.VIEWER_NODE_LABEL),
