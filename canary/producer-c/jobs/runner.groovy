@@ -88,16 +88,19 @@ def runClient(isProducer, params) {
 
     RUNNING_NODES++
     echo "Number of running nodes: ${RUNNING_NODES}"
-    if(isProducer) {
-        buildProducer()
+    if(params.FIRST_ITERATION) {
+        if(isProducer) {
+            buildProducer()
+        }
+        else {
+            // This is to make sure that the consumer does not make RUNNING_NODES
+            // zero before producer build starts. Should handle this in a better
+            // way
+            sleep consumerStartUpDelay
+            buildConsumer(envs)   
+        }        
     }
-    else {
-        // This is to make sure that the consumer does not make RUNNING_NODES
-        // zero before producer build starts. Should handle this in a better
-        // way
-        sleep consumerStartUpDelay
-        buildConsumer(envs)   
-    }
+
     RUNNING_NODES--
     echo "Number of running nodes after build: ${RUNNING_NODES}"
     waitUntil {
@@ -111,9 +114,7 @@ def runClient(isProducer, params) {
         withRunnerWrapper(envs) {
             sh '''
                 cd $WORKSPACE/canary/consumer-java
-                # Create a temporary filename in /tmp directory
                 java -classpath target/aws-kinesisvideo-producer-sdk-canary-consumer-1.0-SNAPSHOT.jar:$(cat tmp_jar) -Daws.accessKeyId=${AWS_ACCESS_KEY_ID} -Daws.secretKey=${AWS_SECRET_ACCESS_KEY} com.amazon.kinesis.video.canary.consumer.ProducerSdkCanaryConsumer
-                rm tmp_jar
             '''
         }
     }

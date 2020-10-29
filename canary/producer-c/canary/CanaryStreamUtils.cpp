@@ -297,6 +297,22 @@ CleanUp:
     return retStatus;
 }
 
+STATUS pushStartUpLatency(PCanaryStreamCallbacks pCanaryStreamCallbacks, DOUBLE startUpLatency)
+{
+    Aws::CloudWatch::Model::MetricDatum startupLatencyDatum, aggstartupLatencyDatum;
+    STATUS retStatus = STATUS_SUCCESS;
+    CHK(pCanaryStreamCallbacks != NULL, STATUS_NULL_ARG);
+    startupLatencyDatum.SetMetricName("StartupLatency");
+    startupLatencyDatum.AddDimensions(pCanaryStreamCallbacks->dimensionPerStream);
+    pushMetric(pCanaryStreamCallbacks, startupLatencyDatum, Aws::CloudWatch::Model::StandardUnit::Milliseconds, startUpLatency);
+
+    aggstartupLatencyDatum.SetMetricName("StartupLatency");
+    aggstartupLatencyDatum.AddDimensions(pCanaryStreamCallbacks->aggregatedDimension);
+    pushMetric(pCanaryStreamCallbacks, aggstartupLatencyDatum, Aws::CloudWatch::Model::StandardUnit::Milliseconds, startUpLatency);
+CleanUp:
+    return STATUS_SUCCESS;
+}
+
 STATUS computeStreamMetricsFromCanary(STREAM_HANDLE streamHandle, PCanaryStreamCallbacks pCanaryStreamCallbacks)
 {
     STATUS retStatus = STATUS_SUCCESS;
