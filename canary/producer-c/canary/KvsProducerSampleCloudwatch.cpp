@@ -197,8 +197,11 @@ INT32 main(INT32 argc, CHAR* argv[])
     BOOL cleanUpDone = FALSE;
     BOOL fileLoggingEnabled = FALSE;
     BOOL runTillStopped = FALSE;
-
+    PAuthCallbacks pAuthCallbacks = NULL;
     CanaryConfig config;
+    BOOL firstFrame = TRUE;
+    UINT64 startTime;
+    DOUBLE startUpLatency;
     initializeEndianness();
     SRAND(time(0));
 
@@ -264,8 +267,25 @@ INT32 main(INT32 argc, CHAR* argv[])
         // adjust members of pStreamInfo here if needed
         pStreamInfo->streamCaps.nalAdaptationFlags = NAL_ADAPTATION_FLAG_NONE;
 
-        CHK_STATUS(createDefaultCallbacksProviderWithAwsCredentials(accessKey, secretKey, sessionToken, MAX_UINT64, region, cacertPath, NULL, NULL,
-                                                                    &pClientCallbacks));
+        startTime = GETTIME();
+        CHK_STATUS(createAbstractDefaultCallbacksProvider(DEFAULT_CALLBACK_CHAIN_COUNT,
+                                                          API_CALL_CACHE_TYPE_NONE,
+                                                          ENDPOINT_UPDATE_PERIOD_SENTINEL_VALUE,
+                                                          region,
+                                                          EMPTY_STRING,
+                                                          cacertPath,
+                                                          NULL,
+                                                          NULL,
+                                                          &pClientCallbacks));
+
+        CHK_STATUS(createStaticAuthCallbacks(pClientCallbacks,
+                                             accessKey,
+                                             secretKey,
+                                             sessionToken,
+                                             MAX_UINT64,
+                                             &pAuthCallbacks));
+        PStreamCallbacks pStreamcallbacks = &pCanaryStreamCallbacks->streamCallbacks;
+        CHK_STATUS(createContinuousRetryStreamCallbacks(pClientCallbacks, &pStreamcallbacks));
 
         if (getenv(CANARY_APP_FILE_LOGGER) != NULL || fileLoggingEnabled) {
             if ((retStatus = addFileLoggerPlatformCallbacksProvider(pClientCallbacks, CANARY_FILE_LOGGING_BUFFER_SIZE, CANARY_MAX_NUMBER_OF_LOG_FILES,
@@ -330,7 +350,14 @@ INT32 main(INT32 argc, CHAR* argv[])
                 lastKeyFrameTimestamp = frame.presentationTs;
             }
             CHK_STATUS(putKinesisVideoFrame(streamHandle, &frame));
-
+            // We measure this after first call to ensure that the latency is measured after the first SUCCESSFUL
+            // putKinesisVideoFrame() call
+            if (firstFrame) {
+               startUpLatency = (DOUBLE)(GETTIME() - startTime) / (DOUBLE) HUNDREDS_OF_NANOS_IN_A_MILLISECOND;
+               CHK_STATUS(pushStartUpLatency(pCanaryStreamCallbacks, startUpLatency));
+               DLOGD("Start up latency: %lf ms", startUpLatency);
+               firstFrame = FALSE;
+            }
             THREAD_SLEEP(HUNDREDS_OF_NANOS_IN_A_SECOND / DEFAULT_FPS_VALUE);
 
             frame.decodingTs = GETTIME(); // current time
@@ -339,7 +366,6 @@ INT32 main(INT32 argc, CHAR* argv[])
         }
         CHK_LOG_ERR(retStatus);
         SAFE_MEMFREE(frame.frameData);
-
         freeDeviceInfo(&pDeviceInfo);
         freeStreamInfoProvider(&pStreamInfo);
         freeKinesisVideoStream(&streamHandle);

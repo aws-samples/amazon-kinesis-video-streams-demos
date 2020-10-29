@@ -7,9 +7,9 @@ GIT_HASH='master'
 RUNNER_JOB_NAME_PREFIX = "producer-runner"
 
 // TODO: Set up configurability to run different parameter combinations
-// Run long run canary for 12 hours. New changes in the SDK will be pulled
-// in every 12 hours
-CANARY_DURATION_IN_SECONDS = 12 * 60 * 60
+// Run long run canary for 12 hours
+LONG_RUN_DURATION_IN_SECONDS = 12 * 60 * 60
+SHORT_RUN_DURATION_IN_SECONDS = 30
 COLD_STARTUP_DELAY_IN_SECONDS = 60 * 60
 MIN_RETRY_DELAY_IN_SECONDS = 60
 FRAGMENT_SIZE_IN_BYTES = 1048576
@@ -119,11 +119,24 @@ pipeline {
                         build(
                             job: NEXT_AVAILABLE_RUNNER,
                             parameters: COMMON_PARAMS + [
-                                string(name: 'CANARY_DURATION_IN_SECONDS', value: CANARY_DURATION_IN_SECONDS.toString()),
+                                string(name: 'CANARY_DURATION_IN_SECONDS', value: LONG_RUN_DURATION_IN_SECONDS.toString()),
                                 string(name: 'PRODUCER_NODE_LABEL', value: "producer-uw2"),
                                 string(name: 'CONSUMER_NODE_LABEL', value: "consumer-uw2"),
                                 string(name: 'CANARY_TYPE', value: "Realtime"),
                                 string(name: 'RUNNER_LABEL', value: "Longrun"),
+                                string(name: 'FRAGMENT_SIZE_IN_BYTES', value: FRAGMENT_SIZE_IN_BYTES.toString()),
+                                string(name: 'AWS_DEFAULT_REGION', value: AWS_DEFAULT_REGION),
+                            ],
+                            wait: false
+                        )
+                        build(
+                            job: NEXT_AVAILABLE_RUNNER,
+                            parameters: COMMON_PARAMS + [
+                                string(name: 'CANARY_DURATION_IN_SECONDS', value: SHORT_RUN_DURATION_IN_SECONDS.toString()),
+                                string(name: 'PRODUCER_NODE_LABEL', value: "producer-uw2"),
+                                string(name: 'CONSUMER_NODE_LABEL', value: "consumer-uw2"),
+                                string(name: 'CANARY_TYPE', value: "Realtime"),
+                                string(name: 'RUNNER_LABEL', value: "Periodic"),
                                 string(name: 'FRAGMENT_SIZE_IN_BYTES', value: FRAGMENT_SIZE_IN_BYTES.toString()),
                                 string(name: 'AWS_DEFAULT_REGION', value: AWS_DEFAULT_REGION),
                             ],

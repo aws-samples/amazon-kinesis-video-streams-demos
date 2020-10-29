@@ -122,6 +122,7 @@ STATUS computeClientMetricsFromCanary(CLIENT_HANDLE, PCanaryStreamCallbacks);
 VOID currentMemoryAllocation(PCanaryStreamCallbacks);
 VOID pushMetric(PCanaryStreamCallbacks pCanaryStreamCallback, Aws::CloudWatch::Model::MetricDatum&, Aws::CloudWatch::Model::StandardUnit, DOUBLE);
 STATUS publishErrorRate(STREAM_HANDLE, PCanaryStreamCallbacks, UINT64);
+STATUS pushStartUpLatency(PCanaryStreamCallbacks, DOUBLE);
 
 ////////////////////////////////////////////////////////////////////////
 // Cloudwatch logging related functions
