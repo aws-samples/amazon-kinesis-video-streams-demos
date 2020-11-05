@@ -36,9 +36,9 @@ typedef struct {
 typedef IncomingRTPMetricsContext* PIncomingRTPMetricsContext;
 
 typedef struct {
-    Aws::Vector<DOUBLE> frameLatency;
-    Aws::Vector<DOUBLE> dataMatch;
-    Aws::Vector<DOUBLE> sizeMatch;
+    DOUBLE frameLatencyAvg = 0.0;
+    DOUBLE dataMatchAvg = 0.0;
+    DOUBLE sizeMatchAvg = 0.0;
 } EndToEndMetricsContext;
 typedef EndToEndMetricsContext* PEndToEndMetricsContext;
 

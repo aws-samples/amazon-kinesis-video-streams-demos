@@ -233,26 +233,28 @@ VOID CloudwatchMonitoring::pushInboundRtpStats(Canary::PIncomingRTPMetricsContex
     this->push(incomingFrameDropRateDatum);
 }
 
-VOID CloudwatchMonitoring::pushEndToEndMetrics(Canary::PEndToEndMetricsContext pEndToEndMetricsContext)
+VOID CloudwatchMonitoring::pushEndToEndMetrics(Canary::EndToEndMetricsContext ctx)
 {
     MetricDatum endToEndLatencyDatum, sizeMatchDatum;
+    DOUBLE latency = ctx.frameLatencyAvg / (DOUBLE) HUNDREDS_OF_NANOS_IN_A_MILLISECOND;
 
+    // TODO: due to https://github.com/aws-samples/amazon-kinesis-video-streams-demos/issues/96,
+    //       it's not clear why the emitted metric shows -nan. Since -nan is a string that's outputted
+    //       from Datum's value stringify implementation, we should try to get the original value by
+    //       printing it ourself.
+    //
+    //       If the issues doesn't exist anymore, please remove this as this is intended for debugging only.
+    //       The generic metric logging should be sufficient.
+    DLOGD("Current end-to-end frame latency: %4.2lf", latency);
     endToEndLatencyDatum.SetMetricName("EndToEndFrameLatency");
     endToEndLatencyDatum.SetUnit(StandardUnit::Milliseconds);
-    auto& latencies = pEndToEndMetricsContext->frameLatency;
-    auto averageLatency = std::accumulate(latencies.begin(), latencies.end(), 0.0) / latencies.size();
-    endToEndLatencyDatum.SetValue(averageLatency);
+    endToEndLatencyDatum.SetValue(latency);
     this->push(endToEndLatencyDatum);
 
     sizeMatchDatum.SetMetricName("FrameSizeMatch");
     sizeMatchDatum.SetUnit(StandardUnit::Count);
-    auto& sizeMatches = pEndToEndMetricsContext->sizeMatch;
-    auto averageSizeMatch = std::accumulate(sizeMatches.begin(), sizeMatches.end(), 0.0) / sizeMatches.size();
-    sizeMatchDatum.SetValue(averageSizeMatch);
+    sizeMatchDatum.SetValue(ctx.sizeMatchAvg);
     this->push(sizeMatchDatum);
-
-    pEndToEndMetricsContext->frameLatency.clear();
-    pEndToEndMetricsContext->sizeMatch.clear();
 }
 
 } // namespace Canary
