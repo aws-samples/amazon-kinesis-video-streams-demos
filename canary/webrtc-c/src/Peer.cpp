@@ -536,11 +536,16 @@ STATUS Peer::addTransceiver(RtcMediaStreamTrack& track)
         frameDataPtr += SIZEOF(UINT64);
         UINT32 receivedSize = getUnalignedInt32BigEndian((PINT32)(frameDataPtr));
 
-        pPeer->endToEndMetricsContext.frameLatency.push_back((DOUBLE)(GETTIME() - receivedTs) / HUNDREDS_OF_NANOS_IN_A_MILLISECOND);
+        pPeer->endToEndMetricsContext.frameLatencyAvg =
+            EMA_ACCUMULATOR_GET_NEXT(pPeer->endToEndMetricsContext.frameLatencyAvg, GETTIME() - receivedTs);
 
         // Do a size match of the raw packet. Since raw packet does not contain the NALu, the
         // comparison would be rawPacketSize + ANNEX_B_NALU_SIZE and the received size
-        pPeer->endToEndMetricsContext.sizeMatch.push_back((rawPacketSize + ANNEX_B_NALU_SIZE) == receivedSize ? 1.0 : 0.0);
+        if (rawPacketSize + ANNEX_B_NALU_SIZE == receivedSize) {
+            pPeer->endToEndMetricsContext.sizeMatchAvg = EMA_ACCUMULATOR_GET_NEXT(pPeer->endToEndMetricsContext.sizeMatchAvg, 1);
+        } else {
+            pPeer->endToEndMetricsContext.sizeMatchAvg = EMA_ACCUMULATOR_GET_NEXT(pPeer->endToEndMetricsContext.sizeMatchAvg, 0);
+        }
         SAFE_MEMFREE(rawPacket);
     };
 
@@ -694,7 +699,8 @@ CleanUp:
 
 STATUS Peer::publishEndToEndMetrics()
 {
-    Canary::Cloudwatch::getInstance().monitoring.pushEndToEndMetrics(&this->endToEndMetricsContext);
+    std::unique_lock<std::recursive_mutex> lock(this->mutex);
+    Canary::Cloudwatch::getInstance().monitoring.pushEndToEndMetrics(this->endToEndMetricsContext);
 
     return STATUS_SUCCESS;
 }
