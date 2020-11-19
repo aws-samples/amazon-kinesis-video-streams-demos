@@ -84,6 +84,8 @@ class Peer {
     std::vector<PRtcRtpTransceiver> videoTransceivers;
     BOOL isMaster;
     BOOL trickleIce;
+    UINT64 offerReceiveTimestamp;
+    BOOL firstFrame;
     STATUS status;
 
     // metrics
