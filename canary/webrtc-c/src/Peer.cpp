@@ -31,6 +31,7 @@ STATUS Peer::init(const Canary::PConfig pConfig, const Callbacks& callbacks)
     this->canaryIncomingRTPMetricsContext.prevBytesReceived = 0;
     this->canaryIncomingRTPMetricsContext.prevFramesDropped = 0;
     this->canaryIncomingRTPMetricsContext.prevTs = GETTIME();
+    this->firstFrame = TRUE;
 
     CHK_STATUS(createStaticCredentialProvider((PCHAR) pConfig->accessKey.value.c_str(), 0, (PCHAR) pConfig->secretKey.value.c_str(), 0,
                                               (PCHAR) pConfig->sessionToken.value.c_str(), 0, MAX_UINT64, &pAwsCredentialProvider));
@@ -415,7 +416,7 @@ STATUS Peer::handleSignalingMsg(PReceivedSignalingMessage pMsg)
         RtcSessionDescriptionInit offerSDPInit, answerSDPInit;
         NullableBool canTrickle;
         UINT32 buffLen;
-
+        this->offerReceiveTimestamp = GETTIME();
         if (!this->isMaster) {
             DLOGW("Unexpected message SIGNALING_MESSAGE_TYPE_OFFER");
             CHK(FALSE, retStatus);
@@ -583,7 +584,7 @@ CleanUp:
 STATUS Peer::writeFrame(PFrame pFrame, MEDIA_STREAM_TRACK_KIND kind)
 {
     STATUS retStatus = STATUS_SUCCESS;
-
+    DOUBLE timeToFirstFrame;
     auto& transceivers = kind == MEDIA_STREAM_TRACK_KIND_VIDEO ? this->videoTransceivers : this->audioTransceivers;
     if (kind == MEDIA_STREAM_TRACK_KIND_VIDEO) {
         std::lock_guard<std::mutex> lock(this->countUpdateMutex);
@@ -597,17 +598,21 @@ STATUS Peer::writeFrame(PFrame pFrame, MEDIA_STREAM_TRACK_KIND kind)
     }
     for (auto& transceiver : transceivers) {
         retStatus = ::writeFrame(transceiver, pFrame);
-        if (retStatus == STATUS_SRTP_NOT_READY_YET) {
-            // do nothing
+        CHK (retStatus == STATUS_SRTP_NOT_READY_YET || retStatus == STATUS_SUCCESS, retStatus);
+
+        if (STATUS_SUCCEEDED(retStatus) && this->firstFrame && this->isMaster) {
+            this->firstFrame = FALSE;
+            timeToFirstFrame = (DOUBLE) (GETTIME() - this->offerReceiveTimestamp) / HUNDREDS_OF_NANOS_IN_A_MILLISECOND;
+            DLOGD("Start up latency from offer receive to first frame write: %lf ms", timeToFirstFrame);
+            Canary::Cloudwatch::getInstance().monitoring.pushTimeToFirstFrame(timeToFirstFrame,
+                                                                              StandardUnit::Milliseconds);
+        }
+        else {
             retStatus = STATUS_SUCCESS;
         }
-
-        CHK_STATUS(retStatus);
     }
-
 CleanUp:
-
-    return STATUS_SUCCESS;
+    return retStatus;
 }
 
 STATUS Peer::populateOutgoingRtpMetricsContext()

@@ -166,6 +166,16 @@ VOID CloudwatchMonitoring::pushSignalingRoundtripLatency(UINT64 delay, StandardU
     this->push(datum);
 }
 
+VOID CloudwatchMonitoring::pushTimeToFirstFrame(UINT64 timeToFirstFrame, StandardUnit unit)
+{
+    MetricDatum datum;
+
+    datum.SetMetricName("TimeToFirstFrame");
+    datum.SetValue(timeToFirstFrame);
+    datum.SetUnit(unit);
+
+    this->push(datum);
+}
 VOID CloudwatchMonitoring::pushSignalingInitDelay(UINT64 delay, StandardUnit unit)
 {
     MetricDatum datum;
