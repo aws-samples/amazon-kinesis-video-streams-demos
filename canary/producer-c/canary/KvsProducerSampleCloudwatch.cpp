@@ -185,7 +185,7 @@ INT32 main(INT32 argc, CHAR* argv[])
     CLIENT_HANDLE clientHandle = INVALID_CLIENT_HANDLE_VALUE;
     STREAM_HANDLE streamHandle = INVALID_STREAM_HANDLE_VALUE;
     STATUS retStatus = STATUS_SUCCESS;
-    PCHAR accessKey = NULL, secretKey = NULL, sessionToken = NULL, region = NULL, cacertPath = NULL;
+    PCHAR accessKey = NULL, secretKey = NULL, sessionToken = NULL, region = NULL, cacertPath = NULL, logLevel;
     CHAR streamName[MAX_STREAM_NAME_LEN + 1];
     Frame frame;
     UINT32 frameIndex = 0, fileIndex = 0;
@@ -261,6 +261,10 @@ INT32 main(INT32 argc, CHAR* argv[])
 
         // adjust members of pDeviceInfo here if needed
         pDeviceInfo->clientInfo.loggerLogLevel = LOG_LEVEL_DEBUG;
+        logLevel = getenv(DEBUG_LOG_LEVEL_ENV_VAR);
+        if (logLevel != NULL) {
+            STRTOUI32(logLevel, NULL, 10, &pDeviceInfo->clientInfo.loggerLogLevel);
+        }
 
         CHK_STATUS(createRealtimeVideoStreamInfoProvider(streamName, DEFAULT_RETENTION_PERIOD, config.bufferDuration, &pStreamInfo));
         adjustStreamInfoToCanaryType(pStreamInfo, config.canaryTypeStr);
