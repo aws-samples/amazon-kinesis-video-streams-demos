@@ -30,7 +30,10 @@ extern "C" {
 
 #define CANARY_FILE_LOGGING_BUFFER_SIZE (200 * 1024)
 #define CANARY_MAX_NUMBER_OF_LOG_FILES  10
-#define CANARY_APP_FILE_LOGGER          (PCHAR) "ENABLE_FILE_LOGGER"
+#define CANARY_APP_FILE_LOGGER       (PCHAR) "ENABLE_FILE_LOGGER"
+
+#define CANARY_INTERMITTENT_SCENARIO (PCHAR) "Intermittent"
+#define CANARY_CONTINUOUS_SCENARIO   (PCHAR) "Continuous"
 
 #define CANARY_TYPE_REALTIME           (PCHAR) "Realtime"
 #define CANARY_TYPE_OFFLINE            (PCHAR) "Offline"
@@ -41,8 +44,10 @@ extern "C" {
 #define CANARY_BUFFER_DURATION_ENV_VAR (PCHAR) "CANARY_BUFFER_DURATION_IN_SECONDS"
 #define CANARY_STORAGE_SIZE_ENV_VAR    (PCHAR) "CANARY_STORAGE_SIZE_IN_BYTES"
 #define CANARY_LABEL_ENV_VAR           (PCHAR) "CANARY_LABEL"
+#define CANARY_SCENARIO_ENV_VAR        (PCHAR) "CANARY_RUN_SCENARIO"
 
 #define CANARY_DEFAULT_STREAM_NAME         (PCHAR) "TestStream"
+#define CANARY_DEFAULT_SCENARIO_NAME       CANARY_CONTINUOUS_SCENARIO
 #define CANARY_DEFAULT_CANARY_TYPE         CANARY_TYPE_REALTIME
 #define CANARY_DEFAULT_DURATION_IN_SECONDS 60
 #define CANARY_DEFAULT_FRAGMENT_SIZE       (25 * 1024)
@@ -64,6 +69,7 @@ typedef struct {
     CHAR streamNamePrefix[CANARY_STREAM_NAME_STR_LEN + 1];
     CHAR canaryTypeStr[CANARY_TYPE_STR_LEN + 1];
     CHAR canaryLabel[CANARY_LABEL_LEN + 1];
+    CHAR canaryScenario[CANARY_LABEL_LEN + 1];
     UINT64 fragmentSizeInBytes;
     UINT64 canaryDuration;
     UINT64 bufferDuration;
@@ -98,6 +104,7 @@ struct __CanaryStreamCallbacks {
     StreamCallbacks streamCallbacks;
     PCHAR pStreamName;
     UINT64 totalNumberOfErrors;
+    BOOL aggregateMetrics;
     Aws::CloudWatch::CloudWatchClient* pCwClient;
     Aws::CloudWatch::Model::PutMetricDataRequest* cwRequest;
     Aws::CloudWatch::Model::Dimension dimensionPerStream;
@@ -123,6 +130,7 @@ VOID currentMemoryAllocation(PCanaryStreamCallbacks);
 VOID pushMetric(PCanaryStreamCallbacks pCanaryStreamCallback, Aws::CloudWatch::Model::MetricDatum&, Aws::CloudWatch::Model::StandardUnit, DOUBLE);
 STATUS publishErrorRate(STREAM_HANDLE, PCanaryStreamCallbacks, UINT64);
 STATUS pushStartUpLatency(PCanaryStreamCallbacks, DOUBLE);
+STATUS publishMetrics(STREAM_HANDLE, CLIENT_HANDLE, PCanaryStreamCallbacks);
 
 ////////////////////////////////////////////////////////////////////////
 // Cloudwatch logging related functions
