@@ -24,7 +24,7 @@ COMMON_PARAMS = [
 
 def getJobLastBuildTimestamp(job) {
     def timestamp = 0
-    
+    def lastBuild = job.getLastBuild()      
     if (lastBuild != null) {
         timestamp = lastBuild.getTimeInMillis()
     }
