@@ -64,6 +64,7 @@ def runClient(isProducer, params) {
         'FRAGMENT_SIZE_IN_BYTES' : params.FRAGMENT_SIZE_IN_BYTES,
         'CANARY_DURATION_IN_SECONDS': params.CANARY_DURATION_IN_SECONDS,
         'AWS_DEFAULT_REGION': params.AWS_DEFAULT_REGION,
+        'CANARY_RUN_SCENARIO': "${params.CANARY_RUN_SCENARIO}",
     ].collect({k,v -> "${k}=${v}" })
 
     // TODO: get the branch and version from orchestrator
@@ -146,6 +147,7 @@ pipeline {
         string(name: 'CANARY_DURATION_IN_SECONDS')
         string(name: 'MIN_RETRY_DELAY_IN_SECONDS')
         string(name: 'AWS_DEFAULT_REGION')
+        string(name: 'CANARY_RUN_SCENARIO')
         booleanParam(name: 'FIRST_ITERATION', defaultValue: true)
     }
 
@@ -171,7 +173,11 @@ pipeline {
                     }
                     steps {
                         script {
-                            runClient(false, params)
+
+                            // Only run consumer if it is not intermittent scenario
+                            if(params.CANARY_RUN_SCENARIO == "Continuous") {
+                                    runClient(false, params)
+                            }
                         }
                     }                
                 }
@@ -205,6 +211,7 @@ pipeline {
                                 string(name: 'MIN_RETRY_DELAY_IN_SECONDS', value: params.MIN_RETRY_DELAY_IN_SECONDS),
                                 string(name: 'AWS_DEFAULT_REGION', value: params.AWS_DEFAULT_REGION),
                                 string(name: 'RUNNER_LABEL', value: params.RUNNER_LABEL),
+                                string(name: 'CANARY_RUN_SCENARIO', value: params.CANARY_RUN_SCENARIO),
                                 booleanParam(name: 'FIRST_ITERATION', value: false)
                             ],
                     wait: false

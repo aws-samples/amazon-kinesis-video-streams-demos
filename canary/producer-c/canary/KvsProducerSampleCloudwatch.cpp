@@ -92,10 +92,11 @@ STATUS parseConfigFile(PCanaryConfig pCanaryConfig, PCHAR filePath)
             getJsonValue(params, tokens[i + 1], final_attr_str);
             STRTOUI64(final_attr_str, NULL, 10, &pCanaryConfig->storageSizeInBytes);
             i++;
-        }
-        else if(compareJsonString((PCHAR) params, &tokens[i], JSMN_STRING, CANARY_LABEL_ENV_VAR)) {
+        } else if (compareJsonString((PCHAR) params, &tokens[i], JSMN_STRING, CANARY_LABEL_ENV_VAR)) {
             getJsonValue(params, tokens[i + 1], pCanaryConfig->canaryLabel);
             i++;
+        } else if (compareJsonString((PCHAR) params, &tokens[i], JSMN_STRING, CANARY_SCENARIO_ENV_VAR)) {
+            getJsonValue(params, tokens[i + 1], pCanaryConfig->canaryScenario);
         }
     }
 CleanUp:
@@ -138,6 +139,7 @@ STATUS printConfig(PCanaryConfig pCanaryConfig)
     DLOGI("Canary duration: %llu seconds", pCanaryConfig->canaryDuration);
     DLOGI("Canary buffer duration: %llu seconds", pCanaryConfig->bufferDuration);
     DLOGI("Canary storage size: %llu bytes", pCanaryConfig->storageSizeInBytes);
+    DLOGI("Canary scenario: %s", pCanaryConfig->canaryScenario);
 CleanUp:
     return retStatus;
 }
@@ -149,10 +151,14 @@ STATUS initWithEnvVars(PCanaryConfig pCanaryConfig)
     CHAR canaryType[CANARY_TYPE_STR_LEN + 1];
     CHAR streamName[CANARY_STREAM_NAME_STR_LEN + 1];
     CHAR canaryLabel[CANARY_LABEL_LEN + 1];
+    CHAR canaryScenario[CANARY_LABEL_LEN + 1];
     CHK(pCanaryConfig != NULL, STATUS_NULL_ARG);
 
     CHK_STATUS(optenv(CANARY_STREAM_NAME_ENV_VAR, streamName, CANARY_DEFAULT_STREAM_NAME));
     STRCPY(pCanaryConfig->streamNamePrefix, streamName);
+
+    CHK_STATUS(optenv(CANARY_SCENARIO_ENV_VAR, canaryScenario, CANARY_DEFAULT_SCENARIO_NAME));
+    STRCPY(pCanaryConfig->canaryScenario, canaryScenario);
 
     CHK_STATUS(optenv(CANARY_TYPE_ENV_VAR, canaryType, CANARY_DEFAULT_CANARY_TYPE));
     STRCPY(pCanaryConfig->canaryTypeStr, canaryType);
@@ -196,15 +202,15 @@ INT32 main(INT32 argc, CHAR* argv[])
     UINT64 currentTime, canaryStopTime;
     BOOL cleanUpDone = FALSE;
     BOOL fileLoggingEnabled = FALSE;
-    BOOL runTillStopped = FALSE;
     PAuthCallbacks pAuthCallbacks = NULL;
     CanaryConfig config;
     BOOL firstFrame = TRUE;
     UINT64 startTime;
     DOUBLE startUpLatency;
+    UINT64 runTill = MAX_UINT64;
+    UINT64 randomTime = 0;
     initializeEndianness();
     SRAND(time(0));
-
     Aws::SDKOptions options;
     Aws::InitAPI(options);
     {
@@ -217,7 +223,11 @@ INT32 main(INT32 argc, CHAR* argv[])
                   "\t\texport CANARY_STREAM_NAME=<val>\n"
                   "\t\texport CANARY_STREAM_TYPE=<realtime/offline>\n"
                   "\t\texport FRAGMENT_SIZE_IN_BYTES=<Size of fragment in bytes>\n"
-                  "\t\texport CANARY_DURATION_IN_SECONDS=<duration in seconds>");
+                  "\t\texport CANARY_DURATION_IN_SECONDS=<duration in seconds>"
+                  "\t\texport CANARY_BUFFER_DURATION_IN_SECONDS=<duration in seconds>"
+                  "\t\texport CANARY_STORAGE_SIZE_IN_BYTES=<storage size in bytes>"
+                  "\t\texport CANARY_LABEL=<canary label (longtime,periodic, etc >"
+                  "\t\texport CANARY_RUN_SCENARIO=<canary label (normal/intermittent) >");
             CHK_STATUS(initWithEnvVars(&config));
         } else {
             CHK_ERR(STRLEN(argv[1]) < (MAX_PATH_LEN + 1), STATUS_INVALID_ARG_LEN, "File path length too long");
@@ -245,7 +255,8 @@ INT32 main(INT32 argc, CHAR* argv[])
         Aws::CloudWatchLogs::CloudWatchLogsClient cwl(clientConfiguration);
 
         STRCPY(cloudwatchLogsObject.logGroupName, "ProducerSDK");
-        SNPRINTF(cloudwatchLogsObject.logStreamName, MAX_LOG_FILE_NAME_LEN, "%s-log-%llu", streamName, GETTIME() / HUNDREDS_OF_NANOS_IN_A_MILLISECOND);
+        SNPRINTF(cloudwatchLogsObject.logStreamName, MAX_LOG_FILE_NAME_LEN, "%s-log-%llu", streamName,
+                 GETTIME() / HUNDREDS_OF_NANOS_IN_A_MILLISECOND);
         cloudwatchLogsObject.pCwl = &cwl;
         if ((retStatus = initializeCloudwatchLogger(&cloudwatchLogsObject)) != STATUS_SUCCESS) {
             DLOGW("Cloudwatch logger failed to be initialized with 0x%08x error code. Fallback to file logging", retStatus);
@@ -272,14 +283,8 @@ INT32 main(INT32 argc, CHAR* argv[])
         pStreamInfo->streamCaps.nalAdaptationFlags = NAL_ADAPTATION_FLAG_NONE;
 
         startTime = GETTIME();
-        CHK_STATUS(createAbstractDefaultCallbacksProvider(DEFAULT_CALLBACK_CHAIN_COUNT,
-                                                          API_CALL_CACHE_TYPE_NONE,
-                                                          ENDPOINT_UPDATE_PERIOD_SENTINEL_VALUE,
-                                                          region,
-                                                          EMPTY_STRING,
-                                                          cacertPath,
-                                                          NULL,
-                                                          NULL,
+        CHK_STATUS(createAbstractDefaultCallbacksProvider(DEFAULT_CALLBACK_CHAIN_COUNT, API_CALL_CACHE_TYPE_NONE,
+                                                          ENDPOINT_UPDATE_PERIOD_SENTINEL_VALUE, region, EMPTY_STRING, cacertPath, NULL, NULL,
                                                           &pClientCallbacks));
 
         CHK_STATUS(createStaticAuthCallbacks(pClientCallbacks,
@@ -317,7 +322,7 @@ INT32 main(INT32 argc, CHAR* argv[])
         CHK(frame.frameData != NULL, STATUS_NOT_ENOUGH_MEMORY);
         frame.version = FRAME_CURRENT_VERSION;
         frame.trackId = DEFAULT_VIDEO_TRACK_ID;
-        frame.duration = 0;
+        frame.duration = HUNDREDS_OF_NANOS_IN_A_MILLISECOND / DEFAULT_FPS_VALUE;
         frame.decodingTs = GETTIME(); // current time
         frame.presentationTs = frame.decodingTs;
         currentTime = GETTIME();
@@ -325,12 +330,20 @@ INT32 main(INT32 argc, CHAR* argv[])
         UINT64 duration;
 
         DLOGD("Producer SDK Log file name: %s", cloudwatchLogsObject.logStreamName);
+
+        // Check if we have continuous run or intermittent scenario
+        if (STRCMP(config.canaryScenario, CANARY_INTERMITTENT_SCENARIO) == 0) {
+            // Set up runTill. This will be used if canary is run under intermittent scenario
+            randomTime = (RAND() % 2) + 1;
+            runTill = GETTIME() + randomTime * HUNDREDS_OF_NANOS_IN_A_MINUTE;
+            DLOGD("Intermittent run time is set to: %" PRIu64 " minutes", randomTime);
+            pCanaryStreamCallbacks->aggregateMetrics = FALSE;
+        }
+
         // Say, the canary needs to be stopped before designated canary run time, signal capture
         // must still be supported
+
         while (GETTIME() < canaryStopTime && ATOMIC_LOAD_BOOL(&sigCaptureInterrupt) != TRUE) {
-            if (frameIndex < 0) {
-                frameIndex = 0;
-            }
             frame.index = frameIndex;
             frame.flags = frameIndex % DEFAULT_KEY_FRAME_INTERVAL == 0 ? FRAME_FLAG_KEY_FRAME : FRAME_FLAG_NONE;
 
@@ -338,9 +351,7 @@ INT32 main(INT32 argc, CHAR* argv[])
             if (frame.flags == FRAME_FLAG_KEY_FRAME) {
                 if (lastKeyFrameTimestamp != 0) {
                     canaryStreamRecordFragmentEndSendTime(pCanaryStreamCallbacks, lastKeyFrameTimestamp, frame.presentationTs);
-                    CHK_STATUS(computeStreamMetricsFromCanary(streamHandle, pCanaryStreamCallbacks));
-                    CHK_STATUS(computeClientMetricsFromCanary(clientHandle, pCanaryStreamCallbacks));
-                    currentMemoryAllocation(pCanaryStreamCallbacks);
+                    publishMetrics(streamHandle, clientHandle, pCanaryStreamCallbacks);
                     duration = GETTIME() - currentTime;
                     if ((!fileLoggingEnabled) && (duration > (60 * HUNDREDS_OF_NANOS_IN_A_SECOND))) {
                         canaryStreamSendLogs(&cloudwatchLogsObject);
@@ -353,7 +364,21 @@ INT32 main(INT32 argc, CHAR* argv[])
                 }
                 lastKeyFrameTimestamp = frame.presentationTs;
             }
-            CHK_STATUS(putKinesisVideoFrame(streamHandle, &frame));
+
+            if (GETTIME() < runTill) {
+                CHK_STATUS(putKinesisVideoFrame(streamHandle, &frame));
+                THREAD_SLEEP(HUNDREDS_OF_NANOS_IN_A_SECOND / DEFAULT_FPS_VALUE);
+            }
+            else {
+                DLOGD("Last frame type put before stopping: %s", (frame.flags == FRAME_FLAG_KEY_FRAME ? "Key Frame" : "Non key frame"));
+                UINT64 sleepTime = ((RAND() % 2) + 1) * HUNDREDS_OF_NANOS_IN_A_MINUTE;
+                DLOGD("Intermittent sleep time is set to: %" PRIu64 " minutes", sleepTime / HUNDREDS_OF_NANOS_IN_A_MINUTE);
+                THREAD_SLEEP(sleepTime);
+                // Reset runTill after 1 run of intermittent scenario
+                randomTime = (RAND() % 10) + 1;
+                DLOGD("Intermittent run time is set to: %" PRIu64 " minutes", randomTime);
+                runTill = GETTIME() + randomTime * HUNDREDS_OF_NANOS_IN_A_MINUTE;
+            }
             // We measure this after first call to ensure that the latency is measured after the first SUCCESSFUL
             // putKinesisVideoFrame() call
             if (firstFrame) {
@@ -362,7 +387,6 @@ INT32 main(INT32 argc, CHAR* argv[])
                DLOGD("Start up latency: %lf ms", startUpLatency);
                firstFrame = FALSE;
             }
-            THREAD_SLEEP(HUNDREDS_OF_NANOS_IN_A_SECOND / DEFAULT_FPS_VALUE);
 
             frame.decodingTs = GETTIME(); // current time
             frame.presentationTs = frame.decodingTs;
