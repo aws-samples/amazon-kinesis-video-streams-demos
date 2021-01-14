@@ -334,7 +334,7 @@ INT32 main(INT32 argc, CHAR* argv[])
         // Check if we have continuous run or intermittent scenario
         if (STRCMP(config.canaryScenario, CANARY_INTERMITTENT_SCENARIO) == 0) {
             // Set up runTill. This will be used if canary is run under intermittent scenario
-            randomTime = (RAND() % 2) + 1;
+            randomTime = (RAND() % 10) + 1;
             runTill = GETTIME() + randomTime * HUNDREDS_OF_NANOS_IN_A_MINUTE;
             DLOGD("Intermittent run time is set to: %" PRIu64 " minutes", randomTime);
             pCanaryStreamCallbacks->aggregateMetrics = FALSE;
@@ -371,7 +371,7 @@ INT32 main(INT32 argc, CHAR* argv[])
             }
             else {
                 DLOGD("Last frame type put before stopping: %s", (frame.flags == FRAME_FLAG_KEY_FRAME ? "Key Frame" : "Non key frame"));
-                UINT64 sleepTime = ((RAND() % 2) + 1) * HUNDREDS_OF_NANOS_IN_A_MINUTE;
+                UINT64 sleepTime = ((RAND() % 10) + 1) * HUNDREDS_OF_NANOS_IN_A_MINUTE;
                 DLOGD("Intermittent sleep time is set to: %" PRIu64 " minutes", sleepTime / HUNDREDS_OF_NANOS_IN_A_MINUTE);
                 THREAD_SLEEP(sleepTime);
                 // Reset runTill after 1 run of intermittent scenario
