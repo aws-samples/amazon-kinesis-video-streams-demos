@@ -370,6 +370,7 @@ INT32 main(INT32 argc, CHAR* argv[])
                 THREAD_SLEEP(HUNDREDS_OF_NANOS_IN_A_SECOND / DEFAULT_FPS_VALUE);
             }
             else {
+                canaryStreamRecordFragmentEndSendTime(pCanaryStreamCallbacks, lastKeyFrameTimestamp, frame.presentationTs);
                 DLOGD("Last frame type put before stopping: %s", (frame.flags == FRAME_FLAG_KEY_FRAME ? "Key Frame" : "Non key frame"));
                 UINT64 sleepTime = ((RAND() % 10) + 1) * HUNDREDS_OF_NANOS_IN_A_MINUTE;
                 DLOGD("Intermittent sleep time is set to: %" PRIu64 " minutes", sleepTime / HUNDREDS_OF_NANOS_IN_A_MINUTE);
