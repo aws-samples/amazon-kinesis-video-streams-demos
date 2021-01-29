@@ -21,7 +21,7 @@ def buildProducer() {
     mkdir -p build
     cd build && 
     cmake .. && 
-    make 
+    make -j4
   """
 }
 
@@ -31,7 +31,7 @@ def buildConsumer(envs) {
         PATH="$JAVA_HOME/bin:$PATH"
         export PATH="$M2_HOME/bin:$PATH"
         cd $WORKSPACE/canary/consumer-java
-        make
+        make -j4
     '''
   }
 }
@@ -89,17 +89,15 @@ def runClient(isProducer, params) {
 
     RUNNING_NODES++
     echo "Number of running nodes: ${RUNNING_NODES}"
-    if(params.FIRST_ITERATION) {
-        if(isProducer) {
-            buildProducer()
-        }
-        else {
-            // This is to make sure that the consumer does not make RUNNING_NODES
-            // zero before producer build starts. Should handle this in a better
-            // way
-            sleep consumerStartUpDelay
-            buildConsumer(envs)   
-        }        
+    if(isProducer) {
+        buildProducer()
+    }
+    else {
+        // This is to make sure that the consumer does not make RUNNING_NODES
+        // zero before producer build starts. Should handle this in a better
+        // way
+        sleep consumerStartUpDelay
+        buildConsumer(envs)   
     }
 
     RUNNING_NODES--
