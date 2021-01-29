@@ -8,10 +8,12 @@ ExternalProject_Add(libawscpp-download
     PREFIX            ${CMAKE_CURRENT_BINARY_DIR}/build
     LIST_SEPARATOR 	  "|"
     CMAKE_ARGS		  -DCUSTOM_MEMORY_MANAGEMENT=OFF 
-                	  -DBUILD_DEPS=ON 
-                	  -DBUILD_SHARED_LIBS=OFF 
-                	  -DBUILD_ONLY=monitoring|logs
-                      -DCMAKE_INSTALL_PREFIX=${OPEN_SRC_INSTALL_PREFIX}
-    BUILD_ALWAYS      TRUE
+                    -DENABLE_TESTING=OFF 
+                    -DAUTORUN_UNIT_TESTS=OFF 
+                    -DBUILD_DEPS=ON 
+                    -DBUILD_SHARED_LIBS=OFF 
+                    -DBUILD_ONLY=monitoring|logs
+                    -DCMAKE_INSTALL_PREFIX=${OPEN_SRC_INSTALL_PREFIX}
+    BUILD_ALWAYS      0
     TEST_COMMAND      ""
 )
