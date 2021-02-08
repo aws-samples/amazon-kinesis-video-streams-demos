@@ -97,6 +97,8 @@ STATUS parseConfigFile(PCanaryConfig pCanaryConfig, PCHAR filePath)
             i++;
         } else if (compareJsonString((PCHAR) params, &tokens[i], JSMN_STRING, CANARY_SCENARIO_ENV_VAR)) {
             getJsonValue(params, tokens[i + 1], pCanaryConfig->canaryScenario);
+        } else if (compareJsonString((PCHAR) params, &tokens[i], JSMN_STRING, CANARY_TRACK_TYPE_ENV_VAR)) {
+            getJsonValue(params, tokens[i + 1], pCanaryConfig->canaryTrackType);
         }
     }
 CleanUp:
@@ -140,6 +142,7 @@ STATUS printConfig(PCanaryConfig pCanaryConfig)
     DLOGI("Canary buffer duration: %llu seconds", pCanaryConfig->bufferDuration);
     DLOGI("Canary storage size: %llu bytes", pCanaryConfig->storageSizeInBytes);
     DLOGI("Canary scenario: %s", pCanaryConfig->canaryScenario);
+    DLOGI("Canary track type: %s", pCanaryConfig->canaryTrackType);
 CleanUp:
     return retStatus;
 }
@@ -152,6 +155,7 @@ STATUS initWithEnvVars(PCanaryConfig pCanaryConfig)
     CHAR streamName[CANARY_STREAM_NAME_STR_LEN + 1];
     CHAR canaryLabel[CANARY_LABEL_LEN + 1];
     CHAR canaryScenario[CANARY_LABEL_LEN + 1];
+    CHAR canaryTrackType[CANARY_TRACK_TYPE_STR_LEN + 1];
     CHK(pCanaryConfig != NULL, STATUS_NULL_ARG);
 
     CHK_STATUS(optenv(CANARY_STREAM_NAME_ENV_VAR, streamName, CANARY_DEFAULT_STREAM_NAME));
@@ -165,6 +169,9 @@ STATUS initWithEnvVars(PCanaryConfig pCanaryConfig)
 
     CHK_STATUS(optenv(CANARY_LABEL_ENV_VAR, canaryLabel, CANARY_DEFAULT_CANARY_LABEL));
     STRCPY(pCanaryConfig->canaryLabel, canaryLabel);
+
+    CHK_STATUS(optenv(CANARY_TRACK_TYPE_ENV_VAR, canaryTrackType, CANARY_DEFAULT_TRACK_TYPE));
+    STRCPY(pCanaryConfig->canaryTrackType, canaryTrackType);
 
     CHK_STATUS(optenvUint64(FRAGMENT_SIZE_ENV_VAR, &pCanaryConfig->fragmentSizeInBytes, CANARY_DEFAULT_FRAGMENT_SIZE));
     CHK_STATUS(optenvUint64(CANARY_DURATION_ENV_VAR, &pCanaryConfig->canaryDuration, CANARY_DEFAULT_DURATION_IN_SECONDS));
@@ -209,6 +216,7 @@ INT32 main(INT32 argc, CHAR* argv[])
     DOUBLE startUpLatency;
     UINT64 runTill = MAX_UINT64;
     UINT64 randomTime = 0;
+
     initializeEndianness();
     SRAND(time(0));
     Aws::SDKOptions options;
@@ -277,7 +285,12 @@ INT32 main(INT32 argc, CHAR* argv[])
             STRTOUI32(logLevel, NULL, 10, &pDeviceInfo->clientInfo.loggerLogLevel);
         }
 
-        CHK_STATUS(createRealtimeVideoStreamInfoProvider(streamName, DEFAULT_RETENTION_PERIOD, config.bufferDuration, &pStreamInfo));
+        // Run multitrack only for intermittent producer scenario
+        if (STRCMP(config.canaryTrackType, CANARY_MULTI_TRACK_TYPE) == 0) {
+            CHK_STATUS(createRealtimeAudioVideoStreamInfoProvider(streamName, DEFAULT_RETENTION_PERIOD, config.bufferDuration, &pStreamInfo));
+        } else {
+            CHK_STATUS(createRealtimeVideoStreamInfoProvider(streamName, DEFAULT_RETENTION_PERIOD, config.bufferDuration, &pStreamInfo));
+        }
         adjustStreamInfoToCanaryType(pStreamInfo, config.canaryTypeStr);
         // adjust members of pStreamInfo here if needed
         pStreamInfo->streamCaps.nalAdaptationFlags = NAL_ADAPTATION_FLAG_NONE;
@@ -346,7 +359,6 @@ INT32 main(INT32 argc, CHAR* argv[])
         while (GETTIME() < canaryStopTime && ATOMIC_LOAD_BOOL(&sigCaptureInterrupt) != TRUE) {
             frame.index = frameIndex;
             frame.flags = frameIndex % DEFAULT_KEY_FRAME_INTERVAL == 0 ? FRAME_FLAG_KEY_FRAME : FRAME_FLAG_NONE;
-
             createCanaryFrameData(&frame);
             if (frame.flags == FRAME_FLAG_KEY_FRAME) {
                 if (lastKeyFrameTimestamp != 0) {
@@ -366,7 +378,16 @@ INT32 main(INT32 argc, CHAR* argv[])
             }
 
             if (GETTIME() < runTill) {
+                frame.trackId = DEFAULT_VIDEO_TRACK_ID;
                 CHK_STATUS(putKinesisVideoFrame(streamHandle, &frame));
+
+                // Send frame on another track only if we want to run multi track. For the sake of
+                // multitrack, we use the same frame for video and audio and just modify the flags.
+                if (STRCMP(config.canaryTrackType, CANARY_MULTI_TRACK_TYPE) == 0) {
+                    frame.flags = FRAME_FLAG_NONE;
+                    frame.trackId = DEFAULT_AUDIO_TRACK_ID;
+                    CHK_STATUS(putKinesisVideoFrame(streamHandle, &frame));
+                }
                 THREAD_SLEEP(HUNDREDS_OF_NANOS_IN_A_SECOND / DEFAULT_FPS_VALUE);
             }
             else {

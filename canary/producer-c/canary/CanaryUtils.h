@@ -35,6 +35,9 @@ extern "C" {
 #define CANARY_INTERMITTENT_SCENARIO (PCHAR) "Intermittent"
 #define CANARY_CONTINUOUS_SCENARIO   (PCHAR) "Continuous"
 
+#define CANARY_SINGLE_TRACK_TYPE (PCHAR) "SingleTrack"
+#define CANARY_MULTI_TRACK_TYPE   (PCHAR) "MultiTrack"
+
 #define CANARY_TYPE_REALTIME           (PCHAR) "Realtime"
 #define CANARY_TYPE_OFFLINE            (PCHAR) "Offline"
 #define CANARY_STREAM_NAME_ENV_VAR     (PCHAR) "CANARY_STREAM_NAME"
@@ -45,6 +48,7 @@ extern "C" {
 #define CANARY_STORAGE_SIZE_ENV_VAR    (PCHAR) "CANARY_STORAGE_SIZE_IN_BYTES"
 #define CANARY_LABEL_ENV_VAR           (PCHAR) "CANARY_LABEL"
 #define CANARY_SCENARIO_ENV_VAR        (PCHAR) "CANARY_RUN_SCENARIO"
+#define CANARY_TRACK_TYPE_ENV_VAR      (PCHAR) "TRACK_TYPE"
 
 #define CANARY_DEFAULT_STREAM_NAME         (PCHAR) "TestStream"
 #define CANARY_DEFAULT_SCENARIO_NAME       CANARY_CONTINUOUS_SCENARIO
@@ -52,11 +56,13 @@ extern "C" {
 #define CANARY_DEFAULT_DURATION_IN_SECONDS 60
 #define CANARY_DEFAULT_FRAGMENT_SIZE       (25 * 1024)
 #define CANARY_DEFAULT_CANARY_LABEL        (PCHAR)"Longrun"
+#define CANARY_DEFAULT_TRACK_TYPE          CANARY_SINGLE_TRACK_TYPE
 
 #define CANARY_TYPE_STR_LEN        10
 #define CANARY_STREAM_NAME_STR_LEN 200
 #define CANARY_LABEL_LEN           40
 #define MAX_LOG_FILE_NAME_LEN      300
+#define CANARY_TRACK_TYPE_STR_LEN  20
 
 struct __CallbackStateMachine;
 struct __CallbacksProvider;
@@ -70,6 +76,7 @@ typedef struct {
     CHAR canaryTypeStr[CANARY_TYPE_STR_LEN + 1];
     CHAR canaryLabel[CANARY_LABEL_LEN + 1];
     CHAR canaryScenario[CANARY_LABEL_LEN + 1];
+    CHAR canaryTrackType[CANARY_TRACK_TYPE_STR_LEN + 1];
     UINT64 fragmentSizeInBytes;
     UINT64 canaryDuration;
     UINT64 bufferDuration;

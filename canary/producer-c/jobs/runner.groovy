@@ -65,6 +65,7 @@ def runClient(isProducer, params) {
         'CANARY_DURATION_IN_SECONDS': params.CANARY_DURATION_IN_SECONDS,
         'AWS_DEFAULT_REGION': params.AWS_DEFAULT_REGION,
         'CANARY_RUN_SCENARIO': "${params.CANARY_RUN_SCENARIO}",
+        'TRACK_TYPE': "${params.TRACK_TYPE}",
     ].collect({k,v -> "${k}=${v}" })
 
     // TODO: get the branch and version from orchestrator
@@ -146,6 +147,7 @@ pipeline {
         string(name: 'MIN_RETRY_DELAY_IN_SECONDS')
         string(name: 'AWS_DEFAULT_REGION')
         string(name: 'CANARY_RUN_SCENARIO')
+        string(name: 'TRACK_TYPE')
         booleanParam(name: 'FIRST_ITERATION', defaultValue: true)
     }
 
@@ -210,6 +212,7 @@ pipeline {
                                 string(name: 'AWS_DEFAULT_REGION', value: params.AWS_DEFAULT_REGION),
                                 string(name: 'RUNNER_LABEL', value: params.RUNNER_LABEL),
                                 string(name: 'CANARY_RUN_SCENARIO', value: params.CANARY_RUN_SCENARIO),
+                                string(name: 'TRACK_TYPE', value: params.TRACK_TYPE),
                                 booleanParam(name: 'FIRST_ITERATION', value: false)
                             ],
                     wait: false

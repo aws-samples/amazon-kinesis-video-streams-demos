@@ -105,10 +105,11 @@ STATUS canaryStreamErrorReportHandler(UINT64 customData, STREAM_HANDLE streamHan
     streamErrorDatum.AddDimensions(pCanaryStreamCallbacks->dimensionPerStream);
     pushMetric(pCanaryStreamCallbacks, streamErrorDatum, Aws::CloudWatch::Model::StandardUnit::None, 1.0);
 
-    aggstreamErrorDatum.SetMetricName("StreamError");
-    aggstreamErrorDatum.AddDimensions(pCanaryStreamCallbacks->aggregatedDimension);
-    pushMetric(pCanaryStreamCallbacks, aggstreamErrorDatum, Aws::CloudWatch::Model::StandardUnit::None, 1.0);
-
+    if (pCanaryStreamCallbacks->aggregateMetrics) {
+        aggstreamErrorDatum.SetMetricName("StreamError");
+        aggstreamErrorDatum.AddDimensions(pCanaryStreamCallbacks->aggregatedDimension);
+        pushMetric(pCanaryStreamCallbacks, aggstreamErrorDatum, Aws::CloudWatch::Model::StandardUnit::None, 1.0);
+    }
     pCanaryStreamCallbacks->totalNumberOfErrors++;
 
     return STATUS_SUCCESS;
