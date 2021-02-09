@@ -126,6 +126,7 @@ pipeline {
                                 string(name: 'FRAGMENT_SIZE_IN_BYTES', value: FRAGMENT_SIZE_IN_BYTES.toString()),
                                 string(name: 'AWS_DEFAULT_REGION', value: AWS_DEFAULT_REGION),
                                 string(name: 'CANARY_RUN_SCENARIO', value: "Continuous"),
+                                string(name: 'TRACK_TYPE', value: "SingleTrack"),
                             ],
                             wait: false
                         )
@@ -140,6 +141,7 @@ pipeline {
                                 string(name: 'FRAGMENT_SIZE_IN_BYTES', value: FRAGMENT_SIZE_IN_BYTES.toString()),
                                 string(name: 'AWS_DEFAULT_REGION', value: AWS_DEFAULT_REGION),
                                 string(name: 'CANARY_RUN_SCENARIO', value: "Continuous"),
+                                string(name: 'TRACK_TYPE', value: "SingleTrack"),
                             ],
                             wait: false
                         )
@@ -150,10 +152,26 @@ pipeline {
                                 string(name: 'PRODUCER_NODE_LABEL', value: "producer-uw2"),
                                 string(name: 'CONSUMER_NODE_LABEL', value: "consumer-uw2"),
                                 string(name: 'CANARY_TYPE', value: "Realtime"),
-                                string(name: 'RUNNER_LABEL', value: "Intermittent"),
+                                string(name: 'RUNNER_LABEL', value: "IntermittentSingleTrack"),
                                 string(name: 'FRAGMENT_SIZE_IN_BYTES', value: FRAGMENT_SIZE_IN_BYTES.toString()),
                                 string(name: 'AWS_DEFAULT_REGION', value: AWS_DEFAULT_REGION),
                                 string(name: 'CANARY_RUN_SCENARIO', value: "Intermittent"),
+                                string(name: 'TRACK_TYPE', value: "SingleTrack"),
+                            ],
+                            wait: false
+                        )
+                        build(
+                            job: NEXT_AVAILABLE_RUNNER,
+                            parameters: COMMON_PARAMS + [
+                                string(name: 'CANARY_DURATION_IN_SECONDS', value: LONG_RUN_DURATION_IN_SECONDS.toString()),
+                                string(name: 'PRODUCER_NODE_LABEL', value: "producer-uw2"),
+                                string(name: 'CONSUMER_NODE_LABEL', value: "consumer-uw2"),
+                                string(name: 'CANARY_TYPE', value: "Realtime"),
+                                string(name: 'RUNNER_LABEL', value: "IntermittentMultiTrack"),
+                                string(name: 'FRAGMENT_SIZE_IN_BYTES', value: FRAGMENT_SIZE_IN_BYTES.toString()),
+                                string(name: 'AWS_DEFAULT_REGION', value: AWS_DEFAULT_REGION),
+                                string(name: 'CANARY_RUN_SCENARIO', value: "Intermittent"),
+                                string(name: 'TRACK_TYPE', value: "MultiTrack"),
                             ],
                             wait: false
                         )
