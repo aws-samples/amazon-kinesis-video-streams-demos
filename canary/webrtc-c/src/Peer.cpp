@@ -143,7 +143,6 @@ STATUS Peer::initSignaling(const Canary::PConfig pConfig)
             CHK(FALSE, retStatus);
         }
 
-        DLOGD("Handling signaling message:\n%s", pMsg->signalingMessage.payload);
         CHK_STATUS(pPeer->handleSignalingMsg(pMsg));
 
     CleanUp:
