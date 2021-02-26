@@ -17,6 +17,8 @@ This repository contains a list of use cases with sample codes or high level des
   * [Producer C](/canary/producer-c)
   * [Consumer Java](/canary/consumer-java)
   * [Webrtc C](/canary/webrtc-c)
+* GStreamer
+  * [KVS GStreamer Plugin](/gst/gst-kvs-plugin)
 
 Note: The structure for this repository, and examples contained within are defined [here](https://github.com/aws-samples/amazon-kinesis-video-streams-demos/pull/8).
 
