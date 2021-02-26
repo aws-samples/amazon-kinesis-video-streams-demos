@@ -54,11 +54,12 @@
 GST_DEBUG_CATEGORY_STATIC(gst_kvs_plugin_debug);
 #define GST_CAT_DEFAULT gst_kvs_plugin_debug
 
-GType gstKvsPluginStreamingGetType(VOID)
+#define GST_TYPE_KVS_PLUGIN_STREAMING_TYPE (gst_kvs_plugin_streaming_type_get_type())
+GType gst_kvs_plugin_streaming_type_get_type(VOID)
 {
     // Need to use static. Could have used a global as well
     static GType kvsPluginStreamingType = 0;
-    GEnumValue enumType[] = {
+    static GEnumValue enumType[] = {
         {STREAMING_TYPE_REALTIME, "streaming type realtime", "realtime"},
         {STREAMING_TYPE_NEAR_REALTIME, "streaming type near realtime", "near-realtime"},
         {STREAMING_TYPE_OFFLINE, "streaming type offline", "offline"},
@@ -66,10 +67,29 @@ GType gstKvsPluginStreamingGetType(VOID)
     };
 
     if (kvsPluginStreamingType == 0) {
-        kvsPluginStreamingType = g_enum_register_static("GstKvsPluginStreamingType", enumType);
+        kvsPluginStreamingType = g_enum_register_static("STREAMING_TYPE", enumType);
     }
 
     return kvsPluginStreamingType;
+}
+
+#define GST_TYPE_KVS_PLUGIN_WEBRTC_CONNECTION_MODE (gst_kvs_plugin_connection_mode_get_type())
+GType gst_kvs_plugin_connection_mode_get_type(VOID)
+{
+    // Need to use static. Could have used a global as well
+    static GType kvsPluginWebRtcMode = 0;
+    static GEnumValue enumType[] = {
+        {WEBRTC_CONNECTION_MODE_DEFAULT, "Default connection mode allowing both P2P and TURN", "default"},
+        {WEBRTC_CONNECTION_MODE_TURN_ONLY, "TURN only connection mode", "turn"},
+        {WEBRTC_CONNECTION_MODE_P2P_ONLY, "P2P only connection mode", "p2p"},
+        {0, NULL, NULL},
+    };
+
+    if (kvsPluginWebRtcMode == 0) {
+        kvsPluginWebRtcMode = g_enum_register_static("WEBRTC_CONNECTION_MODE", enumType);
+    }
+
+    return kvsPluginWebRtcMode;
 }
 
 GstStaticPadTemplate audiosink_templ = GST_STATIC_PAD_TEMPLATE(
@@ -181,12 +201,14 @@ VOID gst_kvs_plugin_class_init(GstKvsPluginClass* klass)
                                                       (GParamFlags)(G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS)));
 
     g_object_class_install_property(gobject_class, PROP_STREAMING_TYPE,
-                                    g_param_spec_enum("streaming-type", "Streaming Type", "Streaming type", GST_TYPE_KVS_PLUGIN_STREAMING_TYPE,
+                                    g_param_spec_enum("streaming-type", "Streaming Type", "KVS Producer streaming type",
+                                                      GST_TYPE_KVS_PLUGIN_STREAMING_TYPE,
                                                       DEFAULT_STREAMING_TYPE, (GParamFlags)(G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS)));
 
     g_object_class_install_property(gobject_class, PROP_WEBRTC_CONNECTION_MODE,
                                     g_param_spec_enum("webrtc-connection-mode", "WebRTC connection mode",
-                                                      "WebRTC connection mode - Default, Turn only, P2P only", GST_TYPE_KVS_PLUGIN_STREAMING_TYPE,
+                                                      "WebRTC connection mode - Default, Turn only, P2P only",
+                                                      GST_TYPE_KVS_PLUGIN_WEBRTC_CONNECTION_MODE,
                                                       DEFAULT_WEBRTC_CONNECTION_MODE, (GParamFlags)(G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS)));
 
     g_object_class_install_property(gobject_class, PROP_CONTENT_TYPE,
@@ -207,12 +229,10 @@ VOID gst_kvs_plugin_class_init(GstKvsPluginClass* klass)
                                                       DEFAULT_TIMECODE_SCALE_MILLISECONDS,
                                                       (GParamFlags)(G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS)));
 
-    g_object_class_install_property(
-        gobject_class, PROP_KEY_FRAME_FRAGMENTATION,
-        g_param_spec_boolean(
-            "key-frame-fragmentation", "Do key frame fragmentation",
-            "If true, generate new fragment on each keyframe, otherwise generate new fragment on first keyframe after fragment-duration has passed.",
-            DEFAULT_KEY_FRAME_FRAGMENTATION, (GParamFlags)(G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS)));
+    g_object_class_install_property(gobject_class, PROP_KEY_FRAME_FRAGMENTATION,
+                                    g_param_spec_boolean("key-frame-fragmentation", "Do key frame fragmentation", "If true, generate new fragment on each keyframe, otherwise generate new fragment on first keyframe after fragment-duration has passed.",
+                                                         DEFAULT_KEY_FRAME_FRAGMENTATION,
+                                                         (GParamFlags)(G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS)));
 
     g_object_class_install_property(gobject_class, PROP_FRAME_TIMECODES,
                                     g_param_spec_boolean("frame-timecodes", "Do frame timecodes", "Do frame timecodes", DEFAULT_FRAME_TIMECODES,
@@ -264,9 +284,10 @@ VOID gst_kvs_plugin_class_init(GstKvsPluginClass* klass)
                                                       G_MAXUINT, DEFAULT_CONNECTION_STALENESS_SECONDS,
                                                       (GParamFlags)(G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS)));
 
-    g_object_class_install_property(
-        gobject_class, PROP_CODEC_ID,
-        g_param_spec_string("codec-id", "Codec ID", "Codec ID", DEFAULT_CODEC_ID_H264, (GParamFlags)(G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS)));
+    g_object_class_install_property(gobject_class, PROP_CODEC_ID,
+                                    g_param_spec_string("codec-id", "Codec ID", "Codec ID",
+                                                        DEFAULT_CODEC_ID_H264,
+                                                        (GParamFlags)(G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS)));
 
     g_object_class_install_property(gobject_class, PROP_ACCESS_KEY,
                                     g_param_spec_string("access-key", "Access Key", "AWS Access Key", DEFAULT_ACCESS_KEY,
@@ -276,9 +297,10 @@ VOID gst_kvs_plugin_class_init(GstKvsPluginClass* klass)
                                     g_param_spec_string("secret-key", "Secret Key", "AWS Secret Key", DEFAULT_SECRET_KEY,
                                                         (GParamFlags)(G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS)));
 
-    g_object_class_install_property(
-        gobject_class, PROP_AWS_REGION,
-        g_param_spec_string("aws-region", "AWS Region", "AWS Region", DEFAULT_REGION, (GParamFlags)(G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS)));
+    g_object_class_install_property(gobject_class, PROP_AWS_REGION,
+                                    g_param_spec_string("aws-region", "AWS Region", "AWS Region",
+                                                        DEFAULT_REGION,
+                                                        (GParamFlags)(G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS)));
 
     g_object_class_install_property(gobject_class, PROP_ROTATION_PERIOD,
                                     g_param_spec_uint("rotation-period", "Rotation Period", "Rotation Period. Unit: seconds", 0, G_MAXUINT,
@@ -310,18 +332,17 @@ VOID gst_kvs_plugin_class_init(GstKvsPluginClass* klass)
                                     g_param_spec_boxed("stream-tags", "Stream Tags", "key-value pair that you can define and assign to each stream",
                                                        GST_TYPE_STRUCTURE, (GParamFlags)(G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS)));
 
-    g_object_class_install_property(
-        gobject_class, PROP_FILE_START_TIME,
-        g_param_spec_uint64("file-start-time", "File Start Time",
-                            "Epoch time that the file starts in kinesis video stream. By default, current time is used. Unit: Seconds", 0, G_MAXULONG,
-                            0, (GParamFlags)(G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS)));
+    g_object_class_install_property(gobject_class, PROP_FILE_START_TIME,
+                                    g_param_spec_uint64("file-start-time", "File Start Time",                            "Epoch time that the file starts in kinesis video stream. By default, current time is used. Unit: Seconds",
+                                                        0, G_MAXULONG, 0,
+                                                        (GParamFlags)(G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS)));
 
-    g_object_class_install_property(
-        gobject_class, PROP_DISABLE_BUFFER_CLIPPING,
-        g_param_spec_boolean("disable-buffer-clipping", "Disable Buffer Clipping",
-                             "Set to true only if your src/mux elements produce GST_CLOCK_TIME_NONE for segment start times.  It is non-standard "
-                             "behavior to set this to true, only use if there are known issues with your src/mux segment start/stop times.",
-                             DEFAULT_DISABLE_BUFFER_CLIPPING, (GParamFlags)(G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS)));
+    g_object_class_install_property(gobject_class, PROP_DISABLE_BUFFER_CLIPPING,
+                                    g_param_spec_boolean("disable-buffer-clipping", "Disable Buffer Clipping",
+                                                         "Set to true only if your src/mux elements produce GST_CLOCK_TIME_NONE for segment start times.  It is non-standard "
+                                                         "behavior to set this to true, only use if there are known issues with your src/mux segment start/stop times.",
+                                                         DEFAULT_DISABLE_BUFFER_CLIPPING,
+                                                         (GParamFlags)(G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS)));
 
     g_object_class_install_property(gobject_class, PROP_TRICKLE_ICE,
                                     g_param_spec_boolean("trickle-ice", "Enable Trickle ICE", "Whether to use tricle ICE mode",
@@ -749,6 +770,12 @@ VOID gst_kvs_plugin_get_property(GObject* object, guint propId, GValue* value, G
             break;
         case PROP_TRICKLE_ICE:
             g_value_set_boolean(value, pGstKvsPlugin->gstParams.trickleIce);
+            break;
+        case PROP_STREAM_CREATE_TIMEOUT:
+            g_value_set_uint(value, pGstKvsPlugin->gstParams.streamCreateTimeoutInSeconds);
+            break;
+        case PROP_STREAM_STOP_TIMEOUT:
+            g_value_set_uint(value, pGstKvsPlugin->gstParams.streamStopTimeoutInSeconds);
             break;
         case PROP_ENABLE_STREAMING:
             g_value_set_boolean(value, pGstKvsPlugin->gstParams.enableStreaming);

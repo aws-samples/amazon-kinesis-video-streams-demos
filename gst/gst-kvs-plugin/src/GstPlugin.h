@@ -115,8 +115,6 @@ typedef enum {
 
 #define DEFAULT_MAX_CONCURRENT_WEBRTC_STREAMING_SESSION 10
 
-#define GST_TYPE_KVS_PLUGIN_STREAMING_TYPE (gstKvsPluginStreamingGetType())
-
 G_BEGIN_DECLS
 
 #define KVS_GST_VERSION AWS_SDK_KVS_PRODUCER_VERSION_STRING
@@ -128,9 +126,17 @@ G_BEGIN_DECLS
 #define GST_IS_KVS_PLUGIN_CLASS(klass) (G_TYPE_CHECK_CLASS_TYPE((klass), GST_TYPE_KVS_PLUGIN))
 #define GST_KVS_PLUGIN_CAST(obj)       ((GstKvsPlugin*) obj)
 
-typedef enum { GST_PLUGIN_MEDIA_TYPE_AUDIO_VIDEO, GST_PLUGIN_MEDIA_TYPE_VIDEO_ONLY, GST_PLUGIN_MEDIA_TYPE_AUDIO_ONLY } GST_PLUGIN_MEDIA_TYPE;
+typedef enum {
+    GST_PLUGIN_MEDIA_TYPE_AUDIO_VIDEO,
+    GST_PLUGIN_MEDIA_TYPE_VIDEO_ONLY,
+    GST_PLUGIN_MEDIA_TYPE_AUDIO_ONLY
+} GST_PLUGIN_MEDIA_TYPE;
 
-typedef enum { WEBRTC_CONNECTION_MODE_DEFAULT, WEBRTC_CONNECTION_MODE_TURN_ONLY, WEBRTC_CONNECTION_MODE_P2P_ONLY } WEBRTC_CONNECTION_MODE;
+typedef enum {
+    WEBRTC_CONNECTION_MODE_DEFAULT,
+    WEBRTC_CONNECTION_MODE_TURN_ONLY,
+    WEBRTC_CONNECTION_MODE_P2P_ONLY
+} WEBRTC_CONNECTION_MODE;
 
 typedef STATUS (*freeCredentialProviderFunc)(PAwsCredentialProvider*);
 
@@ -335,7 +341,6 @@ GType gst_kvs_plugin_get_type(VOID);
 
 G_END_DECLS
 
-GType gstKvsPluginStreamingGetType(VOID);
 STATUS initKinesisVideoStructs(PGstKvsPlugin);
 VOID gst_kvs_plugin_set_property(GObject*, guint, const GValue*, GParamSpec*);
 VOID gst_kvs_plugin_get_property(GObject*, guint, GValue*, GParamSpec*);
