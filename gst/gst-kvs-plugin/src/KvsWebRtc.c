@@ -240,6 +240,7 @@ STATUS initKinesisVideoWebRtc(PGstKvsPlugin pGstPlugin)
     MEMSET(&pGstPlugin->kvsContext.signalingClientInfo, 0x00, SIZEOF(SignalingClientInfo));
     MEMSET(&pGstPlugin->kvsContext.signalingClientCallbacks, 0x00, SIZEOF(SignalingClientCallbacks));
 
+    pGstPlugin->kvsContext.channelInfo.pRegion = pGstPlugin->pRegion;
     pGstPlugin->kvsContext.channelInfo.version = CHANNEL_INFO_CURRENT_VERSION;
     pGstPlugin->kvsContext.channelInfo.pChannelName = pGstPlugin->gstParams.channelName;
     pGstPlugin->kvsContext.channelInfo.pKmsKeyId = NULL;
