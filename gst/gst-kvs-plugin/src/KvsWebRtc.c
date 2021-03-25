@@ -223,6 +223,7 @@ STATUS initKinesisVideoWebRtc(PGstKvsPlugin pGstPlugin)
 
     CHK(pGstPlugin != NULL, STATUS_NULL_ARG);
 
+    DLOGD("Init invoked");
     ATOMIC_STORE_BOOL(&pGstPlugin->terminate, FALSE);
     ATOMIC_STORE_BOOL(&pGstPlugin->recreateSignalingClient, FALSE);
     ATOMIC_STORE_BOOL(&pGstPlugin->signalingConnected, FALSE);
@@ -695,7 +696,10 @@ STATUS createWebRtcStreamingSession(PGstKvsPlugin pGstKvsPlugin, PCHAR peerId, B
 
     // Declare that we support H264,Profile=42E01F,level-asymmetry-allowed=1,packetization-mode=1 and Opus
     CHK_STATUS(addSupportedCodec(pStreamingSession->pPeerConnection, RTC_CODEC_H264_PROFILE_42E01F_LEVEL_ASYMMETRY_ALLOWED_PACKETIZATION_MODE));
+    CHK_STATUS(addSupportedCodec(pStreamingSession->pPeerConnection, RTC_CODEC_VP8));
     CHK_STATUS(addSupportedCodec(pStreamingSession->pPeerConnection, RTC_CODEC_OPUS));
+    CHK_STATUS(addSupportedCodec(pStreamingSession->pPeerConnection, RTC_CODEC_MULAW));
+    CHK_STATUS(addSupportedCodec(pStreamingSession->pPeerConnection, RTC_CODEC_ALAW));
 
     // Add a SendRecv Transceiver of type video
     videoTrack.kind = MEDIA_STREAM_TRACK_KIND_VIDEO;
@@ -707,9 +711,18 @@ STATUS createWebRtcStreamingSession(PGstKvsPlugin pGstKvsPlugin, PCHAR peerId, B
     CHK_STATUS(
         transceiverOnBandwidthEstimation(pStreamingSession->pVideoRtcRtpTransceiver, (UINT64) pStreamingSession, sampleBandwidthEstimationHandler));
 
+    // Set up audio transceiver codec id according to type of encoding used
+    if (STRNCMP(pGstKvsPlugin->gstParams.audioContentType, MKV_MULAW_CONTENT_TYPE, MAX_GSTREAMER_MEDIA_TYPE_LEN) == 0) {
+        audioTrack.codec = RTC_CODEC_MULAW;
+    } else if (STRNCMP(pGstKvsPlugin->gstParams.audioContentType, MKV_ALAW_CONTENT_TYPE, MAX_GSTREAMER_MEDIA_TYPE_LEN) == 0) {
+        audioTrack.codec = RTC_CODEC_ALAW;
+    } else {
+        // no-op, should result in a caps negotiation error before getting here.
+        DLOGE("Error, audio content type %s not accepted by plugin", pGstKvsPlugin->gstParams.audioContentType);
+        CHK(FALSE, STATUS_INVALID_ARG);
+    }
     // Add a SendRecv Transceiver of type video
     audioTrack.kind = MEDIA_STREAM_TRACK_KIND_AUDIO;
-    audioTrack.codec = RTC_CODEC_OPUS;
     STRCPY(audioTrack.streamId, "myKvsVideoStream");
     STRCPY(audioTrack.trackId, "myAudioTrack");
     CHK_STATUS(addTransceiver(pStreamingSession->pPeerConnection, &audioTrack, NULL, &pStreamingSession->pAudioRtcRtpTransceiver));

@@ -29,8 +29,10 @@ To build the library and the provided samples run make in the build directory yo
 
 A very basic example of a GStreamer pipeline to run on Mac
 
+
 ```sh
-gst-launch-1.0 -e autovideosrc !  vtenc_h264_hw max-keyframe-interval=30 bitrate=500 ! kvsplugin stream-name=ScaryTestStream channel-name="ScaryTestChannel" log-level=3
+export GTS_PLUGIN_PATH=`pwd`/build
+gst-launch-1.0 autovideosrc !  vtenc_h264_hw max-keyframe-interval=30 bitrate=500 ! kvsplugin stream-name=ScaryTestStream channel-name="ScaryTestChannel" log-level=3
 ```
 
 This will launch the default camera video stream only with hardware-accelerated encoder with 1sec fragments and up-to 500Kbps stream. Use or create a stream by the given name and a channel by its name. Will use INFO level logging.

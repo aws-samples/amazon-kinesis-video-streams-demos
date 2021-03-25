@@ -166,6 +166,8 @@ struct __GstParams {
     gchar* kmsKeyId;
     STREAMING_TYPE streamingType;
     gchar* contentType;
+    gchar* audioContentType;
+    gchar* videoContentType;
     guint maxLatencyInSeconds;
     guint fragmentDurationInMillis;
     guint timeCodeScaleInMillis;
