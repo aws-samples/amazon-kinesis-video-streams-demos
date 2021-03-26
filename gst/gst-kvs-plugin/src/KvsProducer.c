@@ -133,13 +133,17 @@ STATUS initTrackData(PGstKvsPlugin pGstKvsPlugin)
 
     switch (pGstKvsPlugin->mediaType) {
         case GST_PLUGIN_MEDIA_TYPE_AUDIO_VIDEO:
+            pGstKvsPlugin->gstParams.audioContentType = g_strdup(audioContentType);
+            pGstKvsPlugin->gstParams.videoContentType = g_strdup(videoContentType);
             pGstKvsPlugin->gstParams.contentType = g_strjoin(",", videoContentType, audioContentType, NULL);
             break;
         case GST_PLUGIN_MEDIA_TYPE_AUDIO_ONLY:
+            pGstKvsPlugin->gstParams.audioContentType = g_strdup(audioContentType);
             pGstKvsPlugin->gstParams.contentType = g_strdup(audioContentType);
             break;
         case GST_PLUGIN_MEDIA_TYPE_VIDEO_ONLY:
             pGstKvsPlugin->gstParams.contentType = g_strdup(videoContentType);
+            pGstKvsPlugin->gstParams.videoContentType = g_strdup(videoContentType);
             break;
     }
 
