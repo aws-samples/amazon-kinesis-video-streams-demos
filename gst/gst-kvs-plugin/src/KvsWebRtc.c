@@ -717,9 +717,8 @@ STATUS createWebRtcStreamingSession(PGstKvsPlugin pGstKvsPlugin, PCHAR peerId, B
     } else if (STRNCMP(pGstKvsPlugin->gstParams.audioContentType, MKV_ALAW_CONTENT_TYPE, MAX_GSTREAMER_MEDIA_TYPE_LEN) == 0) {
         audioTrack.codec = RTC_CODEC_ALAW;
     } else {
-        // no-op, should result in a caps negotiation error before getting here.
-        DLOGE("Error, audio content type %s not accepted by plugin", pGstKvsPlugin->gstParams.audioContentType);
-        CHK(FALSE, STATUS_INVALID_ARG);
+        DLOGW("Audio content type %s not accepted by webrtc plugin. Setting to default to Opus", pGstKvsPlugin->gstParams.audioContentType);
+        audioTrack.codec = RTC_CODEC_OPUS;
     }
     // Add a SendRecv Transceiver of type video
     audioTrack.kind = MEDIA_STREAM_TRACK_KIND_AUDIO;
