@@ -712,12 +712,13 @@ STATUS createWebRtcStreamingSession(PGstKvsPlugin pGstKvsPlugin, PCHAR peerId, B
         transceiverOnBandwidthEstimation(pStreamingSession->pVideoRtcRtpTransceiver, (UINT64) pStreamingSession, sampleBandwidthEstimationHandler));
 
     // Set up audio transceiver codec id according to type of encoding used
-    if (STRNCMP(pGstKvsPlugin->gstParams.audioContentType, MKV_MULAW_CONTENT_TYPE, MAX_GSTREAMER_MEDIA_TYPE_LEN) == 0) {
+    if (STRNCMP(pGstKvsPlugin->gstParams.audioContentType, AUDIO_MULAW_CONTENT_TYPE, MAX_GSTREAMER_MEDIA_TYPE_LEN) == 0) {
         audioTrack.codec = RTC_CODEC_MULAW;
-    } else if (STRNCMP(pGstKvsPlugin->gstParams.audioContentType, MKV_ALAW_CONTENT_TYPE, MAX_GSTREAMER_MEDIA_TYPE_LEN) == 0) {
+    } else if (STRNCMP(pGstKvsPlugin->gstParams.audioContentType, AUDIO_ALAW_CONTENT_TYPE, MAX_GSTREAMER_MEDIA_TYPE_LEN) == 0) {
         audioTrack.codec = RTC_CODEC_ALAW;
+    } else if (STRNCMP(pGstKvsPlugin->gstParams.audioContentType, AUDIO_OPUS_CONTENT_TYPE, MAX_GSTREAMER_MEDIA_TYPE_LEN) == 0) {
+        audioTrack.codec = RTC_CODEC_OPUS;
     } else {
-        // no-op, should result in a caps negotiation error before getting here.
         DLOGE("Error, audio content type %s not accepted by plugin", pGstKvsPlugin->gstParams.audioContentType);
         CHK(FALSE, STATUS_INVALID_ARG);
     }

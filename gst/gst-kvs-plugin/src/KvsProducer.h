@@ -39,9 +39,6 @@
 #define DEFAULT_API_CACHE_PERIOD               (24 * HUNDREDS_OF_NANOS_IN_AN_HOUR)
 #define DEFAULT_ENABLE_STREAMING               TRUE
 
-#define DEFAULT_AUDIO_CODEC_ID_AAC "A_AAC"
-#define DEFAULT_AUDIO_CODEC_ID_PCM "A_MS/ACM"
-
 #define CA_CERT_PEM_FILE_EXTENSION ".pem"
 
 #define FILE_LOGGING_BUFFER_SIZE (100 * 1024)
@@ -76,3 +73,4 @@ STATUS convertCpdFromAvcToAnnexB(PGstKvsPlugin, PBYTE, UINT32);
 STATUS convertCpdFromHevcToAnnexB(PGstKvsPlugin, PBYTE, UINT32);
 
 #endif //__KVS_PRODUCER_FUNCTIONALITY_H__
+

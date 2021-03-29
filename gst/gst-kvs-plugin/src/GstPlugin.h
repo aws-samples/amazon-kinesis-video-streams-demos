@@ -110,6 +110,22 @@ typedef enum {
 #define GSTREAMER_MEDIA_TYPE_AAC   "audio/mpeg"
 #define GSTREAMER_MEDIA_TYPE_MULAW "audio/x-mulaw"
 #define GSTREAMER_MEDIA_TYPE_ALAW  "audio/x-alaw"
+#define GSTREAMER_MEDIA_TYPE_OPUS  "audio/x-opus"
+
+/**
+ * Constant definition for some known content types
+ */
+#define VIDEO_H264_CONTENT_TYPE           ((PCHAR) "video/h264")
+#define VIDEO_H265_CONTENT_TYPE           ((PCHAR) "video/h265")
+#define AUDIO_AAC_CONTENT_TYPE            ((PCHAR) "audio/aac")
+#define AUDIO_ALAW_CONTENT_TYPE           ((PCHAR) "audio/alaw")
+#define AUDIO_MULAW_CONTENT_TYPE          ((PCHAR) "audio/mulaw")
+#define AUDIO_OPUS_CONTENT_TYPE           ((PCHAR) "audio/opus")
+
+
+#define DEFAULT_AUDIO_CODEC_ID_AAC  "A_AAC"
+#define DEFAULT_AUDIO_CODEC_ID_PCM  "A_MS/ACM"
+#define DEFAULT_AUDIO_CODEC_ID_OPUS "A_OPUS"
 
 #define MAX_GSTREAMER_MEDIA_TYPE_LEN 16
 
