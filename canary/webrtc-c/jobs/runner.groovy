@@ -48,10 +48,19 @@ def withRunnerWrapper(envs, fn) {
 
 def buildPeer(isMaster, params) {
     def clientID = isMaster ? "Master" : "Viewer"
+    if (params.USE_IOT) {
+        sh """
+            cd ./canary/webrtc-c/
+            ls
+            chmod a+x config_certs.sh
+            ./config_certs.sh $NODE_NAME
+        """
+    }
     def envs = [
       'AWS_KVS_LOG_LEVEL': params.AWS_KVS_LOG_LEVEL,
       'CANARY_USE_TURN': params.USE_TURN,
       'CANARY_TRICKLE_ICE': params.TRICKLE_ICE,
+      'CANARY_USE_IOT_PROVIDER': params.USE_IOT,
       'CANARY_LOG_GROUP_NAME': params.LOG_GROUP_NAME,
       'CANARY_LOG_STREAM_NAME': "${params.RUNNER_LABEL}-${clientID}-${START_TIMESTAMP}",
       'CANARY_CHANNEL_NAME': "${env.JOB_NAME}-${params.RUNNER_LABEL}",
@@ -117,6 +126,7 @@ pipeline {
         booleanParam(name: 'USE_TURN')
         booleanParam(name: 'TRICKLE_ICE')
         booleanParam(name: 'USE_MBEDTLS', defaultValue: false)
+        booleanParam(name: 'USE_IOT')
         string(name: 'LOG_GROUP_NAME')
         string(name: 'MASTER_NODE_LABEL')
         string(name: 'VIEWER_NODE_LABEL')
@@ -198,6 +208,7 @@ pipeline {
                       string(name: 'AWS_KVS_LOG_LEVEL', value: params.AWS_KVS_LOG_LEVEL),
                       booleanParam(name: 'IS_SIGNALING', value: params.IS_SIGNALING),
                       booleanParam(name: 'USE_TURN', value: params.USE_TURN),
+                      booleanParam(name: 'USE_IOT', value: params.USE_IOT),
                       booleanParam(name: 'TRICKLE_ICE', value: params.TRICKLE_ICE),
                       booleanParam(name: 'USE_MBEDTLS', value: params.USE_MBEDTLS),
                       string(name: 'LOG_GROUP_NAME', value: params.LOG_GROUP_NAME),
