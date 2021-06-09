@@ -1,7 +1,4 @@
 #!/bin/bash
-# You need to setup your aws cli first, because this script is based on aws cli.
-# You can use this script to setup environment variables in the shell which samples run on.
-# https://docs.aws.amazon.com/kinesisvideostreams/latest/dg/how-iot.html
 
 prefix=$1
 thingName="w${prefix}_thing"
@@ -14,7 +11,6 @@ iotCert="w${prefix}_certificate.pem"
 iotPublicKey="w${prefix}_public.key"
 iotPrivateKey="w${prefix}_private.key"
 
-# Step 3: Create and Configure the X.509 Certificate
 # Create the certificate to which you must attach the policy for IoT that you created above.
 aws --profile default  iot create-keys-and-certificate --set-as-active --certificate-pem-outfile $iotCert --public-key-outfile $iotPublicKey --private-key-outfile $iotPrivateKey > certificate
 # Attach the policy for IoT (KvsCameraIoTPolicy created above) to this certificate.

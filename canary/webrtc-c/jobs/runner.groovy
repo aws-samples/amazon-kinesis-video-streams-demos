@@ -12,21 +12,34 @@ CREDENTIALS = [
     ]
 ]
 
+
+def setUpIot() {
+    sh """
+        cd ./canary/webrtc-c/scripts
+        chmod a+x cert_setup.sh 
+        ./cert_setup.sh ${NODE_NAME}
+    """
+}
+
 def buildProject(useMbedTLS) {
+
     checkout([$class: 'GitSCM', branches: [[name: params.GIT_HASH ]],
-              userRemoteConfigs: [[url: params.GIT_URL]]])
+            userRemoteConfigs: [[url: params.GIT_URL]]])
 
     def configureCmd = "cmake .. -DCMAKE_INSTALL_PREFIX=\"\$PWD\""
     if (useMbedTLS) {
       configureCmd += " -DUSE_OPENSSL=OFF -DUSE_MBEDTLS=ON"
-    }     
+    }    
 
     sh """
         cd ./canary/webrtc-c && 
         mkdir -p build && 
         cd build && 
         ${configureCmd} && 
-        make -j"""
+        make -j
+    """
+
+    setUpIot()
 }
 
 def withRunnerWrapper(envs, fn) {
@@ -46,36 +59,44 @@ def withRunnerWrapper(envs, fn) {
     }
 }
 
+def withRunnerWrapperIoT(envs, fn) {
+    withEnv(envs) {
+        try {
+            fn()
+        } catch (FlowInterruptedException err) {
+            echo 'Aborted due to cancellation'
+            throw err
+        } catch (err) {
+            HAS_ERROR = true
+            // Ignore errors so that we can auto recover by retrying
+            unstable err.toString()
+        }
+    }
+}
+
 def buildPeer(isMaster, params) {
     def clientID = isMaster ? "Master" : "Viewer"
-    if (params.USE_IOT) {
-        sh """
-            cd ./canary/webrtc-c/
-            ls
-            chmod a+x config_certs.sh
-            ./config_certs.sh $NODE_NAME
-        """
-    }
-    def envs = [
-      'AWS_KVS_LOG_LEVEL': params.AWS_KVS_LOG_LEVEL,
-      'CANARY_USE_TURN': params.USE_TURN,
-      'CANARY_TRICKLE_ICE': params.TRICKLE_ICE,
-      'CANARY_USE_IOT_PROVIDER': params.USE_IOT,
-      'CANARY_LOG_GROUP_NAME': params.LOG_GROUP_NAME,
-      'CANARY_LOG_STREAM_NAME': "${params.RUNNER_LABEL}-${clientID}-${START_TIMESTAMP}",
-      'CANARY_CHANNEL_NAME': "${env.JOB_NAME}-${params.RUNNER_LABEL}",
-      'CANARY_LABEL': params.SCENARIO_LABEL,
-      'CANARY_CLIENT_ID': clientID,
-      'CANARY_IS_MASTER': isMaster,
-      'CANARY_DURATION_IN_SECONDS': params.DURATION_IN_SECONDS
+    def commonEnvs = [
+        'AWS_KVS_LOG_LEVEL': params.AWS_KVS_LOG_LEVEL,
+        'CANARY_USE_TURN': params.USE_TURN,
+        'CANARY_TRICKLE_ICE': params.TRICKLE_ICE,
+        'CANARY_USE_IOT_PROVIDER': params.USE_IOT,
+        'CANARY_LOG_GROUP_NAME': params.LOG_GROUP_NAME,
+        'CANARY_LOG_STREAM_NAME': "${params.RUNNER_LABEL}-${clientID}-${START_TIMESTAMP}",
+        'CANARY_CHANNEL_NAME': "${env.JOB_NAME}-${params.RUNNER_LABEL}",
+        'CANARY_LABEL': params.SCENARIO_LABEL,
+        'CANARY_CLIENT_ID': clientID,
+        'CANARY_IS_MASTER': isMaster,
+        'CANARY_DURATION_IN_SECONDS': params.DURATION_IN_SECONDS
     ].collect({ k, v -> "${k}=${v}" })
-    
+
     RUNNING_NODES_IN_BUILDING++
 
     // TODO: get the branch and version from orchestrator
     if (params.FIRST_ITERATION) {
         deleteDir()
     }
+
     buildProject(params.USE_MBEDTLS)
 
     RUNNING_NODES_IN_BUILDING--
@@ -84,11 +105,18 @@ def buildPeer(isMaster, params) {
         RUNNING_NODES_IN_BUILDING == 0
     }
 
-    withRunnerWrapper(envs) {
-        sh """
-            cd ./canary/webrtc-c/build && 
-            ${isMaster ? "" : "sleep 5 &&"}
-            ./kvsWebrtcCanaryWebrtc"""
+    if(params.USE_IOT) {
+        echo ${WORKSPACE}
+        def iot_endpoint = ${WORKSPACE}/canary/webrtc-c/scripts/iot-credential-provider.txt
+        echo ${iot_endpoint}
+    }
+    else {
+         withRunnerWrapper(commonEnvs) {
+            sh """
+                cd ./canary/webrtc-c/build && 
+                ${isMaster ? "" : "sleep 5 &&"}
+                ./kvsWebrtcCanaryWebrtc"""
+        }
     }
 }
 
