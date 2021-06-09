@@ -12,7 +12,12 @@ Peer::~Peer()
 {
     CHK_LOG_ERR(freePeerConnection(&this->pPeerConnection));
     CHK_LOG_ERR(freeSignalingClient(&this->pSignalingClientHandle));
-    CHK_LOG_ERR(freeStaticCredentialProvider(&this->pAwsCredentialProvider));
+    if(this->useIotCredentialProvider) {
+        CHK_LOG_ERR(freeIotCredentialProvider(&this->pAwsCredentialProvider));
+    }
+    else {
+        CHK_LOG_ERR(freeStaticCredentialProvider(&this->pAwsCredentialProvider));
+    }
 }
 
 STATUS Peer::init(const Canary::PConfig pConfig, const Callbacks& callbacks)
@@ -34,7 +39,6 @@ STATUS Peer::init(const Canary::PConfig pConfig, const Callbacks& callbacks)
     this->firstFrame = TRUE;
     this->useIotCredentialProvider = pConfig->useIotCredentialProvider.value;
     if(this->useIotCredentialProvider) {
-        DLOGD("Here in credential provider");
         CHK_STATUS(createLwsIotCredentialProvider((PCHAR) pConfig->iotCoreCredentialEndPoint.value.c_str(),
                                                   (PCHAR) pConfig->iotCoreCert.value.c_str(),
                                                   (PCHAR) pConfig->iotCorePrivateKey.value.c_str(),

@@ -10,7 +10,7 @@ STATUS Config::init(INT32 argc, PCHAR argv[])
     CHK(argv != NULL, STATUS_NULL_ARG);
 
     if (argc == 2) {
-        DLOGD("Reading configuration from %s\n", argv[1]);
+        DLOGI("Reading configuration from %s\n", argv[1]);
         CHK_STATUS(initWithJSON(argv[1]));
     }
 
