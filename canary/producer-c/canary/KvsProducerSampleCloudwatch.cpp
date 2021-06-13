@@ -39,6 +39,7 @@ VOID adjustStreamInfoToCanaryType(PStreamInfo pStreamInfo, PCHAR canaryType)
         pStreamInfo->streamCaps.streamingType = STREAMING_TYPE_OFFLINE;
     }
 }
+
 VOID getJsonValue(PBYTE params, jsmntok_t tokens, PCHAR param_str)
 {
     PCHAR json_key = NULL;
@@ -105,6 +106,19 @@ CleanUp:
     return retStatus;
 }
 
+STATUS mustenv(PCHAR pKey, PCHAR pResult)
+{
+    STATUS retStatus = STATUS_SUCCESS;
+
+    CHK(pResult != NULL, STATUS_NULL_ARG);
+
+    CHK_ERR(getenv(pKey) != NULL, STATUS_INVALID_OPERATION, "%s must be set", pKey);
+    STRCPY(pResult, getenv(pKey));
+
+CleanUp:
+    return retStatus;
+}
+
 STATUS optenv(PCHAR pKey, PCHAR pResult, PCHAR pDefault)
 {
     STATUS retStatus = STATUS_SUCCESS;
@@ -129,6 +143,30 @@ STATUS optenvUint64(PCHAR pKey, PUINT64 val, UINT64 defVal)
     }
 
 CleanUp:
+    return retStatus;
+}
+
+BOOL strtobool(const PCHAR value)
+{
+    if (STRCMPI(value, "on") == 0 || STRCMPI(value, "true") == 0) {
+        return TRUE;
+    }
+    return FALSE;
+}
+
+STATUS optenvBool(PCHAR pKey, PBOOL pResult, BOOL defVal)
+{
+    STATUS retStatus = STATUS_SUCCESS;
+    BOOL intVal;
+
+    if (NULL == getenv(pKey)) {
+        *pResult = defVal;
+    } else {
+        *pResult = strtobool((PCHAR) getenv(pKey));
+    }
+
+CleanUp:
+
     return retStatus;
 }
 
@@ -178,6 +216,9 @@ STATUS initWithEnvVars(PCanaryConfig pCanaryConfig)
 
     CHK_STATUS(optenvUint64(CANARY_BUFFER_DURATION_ENV_VAR, &pCanaryConfig->bufferDuration, DEFAULT_BUFFER_DURATION));
     CHK_STATUS(optenvUint64(CANARY_STORAGE_SIZE_ENV_VAR, &pCanaryConfig->storageSizeInBytes, 0));
+
+    CHK_STATUS(optenvBool(CANARY_USE_IOT_CREDENTIALS_ENV_VAR, &pCanaryConfig->useIotCredentialProvider, FALSE));
+
     printConfig(pCanaryConfig);
 
     pCanaryConfig->bufferDuration = pCanaryConfig->bufferDuration * HUNDREDS_OF_NANOS_IN_A_SECOND;
@@ -300,12 +341,13 @@ INT32 main(INT32 argc, CHAR* argv[])
                                                           ENDPOINT_UPDATE_PERIOD_SENTINEL_VALUE, region, EMPTY_STRING, cacertPath, NULL, NULL,
                                                           &pClientCallbacks));
 
-        CHK_STATUS(createStaticAuthCallbacks(pClientCallbacks,
-                                             accessKey,
-                                             secretKey,
-                                             sessionToken,
-                                             MAX_UINT64,
-                                             &pAuthCallbacks));
+        if (config.useIotCredentialProvider) {
+            DLOGD("Using iot credential provider\n");
+//            CHK_STATUS(createIotAuthCallbacks(pClientCallbacks, NULL, NULL, NULL, NULL, NULL, NULL, &pAuthCallbacks));
+        } else {
+        	DLOGD("Using static credential provider\n");
+            CHK_STATUS(createStaticAuthCallbacks(pClientCallbacks, accessKey, secretKey, sessionToken, MAX_UINT64, &pAuthCallbacks));
+        }
         PStreamCallbacks pStreamcallbacks = &pCanaryStreamCallbacks->streamCallbacks;
         CHK_STATUS(createContinuousRetryStreamCallbacks(pClientCallbacks, &pStreamcallbacks));
 
@@ -369,7 +411,7 @@ INT32 main(INT32 argc, CHAR* argv[])
                         canaryStreamSendLogs(&cloudwatchLogsObject);
                         currentTime = GETTIME();
                         retStatus = publishErrorRate(streamHandle, pCanaryStreamCallbacks, duration);
-                        if(STATUS_FAILED(retStatus)) {
+                        if (STATUS_FAILED(retStatus)) {
                             DLOGW("Could not publish error rate. Failed with %08x", retStatus);
                         }
                     }
@@ -389,8 +431,7 @@ INT32 main(INT32 argc, CHAR* argv[])
                     CHK_STATUS(putKinesisVideoFrame(streamHandle, &frame));
                 }
                 THREAD_SLEEP(HUNDREDS_OF_NANOS_IN_A_SECOND / DEFAULT_FPS_VALUE);
-            }
-            else {
+            } else {
                 canaryStreamRecordFragmentEndSendTime(pCanaryStreamCallbacks, lastKeyFrameTimestamp, frame.presentationTs);
                 DLOGD("Last frame type put before stopping: %s", (frame.flags == FRAME_FLAG_KEY_FRAME ? "Key Frame" : "Non key frame"));
                 UINT64 sleepTime = ((RAND() % 10) + 1) * HUNDREDS_OF_NANOS_IN_A_MINUTE;
@@ -404,10 +445,10 @@ INT32 main(INT32 argc, CHAR* argv[])
             // We measure this after first call to ensure that the latency is measured after the first SUCCESSFUL
             // putKinesisVideoFrame() call
             if (firstFrame) {
-               startUpLatency = (DOUBLE)(GETTIME() - startTime) / (DOUBLE) HUNDREDS_OF_NANOS_IN_A_MILLISECOND;
-               CHK_STATUS(pushStartUpLatency(pCanaryStreamCallbacks, startUpLatency));
-               DLOGD("Start up latency: %lf ms", startUpLatency);
-               firstFrame = FALSE;
+                startUpLatency = (DOUBLE)(GETTIME() - startTime) / (DOUBLE) HUNDREDS_OF_NANOS_IN_A_MILLISECOND;
+                CHK_STATUS(pushStartUpLatency(pCanaryStreamCallbacks, startUpLatency));
+                DLOGD("Start up latency: %lf ms", startUpLatency);
+                firstFrame = FALSE;
             }
 
             frame.decodingTs = GETTIME(); // current time

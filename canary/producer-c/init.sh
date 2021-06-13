@@ -7,3 +7,4 @@ export CANARY_BUFFER_DURATION_IN_SECONDS=120 #in seconds
 export CANARY_LABEL=Intermittent #This will used as a dimension. Allowed 20 characters
 export CANARY_RUN_SCENARIO=Intermittent # Allowed values: Intermittent, Continuous
 export TRACK_TYPE=SingleTrack #Allowed values: SingleTrack, MultiTrack
+export CANARY_USE_IOT_PROVIDER=true
