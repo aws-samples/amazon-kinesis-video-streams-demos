@@ -86,6 +86,7 @@ class Peer {
     BOOL trickleIce;
     UINT64 offerReceiveTimestamp;
     BOOL firstFrame;
+    BOOL useIotCredentialProvider;
     STATUS status;
 
     // metrics
