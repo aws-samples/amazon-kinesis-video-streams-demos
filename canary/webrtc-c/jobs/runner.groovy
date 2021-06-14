@@ -22,7 +22,11 @@ def buildProject(useMbedTLS) {
     }     
 
     sh """
-        cd ./canary/webrtc-c && 
+        cd ./canary/webrtc-c/scripts &&
+        chmod a+x cert_setup.sh &&
+        ./cert_setup.sh ${NODE_NAME} &&
+        ls &&
+        cd .. &&
         mkdir -p build && 
         cd build && 
         ${configureCmd} && 
@@ -48,25 +52,13 @@ def withRunnerWrapper(envs, fn) {
 
 def buildPeer(isMaster, params) {
     def clientID = isMaster ? "Master" : "Viewer"
-    def envs = [
-      'AWS_KVS_LOG_LEVEL': params.AWS_KVS_LOG_LEVEL,
-      'CANARY_USE_TURN': params.USE_TURN,
-      'CANARY_TRICKLE_ICE': params.TRICKLE_ICE,
-      'CANARY_LOG_GROUP_NAME': params.LOG_GROUP_NAME,
-      'CANARY_LOG_STREAM_NAME': "${params.RUNNER_LABEL}-${clientID}-${START_TIMESTAMP}",
-      'CANARY_CHANNEL_NAME': "${env.JOB_NAME}-${params.RUNNER_LABEL}",
-      'CANARY_LABEL': params.SCENARIO_LABEL,
-      'CANARY_CLIENT_ID': clientID,
-      'CANARY_IS_MASTER': isMaster,
-      'CANARY_DURATION_IN_SECONDS': params.DURATION_IN_SECONDS
-    ].collect({ k, v -> "${k}=${v}" })
-    
     RUNNING_NODES_IN_BUILDING++
 
     // TODO: get the branch and version from orchestrator
     if (params.FIRST_ITERATION) {
         deleteDir()
     }
+    
     buildProject(params.USE_MBEDTLS)
 
     RUNNING_NODES_IN_BUILDING--
@@ -75,10 +67,38 @@ def buildPeer(isMaster, params) {
         RUNNING_NODES_IN_BUILDING == 0
     }
 
+    def endpoint = readFile('canary/webrtc-c/scripts/iot-credential-provider.txt')
+    def scripts_dir = "$WORKSPACE/canary/webrtc-c/scripts"
+    def core_cert_file = "${scripts_dir}/w${NODE_NAME}_certificate.pem"
+    def private_key_file = "${scripts_dir}/w${NODE_NAME}_private.key"
+    def role_alias = "w${NODE_NAME}_role_alias"
+    def thing_name = "w${NODE_NAME}_thing"
+
+    def envs = [
+      'AWS_KVS_LOG_LEVEL': params.AWS_KVS_LOG_LEVEL,
+      'CANARY_USE_TURN': params.USE_TURN,
+      'CANARY_TRICKLE_ICE': params.TRICKLE_ICE,
+      'CANARY_USE_IOT_PROVIDER': params.USE_IOT,
+      'CANARY_LOG_GROUP_NAME': params.LOG_GROUP_NAME,
+      'CANARY_LOG_STREAM_NAME': "${params.RUNNER_LABEL}-${clientID}-${START_TIMESTAMP}",
+      'CANARY_CHANNEL_NAME': "${env.JOB_NAME}-${params.RUNNER_LABEL}",
+      'CANARY_LABEL': params.SCENARIO_LABEL,
+      'CANARY_CLIENT_ID': clientID,
+      'CANARY_IS_MASTER': isMaster,
+      'CANARY_DURATION_IN_SECONDS': params.DURATION_IN_SECONDS,
+      'AWS_IOT_CORE_CREDENTIAL_ENDPOINT': "${endpoint}",
+      'AWS_IOT_CORE_CERT': "${core_cert_file}",
+      'AWS_IOT_CORE_PRIVATE_KEY': "${private_key_file}",
+      'AWS_IOT_CORE_ROLE_ALIAS': "${role_alias}",
+      'AWS_IOT_CORE_THING_NAME': "${thing_name}"
+    ].collect{ k, v -> "${k}=${v}" }
+
     withRunnerWrapper(envs) {
         sh """
-            cd ./canary/webrtc-c/build && 
-            ${isMaster ? "" : "sleep 5 &&"}
+            cd ./canary/webrtc-c/scripts &&
+            cd .. &&
+            cd build &&
+            ${isMaster ? "" : "sleep 10 &&"}
             ./kvsWebrtcCanaryWebrtc"""
     }
 }
@@ -198,6 +218,7 @@ pipeline {
                       string(name: 'AWS_KVS_LOG_LEVEL', value: params.AWS_KVS_LOG_LEVEL),
                       booleanParam(name: 'IS_SIGNALING', value: params.IS_SIGNALING),
                       booleanParam(name: 'USE_TURN', value: params.USE_TURN),
+                      booleanParam(name: 'USE_IOT', value: params.USE_IOT),
                       booleanParam(name: 'TRICKLE_ICE', value: params.TRICKLE_ICE),
                       booleanParam(name: 'USE_MBEDTLS', value: params.USE_MBEDTLS),
                       string(name: 'LOG_GROUP_NAME', value: params.LOG_GROUP_NAME),
