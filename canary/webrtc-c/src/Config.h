@@ -23,12 +23,18 @@ class Config {
     Value<BOOL> trickleIce;
     Value<BOOL> useTurn;
     Value<BOOL> forceTurn;
+    Value<BOOL> useIotCredentialProvider;
 
     // credentials
     Value<std::string> accessKey;
     Value<std::string> secretKey;
     Value<std::string> sessionToken;
     Value<std::string> region;
+    Value<std::string> iotCoreCredentialEndPoint;
+    Value<std::string> iotCoreCert;
+    Value<std::string> iotCorePrivateKey;
+    Value<std::string> iotCoreRoleAlias;
+    Value<std::string> iotCoreThingName;
 
     // logging
     Value<UINT32> logLevel;
@@ -39,6 +45,8 @@ class Config {
     Value<UINT64> iterationDuration;
     Value<UINT64> bitRate;
     Value<UINT64> frameRate;
+
+    Value<std::string> caCertPath;
 
     VOID print();
 

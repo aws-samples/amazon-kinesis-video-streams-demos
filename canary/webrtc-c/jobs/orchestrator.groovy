@@ -6,7 +6,7 @@ LONG_RUNNING_DURATION_IN_SECONDS = 0
 MIN_RETRY_DELAY_IN_SECONDS = 60
 COLD_STARTUP_DELAY_IN_SECONDS = 60 * 60
 GIT_URL = 'https://github.com/aws-samples/amazon-kinesis-video-streams-demos.git'
-GIT_HASH = 'master'
+GIT_HASH = 'iot-jenkins'
 COMMON_PARAMS = [
     string(name: 'AWS_KVS_LOG_LEVEL', value: "2"),
     string(name: 'MIN_RETRY_DELAY_IN_SECONDS', value: MIN_RETRY_DELAY_IN_SECONDS.toString()),
@@ -138,6 +138,21 @@ pipeline {
                                 string(name: 'MASTER_NODE_LABEL', value: "ec2-us-west-2"),
                                 string(name: 'VIEWER_NODE_LABEL', value: "ec2-us-west-2"),
                                 string(name: 'RUNNER_LABEL', value: "WebrtcLongRunningOpenSSL"),
+                                string(name: 'SCENARIO_LABEL', value: "WebrtcLongRunning"),
+                            ],
+                            wait: false
+                        )
+
+                        build(
+                            job: NEXT_AVAILABLE_RUNNER,
+                            parameters: COMMON_PARAMS + [
+                                booleanParam(name: 'USE_TURN', value: true),
+                                booleanParam(name: 'TRICKLE_ICE', value: true),
+                                booleanParam(name: 'USE_IOT', value: true),
+                                string(name: 'DURATION_IN_SECONDS', value: LONG_RUNNING_DURATION_IN_SECONDS.toString()),
+                                string(name: 'MASTER_NODE_LABEL', value: "ec2-us-west-2"),
+                                string(name: 'VIEWER_NODE_LABEL', value: "ec2-us-west-2"),
+                                string(name: 'RUNNER_LABEL', value: "WebrtcLongRunningIoTOpenSSL"),
                                 string(name: 'SCENARIO_LABEL', value: "WebrtcLongRunning"),
                             ],
                             wait: false

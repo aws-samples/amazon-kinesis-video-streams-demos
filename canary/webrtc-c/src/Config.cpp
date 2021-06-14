@@ -166,9 +166,22 @@ STATUS Config::initWithEnvVars()
     CHK_STATUS(optenvBool(CANARY_TRICKLE_ICE_ENV_VAR, &trickleIce, FALSE));
     CHK_STATUS(optenvBool(CANARY_USE_TURN_ENV_VAR, &useTurn, TRUE));
     CHK_STATUS(optenvBool(CANARY_FORCE_TURN_ENV_VAR, &forceTurn, FALSE));
+    CHK_STATUS(optenvBool(CANARY_USE_IOT_CREDENTIALS_ENV_VAR, &useIotCredentialProvider, FALSE));
 
-    CHK_STATUS(mustenv(ACCESS_KEY_ENV_VAR, &accessKey));
-    CHK_STATUS(mustenv(SECRET_KEY_ENV_VAR, &secretKey));
+    CHK_STATUS(optenv(CACERT_PATH_ENV_VAR, &caCertPath, KVS_CA_CERT_PATH));
+
+    if(useIotCredentialProvider.value) {
+        CHK_STATUS(mustenv(IOT_CORE_CREDENTIAL_ENDPOINT_ENV_VAR, &iotCoreCredentialEndPoint));
+        CHK_STATUS(mustenv(IOT_CORE_CERT_ENV_VAR, &iotCoreCert));
+        CHK_STATUS(mustenv(IOT_CORE_PRIVATE_KEY_ENV_VAR, &iotCorePrivateKey));
+        CHK_STATUS(mustenv(IOT_CORE_ROLE_ALIAS_ENV_VAR, &iotCoreRoleAlias));
+        CHK_STATUS(mustenv(IOT_CORE_THING_NAME_ENV_VAR, &channelName));
+    }
+    else {
+        CHK_STATUS(mustenv(ACCESS_KEY_ENV_VAR, &accessKey));
+        CHK_STATUS(mustenv(SECRET_KEY_ENV_VAR, &secretKey));
+        CHK_STATUS(optenv(CANARY_CHANNEL_NAME_ENV_VAR, &channelName, CANARY_DEFAULT_CHANNEL_NAME));
+    }
     CHK_STATUS(optenv(SESSION_TOKEN_ENV_VAR, &sessionToken, ""));
     CHK_STATUS(optenv(DEFAULT_REGION_ENV_VAR, &region, DEFAULT_AWS_REGION));
 
@@ -181,7 +194,7 @@ STATUS Config::initWithEnvVars()
 
     CHK_STATUS(optenv(CANARY_ENDPOINT_ENV_VAR, &endpoint, ""));
     CHK_STATUS(optenv(CANARY_LABEL_ENV_VAR, &label, CANARY_DEFAULT_LABEL));
-    CHK_STATUS(optenv(CANARY_CHANNEL_NAME_ENV_VAR, &channelName, CANARY_DEFAULT_CHANNEL_NAME));
+
     CHK_STATUS(optenv(CANARY_CLIENT_ID_ENV_VAR, &clientId, CANARY_DEFAULT_CLIENT_ID));
     CHK_STATUS(optenvBool(CANARY_IS_MASTER_ENV_VAR, &isMaster, TRUE));
     CHK_STATUS(optenvBool(CANARY_RUN_BOTH_PEERS_ENV_VAR, &runBothPeers, FALSE));
@@ -213,26 +226,27 @@ CleanUp:
 VOID Config::print()
 {
     DLOGD("Applied configuration:\n\n"
-          "\tEndpoint      : %s\n"
-          "\tRegion        : %s\n"
-          "\tLabel         : %s\n"
-          "\tChannel Name  : %s\n"
-          "\tClient ID     : %s\n"
-          "\tRole          : %s\n"
-          "\tTrickle ICE   : %s\n"
-          "\tUse TURN      : %s\n"
-          "\tLog Level     : %u\n"
-          "\tLog Group     : %s\n"
-          "\tLog Stream    : %s\n"
-          "\tDuration      : %lu seconds\n"
-          "\tIteration     : %lu seconds\n"
-          "\tRun both peers: %s\n"
+          "\tEndpoint        : %s\n"
+          "\tRegion          : %s\n"
+          "\tLabel           : %s\n"
+          "\tChannel Name    : %s\n"
+          "\tClient ID       : %s\n"
+          "\tRole            : %s\n"
+          "\tTrickle ICE     : %s\n"
+          "\tUse TURN        : %s\n"
+          "\tLog Level       : %u\n"
+          "\tLog Group       : %s\n"
+          "\tLog Stream      : %s\n"
+          "\tDuration        : %lu seconds\n"
+          "\tIteration       : %lu seconds\n"
+          "\tRun both peers  : %s\n"
+          "\tCredential type : %s\n"
           "\n",
           this->endpoint.value.c_str(), this->region.value.c_str(), this->label.value.c_str(), this->channelName.value.c_str(),
           this->clientId.value.c_str(), this->isMaster.value ? "Master" : "Viewer", this->trickleIce.value ? "True" : "False",
           this->useTurn.value ? "True" : "False", this->logLevel.value, this->logGroupName.value.c_str(), this->logStreamName.value.c_str(),
           this->duration.value / HUNDREDS_OF_NANOS_IN_A_SECOND, this->iterationDuration.value / HUNDREDS_OF_NANOS_IN_A_SECOND,
-          this->runBothPeers.value ? "True" : "False");
+          this->runBothPeers.value ? "True" : "False", this->useIotCredentialProvider.value ? "IoT" : "Static");
 }
 
 VOID jsonString(PBYTE pRaw, jsmntok_t token, Config::Value<std::string>* pResult)
@@ -317,6 +331,26 @@ STATUS Config::initWithJSON(PCHAR filePath)
             jsonUint64(raw, tokens[++i], &logLevel64);
             logLevel.value = (UINT32) logLevel64.value;
             logLevel.initialized = TRUE;
+        }
+
+        // IoT credential provider related tokens
+        else if (compareJsonString((PCHAR) raw, &tokens[i], JSMN_STRING, (PCHAR) CANARY_USE_IOT_CREDENTIALS_ENV_VAR)) {
+            jsonBool(raw, tokens[++i], &useIotCredentialProvider);
+        }
+        else if (compareJsonString((PCHAR) raw, &tokens[i], JSMN_STRING, (PCHAR) IOT_CORE_CREDENTIAL_ENDPOINT_ENV_VAR)) {
+            jsonString(raw, tokens[++i], &iotCoreCredentialEndPoint);
+        }
+        else if (compareJsonString((PCHAR) raw, &tokens[i], JSMN_STRING, (PCHAR) IOT_CORE_CERT_ENV_VAR)) {
+            jsonString(raw, tokens[++i], &iotCoreCert);
+        }
+        else if (compareJsonString((PCHAR) raw, &tokens[i], JSMN_STRING, (PCHAR) IOT_CORE_PRIVATE_KEY_ENV_VAR)) {
+            jsonString(raw, tokens[++i], &iotCorePrivateKey);
+        }
+        else if (compareJsonString((PCHAR) raw, &tokens[i], JSMN_STRING, (PCHAR) IOT_CORE_ROLE_ALIAS_ENV_VAR)) {
+            jsonString(raw, tokens[++i], &iotCoreRoleAlias);
+        }
+        else if (compareJsonString((PCHAR) raw, &tokens[i], JSMN_STRING, (PCHAR) IOT_CORE_THING_NAME_ENV_VAR)) {
+            jsonString(raw, tokens[++i], &iotCoreThingName);
         }
     }
 

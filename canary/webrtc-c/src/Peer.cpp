@@ -12,7 +12,12 @@ Peer::~Peer()
 {
     CHK_LOG_ERR(freePeerConnection(&this->pPeerConnection));
     CHK_LOG_ERR(freeSignalingClient(&this->pSignalingClientHandle));
-    CHK_LOG_ERR(freeStaticCredentialProvider(&this->pAwsCredentialProvider));
+    if(this->useIotCredentialProvider) {
+        CHK_LOG_ERR(freeIotCredentialProvider(&this->pAwsCredentialProvider));
+    }
+    else {
+        CHK_LOG_ERR(freeStaticCredentialProvider(&this->pAwsCredentialProvider));
+    }
 }
 
 STATUS Peer::init(const Canary::PConfig pConfig, const Callbacks& callbacks)
@@ -32,9 +37,21 @@ STATUS Peer::init(const Canary::PConfig pConfig, const Callbacks& callbacks)
     this->canaryIncomingRTPMetricsContext.prevFramesDropped = 0;
     this->canaryIncomingRTPMetricsContext.prevTs = GETTIME();
     this->firstFrame = TRUE;
+    this->useIotCredentialProvider = pConfig->useIotCredentialProvider.value;
+    if(this->useIotCredentialProvider) {
+        CHK_STATUS(createLwsIotCredentialProvider((PCHAR) pConfig->iotCoreCredentialEndPoint.value.c_str(),
+                                                  (PCHAR) pConfig->iotCoreCert.value.c_str(),
+                                                  (PCHAR) pConfig->iotCorePrivateKey.value.c_str(),
+                                                  (PCHAR) pConfig->caCertPath.value.c_str(),
+                                                  (PCHAR) pConfig->iotCoreRoleAlias.value.c_str(),
+                                                  (PCHAR) pConfig->channelName.value.c_str(),
+                                                  &pAwsCredentialProvider));
+    }
+    else {
+        CHK_STATUS(createStaticCredentialProvider((PCHAR) pConfig->accessKey.value.c_str(), 0, (PCHAR) pConfig->secretKey.value.c_str(), 0,
+                                                  (PCHAR) pConfig->sessionToken.value.c_str(), 0, MAX_UINT64, &pAwsCredentialProvider));
+    }
 
-    CHK_STATUS(createStaticCredentialProvider((PCHAR) pConfig->accessKey.value.c_str(), 0, (PCHAR) pConfig->secretKey.value.c_str(), 0,
-                                              (PCHAR) pConfig->sessionToken.value.c_str(), 0, MAX_UINT64, &pAwsCredentialProvider));
     CHK_STATUS(initSignaling(pConfig));
     CHK_STATUS(initRtcConfiguration(pConfig));
 

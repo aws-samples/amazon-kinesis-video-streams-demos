@@ -22,7 +22,11 @@ def buildProject(useMbedTLS) {
     }     
 
     sh """
-        cd ./canary/webrtc-c && 
+        cd ./canary/webrtc-c/scripts &&
+        source generate-iot-credential.sh ${NODE_NAME} &&
+        source cert_setup.sh ${NODE_NAME} &&
+        ls &&
+        cd .. &&
         mkdir -p build && 
         cd build && 
         ${configureCmd} && 
@@ -52,6 +56,7 @@ def buildPeer(isMaster, params) {
       'AWS_KVS_LOG_LEVEL': params.AWS_KVS_LOG_LEVEL,
       'CANARY_USE_TURN': params.USE_TURN,
       'CANARY_TRICKLE_ICE': params.TRICKLE_ICE,
+      'CANARY_USE_IOT': params.USE_IOT,
       'CANARY_LOG_GROUP_NAME': params.LOG_GROUP_NAME,
       'CANARY_LOG_STREAM_NAME': "${params.RUNNER_LABEL}-${clientID}-${START_TIMESTAMP}",
       'CANARY_CHANNEL_NAME': "${env.JOB_NAME}-${params.RUNNER_LABEL}",
@@ -115,6 +120,7 @@ pipeline {
         choice(name: 'AWS_KVS_LOG_LEVEL', choices: ["1", "2", "3", "4", "5"])
         booleanParam(name: 'IS_SIGNALING')
         booleanParam(name: 'USE_TURN')
+        booleanParam(name: 'USE_IOT')
         booleanParam(name: 'TRICKLE_ICE')
         booleanParam(name: 'USE_MBEDTLS', defaultValue: false)
         string(name: 'LOG_GROUP_NAME')
@@ -217,4 +223,3 @@ pipeline {
         }
     }
 }
-
