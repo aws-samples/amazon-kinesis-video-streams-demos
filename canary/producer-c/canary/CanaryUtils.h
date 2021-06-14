@@ -30,13 +30,13 @@ extern "C" {
 
 #define CANARY_FILE_LOGGING_BUFFER_SIZE (200 * 1024)
 #define CANARY_MAX_NUMBER_OF_LOG_FILES  10
-#define CANARY_APP_FILE_LOGGER       (PCHAR) "ENABLE_FILE_LOGGER"
+#define CANARY_APP_FILE_LOGGER          (PCHAR) "ENABLE_FILE_LOGGER"
 
 #define CANARY_INTERMITTENT_SCENARIO (PCHAR) "Intermittent"
 #define CANARY_CONTINUOUS_SCENARIO   (PCHAR) "Continuous"
 
 #define CANARY_SINGLE_TRACK_TYPE (PCHAR) "SingleTrack"
-#define CANARY_MULTI_TRACK_TYPE   (PCHAR) "MultiTrack"
+#define CANARY_MULTI_TRACK_TYPE  (PCHAR) "MultiTrack"
 
 #define CANARY_TYPE_REALTIME           (PCHAR) "Realtime"
 #define CANARY_TYPE_OFFLINE            (PCHAR) "Offline"
@@ -50,12 +50,21 @@ extern "C" {
 #define CANARY_SCENARIO_ENV_VAR        (PCHAR) "CANARY_RUN_SCENARIO"
 #define CANARY_TRACK_TYPE_ENV_VAR      (PCHAR) "TRACK_TYPE"
 
+// IoT related env
+#define CANARY_USE_IOT_CREDENTIALS_ENV_VAR   (PCHAR) "CANARY_USE_IOT_PROVIDER"
+#define IOT_CORE_CREDENTIAL_ENDPOINT_ENV_VAR (PCHAR) "AWS_IOT_CORE_CREDENTIAL_ENDPOINT"
+#define IOT_CORE_CERT_ENV_VAR                (PCHAR) "AWS_IOT_CORE_CERT"
+#define IOT_CORE_PRIVATE_KEY_ENV_VAR         (PCHAR) "AWS_IOT_CORE_PRIVATE_KEY"
+#define IOT_CORE_ROLE_ALIAS_ENV_VAR          (PCHAR) "AWS_IOT_CORE_ROLE_ALIAS"
+#define IOT_CORE_THING_NAME_ENV_VAR          (PCHAR) "AWS_IOT_CORE_THING_NAME"
+
+
 #define CANARY_DEFAULT_STREAM_NAME         (PCHAR) "TestStream"
 #define CANARY_DEFAULT_SCENARIO_NAME       CANARY_CONTINUOUS_SCENARIO
 #define CANARY_DEFAULT_CANARY_TYPE         CANARY_TYPE_REALTIME
 #define CANARY_DEFAULT_DURATION_IN_SECONDS 60
 #define CANARY_DEFAULT_FRAGMENT_SIZE       (25 * 1024)
-#define CANARY_DEFAULT_CANARY_LABEL        (PCHAR)"Longrun"
+#define CANARY_DEFAULT_CANARY_LABEL        (PCHAR) "Longrun"
 #define CANARY_DEFAULT_TRACK_TYPE          CANARY_SINGLE_TRACK_TYPE
 
 #define CANARY_TYPE_STR_LEN        10
@@ -72,11 +81,17 @@ struct __CallbacksProvider;
 ////////////////////////////////////////////////////////////////////////
 
 typedef struct {
+    BOOL useIotCredentialProvider;
     CHAR streamNamePrefix[CANARY_STREAM_NAME_STR_LEN + 1];
     CHAR canaryTypeStr[CANARY_TYPE_STR_LEN + 1];
     CHAR canaryLabel[CANARY_LABEL_LEN + 1];
     CHAR canaryScenario[CANARY_LABEL_LEN + 1];
     CHAR canaryTrackType[CANARY_TRACK_TYPE_STR_LEN + 1];
+    CHAR iotCoreCredentialEndPoint[MAX_URI_CHAR_LEN + 1];
+    CHAR iotCoreCert[MAX_PATH_LEN + 1];
+    CHAR iotCorePrivateKey[MAX_PATH_LEN + 1];
+    CHAR iotCoreRoleAlias[MAX_ROLE_ALIAS_LEN + 1];
+    CHAR iotThingName[MAX_IOT_THING_NAME_LEN + 1];
     UINT64 fragmentSizeInBytes;
     UINT64 canaryDuration;
     UINT64 bufferDuration;
