@@ -40,7 +40,6 @@ VOID adjustStreamInfoToCanaryType(PStreamInfo pStreamInfo, PCHAR canaryType)
     }
 }
 
-
 BOOL strtobool(const PCHAR value)
 {
     if (STRCMPI(value, "on") == 0 || STRCMPI(value, "true") == 0) {
@@ -114,25 +113,28 @@ STATUS parseConfigFile(PCanaryConfig pCanaryConfig, PCHAR filePath)
             i++;
         } else if (compareJsonString((PCHAR) params, &tokens[i], JSMN_STRING, CANARY_SCENARIO_ENV_VAR)) {
             getJsonValue(params, tokens[i + 1], pCanaryConfig->canaryScenario);
+            i++;
         } else if (compareJsonString((PCHAR) params, &tokens[i], JSMN_STRING, CANARY_TRACK_TYPE_ENV_VAR)) {
             getJsonValue(params, tokens[i + 1], pCanaryConfig->canaryTrackType);
+            i++;
         } else if (compareJsonString((PCHAR) params, &tokens[i], JSMN_STRING, (PCHAR) CANARY_USE_IOT_CREDENTIALS_ENV_VAR)) {
             getJsonBoolValue(params, tokens[++i], &pCanaryConfig->useIotCredentialProvider);
-        }
-        else if (compareJsonString((PCHAR) params, &tokens[i], JSMN_STRING, (PCHAR) IOT_CORE_CREDENTIAL_ENDPOINT_ENV_VAR)) {
+            i++;
+        } else if (compareJsonString((PCHAR) params, &tokens[i], JSMN_STRING, (PCHAR) IOT_CORE_CREDENTIAL_ENDPOINT_ENV_VAR)) {
             getJsonValue(params, tokens[i + 1], pCanaryConfig->iotCoreCredentialEndPoint);
-        }
-        else if (compareJsonString((PCHAR) params, &tokens[i], JSMN_STRING, (PCHAR) IOT_CORE_CERT_ENV_VAR)) {
+            i++;
+        } else if (compareJsonString((PCHAR) params, &tokens[i], JSMN_STRING, (PCHAR) IOT_CORE_CERT_ENV_VAR)) {
             getJsonValue(params, tokens[i + 1], pCanaryConfig->iotCoreCert);
-        }
-        else if (compareJsonString((PCHAR) params, &tokens[i], JSMN_STRING, (PCHAR) IOT_CORE_PRIVATE_KEY_ENV_VAR)) {
+            i++;
+        } else if (compareJsonString((PCHAR) params, &tokens[i], JSMN_STRING, (PCHAR) IOT_CORE_PRIVATE_KEY_ENV_VAR)) {
             getJsonValue(params, tokens[i + 1], pCanaryConfig->iotCorePrivateKey);
-        }
-        else if (compareJsonString((PCHAR) params, &tokens[i], JSMN_STRING, (PCHAR) IOT_CORE_ROLE_ALIAS_ENV_VAR)) {
+            i++;
+        } else if (compareJsonString((PCHAR) params, &tokens[i], JSMN_STRING, (PCHAR) IOT_CORE_ROLE_ALIAS_ENV_VAR)) {
             getJsonValue(params, tokens[i + 1], pCanaryConfig->iotCoreRoleAlias);
-        }
-        else if (compareJsonString((PCHAR) params, &tokens[i], JSMN_STRING, (PCHAR) IOT_CORE_THING_NAME_ENV_VAR)) {
+            i++;
+        } else if (compareJsonString((PCHAR) params, &tokens[i], JSMN_STRING, (PCHAR) IOT_CORE_THING_NAME_ENV_VAR)) {
             getJsonValue(params, tokens[i + 1], pCanaryConfig->iotThingName);
+            i++;
         }
     }
 CleanUp:
@@ -207,6 +209,7 @@ STATUS printConfig(PCanaryConfig pCanaryConfig)
     DLOGI("Canary scenario: %s", pCanaryConfig->canaryScenario);
     DLOGI("Canary track type: %s", pCanaryConfig->canaryTrackType);
     DLOGI("Credential type: %s", pCanaryConfig->useIotCredentialProvider ? "IoT" : "Static");
+    DLOGI("IOT Thing name: %s", pCanaryConfig->iotThingName);
 
 CleanUp:
     return retStatus;
@@ -248,7 +251,7 @@ STATUS initWithEnvVars(PCanaryConfig pCanaryConfig)
 
     pCanaryConfig->bufferDuration = pCanaryConfig->bufferDuration * HUNDREDS_OF_NANOS_IN_A_SECOND;
 
-    if(pCanaryConfig->useIotCredentialProvider) {
+    if (pCanaryConfig->useIotCredentialProvider) {
         CHK_STATUS(mustenv(IOT_CORE_CREDENTIAL_ENDPOINT_ENV_VAR, pCanaryConfig->iotCoreCredentialEndPoint));
         CHK_STATUS(mustenv(IOT_CORE_CERT_ENV_VAR, pCanaryConfig->iotCoreCert));
         CHK_STATUS(mustenv(IOT_CORE_PRIVATE_KEY_ENV_VAR, pCanaryConfig->iotCorePrivateKey));
@@ -320,10 +323,9 @@ INT32 main(INT32 argc, CHAR* argv[])
         cacertPath = getenv(CACERT_PATH_ENV_VAR);
         sessionToken = getenv(SESSION_TOKEN_ENV_VAR);
 
-        if(config.useIotCredentialProvider) {
+        if (config.useIotCredentialProvider) {
             STRCPY(streamName, config.iotThingName);
-        }
-        else {
+        } else {
             SNPRINTF(streamName, MAX_STREAM_NAME_LEN, "%s-%s-%s", config.streamNamePrefix, config.canaryTypeStr, config.canaryLabel);
         }
 
@@ -376,23 +378,16 @@ INT32 main(INT32 argc, CHAR* argv[])
                                                           &pClientCallbacks));
 
         if (config.useIotCredentialProvider) {
-            CHK_STATUS(createDefaultCallbacksProviderWithIotCertificate(config.iotCoreCredentialEndPoint,
-                                                                        config.iotCoreCert,
-                                                                        config.iotCorePrivateKey,
-                                                                        cacertPath,
-                                                                        config.iotCoreRoleAlias,
-                                                                        streamName,
-                                                                        region,
-                                                                        NULL,
-                                                                        NULL,
-                                                                        &pClientCallbacks));
+            CHK_STATUS(createDefaultCallbacksProviderWithIotCertificate(config.iotCoreCredentialEndPoint, config.iotCoreCert,
+                                                                        config.iotCorePrivateKey, cacertPath, config.iotCoreRoleAlias, streamName,
+                                                                        region, NULL, NULL, &pClientCallbacks));
         } else {
             if ((accessKey = getenv(ACCESS_KEY_ENV_VAR)) == NULL || (secretKey = getenv(SECRET_KEY_ENV_VAR)) == NULL) {
                 DLOGE("Error missing credentials");
                 CHK(FALSE, STATUS_INVALID_ARG);
             }
-            CHK_STATUS(createDefaultCallbacksProviderWithAwsCredentials(accessKey, secretKey, sessionToken, MAX_UINT64, region, cacertPath, NULL, NULL,
-                                                                        &pClientCallbacks));
+            CHK_STATUS(createDefaultCallbacksProviderWithAwsCredentials(accessKey, secretKey, sessionToken, MAX_UINT64, region, cacertPath, NULL,
+                                                                        NULL, &pClientCallbacks));
         }
         PStreamCallbacks pStreamcallbacks = &pCanaryStreamCallbacks->streamCallbacks;
         CHK_STATUS(createContinuousRetryStreamCallbacks(pClientCallbacks, &pStreamcallbacks));

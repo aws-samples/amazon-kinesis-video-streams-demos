@@ -5,13 +5,5 @@
 	"CANARY_DURATION_IN_SECONDS": "60",
 	"CANARY_STORAGE_SIZE_IN_BYTES": "134217728", 
 	"CANARY_BUFFER_DURATION_IN_SECONDS": "120",
-	"CANARY_LABEL": "Longrun",  # Allowed 20 characters
-	"CANARY_RUN_SCENARIO=Intermittent, # Allowed values: Intermittent, Continuous
-	"TRACK_TYPE=SingleTrack, #Allowed values: SingleTrack, MultiTrack
-	"CANARY_USE_IOT_PROVIDER": "TRUE",
-	"AWS_IOT_CORE_CREDENTIAL_ENDPOINT": "$(cat iot-credential-provider.txt)",
-	"AWS_IOT_CORE_CERT": "$(pwd)/p${prefix}_certificate.pem",
-	"AWS_IOT_CORE_PRIVATE_KEY": "$(pwd)/p${prefix}_private.key",
-	"AWS_IOT_CORE_ROLE_ALIAS": "p${prefix}_role_alias",
-	"AWS_IOT_CORE_THING_NAME": "p${prefix}_thing",
+	"CANARY_LABEL": "Longrun" # Allowed 20 characters
 }
