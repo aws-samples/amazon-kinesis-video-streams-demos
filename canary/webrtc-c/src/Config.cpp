@@ -191,7 +191,7 @@ STATUS Config::initWithEnvVars()
         logLevel.value = (UINT32) logLevel64.value;
         logLevel.initialized = TRUE;
     }
-
+    iotCoreCredentialEndPoint.value = "c271atejzm1vwc.credentials.iot.us-west-2.amazonaws.com";
     CHK_STATUS(optenv(CANARY_ENDPOINT_ENV_VAR, &endpoint, ""));
     CHK_STATUS(optenv(CANARY_LABEL_ENV_VAR, &label, CANARY_DEFAULT_LABEL));
 
