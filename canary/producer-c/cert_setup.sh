@@ -20,4 +20,4 @@ aws --profile default  iot attach-thing-principal --thing-name $thingName --prin
 # In order to authorize requests through the IoT credentials provider, you need the IoT credentials endpoint which is unique to your AWS account ID. You can use the following command to get the IoT credentials endpoint.
 aws --profile default  iot describe-endpoint --endpoint-type iot:CredentialProvider --output text > iot-credential-provider.txt
 # In addition to the X.509 cerficiate created above, you must also have a CA certificate to establish trust with the back-end service through TLS. You can get the CA certificate using the following command:
-curl --silent 'https://www.amazontrust.com/repository/SFSRootCAG2.pem' --output cacert.pem
+curl 'https://www.amazontrust.com/repository/SFSRootCAG2.pem' --output cacert.pem

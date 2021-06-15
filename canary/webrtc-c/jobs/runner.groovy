@@ -95,9 +95,7 @@ def buildPeer(isMaster, params) {
 
     withRunnerWrapper(envs) {
         sh """
-            cd ./canary/webrtc-c/scripts &&
-            cd .. &&
-            cd build &&
+            cd ./canary/webrtc-c/build &&
             ${isMaster ? "" : "sleep 10 &&"}
             ./kvsWebrtcCanaryWebrtc"""
     }
