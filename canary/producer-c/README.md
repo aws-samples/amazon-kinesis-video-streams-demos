@@ -140,6 +140,14 @@ Every metric is available in two dimensions:
 1. Per stream: This will be available under `KinesisVideoSDKCanary->ProducerSDKCanaryStreamName` in cloudwatch console
 2. Aggregated over all streams based on `canary-type`. `canary-type` is set by running `export CANARY_LABEL=value`. This will be available under `KinesisVideoSDKCanary->ProducerSDKCanaryType` in cloudwatch console
 
+## Using IoT credential provider
+
+To use IoT credential provider to run canaries, navigate to the [canary directory] (directory). Run the following scripts:
+1. To generate new IoT thing and credentials: `./generate-iot-credentials.sh <thing-name-prefix>`
+2. Set up certs by running: `./cert_setup.sh <thing-name-prefix>`
+3. Set up IoT credential provider related environment variables by modifying `init.sh` to first use IoT credential provider (set `CANARY_USE_IOT_PROVIDER` to `TRUE`) and run: `./init.sh <thing-name-prefix>`
+4. Run the executable in the build directory by following the build instructions.
+
 
 ## References
 1. http://sdk.amazonaws.com/cpp/api/LATEST/index.html
