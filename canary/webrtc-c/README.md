@@ -39,6 +39,14 @@ JSON config example:
 }
 ```
 
+## Using IoT credential provider
+
+To use IoT credential provider to run canaries, navigate to the [scripts directory] (https://github.com/aws-samples/amazon-kinesis-video-streams-demos/tree/master/canary/webrtc-c/scripts). Run the following scripts:
+1. To generate new IoT thing and credentials: `./generate-iot-credential.sh <thing-name-prefix>`
+2. Set up certs by running: `./cert_setup.sh <thing-name-prefix>`
+3. Set up IoT credential provider related environment variables by modifying `init.sh` for master and `v_init.sh` for viewer to first use IoT credential provider (set `CANARY_USE_IOT_PROVIDER` to `TRUE`) and run: `./init.sh <thing-name-prefix>` and `./v_init.sh <thing-name-prefix>` respectively.
+4. Run the executable in the build directory by following the build and run instructions above.
+
 ## Cloudwatch Metrics
 
 The default Cloudwatch namespace is **KinesisVideoSDKCanary**. Each metric listed below will be emitted twice, 
