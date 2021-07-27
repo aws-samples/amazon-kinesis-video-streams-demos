@@ -210,7 +210,7 @@ STATUS sendViewerOfferCallback(UINT32 timerId, UINT64 time, UINT64 customData)
     curTime = GETTIME();
     latency = (curTime - time) / HUNDREDS_OF_NANOS_IN_A_MILLISECOND;
 
-    Canary::Cloudwatch::getInstance().monitoring.pushSignalingRoundtripLatency(latency, StandardUnit::Milliseconds);
+    Canary::Cloudwatch::getInstance().monitoring.pushSignalingRoundtripLatency(latency, Aws::CloudWatch::Model::StandardUnit::Milliseconds);
 
 CleanUp:
 

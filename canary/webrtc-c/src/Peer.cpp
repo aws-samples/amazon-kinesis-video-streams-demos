@@ -114,7 +114,7 @@ STATUS Peer::initSignaling(const Canary::PConfig pConfig)
                 if (!pPeer->initializedSignaling) {
                     auto duration = (GETTIME() - pPeer->signalingStartTime) / HUNDREDS_OF_NANOS_IN_A_MILLISECOND;
                     DLOGI("Signaling took %lu ms to connect", duration);
-                    Canary::Cloudwatch::getInstance().monitoring.pushSignalingInitDelay(duration, StandardUnit::Milliseconds);
+                    Canary::Cloudwatch::getInstance().monitoring.pushSignalingInitDelay(duration, Aws::CloudWatch::Model::StandardUnit::Milliseconds);
                     pPeer->initializedSignaling = TRUE;
                 }
                 break;
@@ -293,7 +293,7 @@ STATUS Peer::initPeerConnection()
             case RTC_PEER_CONNECTION_STATE_CONNECTED: {
                 auto duration = (GETTIME() - pPeer->iceHolePunchingStartTime) / HUNDREDS_OF_NANOS_IN_A_MILLISECOND;
                 DLOGI("ICE hole punching took %lu ms", duration);
-                Canary::Cloudwatch::getInstance().monitoring.pushICEHolePunchingDelay(duration, StandardUnit::Milliseconds);
+                Canary::Cloudwatch::getInstance().monitoring.pushICEHolePunchingDelay(duration, Aws::CloudWatch::Model::StandardUnit::Milliseconds);
                 break;
             }
             case RTC_PEER_CONNECTION_STATE_FAILED:
@@ -621,7 +621,7 @@ STATUS Peer::writeFrame(PFrame pFrame, MEDIA_STREAM_TRACK_KIND kind)
             timeToFirstFrame = (DOUBLE) (GETTIME() - this->offerReceiveTimestamp) / HUNDREDS_OF_NANOS_IN_A_MILLISECOND;
             DLOGD("Start up latency from offer receive to first frame write: %lf ms", timeToFirstFrame);
             Canary::Cloudwatch::getInstance().monitoring.pushTimeToFirstFrame(timeToFirstFrame,
-                                                                              StandardUnit::Milliseconds);
+                                                                              Aws::CloudWatch::Model::StandardUnit::Milliseconds);
         }
         else {
             retStatus = STATUS_SUCCESS;
