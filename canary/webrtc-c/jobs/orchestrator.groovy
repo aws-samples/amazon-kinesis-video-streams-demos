@@ -50,7 +50,7 @@ ACTIVE_RUNNERS = []
 
 pipeline {
     agent {
-        label 'master'
+        label 'ec2-us-west-2'
     }
 
     options {

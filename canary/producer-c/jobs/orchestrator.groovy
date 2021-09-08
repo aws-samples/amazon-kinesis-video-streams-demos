@@ -57,7 +57,7 @@ ACTIVE_RUNNERS = []
 
 pipeline {
     agent {
-        label 'master'
+        label 'producer-uw2'
     }
 
     options {
