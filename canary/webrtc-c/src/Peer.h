@@ -35,11 +35,11 @@ typedef struct {
 } IncomingRTPMetricsContext;
 typedef IncomingRTPMetricsContext* PIncomingRTPMetricsContext;
 
-typedef struct {
+struct EndToEndMetricsContext{
     DOUBLE frameLatencyAvg = 0.0;
     DOUBLE dataMatchAvg = 0.0;
     DOUBLE sizeMatchAvg = 0.0;
-} EndToEndMetricsContext;
+};
 typedef EndToEndMetricsContext* PEndToEndMetricsContext;
 
 class Peer {
