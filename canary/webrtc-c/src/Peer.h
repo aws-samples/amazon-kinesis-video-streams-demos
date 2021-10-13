@@ -80,6 +80,7 @@ class Peer {
     std::string peerId;
     RtcConfiguration rtcConfiguration;
     PRtcPeerConnection pPeerConnection;
+    PExponentialBackoffState pExponentialBackoffState;
     std::vector<PRtcRtpTransceiver> audioTransceivers;
     std::vector<PRtcRtpTransceiver> videoTransceivers;
     BOOL isMaster;

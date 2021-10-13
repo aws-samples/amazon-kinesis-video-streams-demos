@@ -18,6 +18,7 @@ Peer::~Peer()
     else {
         CHK_LOG_ERR(freeStaticCredentialProvider(&this->pAwsCredentialProvider));
     }
+    exponentialBackoffStateFree(&this->pExponentialBackoffState);
 }
 
 STATUS Peer::init(const Canary::PConfig pConfig, const Callbacks& callbacks)
@@ -68,13 +69,10 @@ STATUS Peer::initSignaling(const Canary::PConfig pConfig)
     ChannelInfo channelInfo;
     SignalingClientCallbacks clientCallbacks;
     CHAR controlPlaneUrl[MAX_CONTROL_PLANE_URI_CHAR_LEN];
-    PExponentialBackoffState pExponentialBackoffState = NULL;
 
     MEMSET(&clientInfo, 0, SIZEOF(clientInfo));
     MEMSET(&channelInfo, 0, SIZEOF(channelInfo));
     MEMSET(&clientCallbacks, 0, SIZEOF(clientCallbacks));
-
-    CHK_STATUS(exponentialBackoffStateWithDefaultConfigCreate(&pExponentialBackoffState));
     
     clientInfo.version = SIGNALING_CLIENT_INFO_CURRENT_VERSION;
     clientInfo.loggingLevel = pConfig->logLevel.value;
@@ -169,8 +167,8 @@ STATUS Peer::initSignaling(const Canary::PConfig pConfig)
 
         return retStatus;
     };
-
-    CHK_STATUS(createSignalingClientSyncWithBackoff(&clientInfo, &channelInfo, &clientCallbacks, pAwsCredentialProvider, &pSignalingClientHandle, pExponentialBackoffState));
+    CHK_STATUS(exponentialBackoffStateWithDefaultConfigCreate(&this->pExponentialBackoffState));
+    CHK_STATUS(createSignalingClientSyncWithBackoff(&clientInfo, &channelInfo, &clientCallbacks, pAwsCredentialProvider, &pSignalingClientHandle, this->pExponentialBackoffState));
 
 CleanUp:
 
