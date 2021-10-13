@@ -29,20 +29,20 @@ VOID CloudwatchMonitoring::deinit()
     }
 }
 
-static const CHAR* unitToString(const StandardUnit& unit)
+static const CHAR* unitToString(const Aws::CloudWatch::Model::StandardUnit& unit)
 {
     switch (unit) {
-        case StandardUnit::Count:
+        case Aws::CloudWatch::Model::StandardUnit::Count:
             return "Count";
-        case StandardUnit::Count_Second:
+        case Aws::CloudWatch::Model::StandardUnit::Count_Second:
             return "Count_Second";
-        case StandardUnit::Milliseconds:
+        case Aws::CloudWatch::Model::StandardUnit::Milliseconds:
             return "Milliseconds";
-        case StandardUnit::Percent:
+        case Aws::CloudWatch::Model::StandardUnit::Percent:
             return "Percent";
-        case StandardUnit::None:
+        case Aws::CloudWatch::Model::StandardUnit::None:
             return "None";
-        case StandardUnit::Kilobits_Second:
+        case Aws::CloudWatch::Model::StandardUnit::Kilobits_Second:
             return "Kilobits_Second";
         default:
             return "Unknown unit";
@@ -129,7 +129,7 @@ VOID CloudwatchMonitoring::pushExitStatus(STATUS retStatus)
 
     datum.SetMetricName("ExitStatus");
     datum.SetValue(1.0);
-    datum.SetUnit(StandardUnit::Count);
+    datum.SetUnit(Aws::CloudWatch::Model::StandardUnit::Count);
 
     datum.AddDimensions(statusDimension);
 
@@ -148,14 +148,14 @@ VOID CloudwatchMonitoring::pushSignalingRoundtripStatus(STATUS retStatus)
 
     datum.SetMetricName("SignalingRoundtripStatus");
     datum.SetValue(1.0);
-    datum.SetUnit(StandardUnit::Count);
+    datum.SetUnit(Aws::CloudWatch::Model::StandardUnit::Count);
 
     datum.AddDimensions(statusDimension);
 
     this->push(datum);
 }
 
-VOID CloudwatchMonitoring::pushSignalingRoundtripLatency(UINT64 delay, StandardUnit unit)
+VOID CloudwatchMonitoring::pushSignalingRoundtripLatency(UINT64 delay, Aws::CloudWatch::Model::StandardUnit unit)
 {
     MetricDatum datum;
 
@@ -166,7 +166,7 @@ VOID CloudwatchMonitoring::pushSignalingRoundtripLatency(UINT64 delay, StandardU
     this->push(datum);
 }
 
-VOID CloudwatchMonitoring::pushTimeToFirstFrame(UINT64 timeToFirstFrame, StandardUnit unit)
+VOID CloudwatchMonitoring::pushTimeToFirstFrame(UINT64 timeToFirstFrame, Aws::CloudWatch::Model::StandardUnit unit)
 {
     MetricDatum datum;
 
@@ -176,7 +176,7 @@ VOID CloudwatchMonitoring::pushTimeToFirstFrame(UINT64 timeToFirstFrame, Standar
 
     this->push(datum);
 }
-VOID CloudwatchMonitoring::pushSignalingInitDelay(UINT64 delay, StandardUnit unit)
+VOID CloudwatchMonitoring::pushSignalingInitDelay(UINT64 delay, Aws::CloudWatch::Model::StandardUnit unit)
 {
     MetricDatum datum;
 
@@ -187,7 +187,7 @@ VOID CloudwatchMonitoring::pushSignalingInitDelay(UINT64 delay, StandardUnit uni
     this->push(datum);
 }
 
-VOID CloudwatchMonitoring::pushICEHolePunchingDelay(UINT64 delay, StandardUnit unit)
+VOID CloudwatchMonitoring::pushICEHolePunchingDelay(UINT64 delay, Aws::CloudWatch::Model::StandardUnit unit)
 {
     MetricDatum datum;
 
@@ -204,22 +204,22 @@ VOID CloudwatchMonitoring::pushOutboundRtpStats(Canary::POutgoingRTPMetricsConte
 
     bytesDiscardedPercentageDatum.SetMetricName("PercentageFrameDiscarded");
     bytesDiscardedPercentageDatum.SetValue(pOutboundRtpStats->framesPercentageDiscarded);
-    bytesDiscardedPercentageDatum.SetUnit(StandardUnit::Percent);
+    bytesDiscardedPercentageDatum.SetUnit(Aws::CloudWatch::Model::StandardUnit::Percent);
     this->push(bytesDiscardedPercentageDatum);
 
     averageFramesRateDatum.SetMetricName("FramesPerSecond");
     averageFramesRateDatum.SetValue(pOutboundRtpStats->averageFramesSentPerSecond);
-    averageFramesRateDatum.SetUnit(StandardUnit::Count_Second);
+    averageFramesRateDatum.SetUnit(Aws::CloudWatch::Model::StandardUnit::Count_Second);
     this->push(averageFramesRateDatum);
 
     nackRateDatum.SetMetricName("NackPerSecond");
     nackRateDatum.SetValue(pOutboundRtpStats->nacksPerSecond);
-    nackRateDatum.SetUnit(StandardUnit::Count_Second);
+    nackRateDatum.SetUnit(Aws::CloudWatch::Model::StandardUnit::Count_Second);
     this->push(nackRateDatum);
 
     retransmissionPercentDatum.SetMetricName("PercentageFramesRetransmitted");
     retransmissionPercentDatum.SetValue(pOutboundRtpStats->retxBytesPercentage);
-    retransmissionPercentDatum.SetUnit(StandardUnit::Percent);
+    retransmissionPercentDatum.SetUnit(Aws::CloudWatch::Model::StandardUnit::Percent);
     this->push(retransmissionPercentDatum);
 }
 
@@ -229,17 +229,17 @@ VOID CloudwatchMonitoring::pushInboundRtpStats(Canary::PIncomingRTPMetricsContex
 
     incomingBitrateDatum.SetMetricName("IncomingBitRate");
     incomingBitrateDatum.SetValue(pIncomingRtpStats->incomingBitRate);
-    incomingBitrateDatum.SetUnit(StandardUnit::Kilobits_Second);
+    incomingBitrateDatum.SetUnit(Aws::CloudWatch::Model::StandardUnit::Kilobits_Second);
     this->push(incomingBitrateDatum);
 
     incomingPacketRate.SetMetricName("IncomingPacketsPerSecond");
     incomingPacketRate.SetValue(pIncomingRtpStats->packetReceiveRate);
-    incomingPacketRate.SetUnit(StandardUnit::Count_Second);
+    incomingPacketRate.SetUnit(Aws::CloudWatch::Model::StandardUnit::Count_Second);
     this->push(incomingPacketRate);
 
     incomingFrameDropRateDatum.SetMetricName("IncomingFramesDroppedPerSecond");
     incomingFrameDropRateDatum.SetValue(pIncomingRtpStats->framesDroppedPerSecond);
-    incomingFrameDropRateDatum.SetUnit(StandardUnit::Count_Second);
+    incomingFrameDropRateDatum.SetUnit(Aws::CloudWatch::Model::StandardUnit::Count_Second);
     this->push(incomingFrameDropRateDatum);
 }
 
@@ -257,12 +257,12 @@ VOID CloudwatchMonitoring::pushEndToEndMetrics(Canary::EndToEndMetricsContext ct
     //       The generic metric logging should be sufficient.
     DLOGD("Current end-to-end frame latency: %4.2lf", latency);
     endToEndLatencyDatum.SetMetricName("EndToEndFrameLatency");
-    endToEndLatencyDatum.SetUnit(StandardUnit::Milliseconds);
+    endToEndLatencyDatum.SetUnit(Aws::CloudWatch::Model::StandardUnit::Milliseconds);
     endToEndLatencyDatum.SetValue(latency);
     this->push(endToEndLatencyDatum);
 
     sizeMatchDatum.SetMetricName("FrameSizeMatch");
-    sizeMatchDatum.SetUnit(StandardUnit::Count);
+    sizeMatchDatum.SetUnit(Aws::CloudWatch::Model::StandardUnit::Count);
     sizeMatchDatum.SetValue(ctx.sizeMatchAvg);
     this->push(sizeMatchDatum);
 }
