@@ -89,7 +89,6 @@ STATUS run(Canary::PConfig pConfig)
     BOOL initialized = FALSE;
     TIMER_QUEUE_HANDLE timerQueueHandle = 0;
     UINT32 timeoutTimerId;
-
     CHK_STATUS(Canary::Cloudwatch::init(pConfig));
     CHK_STATUS(initKvsWebRtc());
     initialized = TRUE;
