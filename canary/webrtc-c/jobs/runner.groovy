@@ -24,7 +24,7 @@ def buildProject(useMbedTLS) {
     sh """
         cd ./canary/webrtc-c/scripts &&
         chmod a+x cert_setup.sh &&
-        ./cert_setup.sh ${NODE_NAME} &&
+        ./cert_setup.sh test &&
         ls &&
         cd .. &&
         mkdir -p build && 
@@ -69,10 +69,10 @@ def buildPeer(isMaster, params) {
 
     def endpoint = readFile('canary/webrtc-c/scripts/iot-credential-provider.txt')
     def scripts_dir = "$WORKSPACE/canary/webrtc-c/scripts"
-    def core_cert_file = "${scripts_dir}/w${NODE_NAME}_certificate.pem"
-    def private_key_file = "${scripts_dir}/w${NODE_NAME}_private.key"
-    def role_alias = "w${NODE_NAME}_role_alias"
-    def thing_name = "w${NODE_NAME}_thing"
+    def core_cert_file = "${scripts_dir}/wtest_certificate.pem"
+    def private_key_file = "${scripts_dir}/wtest_private.key"
+    def role_alias = "wtest_role_alias"
+    def thing_name = "wtest_thing"
 
     echo "Endpoint: ${endpoint}"
     echo "cert file: ${core_cert_file}"
@@ -182,7 +182,8 @@ pipeline {
 
                     steps {
                         script {
-                            buildPeer(false, params)
+//                             buildPeer(false, params)
+                            echo "Test viewer"
                         }
                     }
                 }

@@ -3,16 +3,16 @@
 # You can use this script to setup environment variables in the shell which samples run on.
 # https://docs.aws.amazon.com/kinesisvideostreams/latest/dg/how-iot.html
 
-prefix=$1
-thingName="w${prefix}_thing"
-thingTypeName="w${prefix}_thing_type"
-iotPolicyName="w${prefix}_policy"
-kvsPolicyName="w${prefix}_policy"
-iotRoleName="w${prefix}_role"
-iotRoleAlias="w${prefix}_role_alias"
-iotCert="w${prefix}_certificate.pem"
-iotPublicKey="w${prefix}_public.key"
-iotPrivateKey="w${prefix}_private.key"
+#prefix=$1
+thingName="test_thing"
+thingTypeName="test"
+iotPolicyName="test"
+kvsPolicyName="test"
+iotRoleName="test"
+iotRoleAlias="test_role_alias"
+iotCert="test.pem"
+iotPublicKey="testpublic.key"
+iotPrivateKey="testprivate.key"
 
 # Step 1: Create an IoT Thing Type and an IoT Thing
 # The following example command creates a thing type $thingTypeName
