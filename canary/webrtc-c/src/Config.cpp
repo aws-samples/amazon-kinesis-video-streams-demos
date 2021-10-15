@@ -160,6 +160,7 @@ namespace Canary {
         STATUS retStatus = STATUS_SUCCESS;
         Config::Value<UINT64> logLevel64;
         std::stringstream defaultLogStreamName;
+        UINT64 fileSize;
 
         /* This is ignored for master. Master can extract the info from offer. Viewer has to know if peer can trickle or
          * not ahead of time. */
@@ -171,7 +172,7 @@ namespace Canary {
         CHK_STATUS(optenv(CACERT_PATH_ENV_VAR, &caCertPath, KVS_CA_CERT_PATH));
 
         if(useIotCredentialProvider.value) {
-            CHK_STATUS(mustenv(IOT_CORE_CREDENTIAL_ENDPOINT_ENV_VAR, &iotCoreCredentialEndPoint));
+            CHK_STATUS(mustenv(IOT_CORE_CREDENTIAL_ENDPOINT_ENV_VAR, &iotCoreCredentialEndPointFile));
             CHK_STATUS(mustenv(IOT_CORE_CERT_ENV_VAR, &iotCoreCert));
             CHK_STATUS(mustenv(IOT_CORE_PRIVATE_KEY_ENV_VAR, &iotCorePrivateKey));
             CHK_STATUS(mustenv(IOT_CORE_ROLE_ALIAS_ENV_VAR, &iotCoreRoleAlias));
@@ -191,6 +192,9 @@ namespace Canary {
             logLevel.value = (UINT32) logLevel64.value;
             logLevel.initialized = TRUE;
         }
+        STRCPY(credFile, iotCoreCredentialEndPointFile.value.c_str());
+        CHK_STATUS(readFile(credFile, TRUE, NULL, &fileSize));
+        CHK_STATUS(readFile(credFile, TRUE, filePath, &fileSize));
 
         CHK_STATUS(optenv(CANARY_ENDPOINT_ENV_VAR, &endpoint, ""));
         CHK_STATUS(optenv(CANARY_LABEL_ENV_VAR, &label, CANARY_DEFAULT_LABEL));
@@ -248,7 +252,7 @@ namespace Canary {
               this->duration.value / HUNDREDS_OF_NANOS_IN_A_SECOND, this->iterationDuration.value / HUNDREDS_OF_NANOS_IN_A_SECOND,
               this->runBothPeers.value ? "True" : "False", this->useIotCredentialProvider.value ? "IoT" : "Static");
 
-        DLOGD("Endpoint: %s", this->iotCoreCredentialEndPoint.value.c_str());
+        DLOGD("Endpoint: %s", this->filePath);
         DLOGD("Cert: %s", this->iotCoreCert.value.c_str());
         DLOGD("Role alias: %s", this->iotCoreRoleAlias.value.c_str());
         DLOGD("Thing name: %s", this->channelName.value.c_str());
@@ -343,7 +347,7 @@ namespace Canary {
                 jsonBool(raw, tokens[++i], &useIotCredentialProvider);
             }
             else if (compareJsonString((PCHAR) raw, &tokens[i], JSMN_STRING, (PCHAR) IOT_CORE_CREDENTIAL_ENDPOINT_ENV_VAR)) {
-                jsonString(raw, tokens[++i], &iotCoreCredentialEndPoint);
+                jsonString(raw, tokens[++i], &iotCoreCredentialEndPointFile);
             }
             else if (compareJsonString((PCHAR) raw, &tokens[i], JSMN_STRING, (PCHAR) IOT_CORE_CERT_ENV_VAR)) {
                 jsonString(raw, tokens[++i], &iotCoreCert);

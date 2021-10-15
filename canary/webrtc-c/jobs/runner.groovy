@@ -67,8 +67,8 @@ def buildPeer(isMaster, params) {
         RUNNING_NODES_IN_BUILDING == 0
     }
 
-    def endpoint = "c271atejzm1vwc.credentials.iot.us-west-2.amazonaws.com"
     def scripts_dir = "$WORKSPACE/canary/webrtc-c/scripts"
+    def endpoint = "${scripts_dir}/iot-credential-provider.txt"
     def core_cert_file = "${scripts_dir}/wtest_certificate.pem"
     def private_key_file = "${scripts_dir}/wtest_private.key"
     def role_alias = "wtest_role_alias"

@@ -40,7 +40,7 @@ STATUS Peer::init(const Canary::PConfig pConfig, const Callbacks& callbacks)
     this->firstFrame = TRUE;
     this->useIotCredentialProvider = pConfig->useIotCredentialProvider.value;
     if(this->useIotCredentialProvider) {
-        CHK_STATUS(createLwsIotCredentialProvider((PCHAR) pConfig->iotCoreCredentialEndPoint.value.c_str(),
+        CHK_STATUS(createLwsIotCredentialProvider((PCHAR) pConfig->filePath,
                                                   (PCHAR) pConfig->iotCoreCert.value.c_str(),
                                                   (PCHAR) pConfig->iotCorePrivateKey.value.c_str(),
                                                   (PCHAR) pConfig->caCertPath.value.c_str(),
