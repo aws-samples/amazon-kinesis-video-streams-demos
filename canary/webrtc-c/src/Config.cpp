@@ -172,7 +172,8 @@ namespace Canary {
         CHK_STATUS(optenv(CACERT_PATH_ENV_VAR, &caCertPath, KVS_CA_CERT_PATH));
 
         if(useIotCredentialProvider.value) {
-            CHK_STATUS(mustenv(IOT_CORE_CREDENTIAL_ENDPOINT_ENV_VAR, &iotCoreCredentialEndPointFile));
+            credFile = getenv(IOT_CORE_CREDENTIAL_ENDPOINT_ENV_VAR);
+//            CHK_STATUS(mustenv(IOT_CORE_CREDENTIAL_ENDPOINT_ENV_VAR, &iotCoreCredentialEndPointFile));
             CHK_STATUS(mustenv(IOT_CORE_CERT_ENV_VAR, &iotCoreCert));
             CHK_STATUS(mustenv(IOT_CORE_PRIVATE_KEY_ENV_VAR, &iotCorePrivateKey));
             CHK_STATUS(mustenv(IOT_CORE_ROLE_ALIAS_ENV_VAR, &iotCoreRoleAlias));
@@ -192,7 +193,6 @@ namespace Canary {
             logLevel.value = (UINT32) logLevel64.value;
             logLevel.initialized = TRUE;
         }
-        STRCPY(credFile, iotCoreCredentialEndPointFile.value.c_str());
         CHK_STATUS(readFile(credFile, TRUE, NULL, &fileSize));
         CHK_STATUS(readFile(credFile, TRUE, filePath, &fileSize));
 
