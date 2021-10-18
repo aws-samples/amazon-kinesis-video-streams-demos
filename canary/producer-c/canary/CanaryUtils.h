@@ -88,6 +88,7 @@ typedef struct {
     CHAR canaryScenario[CANARY_LABEL_LEN + 1];
     CHAR canaryTrackType[CANARY_TRACK_TYPE_STR_LEN + 1];
     CHAR iotCoreCredentialEndPoint[MAX_URI_CHAR_LEN + 1];
+    BYTE iotEndpoint[1023 + 1];
     CHAR iotCoreCert[MAX_PATH_LEN + 1];
     CHAR iotCorePrivateKey[MAX_PATH_LEN + 1];
     CHAR iotCoreRoleAlias[MAX_ROLE_ALIAS_LEN + 1];

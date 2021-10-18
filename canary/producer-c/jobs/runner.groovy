@@ -103,17 +103,12 @@ def runClient(isProducer, params) {
     
     echo "Done waiting in NODE_NAME = ${env.NODE_NAME}"
 
-    def endpoint = readFile('canary/producer-c/iot-credential-provider.txt')
-    echo "Endpoint: ${endpoint}"
     def scripts_dir = "$WORKSPACE/canary/producer-c"
+    def endpoint = "${scripts_dir}/iot-credential-provider.txt"
     def core_cert_file = "${scripts_dir}/p${env.NODE_NAME}_certificate.pem"
-    echo "cert file: ${core_cert_file}"
     def private_key_file = "${scripts_dir}/p${env.NODE_NAME}_private.key"
-    echo "private key file: ${private_key_file}"
     def role_alias = "p${env.NODE_NAME}_role_alias"
-    echo "Role alias: ${role_alias}"
     def thing_name = "p${env.NODE_NAME}_thing"
-    echo "thing name: ${thing_name}"
 
     def envs = [
         'JAVA_HOME': "/opt/jdk-13.0.1",

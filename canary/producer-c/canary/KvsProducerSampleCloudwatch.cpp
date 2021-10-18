@@ -225,6 +225,7 @@ STATUS initWithEnvVars(PCanaryConfig pCanaryConfig)
     CHAR canaryScenario[CANARY_LABEL_LEN + 1];
     CHAR canaryTrackType[CANARY_TRACK_TYPE_STR_LEN + 1];
     CHK(pCanaryConfig != NULL, STATUS_NULL_ARG);
+    UINT64 fileSize;
 
     CHK_STATUS(optenv(CANARY_STREAM_NAME_ENV_VAR, streamName, CANARY_DEFAULT_STREAM_NAME));
     STRCPY(pCanaryConfig->streamNamePrefix, streamName);
@@ -251,8 +252,11 @@ STATUS initWithEnvVars(PCanaryConfig pCanaryConfig)
 
     pCanaryConfig->bufferDuration = pCanaryConfig->bufferDuration * HUNDREDS_OF_NANOS_IN_A_SECOND;
 
-    if (pCanaryConfig->useIotCredentialProvider) {
+    if (pCanaryConfig->useIotCredentialProvider == TRUE) {
         CHK_STATUS(mustenv(IOT_CORE_CREDENTIAL_ENDPOINT_ENV_VAR, pCanaryConfig->iotCoreCredentialEndPoint));
+        CHK_STATUS(readFile(pCanaryConfig->iotCoreCredentialEndPoint, TRUE, NULL, &fileSize));
+        CHK_STATUS(readFile(pCanaryConfig->iotCoreCredentialEndPoint, TRUE,pCanaryConfig->iotEndpoint, &fileSize));
+        pCanaryConfig->iotEndpoint[fileSize - 1] = '\0';
         CHK_STATUS(mustenv(IOT_CORE_CERT_ENV_VAR, pCanaryConfig->iotCoreCert));
         CHK_STATUS(mustenv(IOT_CORE_PRIVATE_KEY_ENV_VAR, pCanaryConfig->iotCorePrivateKey));
         CHK_STATUS(mustenv(IOT_CORE_ROLE_ALIAS_ENV_VAR, pCanaryConfig->iotCoreRoleAlias));
@@ -378,7 +382,7 @@ INT32 main(INT32 argc, CHAR* argv[])
                                                           &pClientCallbacks));
 
         if (config.useIotCredentialProvider) {
-            CHK_STATUS(createDefaultCallbacksProviderWithIotCertificate(config.iotCoreCredentialEndPoint, config.iotCoreCert,
+            CHK_STATUS(createDefaultCallbacksProviderWithIotCertificate(PCHAR(config.iotEndpoint), config.iotCoreCert,
                                                                         config.iotCorePrivateKey, cacertPath, config.iotCoreRoleAlias, streamName,
                                                                         region, NULL, NULL, &pClientCallbacks));
         } else {
