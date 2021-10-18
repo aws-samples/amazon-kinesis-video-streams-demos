@@ -18,6 +18,7 @@ Peer::~Peer()
     else {
         CHK_LOG_ERR(freeStaticCredentialProvider(&this->pAwsCredentialProvider));
     }
+    exponentialBackoffStateFree(&this->pExponentialBackoffState);
 }
 
 STATUS Peer::init(const Canary::PConfig pConfig, const Callbacks& callbacks)
@@ -166,8 +167,8 @@ STATUS Peer::initSignaling(const Canary::PConfig pConfig)
 
         return retStatus;
     };
-
-    CHK_STATUS(createSignalingClientSync(&clientInfo, &channelInfo, &clientCallbacks, pAwsCredentialProvider, &pSignalingClientHandle));
+    CHK_STATUS(exponentialBackoffStateWithDefaultConfigCreate(&this->pExponentialBackoffState));
+    CHK_STATUS(createSignalingClientSyncWithBackoff(&clientInfo, &channelInfo, &clientCallbacks, pAwsCredentialProvider, &pSignalingClientHandle, this->pExponentialBackoffState));
 
 CleanUp:
 

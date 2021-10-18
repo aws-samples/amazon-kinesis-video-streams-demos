@@ -64,6 +64,7 @@ class Peer {
 
   private:
     Callbacks callbacks;
+    PExponentialBackoffState pExponentialBackoffState;
     PAwsCredentialProvider pAwsCredentialProvider;
     SIGNALING_CLIENT_HANDLE pSignalingClientHandle;
     std::recursive_mutex mutex;
