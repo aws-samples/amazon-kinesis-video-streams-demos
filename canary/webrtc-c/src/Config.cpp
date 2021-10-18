@@ -172,8 +172,7 @@ namespace Canary {
         CHK_STATUS(optenv(CACERT_PATH_ENV_VAR, &caCertPath, KVS_CA_CERT_PATH));
 
         if(useIotCredentialProvider.value) {
-            credFile = getenv(IOT_CORE_CREDENTIAL_ENDPOINT_ENV_VAR);
-//            CHK_STATUS(mustenv(IOT_CORE_CREDENTIAL_ENDPOINT_ENV_VAR, &iotCoreCredentialEndPointFile));
+            CHK_STATUS(mustenv(IOT_CORE_CREDENTIAL_ENDPOINT_ENV_VAR, &iotCoreCredentialEndPointFile));
             CHK_STATUS(mustenv(IOT_CORE_CERT_ENV_VAR, &iotCoreCert));
             CHK_STATUS(mustenv(IOT_CORE_PRIVATE_KEY_ENV_VAR, &iotCorePrivateKey));
             CHK_STATUS(mustenv(IOT_CORE_ROLE_ALIAS_ENV_VAR, &iotCoreRoleAlias));
@@ -193,8 +192,10 @@ namespace Canary {
             logLevel.value = (UINT32) logLevel64.value;
             logLevel.initialized = TRUE;
         }
-        CHK_STATUS(readFile(credFile, TRUE, NULL, &fileSize));
-        CHK_STATUS(readFile(credFile, TRUE, filePath, &fileSize));
+
+        CHK_STATUS(readFile((PCHAR)iotCoreCredentialEndPointFile.value.c_str(), TRUE, NULL, &fileSize));
+        CHK_STATUS(readFile((PCHAR)iotCoreCredentialEndPointFile.value.c_str(), TRUE, iotEndpoint, &fileSize));
+        iotEndpoint[fileSize - 1] = '\0';
 
         CHK_STATUS(optenv(CANARY_ENDPOINT_ENV_VAR, &endpoint, ""));
         CHK_STATUS(optenv(CANARY_LABEL_ENV_VAR, &label, CANARY_DEFAULT_LABEL));
@@ -251,11 +252,16 @@ namespace Canary {
               this->useTurn.value ? "True" : "False", this->logLevel.value, this->logGroupName.value.c_str(), this->logStreamName.value.c_str(),
               this->duration.value / HUNDREDS_OF_NANOS_IN_A_SECOND, this->iterationDuration.value / HUNDREDS_OF_NANOS_IN_A_SECOND,
               this->runBothPeers.value ? "True" : "False", this->useIotCredentialProvider.value ? "IoT" : "Static");
-
-        DLOGD("Endpoint: %s", this->filePath);
-        DLOGD("Cert: %s", this->iotCoreCert.value.c_str());
-        DLOGD("Role alias: %s", this->iotCoreRoleAlias.value.c_str());
-        DLOGD("Thing name: %s", this->channelName.value.c_str());
+        if(this->useIotCredentialProvider.value) {
+            DLOGD("\tIoT endpoint : %s\n"
+                  "\tIoT cert filename : %s\n"
+                  "\tIoT private key filename : %s\n"
+                  "\tIoT role alias : %s\n",
+                  (PCHAR) this->iotEndpoint,
+                  this->iotCoreCert.value.c_str(),
+                  this->iotCorePrivateKey.value.c_str(),
+                  this->iotCoreRoleAlias.value.c_str());
+        }
     }
 
     VOID jsonString(PBYTE pRaw, jsmntok_t token, Config::Value<std::string>* pResult)
@@ -291,6 +297,7 @@ namespace Canary {
         jsmn_parser parser;
         int r;
         BYTE raw[MAX_CONFIG_JSON_FILE_SIZE];
+        UINT64 fileSize;
         Config::Value<UINT64> logLevel64;
 
         CHK_STATUS(readFile(filePath, TRUE, NULL, &size));
@@ -342,12 +349,15 @@ namespace Canary {
                 logLevel.initialized = TRUE;
             }
 
-                // IoT credential provider related tokens
+            // IoT credential provider related tokens
             else if (compareJsonString((PCHAR) raw, &tokens[i], JSMN_STRING, (PCHAR) CANARY_USE_IOT_CREDENTIALS_ENV_VAR)) {
                 jsonBool(raw, tokens[++i], &useIotCredentialProvider);
             }
             else if (compareJsonString((PCHAR) raw, &tokens[i], JSMN_STRING, (PCHAR) IOT_CORE_CREDENTIAL_ENDPOINT_ENV_VAR)) {
                 jsonString(raw, tokens[++i], &iotCoreCredentialEndPointFile);
+                CHK_STATUS(readFile((PCHAR)iotCoreCredentialEndPointFile.value.c_str(), TRUE, NULL, &fileSize));
+                CHK_STATUS(readFile((PCHAR)iotCoreCredentialEndPointFile.value.c_str(), TRUE, iotEndpoint, &fileSize));
+                iotEndpoint[fileSize - 1] = '\0';
             }
             else if (compareJsonString((PCHAR) raw, &tokens[i], JSMN_STRING, (PCHAR) IOT_CORE_CERT_ENV_VAR)) {
                 jsonString(raw, tokens[++i], &iotCoreCert);
@@ -359,7 +369,7 @@ namespace Canary {
                 jsonString(raw, tokens[++i], &iotCoreRoleAlias);
             }
             else if (compareJsonString((PCHAR) raw, &tokens[i], JSMN_STRING, (PCHAR) IOT_CORE_THING_NAME_ENV_VAR)) {
-                jsonString(raw, tokens[++i], &iotCoreThingName);
+                jsonString(raw, tokens[++i], &channelName);
             }
         }
 

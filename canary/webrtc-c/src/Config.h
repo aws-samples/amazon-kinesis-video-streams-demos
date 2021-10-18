@@ -34,7 +34,6 @@ class Config {
     Value<std::string> iotCoreCert;
     Value<std::string> iotCorePrivateKey;
     Value<std::string> iotCoreRoleAlias;
-    Value<std::string> iotCoreThingName;
 
     // logging
     Value<UINT32> logLevel;
@@ -48,8 +47,7 @@ class Config {
 
     Value<std::string> caCertPath;
 
-    BYTE filePath[MAX_CONFIG_JSON_FILE_SIZE];
-    PCHAR credFile;
+    BYTE iotEndpoint[MAX_CONFIG_JSON_FILE_SIZE];
 
     VOID print();
 

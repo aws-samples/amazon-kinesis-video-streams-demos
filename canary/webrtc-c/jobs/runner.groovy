@@ -24,8 +24,7 @@ def buildProject(useMbedTLS) {
     sh """
         cd ./canary/webrtc-c/scripts &&
         chmod a+x cert_setup.sh &&
-        ./cert_setup.sh test &&
-        ls &&
+        ./cert_setup.sh ${NODE_NAME} &&
         cd .. &&
         mkdir -p build && 
         cd build && 
@@ -69,16 +68,10 @@ def buildPeer(isMaster, params) {
 
     def scripts_dir = "$WORKSPACE/canary/webrtc-c/scripts"
     def endpoint = "${scripts_dir}/iot-credential-provider.txt"
-    def core_cert_file = "${scripts_dir}/wtest_certificate.pem"
-    def private_key_file = "${scripts_dir}/wtest_private.key"
-    def role_alias = "wtest_role_alias"
-    def thing_name = "wtest_thing"
-
-    echo "Endpoint: ${endpoint}"
-    echo "cert file: ${core_cert_file}"
-    echo "private key file: ${private_key_file}"
-    echo "Role alias: ${role_alias}"
-    echo "thing name: ${thing_name}"
+    def core_cert_file = "${scripts_dir}/w${env.NODE_NAME}_certificate.pem"
+    def private_key_file = "${scripts_dir}/w${env.NODE_NAME}_private.key"
+    def role_alias = "w${env.NODE_NAME}_role_alias"
+    def thing_name = "w${env.NODE_NAME}_thing"
 
     def envs = [
       'AWS_KVS_LOG_LEVEL': params.AWS_KVS_LOG_LEVEL,
@@ -182,8 +175,7 @@ pipeline {
 
                     steps {
                         script {
-//                             buildPeer(false, params)
-                            echo "Test viewer"
+                            buildPeer(false, params)
                         }
                     }
                 }
