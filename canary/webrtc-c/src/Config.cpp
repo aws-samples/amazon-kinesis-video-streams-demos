@@ -171,8 +171,11 @@ namespace Canary {
 
         CHK_STATUS(optenv(CACERT_PATH_ENV_VAR, &caCertPath, KVS_CA_CERT_PATH));
 
-        if(useIotCredentialProvider.value) {
+        if(useIotCredentialProvider.value == TRUE) {
             CHK_STATUS(mustenv(IOT_CORE_CREDENTIAL_ENDPOINT_ENV_VAR, &iotCoreCredentialEndPointFile));
+            CHK_STATUS(readFile((PCHAR)iotCoreCredentialEndPointFile.value.c_str(), TRUE, NULL, &fileSize));
+            CHK_STATUS(readFile((PCHAR)iotCoreCredentialEndPointFile.value.c_str(), TRUE, iotEndpoint, &fileSize));
+            iotEndpoint[fileSize - 1] = '\0';
             CHK_STATUS(mustenv(IOT_CORE_CERT_ENV_VAR, &iotCoreCert));
             CHK_STATUS(mustenv(IOT_CORE_PRIVATE_KEY_ENV_VAR, &iotCorePrivateKey));
             CHK_STATUS(mustenv(IOT_CORE_ROLE_ALIAS_ENV_VAR, &iotCoreRoleAlias));
@@ -192,10 +195,6 @@ namespace Canary {
             logLevel.value = (UINT32) logLevel64.value;
             logLevel.initialized = TRUE;
         }
-
-        CHK_STATUS(readFile((PCHAR)iotCoreCredentialEndPointFile.value.c_str(), TRUE, NULL, &fileSize));
-        CHK_STATUS(readFile((PCHAR)iotCoreCredentialEndPointFile.value.c_str(), TRUE, iotEndpoint, &fileSize));
-        iotEndpoint[fileSize - 1] = '\0';
 
         CHK_STATUS(optenv(CANARY_ENDPOINT_ENV_VAR, &endpoint, ""));
         CHK_STATUS(optenv(CANARY_LABEL_ENV_VAR, &label, CANARY_DEFAULT_LABEL));

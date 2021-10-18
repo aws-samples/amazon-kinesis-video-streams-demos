@@ -101,20 +101,34 @@ def buildPeer(isMaster, params) {
 }
 
 def buildSignaling(params) {
-    def envs = [
-      'AWS_KVS_LOG_LEVEL': params.AWS_KVS_LOG_LEVEL,
-      'CANARY_LOG_GROUP_NAME': params.LOG_GROUP_NAME,
-      'CANARY_LOG_STREAM_NAME': "${params.RUNNER_LABEL}-Signaling-${START_TIMESTAMP}",
-      'CANARY_CHANNEL_NAME': "${env.JOB_NAME}-${params.RUNNER_LABEL}",
-      'CANARY_LABEL': params.SCENARIO_LABEL,
-      'CANARY_DURATION_IN_SECONDS': params.DURATION_IN_SECONDS
-    ].collect({ k, v -> "${k}=${v}" })
-    
+
     // TODO: get the branch and version from orchestrator
     if (params.FIRST_ITERATION) {
         deleteDir()
     }
     buildProject(params.USE_MBEDTLS)
+
+    def scripts_dir = "$WORKSPACE/canary/webrtc-c/scripts"
+    def endpoint = "${scripts_dir}/iot-credential-provider.txt"
+    def core_cert_file = "${scripts_dir}/w${env.NODE_NAME}_certificate.pem"
+    def private_key_file = "${scripts_dir}/w${env.NODE_NAME}_private.key"
+    def role_alias = "w${env.NODE_NAME}_role_alias"
+    def thing_name = "w${env.NODE_NAME}_thing"
+
+    def envs = [
+      'AWS_KVS_LOG_LEVEL': params.AWS_KVS_LOG_LEVEL,
+      'CANARY_LOG_GROUP_NAME': params.LOG_GROUP_NAME,
+      'CANARY_USE_IOT_PROVIDER': params.USE_IOT,
+      'CANARY_LOG_STREAM_NAME': "${params.RUNNER_LABEL}-Signaling-${START_TIMESTAMP}",
+      'CANARY_CHANNEL_NAME': "${env.JOB_NAME}-${params.RUNNER_LABEL}",
+      'CANARY_LABEL': params.SCENARIO_LABEL,
+      'CANARY_DURATION_IN_SECONDS': params.DURATION_IN_SECONDS,
+      'AWS_IOT_CORE_CREDENTIAL_ENDPOINT': "${endpoint}",
+      'AWS_IOT_CORE_CERT': "${core_cert_file}",
+      'AWS_IOT_CORE_PRIVATE_KEY': "${private_key_file}",
+      'AWS_IOT_CORE_ROLE_ALIAS': "${role_alias}",
+      'AWS_IOT_CORE_THING_NAME': "${thing_name}"
+    ].collect({ k, v -> "${k}=${v}" })
 
     withRunnerWrapper(envs) {
         sh """
