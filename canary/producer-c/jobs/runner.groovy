@@ -20,11 +20,10 @@ def buildProducer() {
     cd ./canary/producer-c && 
     chmod a+x cert_setup.sh &&
     ./cert_setup.sh ${NODE_NAME} &&
-    ls &&
     mkdir -p build &&
     cd build && 
     cmake .. && 
-    make -j
+    make -j4
   """
 }
 
@@ -87,13 +86,13 @@ def runClient(isProducer, params) {
     if(isProducer) {
         buildProducer()
     }
-    // else {
-    //     // This is to make sure that the consumer does not make RUNNING_NODES
-    //     // zero before producer build starts. Should handle this in a better
-    //     // way
-    //     sleep consumerStartUpDelay
-    //     buildConsumer(consumerEnvs)   
-    // }
+    else {
+        // This is to make sure that the consumer does not make RUNNING_NODES
+        // zero before producer build starts. Should handle this in a better
+        // way
+        sleep consumerStartUpDelay
+        buildConsumer(consumerEnvs)
+    }
 
     RUNNING_NODES--
     echo "Number of running nodes after build: ${RUNNING_NODES}"
@@ -190,20 +189,20 @@ pipeline {
                         }
                     }
                 }
-                // stage('Consumer') {
-                //     agent {
-                //         label params.CONSUMER_NODE_LABEL
-                //     }
-                //     steps {
-                //         script {
+                stage('Consumer') {
+                    agent {
+                        label params.CONSUMER_NODE_LABEL
+                    }
+                    steps {
+                        script {
 
-                //             // Only run consumer if it is not intermittent scenario
-                //             if(params.CANARY_RUN_SCENARIO == "Continuous") {
-                //                     runClient(false, params)
-                //             }
-                //         }
-                //     }                
-                // }
+                            // Only run consumer if it is not intermittent scenario
+                            if(params.CANARY_RUN_SCENARIO == "Continuous") {
+                                    runClient(false, params)
+                            }
+                        }
+                    }
+                }
             }
         }
 
