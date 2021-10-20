@@ -30,11 +30,10 @@ class Config {
     Value<std::string> secretKey;
     Value<std::string> sessionToken;
     Value<std::string> region;
-    Value<std::string> iotCoreCredentialEndPoint;
+    Value<std::string> iotCoreCredentialEndPointFile;
     Value<std::string> iotCoreCert;
     Value<std::string> iotCorePrivateKey;
     Value<std::string> iotCoreRoleAlias;
-    Value<std::string> iotCoreThingName;
 
     // logging
     Value<UINT32> logLevel;
@@ -47,6 +46,8 @@ class Config {
     Value<UINT64> frameRate;
 
     Value<std::string> caCertPath;
+
+    BYTE iotEndpoint[MAX_CONFIG_JSON_FILE_SIZE];
 
     VOID print();
 
