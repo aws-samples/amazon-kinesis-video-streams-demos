@@ -75,6 +75,7 @@ extern "C" {
 #define CANARY_TRACK_TYPE_STR_LEN          20
 #define IOT_ENDPOINT_LENGTH                1023
 
+
 #define STATUS_PRODUCER_CANARY_BASE                    0x80000000
 #define STATUS_PRODUCER_EMPTY_IOT_CRED_FILE            STATUS_PRODUCER_CANARY_BASE + 0x00000001
 
@@ -93,11 +94,11 @@ typedef struct {
     CHAR canaryScenario[CANARY_LABEL_LEN + 1];
     CHAR canaryTrackType[CANARY_TRACK_TYPE_STR_LEN + 1];
     CHAR iotCoreCredentialEndPointFile[MAX_URI_CHAR_LEN + 1];
-    BYTE iotEndpoint[IOT_ENDPOINT_LENGTH + 1];
+    BYTE iotEndpoint[MAX_URI_CHAR_LEN + 1];
     CHAR iotCoreCert[MAX_PATH_LEN + 1];
     CHAR iotCorePrivateKey[MAX_PATH_LEN + 1];
     CHAR iotCoreRoleAlias[MAX_ROLE_ALIAS_LEN + 1];
-    CHAR iotThingName[MAX_IOT_THING_NAME_LEN + 1];
+    CHAR iotThingName[CANARY_STREAM_NAME_STR_LEN + 1];
     UINT64 fragmentSizeInBytes;
     UINT64 canaryDuration;
     UINT64 bufferDuration;
