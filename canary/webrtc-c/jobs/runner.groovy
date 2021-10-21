@@ -24,7 +24,7 @@ def buildProject(useMbedTLS) {
     sh """
         cd ./canary/webrtc-c/scripts &&
         chmod a+x cert_setup.sh &&
-        ./cert_setup.sh ${NODE_NAME} &&
+        ./cert_setup.sh test2 &&
         cd .. &&
         mkdir -p build && 
         cd build && 
@@ -68,10 +68,10 @@ def buildPeer(isMaster, params) {
 
     def scripts_dir = "$WORKSPACE/canary/webrtc-c/scripts"
     def endpoint = "${scripts_dir}/iot-credential-provider.txt"
-    def core_cert_file = "${scripts_dir}/w${env.NODE_NAME}_certificate.pem"
-    def private_key_file = "${scripts_dir}/w${env.NODE_NAME}_private.key"
-    def role_alias = "w${env.NODE_NAME}_role_alias"
-    def thing_name = "w${env.NODE_NAME}_thing"
+    def core_cert_file = "${scripts_dir}/wtest2_certificate.pem"
+    def private_key_file = "${scripts_dir}/wtest2_private.key"
+    def role_alias = "wtest2_role_alias"
+    def thing_name = "wtest2_thing"
 
     def envs = [
       'AWS_KVS_LOG_LEVEL': params.AWS_KVS_LOG_LEVEL,
@@ -110,10 +110,10 @@ def buildSignaling(params) {
 
     def scripts_dir = "$WORKSPACE/canary/webrtc-c/scripts"
     def endpoint = "${scripts_dir}/iot-credential-provider.txt"
-    def core_cert_file = "${scripts_dir}/w${env.NODE_NAME}_certificate.pem"
-    def private_key_file = "${scripts_dir}/w${env.NODE_NAME}_private.key"
-    def role_alias = "w${env.NODE_NAME}_role_alias"
-    def thing_name = "w${env.NODE_NAME}_thing"
+    def core_cert_file = "${scripts_dir}/wtest2_certificate.pem"
+    def private_key_file = "${scripts_dir}/wtest2_private.key"
+    def role_alias = "wtest2_role_alias"
+    def thing_name = "wtest2_thing"
 
     def envs = [
       'AWS_KVS_LOG_LEVEL': params.AWS_KVS_LOG_LEVEL,
