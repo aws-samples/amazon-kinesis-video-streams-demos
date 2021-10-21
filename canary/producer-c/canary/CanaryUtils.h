@@ -67,11 +67,17 @@ extern "C" {
 #define CANARY_DEFAULT_CANARY_LABEL        (PCHAR) "Longrun"
 #define CANARY_DEFAULT_TRACK_TYPE          CANARY_SINGLE_TRACK_TYPE
 
-#define CANARY_TYPE_STR_LEN        10
-#define CANARY_STREAM_NAME_STR_LEN 200
-#define CANARY_LABEL_LEN           40
-#define MAX_LOG_FILE_NAME_LEN      300
-#define CANARY_TRACK_TYPE_STR_LEN  20
+#define CANARY_TYPE_STR_LEN                20
+#define CANARY_STREAM_NAME_STR_LEN         255
+#define CANARY_STREAM_NAME_PREFIX_LEN      125
+#define CANARY_LABEL_LEN                   40
+#define MAX_LOG_FILE_NAME_LEN              300
+#define CANARY_TRACK_TYPE_STR_LEN          20
+#define IOT_ENDPOINT_LENGTH                1023
+
+
+#define STATUS_PRODUCER_CANARY_BASE                    0x80000000
+#define STATUS_PRODUCER_EMPTY_IOT_CRED_FILE            STATUS_PRODUCER_CANARY_BASE + 0x00000001
 
 struct __CallbackStateMachine;
 struct __CallbacksProvider;
@@ -82,16 +88,17 @@ struct __CallbacksProvider;
 
 typedef struct {
     BOOL useIotCredentialProvider;
-    CHAR streamNamePrefix[CANARY_STREAM_NAME_STR_LEN + 1];
+    CHAR streamNamePrefix[CANARY_STREAM_NAME_PREFIX_LEN + 1];
     CHAR canaryTypeStr[CANARY_TYPE_STR_LEN + 1];
     CHAR canaryLabel[CANARY_LABEL_LEN + 1];
     CHAR canaryScenario[CANARY_LABEL_LEN + 1];
     CHAR canaryTrackType[CANARY_TRACK_TYPE_STR_LEN + 1];
-    CHAR iotCoreCredentialEndPoint[MAX_URI_CHAR_LEN + 1];
+    CHAR iotCoreCredentialEndPointFile[MAX_URI_CHAR_LEN + 1];
+    BYTE iotEndpoint[MAX_URI_CHAR_LEN + 1];
     CHAR iotCoreCert[MAX_PATH_LEN + 1];
     CHAR iotCorePrivateKey[MAX_PATH_LEN + 1];
     CHAR iotCoreRoleAlias[MAX_ROLE_ALIAS_LEN + 1];
-    CHAR iotThingName[MAX_IOT_THING_NAME_LEN + 1];
+    CHAR iotThingName[CANARY_STREAM_NAME_STR_LEN + 1];
     UINT64 fragmentSizeInBytes;
     UINT64 canaryDuration;
     UINT64 bufferDuration;

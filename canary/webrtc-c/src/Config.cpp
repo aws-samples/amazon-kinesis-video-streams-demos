@@ -160,9 +160,10 @@ STATUS Config::initWithEnvVars()
     STATUS retStatus = STATUS_SUCCESS;
     Config::Value<UINT64> logLevel64;
     std::stringstream defaultLogStreamName;
+    UINT64 fileSize;
 
     /* This is ignored for master. Master can extract the info from offer. Viewer has to know if peer can trickle or
-     * not ahead of time. */
+    * not ahead of time. */
     CHK_STATUS(optenvBool(CANARY_TRICKLE_ICE_ENV_VAR, &trickleIce, FALSE));
     CHK_STATUS(optenvBool(CANARY_USE_TURN_ENV_VAR, &useTurn, TRUE));
     CHK_STATUS(optenvBool(CANARY_FORCE_TURN_ENV_VAR, &forceTurn, FALSE));
@@ -170,8 +171,12 @@ STATUS Config::initWithEnvVars()
 
     CHK_STATUS(optenv(CACERT_PATH_ENV_VAR, &caCertPath, KVS_CA_CERT_PATH));
 
-    if(useIotCredentialProvider.value) {
-        CHK_STATUS(mustenv(IOT_CORE_CREDENTIAL_ENDPOINT_ENV_VAR, &iotCoreCredentialEndPoint));
+    if(useIotCredentialProvider.value == TRUE) {
+        CHK_STATUS(mustenv(IOT_CORE_CREDENTIAL_ENDPOINT_ENV_VAR, &iotCoreCredentialEndPointFile));
+        CHK_STATUS(readFile((PCHAR)iotCoreCredentialEndPointFile.value.c_str(), TRUE, NULL, &fileSize));
+        CHK_ERR(fileSize != 0, STATUS_WEBRTC_EMPTY_IOT_CRED_FILE, "Empty credential file");
+        CHK_STATUS(readFile((PCHAR)iotCoreCredentialEndPointFile.value.c_str(), TRUE, iotEndpoint, &fileSize));
+        iotEndpoint[fileSize - 1] = '\0';
         CHK_STATUS(mustenv(IOT_CORE_CERT_ENV_VAR, &iotCoreCert));
         CHK_STATUS(mustenv(IOT_CORE_PRIVATE_KEY_ENV_VAR, &iotCorePrivateKey));
         CHK_STATUS(mustenv(IOT_CORE_ROLE_ALIAS_ENV_VAR, &iotCoreRoleAlias));
@@ -201,7 +206,7 @@ STATUS Config::initWithEnvVars()
 
     CHK_STATUS(optenv(CANARY_LOG_GROUP_NAME_ENV_VAR, &this->logGroupName, CANARY_DEFAULT_LOG_GROUP_NAME));
     defaultLogStreamName << channelName.value << '-' << (isMaster.value ? "master" : "viewer") << '-'
-                         << GETTIME() / HUNDREDS_OF_NANOS_IN_A_MILLISECOND;
+                          << GETTIME() / HUNDREDS_OF_NANOS_IN_A_MILLISECOND;
     CHK_STATUS(optenv(CANARY_LOG_STREAM_NAME_ENV_VAR, &this->logStreamName, defaultLogStreamName.str()));
 
     if (!duration.initialized) {
@@ -247,6 +252,16 @@ VOID Config::print()
           this->useTurn.value ? "True" : "False", this->logLevel.value, this->logGroupName.value.c_str(), this->logStreamName.value.c_str(),
           this->duration.value / HUNDREDS_OF_NANOS_IN_A_SECOND, this->iterationDuration.value / HUNDREDS_OF_NANOS_IN_A_SECOND,
           this->runBothPeers.value ? "True" : "False", this->useIotCredentialProvider.value ? "IoT" : "Static");
+    if(this->useIotCredentialProvider.value) {
+        DLOGD("\tIoT endpoint : %s\n"
+              "\tIoT cert filename : %s\n"
+              "\tIoT private key filename : %s\n"
+              "\tIoT role alias : %s\n",
+              (PCHAR) this->iotEndpoint,
+              this->iotCoreCert.value.c_str(),
+              this->iotCorePrivateKey.value.c_str(),
+              this->iotCoreRoleAlias.value.c_str());
+    }
 }
 
 VOID jsonString(PBYTE pRaw, jsmntok_t token, Config::Value<std::string>* pResult)
@@ -282,6 +297,7 @@ STATUS Config::initWithJSON(PCHAR filePath)
     jsmn_parser parser;
     int r;
     BYTE raw[MAX_CONFIG_JSON_FILE_SIZE];
+    UINT64 fileSize;
     Config::Value<UINT64> logLevel64;
 
     CHK_STATUS(readFile(filePath, TRUE, NULL, &size));
@@ -338,7 +354,11 @@ STATUS Config::initWithJSON(PCHAR filePath)
             jsonBool(raw, tokens[++i], &useIotCredentialProvider);
         }
         else if (compareJsonString((PCHAR) raw, &tokens[i], JSMN_STRING, (PCHAR) IOT_CORE_CREDENTIAL_ENDPOINT_ENV_VAR)) {
-            jsonString(raw, tokens[++i], &iotCoreCredentialEndPoint);
+            jsonString(raw, tokens[++i], &iotCoreCredentialEndPointFile);
+            CHK_STATUS(readFile((PCHAR)iotCoreCredentialEndPointFile.value.c_str(), TRUE, NULL, &fileSize));
+            CHK_ERR(fileSize != 0, STATUS_WEBRTC_EMPTY_IOT_CRED_FILE, "Empty credential file");
+            CHK_STATUS(readFile((PCHAR)iotCoreCredentialEndPointFile.value.c_str(), TRUE, iotEndpoint, &fileSize));
+            iotEndpoint[fileSize - 1] = '\0';
         }
         else if (compareJsonString((PCHAR) raw, &tokens[i], JSMN_STRING, (PCHAR) IOT_CORE_CERT_ENV_VAR)) {
             jsonString(raw, tokens[++i], &iotCoreCert);
@@ -350,7 +370,7 @@ STATUS Config::initWithJSON(PCHAR filePath)
             jsonString(raw, tokens[++i], &iotCoreRoleAlias);
         }
         else if (compareJsonString((PCHAR) raw, &tokens[i], JSMN_STRING, (PCHAR) IOT_CORE_THING_NAME_ENV_VAR)) {
-            jsonString(raw, tokens[++i], &iotCoreThingName);
+            jsonString(raw, tokens[++i], &channelName);
         }
     }
 

@@ -17,8 +17,10 @@ CREDENTIALS = [
 
 def buildProducer() {
   sh  """
-    cd $WORKSPACE/canary/producer-c && 
-    mkdir -p build
+    cd ./canary/producer-c && 
+    chmod a+x cert_setup.sh &&
+    ./cert_setup.sh ${NODE_NAME} &&
+    mkdir -p build &&
     cd build && 
     cmake .. && 
     make -j4
@@ -54,18 +56,9 @@ def withRunnerWrapper(envs, fn) {
 }
 
 def runClient(isProducer, params) {
-    def envs = [
+    def consumerEnvs = [        
         'JAVA_HOME': "/opt/jdk-13.0.1",
-        'M2_HOME': "/opt/apache-maven-3.6.3",
-        'AWS_KVS_LOG_LEVEL': params.AWS_KVS_LOG_LEVEL,
-        'CANARY_STREAM_NAME': "${env.JOB_NAME}",
-        'CANARY_LABEL': "${params.RUNNER_LABEL}",
-        'CANARY_TYPE': params.CANARY_TYPE,
-        'FRAGMENT_SIZE_IN_BYTES' : params.FRAGMENT_SIZE_IN_BYTES,
-        'CANARY_DURATION_IN_SECONDS': params.CANARY_DURATION_IN_SECONDS,
-        'AWS_DEFAULT_REGION': params.AWS_DEFAULT_REGION,
-        'CANARY_RUN_SCENARIO': "${params.CANARY_RUN_SCENARIO}",
-        'TRACK_TYPE': "${params.TRACK_TYPE}",
+        'M2_HOME': "/opt/apache-maven-3.6.3"
     ].collect({k,v -> "${k}=${v}" })
 
     // TODO: get the branch and version from orchestrator
@@ -78,7 +71,7 @@ def runClient(isProducer, params) {
         """
     }
     
-    def consumerStartUpDelay = 30
+    def consumerStartUpDelay = 45
     echo "NODE_NAME = ${env.NODE_NAME}"
     checkout([
         scm: [
@@ -98,7 +91,7 @@ def runClient(isProducer, params) {
         // zero before producer build starts. Should handle this in a better
         // way
         sleep consumerStartUpDelay
-        buildConsumer(envs)   
+        buildConsumer(consumerEnvs)
     }
 
     RUNNING_NODES--
@@ -108,6 +101,33 @@ def runClient(isProducer, params) {
     }
     
     echo "Done waiting in NODE_NAME = ${env.NODE_NAME}"
+
+    def scripts_dir = "$WORKSPACE/canary/producer-c"
+    def endpoint = "${scripts_dir}/iot-credential-provider.txt"
+    def core_cert_file = "${scripts_dir}/p${env.NODE_NAME}_certificate.pem"
+    def private_key_file = "${scripts_dir}/p${env.NODE_NAME}_private.key"
+    def role_alias = "p${env.NODE_NAME}_role_alias"
+    def thing_name = "p${env.NODE_NAME}_thing"
+
+    def envs = [
+        'JAVA_HOME': "/opt/jdk-13.0.1",
+        'M2_HOME': "/opt/apache-maven-3.6.3",
+        'AWS_KVS_LOG_LEVEL': params.AWS_KVS_LOG_LEVEL,
+        'CANARY_STREAM_NAME': "${env.JOB_NAME}",
+        'CANARY_LABEL': params.RUNNER_LABEL,
+        'CANARY_TYPE': params.CANARY_TYPE,
+        'FRAGMENT_SIZE_IN_BYTES' : params.FRAGMENT_SIZE_IN_BYTES,
+        'CANARY_DURATION_IN_SECONDS': params.CANARY_DURATION_IN_SECONDS,
+        'AWS_DEFAULT_REGION': params.AWS_DEFAULT_REGION,
+        'CANARY_RUN_SCENARIO': params.CANARY_RUN_SCENARIO,
+        'TRACK_TYPE': params.TRACK_TYPE,
+        'CANARY_USE_IOT_PROVIDER': params.USE_IOT,
+        'AWS_IOT_CORE_CREDENTIAL_ENDPOINT': "${endpoint}",
+        'AWS_IOT_CORE_CERT': "${core_cert_file}",
+        'AWS_IOT_CORE_PRIVATE_KEY': "${private_key_file}",
+        'AWS_IOT_CORE_ROLE_ALIAS': "${role_alias}",
+        'AWS_IOT_CORE_THING_NAME': "${thing_name}"
+    ].collect({k,v -> "${k}=${v}" })
 
     if(!isProducer) {
         // Run consumer
@@ -122,7 +142,8 @@ def runClient(isProducer, params) {
         withRunnerWrapper(envs) {
             sh """
                 echo "Running producer"
-                cd $WORKSPACE/canary/producer-c/build && 
+                ls ./canary/producer-c
+                cd ./canary/producer-c/build && 
                 ./kvsProducerSampleCloudwatch
             """
         }
@@ -149,6 +170,7 @@ pipeline {
         string(name: 'CANARY_RUN_SCENARIO')
         string(name: 'TRACK_TYPE')
         booleanParam(name: 'FIRST_ITERATION', defaultValue: true)
+        booleanParam(name: 'USE_IOT')
     }
 
     stages {
@@ -179,7 +201,7 @@ pipeline {
                                     runClient(false, params)
                             }
                         }
-                    }                
+                    }
                 }
             }
         }
@@ -201,6 +223,8 @@ pipeline {
                 build(
                     job: env.JOB_NAME,
                             parameters: [
+                                string(name: 'AWS_KVS_LOG_LEVEL', value: params.AWS_KVS_LOG_LEVEL),
+                                booleanParam(name: 'USE_IOT', value: params.USE_IOT),
                                 string(name: 'PRODUCER_NODE_LABEL', value: params.PRODUCER_NODE_LABEL),
                                 string(name: 'CONSUMER_NODE_LABEL', value: params.CONSUMER_NODE_LABEL),
                                 string(name: 'GIT_URL', value: params.GIT_URL),

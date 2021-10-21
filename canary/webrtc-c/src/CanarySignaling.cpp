@@ -299,8 +299,19 @@ STATUS run(Canary::PConfig pConfig)
     CHK_STATUS(timerQueueCreate(&timerQueueHandle));
 
     // We will create a static credential provider. We can replace it with others if needed.
-    CHK_STATUS(createStaticCredentialProvider((PCHAR) pConfig->accessKey.value.c_str(), 0, (PCHAR) pConfig->secretKey.value.c_str(), 0,
-                                              (PCHAR) pConfig->sessionToken.value.c_str(), 0, MAX_UINT64, &pCredentialProvider));
+    if(pConfig->useIotCredentialProvider.value) {
+        CHK_STATUS(createLwsIotCredentialProvider((PCHAR) pConfig->iotEndpoint,
+                                                  (PCHAR) pConfig->iotCoreCert.value.c_str(),
+                                                  (PCHAR) pConfig->iotCorePrivateKey.value.c_str(),
+                                                  (PCHAR) pConfig->caCertPath.value.c_str(),
+                                                  (PCHAR) pConfig->iotCoreRoleAlias.value.c_str(),
+                                                  (PCHAR) pConfig->channelName.value.c_str(),
+                                                  &pCredentialProvider));
+    }
+    else {
+        CHK_STATUS(createStaticCredentialProvider((PCHAR) pConfig->accessKey.value.c_str(), 0, (PCHAR) pConfig->secretKey.value.c_str(), 0,
+                                                  (PCHAR) pConfig->sessionToken.value.c_str(), 0, MAX_UINT64, &pCredentialProvider));
+    }
 
     // Generate a random channel name if not specified in the config.
     // In case we generate the random name we will follow-up with deleting
@@ -418,7 +429,12 @@ CleanUp:
     }
 
     if (pCredentialProvider != NULL) {
-        freeStaticCredentialProvider(&pCredentialProvider);
+        if(pConfig->useIotCredentialProvider.value) {
+            freeIotCredentialProvider(&pCredentialProvider);
+        }
+        else {
+            freeStaticCredentialProvider(&pCredentialProvider);
+        }
     }
 
     if (IS_VALID_MUTEX_VALUE(lock)) {

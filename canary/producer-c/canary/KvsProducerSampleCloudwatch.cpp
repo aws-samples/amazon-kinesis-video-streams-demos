@@ -1,4 +1,3 @@
-
 #include "CanaryUtils.h"
 
 volatile ATOMIC_BOOL sigCaptureInterrupt;
@@ -117,11 +116,18 @@ STATUS parseConfigFile(PCanaryConfig pCanaryConfig, PCHAR filePath)
         } else if (compareJsonString((PCHAR) params, &tokens[i], JSMN_STRING, CANARY_TRACK_TYPE_ENV_VAR)) {
             getJsonValue(params, tokens[i + 1], pCanaryConfig->canaryTrackType);
             i++;
-        } else if (compareJsonString((PCHAR) params, &tokens[i], JSMN_STRING, (PCHAR) CANARY_USE_IOT_CREDENTIALS_ENV_VAR)) {
+        }
+
+        // IoT related items
+        else if (compareJsonString((PCHAR) params, &tokens[i], JSMN_STRING, (PCHAR) CANARY_USE_IOT_CREDENTIALS_ENV_VAR)) {
             getJsonBoolValue(params, tokens[++i], &pCanaryConfig->useIotCredentialProvider);
             i++;
         } else if (compareJsonString((PCHAR) params, &tokens[i], JSMN_STRING, (PCHAR) IOT_CORE_CREDENTIAL_ENDPOINT_ENV_VAR)) {
-            getJsonValue(params, tokens[i + 1], pCanaryConfig->iotCoreCredentialEndPoint);
+            getJsonValue(params, tokens[i + 1], pCanaryConfig->iotCoreCredentialEndPointFile);
+            CHK_STATUS(readFile(pCanaryConfig->iotCoreCredentialEndPointFile, TRUE, NULL, &size));
+            CHK_ERR(size != 0, STATUS_PRODUCER_EMPTY_IOT_CRED_FILE, "Empty credential file");
+            CHK_STATUS(readFile(pCanaryConfig->iotCoreCredentialEndPointFile, TRUE,pCanaryConfig->iotEndpoint, &size));
+            pCanaryConfig->iotEndpoint[size - 1] = '\0';
             i++;
         } else if (compareJsonString((PCHAR) params, &tokens[i], JSMN_STRING, (PCHAR) IOT_CORE_CERT_ENV_VAR)) {
             getJsonValue(params, tokens[i + 1], pCanaryConfig->iotCoreCert);
@@ -200,7 +206,7 @@ CleanUp:
 STATUS printConfig(PCanaryConfig pCanaryConfig)
 {
     STATUS retStatus = STATUS_SUCCESS;
-    DLOGI("Canary Stream name prefix: %s", pCanaryConfig->streamNamePrefix);
+    DLOGI("Canary Stream name prefix: %s", pCanaryConfig->useIotCredentialProvider ? pCanaryConfig->iotThingName : pCanaryConfig->streamNamePrefix);
     DLOGI("Canary type: %s", pCanaryConfig->canaryTypeStr);
     DLOGI("Fragment size in bytes: %llu bytes", pCanaryConfig->fragmentSizeInBytes);
     DLOGI("Canary duration: %llu seconds", pCanaryConfig->canaryDuration);
@@ -209,8 +215,13 @@ STATUS printConfig(PCanaryConfig pCanaryConfig)
     DLOGI("Canary scenario: %s", pCanaryConfig->canaryScenario);
     DLOGI("Canary track type: %s", pCanaryConfig->canaryTrackType);
     DLOGI("Credential type: %s", pCanaryConfig->useIotCredentialProvider ? "IoT" : "Static");
-    DLOGI("IOT Thing name: %s", pCanaryConfig->iotThingName);
 
+    if(pCanaryConfig->useIotCredentialProvider == TRUE) {
+        DLOGI("IOT Endpoint: %s", pCanaryConfig->iotEndpoint);
+        DLOGI("IOT Cert file: %s", pCanaryConfig->iotCoreCert);
+        DLOGI("IOT Private Key: %s", pCanaryConfig->iotCorePrivateKey);
+        DLOGI("IOT Role Alias: %s", pCanaryConfig->iotCoreRoleAlias);
+    }
 CleanUp:
     return retStatus;
 }
@@ -219,6 +230,7 @@ STATUS initWithEnvVars(PCanaryConfig pCanaryConfig)
 {
     STATUS retStatus = STATUS_SUCCESS;
     PCHAR type;
+    UINT64 size;
     CHAR canaryType[CANARY_TYPE_STR_LEN + 1];
     CHAR streamName[CANARY_STREAM_NAME_STR_LEN + 1];
     CHAR canaryLabel[CANARY_LABEL_LEN + 1];
@@ -252,7 +264,11 @@ STATUS initWithEnvVars(PCanaryConfig pCanaryConfig)
     pCanaryConfig->bufferDuration = pCanaryConfig->bufferDuration * HUNDREDS_OF_NANOS_IN_A_SECOND;
 
     if (pCanaryConfig->useIotCredentialProvider) {
-        CHK_STATUS(mustenv(IOT_CORE_CREDENTIAL_ENDPOINT_ENV_VAR, pCanaryConfig->iotCoreCredentialEndPoint));
+        CHK_STATUS(mustenv(IOT_CORE_CREDENTIAL_ENDPOINT_ENV_VAR, pCanaryConfig->iotCoreCredentialEndPointFile));
+        CHK_STATUS(readFile(pCanaryConfig->iotCoreCredentialEndPointFile, TRUE, NULL, &size));
+        CHK_ERR(size != 0, STATUS_PRODUCER_EMPTY_IOT_CRED_FILE, "Empty credential file");
+        CHK_STATUS(readFile(pCanaryConfig->iotCoreCredentialEndPointFile, TRUE, pCanaryConfig->iotEndpoint, &size));
+        pCanaryConfig->iotEndpoint[size - 1] = '\0';
         CHK_STATUS(mustenv(IOT_CORE_CERT_ENV_VAR, pCanaryConfig->iotCoreCert));
         CHK_STATUS(mustenv(IOT_CORE_PRIVATE_KEY_ENV_VAR, pCanaryConfig->iotCorePrivateKey));
         CHK_STATUS(mustenv(IOT_CORE_ROLE_ALIAS_ENV_VAR, pCanaryConfig->iotCoreRoleAlias));
@@ -378,7 +394,7 @@ INT32 main(INT32 argc, CHAR* argv[])
                                                           &pClientCallbacks));
 
         if (config.useIotCredentialProvider) {
-            CHK_STATUS(createDefaultCallbacksProviderWithIotCertificate(config.iotCoreCredentialEndPoint, config.iotCoreCert,
+            CHK_STATUS(createDefaultCallbacksProviderWithIotCertificate((PCHAR)config.iotEndpoint, config.iotCoreCert,
                                                                         config.iotCorePrivateKey, cacertPath, config.iotCoreRoleAlias, streamName,
                                                                         region, NULL, NULL, &pClientCallbacks));
         } else {
