@@ -59,7 +59,7 @@ echo '{
 # Next, you must attach a permissions policy to the IAM role you created above. 
 aws --profile default iam put-role-policy --role-name $iotRoleName --policy-name $kvsPolicyName --policy-document 'file://iam-permission-document.json' 
 # Next, create a Role Alias for your IAM Role
-aws --profile default  iot create-role-alias --role-alias $iotRoleAlias --role-arn $(jq --raw-output '.Role.Arn' iam-role.json) --credential-duration-seconds 3600 > iot-role-alias.json
+aws --profile default  iot create-role-alias --role-alias $iotRoleAlias --role-arn $(jq --raw-output '.Role.Arn' iam-role.json) --credential-duration-seconds 43200 > iot-role-alias.json
 
 # You can use the following command to create the iot-policy-document.json document JSON:
 cat > iot-policy-document.json <<EOF
