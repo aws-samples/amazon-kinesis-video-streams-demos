@@ -167,8 +167,7 @@ STATUS Peer::initSignaling(const Canary::PConfig pConfig)
 
         return retStatus;
     };
-    CHK_STATUS(exponentialBackoffStateWithDefaultConfigCreate(&this->pExponentialBackoffState));
-    CHK_STATUS(createSignalingClientSyncWithBackoff(&clientInfo, &channelInfo, &clientCallbacks, pAwsCredentialProvider, &pSignalingClientHandle, this->pExponentialBackoffState));
+    CHK_STATUS(createSignalingClientSyncWithBackoff(&clientInfo, &channelInfo, &clientCallbacks, pAwsCredentialProvider, &pSignalingClientHandle));
 
 CleanUp:
 
