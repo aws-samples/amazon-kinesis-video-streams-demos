@@ -16,7 +16,7 @@ RUN yum install -y \
 	gcc-c++ \
 	git \
 	gmp-devel \
-	gstreamer* \
+	gstreamer1* \
 	libcurl-devel \
 	libffi \
 	libffi-devel \
