@@ -1,7 +1,7 @@
 # Build docker with
 # docker build -t kinesis-video-producer-sdk-cpp-amazon-linux .
 #
-FROM amazonlinux:latest
+FROM amazonlinux:2
 
 RUN yum install -y \
 	autoconf \
