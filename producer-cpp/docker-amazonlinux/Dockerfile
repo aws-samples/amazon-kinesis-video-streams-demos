@@ -28,7 +28,8 @@ RUN yum install -y \
 	pkgconfig \
 	vim \
 	wget \
-	xz
+	xz && \
+    yum clean all
 
 ENV KVS_SDK_VERSION v3.2.0
 
