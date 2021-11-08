@@ -392,19 +392,18 @@ INT32 main(INT32 argc, CHAR* argv[])
         CHK_STATUS(createAbstractDefaultCallbacksProvider(DEFAULT_CALLBACK_CHAIN_COUNT, API_CALL_CACHE_TYPE_NONE,
                                                           ENDPOINT_UPDATE_PERIOD_SENTINEL_VALUE, region, "http://beta.us-west-2.acuity.amazonaws.com", cacertPath, NULL, NULL,
                                                           &pClientCallbacks));
-
         if (config.useIotCredentialProvider) {
-            CHK_STATUS(createDefaultCallbacksProviderWithIotCertificate((PCHAR)config.iotEndpoint, config.iotCoreCert,
-                                                                        config.iotCorePrivateKey, cacertPath, config.iotCoreRoleAlias, streamName,
-                                                                        region, NULL, NULL, &pClientCallbacks));
+            CHK_STATUS(createIotAuthCallbacks(pClientCallbacks, (PCHAR)config.iotEndpoint, config.iotCoreCert, config.iotCorePrivateKey, cacertPath, config.iotCoreRoleAlias,
+                                              streamName, &pAuthCallbacks));
+
         } else {
             if ((accessKey = getenv(ACCESS_KEY_ENV_VAR)) == NULL || (secretKey = getenv(SECRET_KEY_ENV_VAR)) == NULL) {
                 DLOGE("Error missing credentials");
                 CHK(FALSE, STATUS_INVALID_ARG);
             }
-            CHK_STATUS(createDefaultCallbacksProviderWithAwsCredentials(accessKey, secretKey, sessionToken, MAX_UINT64, region, cacertPath, NULL,
-                                                                        NULL, &pClientCallbacks));
+            CHK_STATUS(createStaticAuthCallbacks(pClientCallbacks, accessKey, secretKey, sessionToken, MAX_UINT64, &pAuthCallbacks));
         }
+
         PStreamCallbacks pStreamcallbacks = &pCanaryStreamCallbacks->streamCallbacks;
         CHK_STATUS(createContinuousRetryStreamCallbacks(pClientCallbacks, &pStreamcallbacks));
 
