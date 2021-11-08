@@ -390,7 +390,7 @@ INT32 main(INT32 argc, CHAR* argv[])
 
         startTime = GETTIME();
         CHK_STATUS(createAbstractDefaultCallbacksProvider(DEFAULT_CALLBACK_CHAIN_COUNT, API_CALL_CACHE_TYPE_NONE,
-                                                          ENDPOINT_UPDATE_PERIOD_SENTINEL_VALUE, region, EMPTY_STRING, cacertPath, NULL, NULL,
+                                                          ENDPOINT_UPDATE_PERIOD_SENTINEL_VALUE, region, "http://beta.us-west-2.acuity.amazonaws.com", cacertPath, NULL, NULL,
                                                           &pClientCallbacks));
 
         if (config.useIotCredentialProvider) {
