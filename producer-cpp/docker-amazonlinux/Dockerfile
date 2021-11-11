@@ -1,14 +1,14 @@
 # Build docker with
 # docker build -t kinesis-video-producer-sdk-cpp-amazon-linux .
 #
-FROM amazonlinux:latest
+FROM amazonlinux:2
 
 RUN yum install -y \
 	autoconf \
 	automake  \
 	bison \
 	bzip2 \
-	cmake \
+	cmake3 \
 	curl \
 	diffutils \
 	flex \
@@ -29,18 +29,14 @@ RUN yum install -y \
 	vim \
 	wget \
 	xz && \
-	wget https://cmake.org/files/v3.12/cmake-3.12.3.tar.gz && \
-    tar zxvf cmake-3.* && \
-    rm cmake-3.12.3.tar.gz && \
-    cd cmake-3.12.3/ && \
-    ./bootstrap && \
-    make -j4 && \
-    make install
+    yum clean all
+
+ENV KVS_SDK_VERSION v3.2.0
 
 WORKDIR /opt/
-RUN git clone https://github.com/awslabs/amazon-kinesis-video-streams-producer-sdk-cpp.git
+RUN git clone --depth 1 --branch $KVS_SDK_VERSION https://github.com/awslabs/amazon-kinesis-video-streams-producer-sdk-cpp.git
 WORKDIR /opt/amazon-kinesis-video-streams-producer-sdk-cpp/build/
-RUN cmake .. -DBUILD_GSTREAMER_PLUGIN=ON -DCMAKE_VERBOSE_MAKEFILE:BOOL=ON && \
+RUN cmake3 .. -DBUILD_GSTREAMER_PLUGIN=ON -DCMAKE_VERBOSE_MAKEFILE:BOOL=ON && \
     make 
 
 ENV LD_LIBRARY_PATH=/opt/amazon-kinesis-video-streams-producer-sdk-cpp/open-source/local/lib
