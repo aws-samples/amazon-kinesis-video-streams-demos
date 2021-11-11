@@ -1,4 +1,5 @@
 #include "Include.h"
+#include <ctime>
 
 namespace Canary {
 
@@ -69,6 +70,7 @@ STATUS Peer::initSignaling(const Canary::PConfig pConfig)
     ChannelInfo channelInfo;
     SignalingClientCallbacks clientCallbacks;
     CHAR controlPlaneUrl[MAX_CONTROL_PLANE_URI_CHAR_LEN];
+    UINT64 retryAttempt = 1;
 
     MEMSET(&clientInfo, 0, SIZEOF(clientInfo));
     MEMSET(&channelInfo, 0, SIZEOF(channelInfo));
@@ -168,7 +170,18 @@ STATUS Peer::initSignaling(const Canary::PConfig pConfig)
         return retStatus;
     };
     CHK_STATUS(exponentialBackoffStateWithDefaultConfigCreate(&this->pExponentialBackoffState));
-    CHK_STATUS(createSignalingClientSyncWithBackoff(&clientInfo, &channelInfo, &clientCallbacks, pAwsCredentialProvider, &pSignalingClientHandle, this->pExponentialBackoffState));
+    
+    while (true) {
+        time_t now = time(0);
+        DLOGD("Attempting to create signaling client. Current system time [%s]. Retry attempt# [%d]", ctime(&now), retryAttempt++);
+        auto status = createSignalingClientSyncWithBackoff(
+                &clientInfo, &channelInfo, &clientCallbacks, pAwsCredentialProvider, &pSignalingClientHandle, this->pExponentialBackoffState);
+        if (status == STATUS_SUCCESS) {
+            DLOGD("Received success from create signaling client API.");
+            break;
+        }
+        DLOGD("Received non-success code [%ld] from create signaling client API", status);
+    }
 
 CleanUp:
 
