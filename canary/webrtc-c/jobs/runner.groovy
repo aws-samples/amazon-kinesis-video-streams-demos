@@ -12,7 +12,7 @@ CREDENTIALS = [
     ]
 ]
 
-def buildProject(useMbedTLS) {
+def buildProject(useMbedTLS, params) {
     checkout([$class: 'GitSCM', branches: [[name: params.GIT_HASH ]],
               userRemoteConfigs: [[url: params.GIT_URL]]])
 
@@ -24,7 +24,7 @@ def buildProject(useMbedTLS) {
     sh """
         cd ./canary/webrtc-c/scripts &&
         chmod a+x cert_setup.sh &&
-        ./cert_setup.sh ${NODE_NAME} &&
+        ./cert_setup.sh ${NODE_NAME}_${params.AWS_DEFAULT_REGION} &&
         cd .. &&
         mkdir -p build && 
         cd build && 
@@ -58,7 +58,7 @@ def buildPeer(isMaster, params) {
         deleteDir()
     }
     
-    buildProject(params.USE_MBEDTLS)
+    buildProject(params.USE_MBEDTLS, params)
 
     RUNNING_NODES_IN_BUILDING--
     
@@ -68,13 +68,15 @@ def buildPeer(isMaster, params) {
 
     def scripts_dir = "$WORKSPACE/canary/webrtc-c/scripts"
     def endpoint = "${scripts_dir}/iot-credential-provider.txt"
-    def core_cert_file = "${scripts_dir}/w${env.NODE_NAME}_certificate.pem"
-    def private_key_file = "${scripts_dir}/w${env.NODE_NAME}_private.key"
-    def role_alias = "w${env.NODE_NAME}_role_alias"
-    def thing_name = "w${env.NODE_NAME}_thing"
+    def core_cert_file = "${scripts_dir}/w${env.NODE_NAME}_${params.AWS_DEFAULT_REGION}_certificate.pem"
+    def private_key_file = "${scripts_dir}/w${env.NODE_NAME}_${params.AWS_DEFAULT_REGION}_private.key"
+    def role_alias = "w${env.NODE_NAME}_${params.AWS_DEFAULT_REGION}_role_alias"
+    def thing_name = "w${env.NODE_NAME}_${params.AWS_DEFAULT_REGION}_thing"
 
     def envs = [
       'AWS_KVS_LOG_LEVEL': params.AWS_KVS_LOG_LEVEL,
+      'AWS_DEFAULT_REGION': params.AWS_DEFAULT_REGION,
+      'CANARY_ENDPOINT': "${env.CP_ENDPOINT}",
       'CANARY_USE_TURN': params.USE_TURN,
       'CANARY_TRICKLE_ICE': params.TRICKLE_ICE,
       'CANARY_USE_IOT_PROVIDER': params.USE_IOT,
@@ -106,17 +108,19 @@ def buildSignaling(params) {
     if (params.FIRST_ITERATION) {
         deleteDir()
     }
-    buildProject(params.USE_MBEDTLS)
+    buildProject(params.USE_MBEDTLS, params)
 
     def scripts_dir = "$WORKSPACE/canary/webrtc-c/scripts"
     def endpoint = "${scripts_dir}/iot-credential-provider.txt"
-    def core_cert_file = "${scripts_dir}/w${env.NODE_NAME}_certificate.pem"
-    def private_key_file = "${scripts_dir}/w${env.NODE_NAME}_private.key"
-    def role_alias = "w${env.NODE_NAME}_role_alias"
-    def thing_name = "w${env.NODE_NAME}_thing"
+    def core_cert_file = "${scripts_dir}/w${env.NODE_NAME}_${params.AWS_DEFAULT_REGION}_certificate.pem"
+    def private_key_file = "${scripts_dir}/w${env.NODE_NAME}_${params.AWS_DEFAULT_REGION}_private.key"
+    def role_alias = "w${env.NODE_NAME}_${params.AWS_DEFAULT_REGION}_role_alias"
+    def thing_name = "w${env.NODE_NAME}_${params.AWS_DEFAULT_REGION}_thing"
 
     def envs = [
       'AWS_KVS_LOG_LEVEL': params.AWS_KVS_LOG_LEVEL,
+      'AWS_DEFAULT_REGION': params.AWS_DEFAULT_REGION,
+      'CANARY_ENDPOINT': "${env.CP_ENDPOINT}",
       'CANARY_LOG_GROUP_NAME': params.LOG_GROUP_NAME,
       'CANARY_USE_IOT_PROVIDER': params.USE_IOT,
       'CANARY_LOG_STREAM_NAME': "${params.RUNNER_LABEL}-Signaling-${START_TIMESTAMP}",
@@ -157,6 +161,7 @@ pipeline {
         string(name: 'MIN_RETRY_DELAY_IN_SECONDS')
         string(name: 'GIT_URL')
         string(name: 'GIT_HASH')
+        string(name: 'AWS_DEFAULT_REGION')
         booleanParam(name: 'FIRST_ITERATION', defaultValue: true)
     }
 
@@ -227,6 +232,7 @@ pipeline {
                     job: env.JOB_NAME,
                     parameters: [
                       string(name: 'AWS_KVS_LOG_LEVEL', value: params.AWS_KVS_LOG_LEVEL),
+                      string(name: 'AWS_DEFAULT_REGION', value: params.AWS_DEFAULT_REGION),
                       booleanParam(name: 'IS_SIGNALING', value: params.IS_SIGNALING),
                       booleanParam(name: 'USE_TURN', value: params.USE_TURN),
                       booleanParam(name: 'USE_IOT', value: params.USE_IOT),
