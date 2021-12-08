@@ -61,10 +61,10 @@ class Peer {
     // WebRTC Stats
     STATUS publishStatsForCanary(RTC_STATS_TYPE);
     STATUS publishEndToEndMetrics();
+    STATUS publishRetryCount();
 
   private:
     Callbacks callbacks;
-    PExponentialBackoffState pExponentialBackoffState;
     PAwsCredentialProvider pAwsCredentialProvider;
     SIGNALING_CLIENT_HANDLE pSignalingClientHandle;
     std::recursive_mutex mutex;
@@ -89,6 +89,7 @@ class Peer {
     BOOL firstFrame;
     BOOL useIotCredentialProvider;
     STATUS status;
+    SignalingClientInfo clientInfo;
 
     // metrics
     UINT64 signalingStartTime;

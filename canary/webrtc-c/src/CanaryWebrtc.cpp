@@ -8,6 +8,7 @@ VOID sendCustomFrames(Canary::PPeer, MEDIA_STREAM_TRACK_KIND, UINT64, UINT64);
 STATUS canaryRtpOutboundStats(UINT32, UINT64, UINT64);
 STATUS canaryRtpInboundStats(UINT32, UINT64, UINT64);
 STATUS canaryEndToEndStats(UINT32, UINT64, UINT64);
+STATUS canaryKvsStats(UINT32, UINT64, UINT64);
 
 std::atomic<bool> terminated;
 VOID handleSignal(INT32 signal)
@@ -180,6 +181,8 @@ VOID runPeer(Canary::PConfig pConfig, TIMER_QUEUE_HANDLE timerQueueHandle, STATU
     CHK(pConfig != NULL, STATUS_NULL_ARG);
 
     pConfig->print();
+    CHK_STATUS(timerQueueAddTimer(timerQueueHandle, KVS_METRICS_INVOCATION_PERIOD, KVS_METRICS_INVOCATION_PERIOD,
+                                  canaryKvsStats, (UINT64) &peer, &timeoutTimerId));
     CHK_STATUS(peer.init(pConfig, callbacks));
     CHK_STATUS(peer.connect());
 
@@ -330,6 +333,21 @@ STATUS canaryEndToEndStats(UINT32 timerId, UINT64 currentTime, UINT64 customData
     if (!terminated.load()) {
         Canary::PPeer pPeer = (Canary::PPeer) customData;
         pPeer->publishEndToEndMetrics();
+    } else {
+        retStatus = STATUS_TIMER_QUEUE_STOP_SCHEDULING;
+    }
+
+    return retStatus;
+}
+
+STATUS canaryKvsStats(UINT32 timerId, UINT64 currentTime, UINT64 customData)
+{
+    UNUSED_PARAM(timerId);
+    UNUSED_PARAM(currentTime);
+    STATUS retStatus = STATUS_SUCCESS;
+    if (!terminated.load()) {
+        Canary::PPeer pPeer = (Canary::PPeer) customData;
+        pPeer->publishRetryCount();
     } else {
         retStatus = STATUS_TIMER_QUEUE_STOP_SCHEDULING;
     }

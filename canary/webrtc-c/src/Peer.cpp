@@ -18,7 +18,6 @@ Peer::~Peer()
     else {
         CHK_LOG_ERR(freeStaticCredentialProvider(&this->pAwsCredentialProvider));
     }
-    exponentialBackoffStateFree(&this->pExponentialBackoffState);
 }
 
 STATUS Peer::init(const Canary::PConfig pConfig, const Callbacks& callbacks)
@@ -65,18 +64,17 @@ STATUS Peer::initSignaling(const Canary::PConfig pConfig)
 {
     STATUS retStatus = STATUS_SUCCESS;
 
-    SignalingClientInfo clientInfo;
     ChannelInfo channelInfo;
     SignalingClientCallbacks clientCallbacks;
     CHAR controlPlaneUrl[MAX_CONTROL_PLANE_URI_CHAR_LEN];
 
-    MEMSET(&clientInfo, 0, SIZEOF(clientInfo));
+    MEMSET(&this->clientInfo, 0, SIZEOF(this->clientInfo));
     MEMSET(&channelInfo, 0, SIZEOF(channelInfo));
     MEMSET(&clientCallbacks, 0, SIZEOF(clientCallbacks));
 
-    clientInfo.version = SIGNALING_CLIENT_INFO_CURRENT_VERSION;
-    clientInfo.loggingLevel = pConfig->logLevel.value;
-    STRCPY(clientInfo.clientId, pConfig->clientId.value.c_str());
+    this->clientInfo.version = SIGNALING_CLIENT_INFO_CURRENT_VERSION;
+    this->clientInfo.loggingLevel = pConfig->logLevel.value;
+    STRCPY(this->clientInfo.clientId, pConfig->clientId.value.c_str());
 
     channelInfo.version = CHANNEL_INFO_CURRENT_VERSION;
     if (!pConfig->endpoint.value.empty()) {
@@ -97,6 +95,8 @@ STATUS Peer::initSignaling(const Canary::PConfig pConfig)
     channelInfo.reconnect = TRUE;
     channelInfo.pCertPath = (PCHAR) DEFAULT_KVS_CACERT_PATH;
     channelInfo.messageTtl = 0; // Default is 60 seconds
+
+    this->clientInfo.signalingClientCreationMaxRetryAttempts = MAX_CALL_RETRY_COUNT;
 
     clientCallbacks.customData = (UINT64) this;
     clientCallbacks.stateChangeFn = [](UINT64 customData, SIGNALING_CLIENT_STATE state) -> STATUS {
@@ -167,8 +167,7 @@ STATUS Peer::initSignaling(const Canary::PConfig pConfig)
 
         return retStatus;
     };
-    CHK_STATUS(exponentialBackoffStateWithDefaultConfigCreate(&this->pExponentialBackoffState));
-    CHK_STATUS(createSignalingClientSyncWithBackoff(&clientInfo, &channelInfo, &clientCallbacks, pAwsCredentialProvider, &pSignalingClientHandle, this->pExponentialBackoffState));
+    CHK_STATUS(createSignalingClientSync(&this->clientInfo, &channelInfo, &clientCallbacks, pAwsCredentialProvider, &pSignalingClientHandle));
 
 CleanUp:
 
@@ -725,6 +724,14 @@ STATUS Peer::publishEndToEndMetrics()
     Canary::Cloudwatch::getInstance().monitoring.pushEndToEndMetrics(this->endToEndMetricsContext);
 
     return STATUS_SUCCESS;
+}
+
+STATUS Peer::publishRetryCount()
+{
+    STATUS retStatus = STATUS_SUCCESS;
+    Canary::Cloudwatch::getInstance().monitoring.pushRetryCount(this->clientInfo.stateMachineRetryCountReadOnly);
+CleanUp:
+    return retStatus;
 }
 
 } // namespace Canary
