@@ -267,4 +267,13 @@ VOID CloudwatchMonitoring::pushEndToEndMetrics(Canary::EndToEndMetricsContext ct
     this->push(sizeMatchDatum);
 }
 
+VOID CloudwatchMonitoring::pushCustomKvsMetrics(UINT32 apiRetryCount)
+{
+    MetricDatum currentRetryCountDatum;
+
+    currentRetryCountDatum.SetMetricName("APICallRetryCount");
+    currentRetryCountDatum.SetUnit(Aws::CloudWatch::Model::StandardUnit::Count);
+    currentRetryCountDatum.SetValue(apiRetryCount);
+    this->push(currentRetryCountDatum);
+}
 } // namespace Canary

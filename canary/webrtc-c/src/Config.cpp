@@ -198,6 +198,7 @@ STATUS Config::initWithEnvVars()
     }
 
     CHK_STATUS(optenv(CANARY_ENDPOINT_ENV_VAR, &endpoint, ""));
+    printf("endpoint: %s\n", endpoint.value.c_str());
     CHK_STATUS(optenv(CANARY_LABEL_ENV_VAR, &label, CANARY_DEFAULT_LABEL));
 
     CHK_STATUS(optenv(CANARY_CLIENT_ID_ENV_VAR, &clientId, CANARY_DEFAULT_CLIENT_ID));

@@ -18,7 +18,11 @@ Peer::~Peer()
     else {
         CHK_LOG_ERR(freeStaticCredentialProvider(&this->pAwsCredentialProvider));
     }
-    exponentialBackoffStateFree(&this->pExponentialBackoffState);
+
+    if (this->pSignalingClientInfo->signalingClientRetryStrategy.freeRetryStrategyFn != NULL) {
+        this->pSignalingClientInfo->signalingClientRetryStrategy.freeRetryStrategyFn(
+                &(this->pSignalingClientInfo->signalingClientRetryStrategy.pRetryStrategy));
+    }
 }
 
 STATUS Peer::init(const Canary::PConfig pConfig, const Callbacks& callbacks)
@@ -65,18 +69,17 @@ STATUS Peer::initSignaling(const Canary::PConfig pConfig)
 {
     STATUS retStatus = STATUS_SUCCESS;
 
-    SignalingClientInfo clientInfo;
     ChannelInfo channelInfo;
     SignalingClientCallbacks clientCallbacks;
     CHAR controlPlaneUrl[MAX_CONTROL_PLANE_URI_CHAR_LEN];
 
-    MEMSET(&clientInfo, 0, SIZEOF(clientInfo));
+    MEMSET(this->pSignalingClientInfo, 0, SIZEOF(&this->pSignalingClientInfo));
     MEMSET(&channelInfo, 0, SIZEOF(channelInfo));
     MEMSET(&clientCallbacks, 0, SIZEOF(clientCallbacks));
 
-    clientInfo.version = SIGNALING_CLIENT_INFO_CURRENT_VERSION;
-    clientInfo.loggingLevel = pConfig->logLevel.value;
-    STRCPY(clientInfo.clientId, pConfig->clientId.value.c_str());
+    this->pSignalingClientInfo->version = SIGNALING_CLIENT_INFO_CURRENT_VERSION;
+    this->pSignalingClientInfo->loggingLevel = pConfig->logLevel.value;
+    STRCPY(this->pSignalingClientInfo->clientId, pConfig->clientId.value.c_str());
 
     channelInfo.version = CHANNEL_INFO_CURRENT_VERSION;
     if (!pConfig->endpoint.value.empty()) {
@@ -90,13 +93,15 @@ STATUS Peer::initSignaling(const Canary::PConfig pConfig)
     channelInfo.pTags = NULL;
     channelInfo.channelType = SIGNALING_CHANNEL_TYPE_SINGLE_MASTER;
     channelInfo.channelRoleType = pConfig->isMaster.value ? SIGNALING_CHANNEL_ROLE_TYPE_MASTER : SIGNALING_CHANNEL_ROLE_TYPE_VIEWER;
-    channelInfo.cachingPolicy = SIGNALING_API_CALL_CACHE_TYPE_FILE;
+    channelInfo.cachingPolicy = SIGNALING_API_CALL_CACHE_TYPE_NONE;
     channelInfo.cachingPeriod = SIGNALING_API_CALL_CACHE_TTL_SENTINEL_VALUE;
     channelInfo.asyncIceServerConfig = TRUE;
     channelInfo.retry = TRUE;
     channelInfo.reconnect = TRUE;
     channelInfo.pCertPath = (PCHAR) DEFAULT_KVS_CACERT_PATH;
     channelInfo.messageTtl = 0; // Default is 60 seconds
+
+    clientInfo.signalingClientCreationMaxRetryAttempts =
 
     clientCallbacks.customData = (UINT64) this;
     clientCallbacks.stateChangeFn = [](UINT64 customData, SIGNALING_CLIENT_STATE state) -> STATUS {
@@ -167,8 +172,8 @@ STATUS Peer::initSignaling(const Canary::PConfig pConfig)
 
         return retStatus;
     };
-    CHK_STATUS(exponentialBackoffStateWithDefaultConfigCreate(&this->pExponentialBackoffState));
-    CHK_STATUS(createSignalingClientSyncWithBackoff(&clientInfo, &channelInfo, &clientCallbacks, pAwsCredentialProvider, &pSignalingClientHandle, this->pExponentialBackoffState));
+
+    CHK_STATUS(createSignalingClientSync(this->pSignalingClientInfo, &channelInfo, &clientCallbacks, pAwsCredentialProvider, &pSignalingClientHandle));
 
 CleanUp:
 
@@ -697,6 +702,7 @@ STATUS Peer::publishStatsForCanary(RTC_STATS_TYPE statsType)
 {
     STATUS retStatus = STATUS_SUCCESS;
     this->canaryMetrics.requestedTypeOfStats = statsType;
+    SignalingClientMetrics signalingClientMetrics;
     switch (statsType) {
         case RTC_STATS_TYPE_OUTBOUND_RTP:
             if (!this->videoTransceivers.empty()) {
@@ -727,4 +733,8 @@ STATUS Peer::publishEndToEndMetrics()
     return STATUS_SUCCESS;
 }
 
+STATUS Peer::pushRetryCount()
+{
+    DLOGD("Retry count: %d", this->pSignalingClientInfo->stateMachineRetryCountReadOnly);
+}
 } // namespace Canary

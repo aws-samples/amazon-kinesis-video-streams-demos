@@ -3,6 +3,7 @@
 prefix=$1
 export CANARY_CHANNEL_NAME=test_channel
 export CANARY_CLIENT_ID=test
+export CANARY_ENDPOINT=test
 export CANARY_IS_MASTER=TRUE  # if you are running the app as master
 export CANARY_TRICKLE_ICE=FALSE  # If you would like to enable trickle ICE
 export CANARY_USE_TURN=TRUE  # This means turn urls are are also selected as an alternate path

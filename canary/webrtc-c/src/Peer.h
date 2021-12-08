@@ -21,8 +21,7 @@ typedef struct {
     DOUBLE nacksPerSecond;
     DOUBLE averageFramesSentPerSecond;
     DOUBLE retxBytesPercentage;
-} OutgoingRTPMetricsContext;
-typedef OutgoingRTPMetricsContext* POutgoingRTPMetricsContext;
+} OutgoingRTPMetricsContext, *POutgoingRTPMetricsContext;
 
 typedef struct {
     UINT64 prevPacketsReceived;
@@ -32,8 +31,11 @@ typedef struct {
     DOUBLE packetReceiveRate;
     DOUBLE incomingBitRate;
     DOUBLE framesDroppedPerSecond;
-} IncomingRTPMetricsContext;
-typedef IncomingRTPMetricsContext* PIncomingRTPMetricsContext;
+} IncomingRTPMetricsContext, *PIncomingRTPMetricsContext;
+
+typedef struct {
+    UINT32 apiRetryCount;
+} CustomKvsMetricsContext, *PCustomKvsMetricsContext;
 
 struct EndToEndMetricsContext{
     DOUBLE frameLatencyAvg = 0.0;
@@ -61,10 +63,10 @@ class Peer {
     // WebRTC Stats
     STATUS publishStatsForCanary(RTC_STATS_TYPE);
     STATUS publishEndToEndMetrics();
+    STATUS pushRetryCount();
 
   private:
     Callbacks callbacks;
-    PExponentialBackoffState pExponentialBackoffState;
     PAwsCredentialProvider pAwsCredentialProvider;
     SIGNALING_CLIENT_HANDLE pSignalingClientHandle;
     std::recursive_mutex mutex;
@@ -81,6 +83,7 @@ class Peer {
     std::string peerId;
     RtcConfiguration rtcConfiguration;
     PRtcPeerConnection pPeerConnection;
+    PSignalingClientInfo pSignalingClientInfo;
     std::vector<PRtcRtpTransceiver> audioTransceivers;
     std::vector<PRtcRtpTransceiver> videoTransceivers;
     BOOL isMaster;
