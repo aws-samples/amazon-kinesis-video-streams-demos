@@ -6,7 +6,7 @@ LONG_RUNNING_DURATION_IN_SECONDS = 0
 MIN_RETRY_DELAY_IN_SECONDS = 60
 COLD_STARTUP_DELAY_IN_SECONDS = 60 * 60
 GIT_URL = 'https://github.com/aws-samples/amazon-kinesis-video-streams-demos.git'
-GIT_HASH = 'master'
+GIT_HASH = 'retry-metric-webrtc'
 COMMON_PARAMS = [
     string(name: 'AWS_KVS_LOG_LEVEL', value: "2"),
     string(name: 'MIN_RETRY_DELAY_IN_SECONDS', value: MIN_RETRY_DELAY_IN_SECONDS.toString()),

@@ -17,6 +17,7 @@ class CloudwatchMonitoring {
     VOID pushOutboundRtpStats(Canary::POutgoingRTPMetricsContext);
     VOID pushInboundRtpStats(Canary::PIncomingRTPMetricsContext);
     VOID pushEndToEndMetrics(Canary::EndToEndMetricsContext);
+    VOID pushRetryCount(UINT32);
 
   private:
     Dimension channelDimension;
