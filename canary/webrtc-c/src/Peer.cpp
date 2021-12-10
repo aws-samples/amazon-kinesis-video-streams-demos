@@ -11,7 +11,7 @@ Peer::Peer()
 Peer::~Peer()
 {
     CHK_LOG_ERR(freePeerConnection(&this->pPeerConnection));
-    CHK_LOG_ERR(freeSignalingClient(&this->pSignalingClientHandle));
+    CHK_LOG_ERR(freeSignalingClient(&this->signalingClientHandle));
     if(this->useIotCredentialProvider) {
         CHK_LOG_ERR(freeIotCredentialProvider(&this->pAwsCredentialProvider));
     }
@@ -167,7 +167,8 @@ STATUS Peer::initSignaling(const Canary::PConfig pConfig)
 
         return retStatus;
     };
-    CHK_STATUS(createSignalingClientSync(&this->clientInfo, &channelInfo, &clientCallbacks, pAwsCredentialProvider, &pSignalingClientHandle));
+    CHK_STATUS(createSignalingClientSync(&this->clientInfo, &channelInfo, &clientCallbacks, pAwsCredentialProvider, &signalingClientHandle));
+    CHK_STATUS(signalingClientFetchSync(signalingClientHandle))
 
 CleanUp:
 
@@ -176,15 +177,15 @@ CleanUp:
 
 STATUS Peer::initRtcConfiguration(const Canary::PConfig pConfig)
 {
-    auto awaitGetIceConfigInfoCount = [](SIGNALING_CLIENT_HANDLE pSignalingClientHandle, PUINT32 pIceConfigInfoCount) -> STATUS {
+    auto awaitGetIceConfigInfoCount = [](SIGNALING_CLIENT_HANDLE signalingClientHandle, PUINT32 pIceConfigInfoCount) -> STATUS {
         STATUS retStatus = STATUS_SUCCESS;
         UINT64 elapsed = 0;
 
-        CHK(IS_VALID_SIGNALING_CLIENT_HANDLE(pSignalingClientHandle) && pIceConfigInfoCount != NULL, STATUS_NULL_ARG);
+        CHK(IS_VALID_SIGNALING_CLIENT_HANDLE(signalingClientHandle) && pIceConfigInfoCount != NULL, STATUS_NULL_ARG);
 
         while (TRUE) {
             // Get the configuration count
-            CHK_STATUS(signalingClientGetIceConfigInfoCount(pSignalingClientHandle, pIceConfigInfoCount));
+            CHK_STATUS(signalingClientGetIceConfigInfoCount(signalingClientHandle, pIceConfigInfoCount));
 
             // Return OK if we have some ice configs
             CHK(*pIceConfigInfoCount == 0, retStatus);
@@ -203,7 +204,6 @@ STATUS Peer::initRtcConfiguration(const Canary::PConfig pConfig)
     };
 
     STATUS retStatus = STATUS_SUCCESS;
-    auto pSignalingClientHandle = this->pSignalingClientHandle;
     UINT32 i, j, iceConfigCount, uriCount;
     PIceConfigInfo pIceConfigInfo;
     PRtcConfiguration pConfiguration = &this->rtcConfiguration;
@@ -226,12 +226,12 @@ STATUS Peer::initRtcConfiguration(const Canary::PConfig pConfig)
 
     if (pConfig->useTurn.value) {
         // Set the URIs from the configuration
-        CHK_STATUS(awaitGetIceConfigInfoCount(pSignalingClientHandle, &iceConfigCount));
+        CHK_STATUS(awaitGetIceConfigInfoCount(signalingClientHandle, &iceConfigCount));
 
         /* signalingClientGetIceConfigInfoCount can return more than one turn server. Use only one to optimize
          * candidate gathering latency. But user can also choose to use more than 1 turn server. */
         for (uriCount = 0, i = 0; i < MAX_TURN_SERVERS; i++) {
-            CHK_STATUS(signalingClientGetIceConfigInfo(pSignalingClientHandle, i, &pIceConfigInfo));
+            CHK_STATUS(signalingClientGetIceConfigInfo(signalingClientHandle, i, &pIceConfigInfo));
             for (j = 0; j < pIceConfigInfo->uriCount; j++) {
                 CHECK(uriCount < MAX_ICE_SERVERS_COUNT);
                 /*
@@ -343,8 +343,8 @@ STATUS Peer::shutdown()
         CHK_LOG_ERR(closePeerConnection(this->pPeerConnection));
     }
 
-    if (!this->isMaster && IS_VALID_SIGNALING_CLIENT_HANDLE(this->pSignalingClientHandle)) {
-        CHK_LOG_ERR(signalingClientDeleteSync(this->pSignalingClientHandle));
+    if (!this->isMaster && IS_VALID_SIGNALING_CLIENT_HANDLE(this->signalingClientHandle)) {
+        CHK_LOG_ERR(signalingClientDeleteSync(this->signalingClientHandle));
     }
 
     return this->status;
@@ -377,7 +377,7 @@ STATUS Peer::connect()
     };
 
     STATUS retStatus = STATUS_SUCCESS;
-    CHK_STATUS(signalingClientConnectSync(pSignalingClientHandle));
+    CHK_STATUS(signalingClientConnectSync(signalingClientHandle));
 
     if (!this->isMaster) {
         this->foundPeerId = TRUE;
@@ -400,7 +400,7 @@ STATUS Peer::send(PSignalingMessage pMsg)
         pMsg->correlationId[0] = '\0';
         STRCPY(pMsg->peerClientId, peerId.c_str());
         pMsg->payloadLen = (UINT32) STRLEN(pMsg->payload);
-        CHK_STATUS(signalingClientSendMessageSync(this->pSignalingClientHandle, pMsg));
+        CHK_STATUS(signalingClientSendMessageSync(this->signalingClientHandle, pMsg));
     } else {
         // TODO: maybe queue messages when there's no peer id
         DLOGW("Peer id hasn't been found yet. Failed to send a signaling message");
