@@ -281,11 +281,15 @@ STATUS initKinesisVideoWebRtc(PGstKvsPlugin pGstPlugin)
                                                GST_PLUGIN_PRE_GENERATE_CERT_PERIOD, pregenerateCertTimerCallback, (UINT64) pGstPlugin,
                                                &pGstPlugin->pregenerateCertTimerId));
 
-    // Create the signaling client and connect to it
+    // Create the signaling client
     CHK_STATUS(createSignalingClientSync(&pGstPlugin->kvsContext.signalingClientInfo, &pGstPlugin->kvsContext.channelInfo,
                                          &pGstPlugin->kvsContext.signalingClientCallbacks, pGstPlugin->kvsContext.pCredentialProvider,
                                          &pGstPlugin->kvsContext.signalingHandle));
 
+    // Get signaling client to Ready state
+    CHK_STATUS(signalingClientFetchSync(pGstPlugin->kvsContext.signalingHandle));
+
+    // Get signaling client to connect state
     if (ATOMIC_LOAD_BOOL(&pGstPlugin->connectWebRtc)) {
         CHK_STATUS(signalingClientConnectSync(pGstPlugin->kvsContext.signalingHandle));
     }
@@ -1302,7 +1306,8 @@ STATUS sessionServiceHandler(UINT32 timerId, UINT64 currentTime, UINT64 customDa
         STATUS_SUCCEEDED(freeSignalingClient(&pGstKvsPlugin->kvsContext.signalingHandle)) &&
         STATUS_SUCCEEDED(createSignalingClientSync(&pGstKvsPlugin->kvsContext.signalingClientInfo, &pGstKvsPlugin->kvsContext.channelInfo,
                                                    &pGstKvsPlugin->kvsContext.signalingClientCallbacks, pGstKvsPlugin->kvsContext.pCredentialProvider,
-                                                   &pGstKvsPlugin->kvsContext.signalingHandle))) {
+                                                   &pGstKvsPlugin->kvsContext.signalingHandle)) &&
+        STATUS_SUCCEEDED(signalingClientFetchSync(pGstKvsPlugin->kvsContext.signalingHandle))) {
         // Re-set the variable again
         ATOMIC_STORE_BOOL(&pGstKvsPlugin->recreateSignalingClient, FALSE);
     }

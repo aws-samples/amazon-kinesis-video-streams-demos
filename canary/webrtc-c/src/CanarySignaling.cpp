@@ -353,6 +353,7 @@ STATUS run(Canary::PConfig pConfig)
     // Create the master signaling client
     CHK_STATUS(createSignalingClientSync(&masterClientInfo, &masterChannelInfo, &masterSignalingClientCallbacks, pCredentialProvider,
                                          &masterSignalingClientHandle));
+    CHK_STATUS(signalingClientFetchSync(masterSignalingClientHandle));
 
     canarySessionInfo.pMasterChannelInfo = &masterChannelInfo;
     canarySessionInfo.pMasterClientInfo = &masterClientInfo;
@@ -371,6 +372,7 @@ STATUS run(Canary::PConfig pConfig)
 
     CHK_STATUS(createSignalingClientSync(&viewerClientInfo, &viewerChannelInfo, &viewerSignalingClientCallbacks, pCredentialProvider,
                                          &viewerSignalingClientHandle));
+    CHK_STATUS(signalingClientFetchSync(viewerSignalingClientHandle));
 
     canarySessionInfo.pViewerChannelInfo = &viewerChannelInfo;
     canarySessionInfo.pViewerClientInfo = &viewerClientInfo;
