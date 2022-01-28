@@ -19,7 +19,7 @@
         <dependency>
             <groupId>com.amazonaws</groupId>
             <artifactId>amazon-kinesis-video-streams-parser-library</artifactId>
-            <version>1.0.13</version>
+            <version>1.2.1</version>
         </dependency>
         <dependency>
             <groupId>org.projectlombok</groupId>
@@ -30,17 +30,17 @@
         <dependency>
             <groupId>org.apache.commons</groupId>
             <artifactId>commons-lang3</artifactId>
-            <version>3.6</version>
+            <version>3.12.0</version>
         </dependency>
         <dependency>
             <groupId>org.slf4j</groupId>
             <artifactId>slf4j-api</artifactId>
-            <version>1.7.10</version>
+            <version>1.7.35</version>
         </dependency>
         <dependency>
             <groupId>org.slf4j</groupId>
             <artifactId>slf4j-log4j12</artifactId>
-            <version>1.7.25</version>
+            <version>1.7.35</version>
         </dependency>
         <dependency>
             <groupId>org.apache.logging.log4j</groupId>
