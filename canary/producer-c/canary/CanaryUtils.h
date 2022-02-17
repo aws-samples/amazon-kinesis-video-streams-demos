@@ -49,6 +49,7 @@ extern "C" {
 #define CANARY_LABEL_ENV_VAR           (PCHAR) "CANARY_LABEL"
 #define CANARY_SCENARIO_ENV_VAR        (PCHAR) "CANARY_RUN_SCENARIO"
 #define CANARY_TRACK_TYPE_ENV_VAR      (PCHAR) "TRACK_TYPE"
+#define CANARY_CP_API_ENV_VAR          (PCHAR) "CANARY_CP_URL"
 
 // IoT related env
 #define CANARY_USE_IOT_CREDENTIALS_ENV_VAR   (PCHAR) "CANARY_USE_IOT_PROVIDER"
@@ -99,6 +100,7 @@ typedef struct {
     CHAR iotCorePrivateKey[MAX_PATH_LEN + 1];
     CHAR iotCoreRoleAlias[MAX_ROLE_ALIAS_LEN + 1];
     CHAR iotThingName[CANARY_STREAM_NAME_STR_LEN + 1];
+    CHAR canaryCpUrl[MAX_URI_CHAR_LEN];
     UINT64 fragmentSizeInBytes;
     UINT64 canaryDuration;
     UINT64 bufferDuration;
