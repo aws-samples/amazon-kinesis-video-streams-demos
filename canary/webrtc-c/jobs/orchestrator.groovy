@@ -204,7 +204,7 @@ pipeline {
                                 // TODO: should not need viewer node label for signaling. If not set, Jenkins pipeline will crash
                                 //       because it's used to defined an agent
                                 string(name: 'VIEWER_NODE_LABEL', value: "ec2-us-west-2"),
-                                string(name: 'RUNNER_LABEL', value: "SignalingStaticLongRunning"),
+                                string(name: 'RUNNER_LABEL', value: "SignalingLongRunning"),
                                 string(name: 'SCENARIO_LABEL', value: "SignalingLongRunning"),
                             ],
                             wait: false
