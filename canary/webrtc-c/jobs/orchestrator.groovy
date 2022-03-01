@@ -6,7 +6,7 @@ LONG_RUNNING_DURATION_IN_SECONDS = 0
 MIN_RETRY_DELAY_IN_SECONDS = 60
 COLD_STARTUP_DELAY_IN_SECONDS = 60 * 60
 GIT_URL = 'https://github.com/aws-samples/amazon-kinesis-video-streams-demos.git'
-GIT_HASH = 'master'
+GIT_HASH = 'fix_iot_thing_conflict'
 COMMON_PARAMS = [
     string(name: 'AWS_KVS_LOG_LEVEL', value: "2"),
     string(name: 'MIN_RETRY_DELAY_IN_SECONDS', value: MIN_RETRY_DELAY_IN_SECONDS.toString()),
@@ -116,20 +116,20 @@ pipeline {
 
                         // TODO: Use matrix to spawn runners
 
-                        build(
-                            job: NEXT_AVAILABLE_RUNNER,
-                            parameters: COMMON_PARAMS + [
-                                booleanParam(name: 'USE_TURN', value: true),
-                                booleanParam(name: 'TRICKLE_ICE', value: true),
-                                booleanParam(name: 'USE_IOT', value: true),
-                                string(name: 'DURATION_IN_SECONDS', value: PERIODIC_DURATION_IN_SECONDS.toString()),
-                                string(name: 'MASTER_NODE_LABEL', value: "ec2-us-west-2"),
-                                string(name: 'VIEWER_NODE_LABEL', value: "ec2-us-west-2"),
-                                string(name: 'RUNNER_LABEL', value: "WebrtcPeriodicOpenSSL"),
-                                string(name: 'SCENARIO_LABEL', value: "WebrtcPeriodic"),
-                            ],
-                            wait: false
-                        )
+//                         build(
+//                             job: NEXT_AVAILABLE_RUNNER,
+//                             parameters: COMMON_PARAMS + [
+//                                 booleanParam(name: 'USE_TURN', value: true),
+//                                 booleanParam(name: 'TRICKLE_ICE', value: true),
+//                                 booleanParam(name: 'USE_IOT', value: true),
+//                                 string(name: 'DURATION_IN_SECONDS', value: PERIODIC_DURATION_IN_SECONDS.toString()),
+//                                 string(name: 'MASTER_NODE_LABEL', value: "ec2-us-west-2"),
+//                                 string(name: 'VIEWER_NODE_LABEL', value: "ec2-us-west-2"),
+//                                 string(name: 'RUNNER_LABEL', value: "WebrtcPeriodicOpenSSL"),
+//                                 string(name: 'SCENARIO_LABEL', value: "WebrtcPeriodic"),
+//                             ],
+//                             wait: false
+//                         )
 
                         build(
                             job: NEXT_AVAILABLE_RUNNER,
@@ -146,69 +146,69 @@ pipeline {
                             wait: false
                         )
 
-                        build(
-                            job: NEXT_AVAILABLE_RUNNER,
-                            parameters: COMMON_PARAMS + [
-                                booleanParam(name: 'USE_TURN', value: true),
-                                booleanParam(name: 'TRICKLE_ICE', value: true),
-                                booleanParam(name: 'USE_IOT', value: false),
-                                booleanParam(name: 'USE_MBEDTLS', value: true),
-                                string(name: 'DURATION_IN_SECONDS', value: PERIODIC_DURATION_IN_SECONDS.toString()),
-                                string(name: 'MASTER_NODE_LABEL', value: "ec2-us-west-2"),
-                                string(name: 'VIEWER_NODE_LABEL', value: "ec2-us-west-2"),
-                                string(name: 'RUNNER_LABEL', value: "WebrtcPeriodicStaticMbedTLS"),
-                                string(name: 'SCENARIO_LABEL', value: "WebrtcPeriodic"),
-                            ],
-                            wait: false
-                        )
+//                         build(
+//                             job: NEXT_AVAILABLE_RUNNER,
+//                             parameters: COMMON_PARAMS + [
+//                                 booleanParam(name: 'USE_TURN', value: true),
+//                                 booleanParam(name: 'TRICKLE_ICE', value: true),
+//                                 booleanParam(name: 'USE_IOT', value: false),
+//                                 booleanParam(name: 'USE_MBEDTLS', value: true),
+//                                 string(name: 'DURATION_IN_SECONDS', value: PERIODIC_DURATION_IN_SECONDS.toString()),
+//                                 string(name: 'MASTER_NODE_LABEL', value: "ec2-us-west-2"),
+//                                 string(name: 'VIEWER_NODE_LABEL', value: "ec2-us-west-2"),
+//                                 string(name: 'RUNNER_LABEL', value: "WebrtcPeriodicStaticMbedTLS"),
+//                                 string(name: 'SCENARIO_LABEL', value: "WebrtcPeriodic"),
+//                             ],
+//                             wait: false
+//                         )
 
-                        build(
-                            job: NEXT_AVAILABLE_RUNNER,
-                            parameters: COMMON_PARAMS + [
-                                booleanParam(name: 'USE_TURN', value: true),
-                                booleanParam(name: 'TRICKLE_ICE', value: true),
-                                booleanParam(name: 'USE_IOT', value: false),
-                                booleanParam(name: 'USE_MBEDTLS', value: true),
-                                string(name: 'DURATION_IN_SECONDS', value: LONG_RUNNING_DURATION_IN_SECONDS.toString()),
-                                string(name: 'MASTER_NODE_LABEL', value: "ec2-us-west-2"),
-                                string(name: 'VIEWER_NODE_LABEL', value: "ec2-us-west-2"),
-                                string(name: 'RUNNER_LABEL', value: "WebrtcLongRunningStaticMbedTLS"),
-                                string(name: 'SCENARIO_LABEL', value: "WebrtcLongRunning"),
-                            ],
-                            wait: false
-                        )
+//                         build(
+//                             job: NEXT_AVAILABLE_RUNNER,
+//                             parameters: COMMON_PARAMS + [
+//                                 booleanParam(name: 'USE_TURN', value: true),
+//                                 booleanParam(name: 'TRICKLE_ICE', value: true),
+//                                 booleanParam(name: 'USE_IOT', value: false),
+//                                 booleanParam(name: 'USE_MBEDTLS', value: true),
+//                                 string(name: 'DURATION_IN_SECONDS', value: LONG_RUNNING_DURATION_IN_SECONDS.toString()),
+//                                 string(name: 'MASTER_NODE_LABEL', value: "ec2-us-west-2"),
+//                                 string(name: 'VIEWER_NODE_LABEL', value: "ec2-us-west-2"),
+//                                 string(name: 'RUNNER_LABEL', value: "WebrtcLongRunningStaticMbedTLS"),
+//                                 string(name: 'SCENARIO_LABEL', value: "WebrtcLongRunning"),
+//                             ],
+//                             wait: false
+//                         )
 
-                        build(
-                            job: NEXT_AVAILABLE_RUNNER,
-                            parameters: COMMON_PARAMS + [
-                                booleanParam(name: 'IS_SIGNALING', value: true),
-                                booleanParam(name: 'USE_IOT', value: false),
-                                string(name: 'DURATION_IN_SECONDS', value: PERIODIC_DURATION_IN_SECONDS.toString()),
-                                string(name: 'MASTER_NODE_LABEL', value: "ec2-us-west-2"),
-                                // TODO: should not need viewer node label for signaling. If not set, Jenkins pipeline will crash
-                                //       because it's used to defined an agent
-                                string(name: 'VIEWER_NODE_LABEL', value: "ec2-us-west-2"),
-                                string(name: 'RUNNER_LABEL', value: "SignalingStaticPeriodic"),
-                                string(name: 'SCENARIO_LABEL', value: "SignalingPeriodic"),
-                            ],
-                            wait: false
-                        )
-
-                        build(
-                            job: NEXT_AVAILABLE_RUNNER,
-                            parameters: COMMON_PARAMS + [
-                                booleanParam(name: 'IS_SIGNALING', value: true),
-                                booleanParam(name: 'USE_IOT', value: true),
-                                string(name: 'DURATION_IN_SECONDS', value: LONG_RUNNING_DURATION_IN_SECONDS.toString()),
-                                string(name: 'MASTER_NODE_LABEL', value: "ec2-us-west-2"),
-                                // TODO: should not need viewer node label for signaling. If not set, Jenkins pipeline will crash
-                                //       because it's used to defined an agent
-                                string(name: 'VIEWER_NODE_LABEL', value: "ec2-us-west-2"),
-                                string(name: 'RUNNER_LABEL', value: "SignalingStaticLongRunning"),
-                                string(name: 'SCENARIO_LABEL', value: "SignalingLongRunning"),
-                            ],
-                            wait: false
-                        )
+//                         build(
+//                             job: NEXT_AVAILABLE_RUNNER,
+//                             parameters: COMMON_PARAMS + [
+//                                 booleanParam(name: 'IS_SIGNALING', value: true),
+//                                 booleanParam(name: 'USE_IOT', value: false),
+//                                 string(name: 'DURATION_IN_SECONDS', value: PERIODIC_DURATION_IN_SECONDS.toString()),
+//                                 string(name: 'MASTER_NODE_LABEL', value: "ec2-us-west-2"),
+//                                 // TODO: should not need viewer node label for signaling. If not set, Jenkins pipeline will crash
+//                                 //       because it's used to defined an agent
+//                                 string(name: 'VIEWER_NODE_LABEL', value: "ec2-us-west-2"),
+//                                 string(name: 'RUNNER_LABEL', value: "SignalingStaticPeriodic"),
+//                                 string(name: 'SCENARIO_LABEL', value: "SignalingPeriodic"),
+//                             ],
+//                             wait: false
+//                         )
+//
+//                         build(
+//                             job: NEXT_AVAILABLE_RUNNER,
+//                             parameters: COMMON_PARAMS + [
+//                                 booleanParam(name: 'IS_SIGNALING', value: true),
+//                                 booleanParam(name: 'USE_IOT', value: true),
+//                                 string(name: 'DURATION_IN_SECONDS', value: LONG_RUNNING_DURATION_IN_SECONDS.toString()),
+//                                 string(name: 'MASTER_NODE_LABEL', value: "ec2-us-west-2"),
+//                                 // TODO: should not need viewer node label for signaling. If not set, Jenkins pipeline will crash
+//                                 //       because it's used to defined an agent
+//                                 string(name: 'VIEWER_NODE_LABEL', value: "ec2-us-west-2"),
+//                                 string(name: 'RUNNER_LABEL', value: "SignalingLongRunning"),
+//                                 string(name: 'SCENARIO_LABEL', value: "SignalingLongRunning"),
+//                             ],
+//                             wait: false
+//                         )
                     }
                 }
 

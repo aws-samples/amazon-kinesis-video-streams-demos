@@ -1,15 +1,15 @@
 #!/bin/bash
 
 prefix=$1
-thingName="w${prefix}_thing"
-thingTypeName="w${prefix}_thing_type"
-iotPolicyName="w${prefix}_policy"
-kvsPolicyName="w${prefix}_policy"
-iotRoleName="w${prefix}_role"
-iotRoleAlias="w${prefix}_role_alias"
-iotCert="w${prefix}_certificate.pem"
-iotPublicKey="w${prefix}_public.key"
-iotPrivateKey="w${prefix}_private.key"
+thingName="${prefix}_thing"
+thingTypeName="${prefix}_thing_type"
+iotPolicyName="${prefix}_policy"
+kvsPolicyName="${prefix}_policy"
+iotRoleName="${prefix}_role"
+iotRoleAlias="${prefix}_role_alias"
+iotCert="${prefix}_certificate.pem"
+iotPublicKey="${prefix}_public.key"
+iotPrivateKey="${prefix}_private.key"
 
 # Create the certificate to which you must attach the policy for IoT that you created above.
 aws --profile default  iot create-keys-and-certificate --set-as-active --certificate-pem-outfile $iotCert --public-key-outfile $iotPublicKey --private-key-outfile $iotPrivateKey > certificate

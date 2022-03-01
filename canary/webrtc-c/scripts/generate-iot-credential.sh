@@ -4,15 +4,15 @@
 # https://docs.aws.amazon.com/kinesisvideostreams/latest/dg/how-iot.html
 
 prefix=$1
-thingName="w${prefix}_thing"
-thingTypeName="w${prefix}_thing_type"
-iotPolicyName="w${prefix}_policy"
-kvsPolicyName="w${prefix}_policy"
-iotRoleName="w${prefix}_role"
-iotRoleAlias="w${prefix}_role_alias"
-iotCert="w${prefix}_certificate.pem"
-iotPublicKey="w${prefix}_public.key"
-iotPrivateKey="w${prefix}_private.key"
+thingName="${prefix}_thing"
+thingTypeName="${prefix}_thing_type"
+iotPolicyName="${prefix}_policy"
+kvsPolicyName="${prefix}_policy"
+iotRoleName="${prefix}_role"
+iotRoleAlias="${prefix}_role_alias"
+iotCert="${prefix}_certificate.pem"
+iotPublicKey="${prefix}_public.key"
+iotPrivateKey="${prefix}_private.key"
 
 # Step 1: Create an IoT Thing Type and an IoT Thing
 # The following example command creates a thing type $thingTypeName
