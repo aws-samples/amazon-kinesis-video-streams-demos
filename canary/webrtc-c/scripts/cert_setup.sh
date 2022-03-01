@@ -11,6 +11,16 @@ iotCert="${prefix}_certificate.pem"
 iotPublicKey="${prefix}_public.key"
 iotPrivateKey="${prefix}_private.key"
 
+echo $thingName
+echo $thingTypeName
+echo $iotPolicyName
+echo $kvsPolicyName
+echo $iotRoleName
+echo $iotRoleAlias
+echo $iotCert
+echo $iotPublicKey
+echo $iotPrivateKey
+
 # Create the certificate to which you must attach the policy for IoT that you created above.
 aws --profile default  iot create-keys-and-certificate --set-as-active --certificate-pem-outfile $iotCert --public-key-outfile $iotPublicKey --private-key-outfile $iotPrivateKey > certificate
 # Attach the policy for IoT (KvsCameraIoTPolicy created above) to this certificate.

@@ -50,7 +50,7 @@ ACTIVE_RUNNERS = []
 
 pipeline {
     agent {
-        label 'ec2-us-west-2'
+        label 'ec2-us-west-2-prod'
     }
 
     options {
@@ -138,8 +138,8 @@ pipeline {
                                 booleanParam(name: 'TRICKLE_ICE', value: true),
                                 booleanParam(name: 'USE_IOT', value: true),
                                 string(name: 'DURATION_IN_SECONDS', value: LONG_RUNNING_DURATION_IN_SECONDS.toString()),
-                                string(name: 'MASTER_NODE_LABEL', value: "ec2-us-west-2"),
-                                string(name: 'VIEWER_NODE_LABEL', value: "ec2-us-west-2"),
+                                string(name: 'MASTER_NODE_LABEL', value: "ec2-us-west-2-prod"),
+                                string(name: 'VIEWER_NODE_LABEL', value: "ec2-us-west-2-prod"),
                                 string(name: 'RUNNER_LABEL', value: "WebrtcLongRunningOpenSSL"),
                                 string(name: 'SCENARIO_LABEL', value: "WebrtcLongRunning"),
                             ],
