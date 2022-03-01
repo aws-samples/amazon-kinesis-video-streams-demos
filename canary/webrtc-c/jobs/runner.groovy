@@ -12,7 +12,7 @@ CREDENTIALS = [
     ]
 ]
 
-def buildProject(useMbedTLS) {
+def buildProject(useMbedTLS, thing_prefix) {
     checkout([$class: 'GitSCM', branches: [[name: params.GIT_HASH ]],
               userRemoteConfigs: [[url: params.GIT_URL]]])
 
@@ -24,7 +24,7 @@ def buildProject(useMbedTLS) {
     sh """
         cd ./canary/webrtc-c/scripts &&
         chmod a+x cert_setup.sh &&
-        ./cert_setup.sh ${NODE_NAME} &&
+        ./cert_setup.sh ${thing_prefix} &&
         cd .. &&
         mkdir -p build && 
         cd build && 
@@ -57,8 +57,9 @@ def buildPeer(isMaster, params) {
     if (params.FIRST_ITERATION) {
         deleteDir()
     }
-    
-    buildProject(params.USE_MBEDTLS)
+
+    def thing_prefix = "${env.JOB_NAME}-${params.RUNNER_LABEL}"
+    buildProject(params.USE_MBEDTLS, thing_prefix)
 
     RUNNING_NODES_IN_BUILDING--
     
@@ -68,10 +69,10 @@ def buildPeer(isMaster, params) {
 
     def scripts_dir = "$WORKSPACE/canary/webrtc-c/scripts"
     def endpoint = "${scripts_dir}/iot-credential-provider.txt"
-    def core_cert_file = "${scripts_dir}/w${env.NODE_NAME}_certificate.pem"
-    def private_key_file = "${scripts_dir}/w${env.NODE_NAME}_private.key"
-    def role_alias = "w${env.NODE_NAME}_role_alias"
-    def thing_name = "w${env.NODE_NAME}_thing"
+    def core_cert_file = "${scripts_dir}/${thing_prefix}_certificate.pem"
+    def private_key_file = "${scripts_dir}/${thing_prefix}_private.key"
+    def role_alias = "${thing_prefix}_role_alias"
+    def thing_name = "${thing_prefix}_thing"
 
     def envs = [
       'AWS_KVS_LOG_LEVEL': params.AWS_KVS_LOG_LEVEL,
@@ -106,14 +107,15 @@ def buildSignaling(params) {
     if (params.FIRST_ITERATION) {
         deleteDir()
     }
-    buildProject(params.USE_MBEDTLS)
+    def thing_prefix = "${env.JOB_NAME}-${params.RUNNER_LABEL}"
+    buildProject(params.USE_MBEDTLS, thing_prefix)
 
     def scripts_dir = "$WORKSPACE/canary/webrtc-c/scripts"
     def endpoint = "${scripts_dir}/iot-credential-provider.txt"
-    def core_cert_file = "${scripts_dir}/w${env.NODE_NAME}_certificate.pem"
-    def private_key_file = "${scripts_dir}/w${env.NODE_NAME}_private.key"
-    def role_alias = "w${env.NODE_NAME}_role_alias"
-    def thing_name = "w${env.NODE_NAME}_thing"
+    def core_cert_file = "${scripts_dir}/${thing_prefix}_certificate.pem"
+    def private_key_file = "${scripts_dir}/${thing_prefix}_private.key"
+    def role_alias = "${thing_prefix}_role_alias"
+    def thing_name = "${thing_prefix}_thing"
 
     def envs = [
       'AWS_KVS_LOG_LEVEL': params.AWS_KVS_LOG_LEVEL,
