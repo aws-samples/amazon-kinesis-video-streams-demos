@@ -204,7 +204,7 @@ STATUS sendViewerOfferCallback(UINT32 timerId, UINT64 time, UINT64 customData)
 
     while (!ATOMIC_LOAD_BOOL(&pCanarySessionInfo->answerReceived)) {
         // This will jump to cleanup on timeout
-        CHK_STATUS(CVAR_WAIT(pCanarySessionInfo->roundtripCv, pCanarySessionInfo->roundtripLock, 1*HUNDREDS_OF_NANOS_IN_A_SECOND));
+        CHK_STATUS(CVAR_WAIT(pCanarySessionInfo->roundtripCv, pCanarySessionInfo->roundtripLock, SIGNALING_CANARY_ROUNDTRIP_TIMEOUT));
     }
 
     curTime = GETTIME();
