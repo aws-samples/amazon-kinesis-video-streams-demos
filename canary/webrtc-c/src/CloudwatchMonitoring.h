@@ -13,6 +13,7 @@ class CloudwatchMonitoring {
     VOID pushSignalingInitDelay(UINT64, Aws::CloudWatch::Model::StandardUnit);
     VOID pushTimeToFirstFrame(UINT64, Aws::CloudWatch::Model::StandardUnit);
     VOID pushSignalingRoundtripLatency(UINT64, Aws::CloudWatch::Model::StandardUnit);
+    VOID pushSignalingConnectionDuration(UINT64, Aws::CloudWatch::Model::StandardUnit);
     VOID pushICEHolePunchingDelay(UINT64, Aws::CloudWatch::Model::StandardUnit);
     VOID pushOutboundRtpStats(Canary::POutgoingRTPMetricsContext);
     VOID pushInboundRtpStats(Canary::PIncomingRTPMetricsContext);

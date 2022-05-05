@@ -166,6 +166,17 @@ VOID CloudwatchMonitoring::pushSignalingRoundtripLatency(UINT64 delay, Aws::Clou
     this->push(datum);
 }
 
+VOID CloudwatchMonitoring::pushSignalingConnectionDuration(UINT64 duration, Aws::CloudWatch::Model::StandardUnit unit)
+{
+    MetricDatum datum;
+
+    datum.SetMetricName("SignalingConnectionDuration");
+    datum.SetValue(duration);
+    datum.SetUnit(unit);
+
+    this->push(datum);
+}
+
 VOID CloudwatchMonitoring::pushTimeToFirstFrame(UINT64 timeToFirstFrame, Aws::CloudWatch::Model::StandardUnit unit)
 {
     MetricDatum datum;
