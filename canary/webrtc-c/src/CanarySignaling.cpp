@@ -204,7 +204,7 @@ STATUS sendViewerOfferCallback(UINT32 timerId, UINT64 time, UINT64 customData)
 
     while (!ATOMIC_LOAD_BOOL(&pCanarySessionInfo->answerReceived)) {
         // This will jump to cleanup on timeout
-        CHK_STATUS(CVAR_WAIT(pCanarySessionInfo->roundtripCv, pCanarySessionInfo->roundtripLock, SIGNALING_CANARY_ROUNDTRIP_TIMEOUT));
+        CHK_STATUS(CVAR_WAIT(pCanarySessionInfo->roundtripCv, pCanarySessionInfo->roundtripLock, 1*HUNDREDS_OF_NANOS_IN_A_SECOND));
     }
 
     curTime = GETTIME();
@@ -263,6 +263,7 @@ STATUS run(Canary::PConfig pConfig)
     BOOL initialized = FALSE, channelNameGenerated = FALSE;
     TIMER_QUEUE_HANDLE timerQueueHandle = 0;
     UINT32 timeoutTimerId;
+    UINT64 connectionStart, curTime, connectionDuration;
     ChannelInfo masterChannelInfo = {};
     ChannelInfo viewerChannelInfo = {};
     SignalingClientInfo masterClientInfo = {};
@@ -384,6 +385,7 @@ STATUS run(Canary::PConfig pConfig)
 
     // Connect the signaling clients
     CHK_STATUS(signalingClientConnectSync(canarySessionInfo.masterHandle));
+    connectionStart = GETTIME();
     CHK_STATUS(signalingClientConnectSync(canarySessionInfo.viewerHandle));
 
     if (pConfig->duration.value != 0) {
@@ -401,6 +403,11 @@ STATUS run(Canary::PConfig pConfig)
         CVAR_WAIT(terminateCv, lock, 1 * HUNDREDS_OF_NANOS_IN_A_SECOND);
     }
     MUTEX_UNLOCK(lock);
+    
+    curTime = GETTIME();
+    connectionDuration = (curTime - connectionStart) / HUNDREDS_OF_NANOS_IN_A_SECOND;
+
+    Canary::Cloudwatch::getInstance().monitoring.pushSignalingConnectionDuration(connectionDuration, Aws::CloudWatch::Model::StandardUnit::Seconds);
 
 CleanUp:
 
