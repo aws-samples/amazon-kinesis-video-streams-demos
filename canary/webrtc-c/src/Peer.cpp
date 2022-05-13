@@ -554,7 +554,7 @@ STATUS Peer::addTransceiver(RtcMediaStreamTrack& track)
         UINT32 receivedSize = getUnalignedInt32BigEndian((PINT32)(frameDataPtr));
 
         pPeer->endToEndMetricsContext.frameLatencyAvg =
-            EMA_ACCUMULATOR_GET_NEXT(pPeer->endToEndMetricsContext.frameLatencyAvg, GETTIME() - receivedTs);
+                EMA_ACCUMULATOR_GET_NEXT(pPeer->endToEndMetricsContext.frameLatencyAvg, GETTIME() - receivedTs);
 
         // Do a size match of the raw packet. Since raw packet does not contain the NALu, the
         // comparison would be rawPacketSize + ANNEX_B_NALU_SIZE and the received size
@@ -721,7 +721,7 @@ CleanUp:
 STATUS Peer::publishEndToEndMetrics()
 {
     std::unique_lock<std::recursive_mutex> lock(this->mutex);
-    Canary::Cloudwatch::getInstance().monitoring.pushEndToEndMetrics(this->endToEndMetricsContext);
+    Canary::Cloudwatch::getInstance().monitoring.pushEndToEndMetrics(this->endToEndMetricsContext, this->rtcConfiguration.iceTransportPolicy);
 
     return STATUS_SUCCESS;
 }

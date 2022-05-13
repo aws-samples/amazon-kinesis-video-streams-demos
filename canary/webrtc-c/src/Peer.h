@@ -37,6 +37,7 @@ typedef IncomingRTPMetricsContext* PIncomingRTPMetricsContext;
 
 struct EndToEndMetricsContext{
     DOUBLE frameLatencyAvg = 0.0;
+    DOUBLE frameLatencyForcedTurnAvg = 0.0;
     DOUBLE dataMatchAvg = 0.0;
     DOUBLE sizeMatchAvg = 0.0;
 };

@@ -17,7 +17,7 @@ class CloudwatchMonitoring {
     VOID pushICEHolePunchingDelay(UINT64, Aws::CloudWatch::Model::StandardUnit);
     VOID pushOutboundRtpStats(Canary::POutgoingRTPMetricsContext);
     VOID pushInboundRtpStats(Canary::PIncomingRTPMetricsContext);
-    VOID pushEndToEndMetrics(Canary::EndToEndMetricsContext);
+    VOID pushEndToEndMetrics(Canary::EndToEndMetricsContext, ICE_TRANSPORT_POLICY);
     VOID pushRetryCount(UINT32);
 
   private:

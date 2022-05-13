@@ -254,7 +254,7 @@ VOID CloudwatchMonitoring::pushInboundRtpStats(Canary::PIncomingRTPMetricsContex
     this->push(incomingFrameDropRateDatum);
 }
 
-VOID CloudwatchMonitoring::pushEndToEndMetrics(Canary::EndToEndMetricsContext ctx)
+VOID CloudwatchMonitoring::pushEndToEndMetrics(Canary::EndToEndMetricsContext ctx, ICE_TRANSPORT_POLICY policy)
 {
     MetricDatum endToEndLatencyDatum, sizeMatchDatum;
     DOUBLE latency = ctx.frameLatencyAvg / (DOUBLE) HUNDREDS_OF_NANOS_IN_A_MILLISECOND;
@@ -266,13 +266,24 @@ VOID CloudwatchMonitoring::pushEndToEndMetrics(Canary::EndToEndMetricsContext ct
     //
     //       If the issues doesn't exist anymore, please remove this as this is intended for debugging only.
     //       The generic metric logging should be sufficient.
-    DLOGD("Current end-to-end frame latency: %4.2lf", latency);
-    endToEndLatencyDatum.SetMetricName("EndToEndFrameLatency");
+    DLOGD("Current end-to-end frame latency (: %4.2lf", latency);
+    if(policy == ICE_TRANSPORT_POLICY_RELAY) {
+        endToEndLatencyDatum.SetMetricName("EndToEndFrameLatencyForceTURN");
+    }
+    else {
+        endToEndLatencyDatum.SetMetricName("EndToEndFrameLatency");
+    }
     endToEndLatencyDatum.SetUnit(Aws::CloudWatch::Model::StandardUnit::Milliseconds);
     endToEndLatencyDatum.SetValue(latency);
     this->push(endToEndLatencyDatum);
 
-    sizeMatchDatum.SetMetricName("FrameSizeMatch");
+    if(policy == ICE_TRANSPORT_POLICY_RELAY) {
+        DLOGD("RELAY");
+        sizeMatchDatum.SetMetricName("FrameSizeMatchForceTURN");
+    }
+    else {
+        sizeMatchDatum.SetMetricName("FrameSizeMatch");
+    }
     sizeMatchDatum.SetUnit(Aws::CloudWatch::Model::StandardUnit::Count);
     sizeMatchDatum.SetValue(ctx.sizeMatchAvg);
     this->push(sizeMatchDatum);
