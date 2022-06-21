@@ -1,0 +1,31 @@
+cmake_minimum_required(VERSION 3.6.3)
+
+project(libopenssl-download NONE)
+
+if (WIN32)
+  find_program(MAKE_EXE NAMES nmake)
+  SET(CONFIGURE_COMMAND perl ${CMAKE_CURRENT_BINARY_DIR}/build/src/project_libopenssl/Configure VC-WIN64A no-asm --prefix=${OPEN_SRC_INSTALL_PREFIX} --openssldir=${OPEN_SRC_INSTALL_PREFIX})
+else()
+  find_program(MAKE_EXE NAMES make)
+  if (BUILD_STATIC)
+    SET(OPENSSL_EXTRA ${OPENSSL_EXTRA} no-shared no-dso)
+  endif()
+
+  if (DEFINED BUILD_OPENSSL_PLATFORM AND NOT BUILD_OPENSSL_PLATFORM STREQUAL OFF)
+    SET(CONFIGURE_COMMAND ${CMAKE_CURRENT_BINARY_DIR}/build/src/project_libopenssl/Configure ${OPENSSL_EXTRA} --prefix=${OPEN_SRC_INSTALL_PREFIX} --openssldir=${OPEN_SRC_INSTALL_PREFIX} ${BUILD_OPENSSL_PLATFORM} -Wno-nullability-completeness -Wno-expansion-to-defined)
+  else()
+    SET(CONFIGURE_COMMAND ${CMAKE_CURRENT_BINARY_DIR}/build/src/project_libopenssl/config ${OPENSSL_EXTRA} --prefix=${OPEN_SRC_INSTALL_PREFIX} --openssldir=${OPEN_SRC_INSTALL_PREFIX} -Wno-nullability-completeness -Wno-expansion-to-defined)
+  endif()
+endif()
+
+include(ExternalProject)
+ExternalProject_Add(project_libopenssl
+    GIT_REPOSITORY    https://github.com/openssl/openssl.git
+    GIT_TAG           OpenSSL_1_1_1g
+    PREFIX            ${CMAKE_CURRENT_BINARY_DIR}/build
+    CONFIGURE_COMMAND ${CONFIGURE_COMMAND}
+    BUILD_COMMAND     ${MAKE_EXE}
+    BUILD_IN_SOURCE   TRUE
+    INSTALL_COMMAND   ${MAKE_EXE} install_sw
+    TEST_COMMAND      ""
+)

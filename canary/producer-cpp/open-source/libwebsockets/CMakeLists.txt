@@ -1,0 +1,47 @@
+cmake_minimum_required(VERSION 3.6.3)
+
+project(libwebsocket-download NONE)
+
+include(ExternalProject)
+
+if (BUILD_STATIC)
+  set(LWS_WITH_STATIC 1)
+  set(LWS_WITH_SHARED 0)
+else()
+  set(LWS_WITH_STATIC 0)
+  set(LWS_WITH_SHARED 1)
+endif()
+
+if (USE_MBEDTLS)
+  set(LWS_WITH_MBEDTLS ON)
+else()
+  set(LWS_WITH_MBEDTLS OFF)
+endif()
+
+ExternalProject_Add(project_libwebsockets
+    GIT_REPOSITORY    https://github.com/warmcat/libwebsockets.git
+    GIT_TAG           v3.2.3
+    PREFIX            ${CMAKE_CURRENT_BINARY_DIR}/build
+    CMAKE_ARGS
+        -DCMAKE_INSTALL_PREFIX=${OPEN_SRC_INSTALL_PREFIX}
+        -DLWS_WITH_HTTP2=1
+        -DLWS_HAVE_HMAC_CTX_new=1
+        -DLWS_HAVE_SSL_EXTRA_CHAIN_CERTS=1
+        -DLWS_HAVE_OPENSSL_ECDH_H=1
+        -DLWS_HAVE_EVP_MD_CTX_free=1
+        -DLWS_WITHOUT_SERVER=1
+        -DLWS_WITHOUT_TESTAPPS=1
+        -DLWS_WITH_THREADPOOL=1
+        -DLWS_WITHOUT_TEST_SERVER_EXTPOLL=1
+        -DLWS_WITHOUT_TEST_PING=1
+        -DLWS_WITHOUT_TEST_CLIENT=1
+        -DLWS_WITH_STATIC=${LWS_WITH_STATIC}
+        -DLWS_WITH_SHARED=${LWS_WITH_SHARED}
+        -DLWS_STATIC_PIC=1
+        -DLWS_WITH_ZLIB=0
+        -DLWS_WITH_MBEDTLS=${LWS_WITH_MBEDTLS}
+# enable for debug output        -DCMAKE_BUILD_TYPE=DEBUG
+        -DOPENSSL_ROOT_DIR=${OPENSSL_DIR}
+        BUILD_ALWAYS      TRUE
+    TEST_COMMAND      ""
+)

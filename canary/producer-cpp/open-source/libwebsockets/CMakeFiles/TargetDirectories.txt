@@ -1,0 +1,3 @@
+/Users/stefankk/Documents/GitHub/amazon-kinesis-video-streams-demos/canary/producer-c/open-source/libwebsockets/CMakeFiles/project_libwebsockets.dir
+/Users/stefankk/Documents/GitHub/amazon-kinesis-video-streams-demos/canary/producer-c/open-source/libwebsockets/CMakeFiles/edit_cache.dir
+/Users/stefankk/Documents/GitHub/amazon-kinesis-video-streams-demos/canary/producer-c/open-source/libwebsockets/CMakeFiles/rebuild_cache.dir

@@ -1,0 +1,14 @@
+# Target labels
+ project_libopenssl
+# Source files and their labels
+/Users/stefankk/Documents/GitHub/amazon-kinesis-video-streams-demos/canary/producer-c/open-source/libopenssl/CMakeFiles/project_libopenssl
+/Users/stefankk/Documents/GitHub/amazon-kinesis-video-streams-demos/canary/producer-c/open-source/libopenssl/CMakeFiles/project_libopenssl.rule
+/Users/stefankk/Documents/GitHub/amazon-kinesis-video-streams-demos/canary/producer-c/open-source/libopenssl/CMakeFiles/project_libopenssl-complete.rule
+/Users/stefankk/Documents/GitHub/amazon-kinesis-video-streams-demos/canary/producer-c/open-source/libopenssl/build/src/project_libopenssl-stamp/project_libopenssl-build.rule
+/Users/stefankk/Documents/GitHub/amazon-kinesis-video-streams-demos/canary/producer-c/open-source/libopenssl/build/src/project_libopenssl-stamp/project_libopenssl-configure.rule
+/Users/stefankk/Documents/GitHub/amazon-kinesis-video-streams-demos/canary/producer-c/open-source/libopenssl/build/src/project_libopenssl-stamp/project_libopenssl-download.rule
+/Users/stefankk/Documents/GitHub/amazon-kinesis-video-streams-demos/canary/producer-c/open-source/libopenssl/build/src/project_libopenssl-stamp/project_libopenssl-install.rule
+/Users/stefankk/Documents/GitHub/amazon-kinesis-video-streams-demos/canary/producer-c/open-source/libopenssl/build/src/project_libopenssl-stamp/project_libopenssl-mkdir.rule
+/Users/stefankk/Documents/GitHub/amazon-kinesis-video-streams-demos/canary/producer-c/open-source/libopenssl/build/src/project_libopenssl-stamp/project_libopenssl-patch.rule
+/Users/stefankk/Documents/GitHub/amazon-kinesis-video-streams-demos/canary/producer-c/open-source/libopenssl/build/src/project_libopenssl-stamp/project_libopenssl-test.rule
+/Users/stefankk/Documents/GitHub/amazon-kinesis-video-streams-demos/canary/producer-c/open-source/libopenssl/build/src/project_libopenssl-stamp/project_libopenssl-update.rule
