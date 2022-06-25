@@ -43,19 +43,11 @@ find_package(Threads)
 find_package(PkgConfig REQUIRED)
 find_package(AWSSDK REQUIRED COMPONENTS monitoring logs)
 
-include_directories(${cproducer_SOURCE_DIR}/dependency/libkvspic/kvspic-src/src/client/include)
-include_directories(${cproducer_SOURCE_DIR}/dependency/libkvspic/kvspic-src/src/common/include)
-include_directories(${cproducer_SOURCE_DIR}/dependency/libkvspic/kvspic-src/src/heap/include)
-include_directories(${cproducer_SOURCE_DIR}/dependency/libkvspic/kvspic-src/src/mkvgen/include)
-include_directories(${cproducer_SOURCE_DIR}/dependency/libkvspic/kvspic-src/src/state/include)
-include_directories(${cproducer_SOURCE_DIR}/dependency/libkvspic/kvspic-src/src/utils/include)
-include_directories(${cproducer_SOURCE_DIR}/dependency/libkvspic/kvspic-src/src/view/include)
-
 if (WIN32)
-  find_library(LIBKVSPIC_LIBRARIES kvspic REQUIRED)
+  # find_library(LIBKVSPIC_LIBRARIES kvspic REQUIRED)
   find_library(LIBKVSPRODUCERCPP cppproducer REQUIRED) # changed this
 else()
-  pkg_check_modules(LIBKVSPIC REQUIRED libkvspic)
+  # pkg_check_modules(LIBKVSPIC REQUIRED libkvspic)
   pkg_check_modules(LIBKVSPRODUCERCPP REQUIRED libcppproducer) # changed this
 endif()
 
