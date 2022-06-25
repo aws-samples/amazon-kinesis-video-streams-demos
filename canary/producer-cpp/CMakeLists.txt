@@ -31,7 +31,6 @@ if(NOT EXISTS ${DEPENDENCY_DOWNLOAD_PATH})
   file(MAKE_DIRECTORY ${DEPENDENCY_DOWNLOAD_PATH})
 endif()
 
-fetch_repo(kvscppproducer)
 add_subdirectory(${DEPENDENCY_DOWNLOAD_PATH}/libkvscppproducer/kvscppproducer-src EXCLUDE_FROM_ALL)
 
 
