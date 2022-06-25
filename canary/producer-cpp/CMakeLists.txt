@@ -43,13 +43,13 @@ find_package(Threads)
 find_package(PkgConfig REQUIRED)
 find_package(AWSSDK REQUIRED COMPONENTS monitoring logs)
 
-if (WIN32)
-  # find_library(LIBKVSPIC_LIBRARIES kvspic REQUIRED)
-  find_library(LIBKVSPRODUCERCPP cppproducer REQUIRED) # changed this
-else()
-  # pkg_check_modules(LIBKVSPIC REQUIRED libkvspic)
-  pkg_check_modules(LIBKVSPRODUCERCPP REQUIRED libcppproducer) # changed this
-endif()
+# if (WIN32)
+#   find_library(LIBKVSPIC_LIBRARIES kvspic REQUIRED)
+#   find_library(LIBKVSPRODUCERCPP cppproducer REQUIRED) # changed this
+# else()
+#   pkg_check_modules(LIBKVSPIC REQUIRED libkvspic)
+#   pkg_check_modules(LIBKVSPRODUCERCPP REQUIRED libcppproducer) # changed this
+# endif()
 
 set(OPEN_SRC_INCLUDE_DIRS ${LIBKVSPIC_INCLUDE_DIRS})
 link_directories(${LIBKVSPIC_LIBRARY_DIRS})
