@@ -4,7 +4,7 @@ project(libkvsProducerCPP-download NONE)
 
 include(ExternalProject)
 
-ExternalProject_Add(libkvsProducerCPP-download # changed this
+ExternalProject_Add(libkvsProducerCPP-download
     GIT_REPOSITORY    https://github.com/awslabs/amazon-kinesis-video-streams-producer-sdk-cpp
     GIT_TAG           v3.3.1
     PREFIX            ${CMAKE_CURRENT_BINARY_DIR}/build
