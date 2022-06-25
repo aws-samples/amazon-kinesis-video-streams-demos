@@ -12,7 +12,7 @@ set(CMAKE_MACOSX_RPATH TRUE)
 get_filename_component(ROOT "${CMAKE_CURRENT_SOURCE_DIR}" ABSOLUTE)
 
 # changed below, not sure where KINESIS_VIDEO_PRODUCER_CPP_SRC gets set
-message(STATUS "Kinesis Video Producer path is ${KINESIS_VIDEO_PRODUCER_CPP_SRC}")
+message(STATUS "Kinesis Video Producer path is ${KINESIS_VIDEO_PRODUCER_C_SRC}")
 
 # what happens here?
 if (NOT OPEN_SRC_INSTALL_PREFIX)
@@ -27,11 +27,19 @@ if(NOT EXISTS ${OPEN_SRC_INSTALL_PREFIX})
   file(MAKE_DIRECTORY ${OPEN_SRC_INSTALL_PREFIX})
 endif()
 
+if(NOT EXISTS ${DEPENDENCY_DOWNLOAD_PATH})
+  file(MAKE_DIRECTORY ${DEPENDENCY_DOWNLOAD_PATH})
+endif()
+
+fetch_repo(kvscppproducer)
+add_subdirectory(${DEPENDENCY_DOWNLOAD_PATH}/libkvscppproducer/kvscppproducer-src EXCLUDE_FROM_ALL)
+
 
 message(STATUS "Begin building dependencies.")
 
 build_dependency(autoconf)
 build_dependency(automake)
+build_dependency(kvsProducerC)
 build_dependency(kvsProducerCPP) # changed this
 build_dependency(cppsdk)
 
@@ -45,9 +53,11 @@ find_package(AWSSDK REQUIRED COMPONENTS monitoring logs)
 
 if (WIN32)
   find_library(LIBKVSPIC_LIBRARIES kvspic REQUIRED)
+  find_library(LIBKVSPRODUCERC cproducer REQUIRED)
   find_library(LIBKVSPRODUCERCPP cppproducer REQUIRED) # changed this
 else()
   pkg_check_modules(LIBKVSPIC REQUIRED libkvspic)
+  pkg_check_modules(LIBKVSPRODUCERC REQUIRED libcproducer)
   pkg_check_modules(LIBKVSPRODUCERCPP REQUIRED libcppproducer) # changed this
 endif()
 
@@ -55,10 +65,19 @@ set(OPEN_SRC_INCLUDE_DIRS ${LIBKVSPIC_INCLUDE_DIRS})
 link_directories(${LIBKVSPIC_LIBRARY_DIRS})
 
 include_directories(${OPEN_SRC_INCLUDE_DIRS})
+include_directories(${PIC_HEADERS})
+include_directories(${KinesisVideoProducerCPP_SOURCE_DIR}/src/include)
+
+
+add_library(KinesisVideoProducer ${LINKAGE} ${PRODUCER_CPP_SOURCE_FILES})
+target_link_libraries(
+  KinesisVideoProducer
+  PUBLIC cppproducer)
+
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
 add_executable(kvsProducerSampleCloudwatch
             ${CMAKE_CURRENT_SOURCE_DIR}/src/CanaryTest.cpp # changed this
             ${CMAKE_CURRENT_SOURCE_DIR}/src/CanaryTestTwo.cpp) # changed this
 
-target_link_libraries(kvsProducerSampleCloudwatch cppproducer kvspicUtils ${AWSSDK_LINK_LIBRARIES}) # changed this
+target_link_libraries(kvsProducerSampleCloudwatch cproducer cppproducer kvspicUtils ${AWSSDK_LINK_LIBRARIES}) # changed this
