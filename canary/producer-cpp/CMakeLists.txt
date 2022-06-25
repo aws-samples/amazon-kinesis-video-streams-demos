@@ -66,6 +66,13 @@ link_directories(${LIBKVSPIC_LIBRARY_DIRS})
 include_directories(${OPEN_SRC_INCLUDE_DIRS})
 include_directories(${PIC_HEADERS})
 include_directories(${KinesisVideoProducerCPP_SOURCE_DIR}/src/include)
+include_directories(${cproducer_SOURCE_DIR}/dependency/libkvspic/kvspic-src/src/client/include)
+include_directories(${cproducer_SOURCE_DIR}/dependency/libkvspic/kvspic-src/src/common/include)
+include_directories(${cproducer_SOURCE_DIR}/dependency/libkvspic/kvspic-src/src/heap/include)
+include_directories(${cproducer_SOURCE_DIR}/dependency/libkvspic/kvspic-src/src/mkvgen/include)
+include_directories(${cproducer_SOURCE_DIR}/dependency/libkvspic/kvspic-src/src/state/include)
+include_directories(${cproducer_SOURCE_DIR}/dependency/libkvspic/kvspic-src/src/utils/include)
+include_directories(${cproducer_SOURCE_DIR}/dependency/libkvspic/kvspic-src/src/view/include)
 
 
 add_library(KinesisVideoProducer ${LINKAGE} ${PRODUCER_CPP_SOURCE_FILES})
