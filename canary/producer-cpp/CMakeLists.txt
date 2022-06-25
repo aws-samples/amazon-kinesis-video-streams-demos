@@ -41,6 +41,10 @@ build_dependency(automake)
 build_dependency(kvsProducerC)
 build_dependency(kvsProducerCPP) # changed this
 build_dependency(cppsdk)
+build_dependency(kvspicUtils)
+build_dependency(kvspic)
+
+
 
 message(STATUS "Finished building dependencies.")
 
@@ -86,4 +90,4 @@ add_executable(kvsProducerSampleCloudwatch
             ${CMAKE_CURRENT_SOURCE_DIR}/src/CanaryTest.cpp # changed this
             ${CMAKE_CURRENT_SOURCE_DIR}/src/CanaryTestTwo.cpp) # changed this
 
-target_link_libraries(kvsProducerSampleCloudwatch cproducer cppproducer kvspicUtils ${AWSSDK_LINK_LIBRARIES}) # changed this
+target_link_libraries(kvsProducerSampleCloudwatch cproducer cppproducer kvspic kvspicUtils ${AWSSDK_LINK_LIBRARIES}) # changed this
