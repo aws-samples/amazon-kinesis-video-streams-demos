@@ -27,6 +27,7 @@ if(NOT EXISTS ${OPEN_SRC_INSTALL_PREFIX})
   file(MAKE_DIRECTORY ${OPEN_SRC_INSTALL_PREFIX})
 endif()
 
+
 message(STATUS "Begin building dependencies.")
 
 build_dependency(autoconf)
@@ -41,6 +42,14 @@ message(STATUS "Finished building dependencies.")
 find_package(Threads)
 find_package(PkgConfig REQUIRED)
 find_package(AWSSDK REQUIRED COMPONENTS monitoring logs)
+
+include_directories(${cproducer_SOURCE_DIR}/dependency/libkvspic/kvspic-src/src/client/include)
+include_directories(${cproducer_SOURCE_DIR}/dependency/libkvspic/kvspic-src/src/common/include)
+include_directories(${cproducer_SOURCE_DIR}/dependency/libkvspic/kvspic-src/src/heap/include)
+include_directories(${cproducer_SOURCE_DIR}/dependency/libkvspic/kvspic-src/src/mkvgen/include)
+include_directories(${cproducer_SOURCE_DIR}/dependency/libkvspic/kvspic-src/src/state/include)
+include_directories(${cproducer_SOURCE_DIR}/dependency/libkvspic/kvspic-src/src/utils/include)
+include_directories(${cproducer_SOURCE_DIR}/dependency/libkvspic/kvspic-src/src/view/include)
 
 if (WIN32)
   find_library(LIBKVSPIC_LIBRARIES kvspic REQUIRED)
