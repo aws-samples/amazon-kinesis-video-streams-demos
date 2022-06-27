@@ -60,8 +60,7 @@ set(OPEN_SRC_LIBRARY_DIRS ${OPEN_SRC_INSTALL_PREFIX}/lib)
 include_directories(${OPEN_SRC_INCLUDE_DIRS})
 include_directories(${KinesisVideoProducerCPP_SOURCE_DIR}/src/include)
 link_directories(${OPEN_SRC_LIBRARY_DIRS})
-
-
+message("the cppp directory: " ${KinesisVideoProducerCPP_SOURCE_DIR})
 add_library(KinesisVideoProducer ${LINKAGE} ${PRODUCER_CPP_SOURCE_FILES})
 target_link_libraries(
   KinesisVideoProducer
