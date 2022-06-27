@@ -41,8 +41,6 @@ build_dependency(automake)
 build_dependency(kvsProducerC)
 build_dependency(kvsProducerCPP) # changed this
 build_dependency(cppsdk)
-build_dependency(kvspicUtils)
-build_dependency(kvspic)
 
 
 
