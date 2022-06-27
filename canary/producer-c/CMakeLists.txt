@@ -45,7 +45,12 @@ else()
   pkg_check_modules(LIBKVSPRODUCERC REQUIRED libcproducer)
 endif()
 
+find_package(CURL REQUIRED)
+set(CURL_LIBRARIES CURL::libcurl)
+
+set(LIBKVSPIC_INCLUDE_DIRS ${OPEN_SRC_INSTALL_PREFIX}/include)
 set(OPEN_SRC_INCLUDE_DIRS ${LIBKVSPIC_INCLUDE_DIRS})
+set(LIBKVSPIC_LIBRARY_DIRS ${OPEN_SRC_INSTALL_PREFIX}/lib)
 link_directories(${LIBKVSPIC_LIBRARY_DIRS})
 
 include_directories(${OPEN_SRC_INCLUDE_DIRS})
@@ -56,4 +61,4 @@ add_executable(kvsProducerSampleCloudwatch
             ${CMAKE_CURRENT_SOURCE_DIR}/canary/CanaryStreamUtils.cpp
             ${CMAKE_CURRENT_SOURCE_DIR}/canary/CanaryLogsUtils.cpp)
 
-target_link_libraries(kvsProducerSampleCloudwatch cproducer kvspicUtils ${AWSSDK_LINK_LIBRARIES})
+target_link_libraries(kvsProducerSampleCloudwatch cproducer kvspicUtils ${CURL_LIBRARIES} ${AWSSDK_LINK_LIBRARIES})

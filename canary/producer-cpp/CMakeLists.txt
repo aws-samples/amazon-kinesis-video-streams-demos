@@ -12,7 +12,7 @@ set(CMAKE_MACOSX_RPATH TRUE)
 get_filename_component(ROOT "${CMAKE_CURRENT_SOURCE_DIR}" ABSOLUTE)
 
 # changed below, not sure where KINESIS_VIDEO_PRODUCER_CPP_SRC gets set
-message(STATUS "Kinesis Video Producer path is ${KINESIS_VIDEO_PRODUCER_C_SRC}")
+message(STATUS "Kinesis Video Producer path is ${KINESIS_VIDEO_PRODUCER_CPP_SRC}")
 
 # what happens here?
 if (NOT OPEN_SRC_INSTALL_PREFIX)
@@ -55,28 +55,16 @@ find_package(PkgConfig REQUIRED)
 find_package(AWSSDK REQUIRED COMPONENTS monitoring logs)
 
 if (WIN32)
-  find_library(LIBKVSPIC_LIBRARIES kvspic REQUIRED)
-  find_library(LIBKVSPRODUCERC cproducer REQUIRED)
   find_library(LIBKVSPRODUCERCPP cppproducer REQUIRED) # changed this
 else()
-  pkg_check_modules(LIBKVSPIC REQUIRED libkvspic)
-  pkg_check_modules(LIBKVSPRODUCERC REQUIRED libcproducer)
   pkg_check_modules(LIBKVSPRODUCERCPP REQUIRED libcppproducer) # changed this
 endif()
 
-set(OPEN_SRC_INCLUDE_DIRS ${LIBKVSPIC_INCLUDE_DIRS})
-link_directories(${LIBKVSPIC_LIBRARY_DIRS})
-
+set(OPEN_SRC_INCLUDE_DIRS ${OPEN_SRC_INSTALL_PREFIX}/include)
+set(OPEN_SRC_LIBRARY_DIRS ${OPEN_SRC_INSTALL_PREFIX}/lib)
 include_directories(${OPEN_SRC_INCLUDE_DIRS})
-include_directories(${PIC_HEADERS})
 include_directories(${KinesisVideoProducerCPP_SOURCE_DIR}/src/include)
-include_directories(${cproducer_SOURCE_DIR}/dependency/libkvspic/kvspic-src/src/client/include)
-include_directories(${cproducer_SOURCE_DIR}/dependency/libkvspic/kvspic-src/src/common/include)
-include_directories(${cproducer_SOURCE_DIR}/dependency/libkvspic/kvspic-src/src/heap/include)
-include_directories(${cproducer_SOURCE_DIR}/dependency/libkvspic/kvspic-src/src/mkvgen/include)
-include_directories(${cproducer_SOURCE_DIR}/dependency/libkvspic/kvspic-src/src/state/include)
-include_directories(${cproducer_SOURCE_DIR}/dependency/libkvspic/kvspic-src/src/utils/include)
-include_directories(${cproducer_SOURCE_DIR}/dependency/libkvspic/kvspic-src/src/view/include)
+link_directories(${OPEN_SRC_LIBRARY_DIRS})
 
 
 add_library(KinesisVideoProducer ${LINKAGE} ${PRODUCER_CPP_SOURCE_FILES})
@@ -90,4 +78,4 @@ add_executable(kvsProducerSampleCloudwatch
             ${CMAKE_CURRENT_SOURCE_DIR}/src/CanaryTest.cpp # changed this
             ${CMAKE_CURRENT_SOURCE_DIR}/src/CanaryTestTwo.cpp) # changed this
 
-target_link_libraries(kvsProducerSampleCloudwatch cproducer cppproducer kvspic kvspicUtils ${AWSSDK_LINK_LIBRARIES}) # changed this
+target_link_libraries(kvsProducerSampleCloudwatch cppproducer ${AWSSDK_LINK_LIBRARIES}) # changed this

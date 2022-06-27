@@ -1,0 +1,14 @@
+# Target labels
+ libkvsProducerCPP-download
+# Source files and their labels
+/Users/stefankk/Desktop/Canary/amazon-kinesis-video-streams-demos/canary/producer-cpp/open-source/libkvsProducerCPP/CMakeFiles/libkvsProducerCPP-download
+/Users/stefankk/Desktop/Canary/amazon-kinesis-video-streams-demos/canary/producer-cpp/open-source/libkvsProducerCPP/CMakeFiles/libkvsProducerCPP-download.rule
+/Users/stefankk/Desktop/Canary/amazon-kinesis-video-streams-demos/canary/producer-cpp/open-source/libkvsProducerCPP/CMakeFiles/libkvsProducerCPP-download-complete.rule
+/Users/stefankk/Desktop/Canary/amazon-kinesis-video-streams-demos/canary/producer-cpp/open-source/libkvsProducerCPP/build/src/libkvsProducerCPP-download-stamp/libkvsProducerCPP-download-build.rule
+/Users/stefankk/Desktop/Canary/amazon-kinesis-video-streams-demos/canary/producer-cpp/open-source/libkvsProducerCPP/build/src/libkvsProducerCPP-download-stamp/libkvsProducerCPP-download-configure.rule
+/Users/stefankk/Desktop/Canary/amazon-kinesis-video-streams-demos/canary/producer-cpp/open-source/libkvsProducerCPP/build/src/libkvsProducerCPP-download-stamp/libkvsProducerCPP-download-download.rule
+/Users/stefankk/Desktop/Canary/amazon-kinesis-video-streams-demos/canary/producer-cpp/open-source/libkvsProducerCPP/build/src/libkvsProducerCPP-download-stamp/libkvsProducerCPP-download-install.rule
+/Users/stefankk/Desktop/Canary/amazon-kinesis-video-streams-demos/canary/producer-cpp/open-source/libkvsProducerCPP/build/src/libkvsProducerCPP-download-stamp/libkvsProducerCPP-download-mkdir.rule
+/Users/stefankk/Desktop/Canary/amazon-kinesis-video-streams-demos/canary/producer-cpp/open-source/libkvsProducerCPP/build/src/libkvsProducerCPP-download-stamp/libkvsProducerCPP-download-patch.rule
+/Users/stefankk/Desktop/Canary/amazon-kinesis-video-streams-demos/canary/producer-cpp/open-source/libkvsProducerCPP/build/src/libkvsProducerCPP-download-stamp/libkvsProducerCPP-download-test.rule
+/Users/stefankk/Desktop/Canary/amazon-kinesis-video-streams-demos/canary/producer-cpp/open-source/libkvsProducerCPP/build/src/libkvsProducerCPP-download-stamp/libkvsProducerCPP-download-update.rule

@@ -1,0 +1,46 @@
+{
+	"sources" : 
+	[
+		{
+			"file" : "/Users/stefankk/Desktop/Canary/amazon-kinesis-video-streams-demos/canary/producer-cpp/open-source/libkvsProducerCPP/CMakeFiles/libkvsProducerCPP-download"
+		},
+		{
+			"file" : "/Users/stefankk/Desktop/Canary/amazon-kinesis-video-streams-demos/canary/producer-cpp/open-source/libkvsProducerCPP/CMakeFiles/libkvsProducerCPP-download.rule"
+		},
+		{
+			"file" : "/Users/stefankk/Desktop/Canary/amazon-kinesis-video-streams-demos/canary/producer-cpp/open-source/libkvsProducerCPP/CMakeFiles/libkvsProducerCPP-download-complete.rule"
+		},
+		{
+			"file" : "/Users/stefankk/Desktop/Canary/amazon-kinesis-video-streams-demos/canary/producer-cpp/open-source/libkvsProducerCPP/build/src/libkvsProducerCPP-download-stamp/libkvsProducerCPP-download-build.rule"
+		},
+		{
+			"file" : "/Users/stefankk/Desktop/Canary/amazon-kinesis-video-streams-demos/canary/producer-cpp/open-source/libkvsProducerCPP/build/src/libkvsProducerCPP-download-stamp/libkvsProducerCPP-download-configure.rule"
+		},
+		{
+			"file" : "/Users/stefankk/Desktop/Canary/amazon-kinesis-video-streams-demos/canary/producer-cpp/open-source/libkvsProducerCPP/build/src/libkvsProducerCPP-download-stamp/libkvsProducerCPP-download-download.rule"
+		},
+		{
+			"file" : "/Users/stefankk/Desktop/Canary/amazon-kinesis-video-streams-demos/canary/producer-cpp/open-source/libkvsProducerCPP/build/src/libkvsProducerCPP-download-stamp/libkvsProducerCPP-download-install.rule"
+		},
+		{
+			"file" : "/Users/stefankk/Desktop/Canary/amazon-kinesis-video-streams-demos/canary/producer-cpp/open-source/libkvsProducerCPP/build/src/libkvsProducerCPP-download-stamp/libkvsProducerCPP-download-mkdir.rule"
+		},
+		{
+			"file" : "/Users/stefankk/Desktop/Canary/amazon-kinesis-video-streams-demos/canary/producer-cpp/open-source/libkvsProducerCPP/build/src/libkvsProducerCPP-download-stamp/libkvsProducerCPP-download-patch.rule"
+		},
+		{
+			"file" : "/Users/stefankk/Desktop/Canary/amazon-kinesis-video-streams-demos/canary/producer-cpp/open-source/libkvsProducerCPP/build/src/libkvsProducerCPP-download-stamp/libkvsProducerCPP-download-test.rule"
+		},
+		{
+			"file" : "/Users/stefankk/Desktop/Canary/amazon-kinesis-video-streams-demos/canary/producer-cpp/open-source/libkvsProducerCPP/build/src/libkvsProducerCPP-download-stamp/libkvsProducerCPP-download-update.rule"
+		}
+	],
+	"target" : 
+	{
+		"labels" : 
+		[
+			"libkvsProducerCPP-download"
+		],
+		"name" : "libkvsProducerCPP-download"
+	}
+}
