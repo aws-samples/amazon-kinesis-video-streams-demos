@@ -14,7 +14,6 @@ get_filename_component(ROOT "${CMAKE_CURRENT_SOURCE_DIR}" ABSOLUTE)
 # changed below, not sure where KINESIS_VIDEO_PRODUCER_CPP_SRC gets set
 message(STATUS "Kinesis Video Producer path is ${KINESIS_VIDEO_PRODUCER_CPP_SRC}")
 
-# what happens here?
 if (NOT OPEN_SRC_INSTALL_PREFIX)
   set(OPEN_SRC_INSTALL_PREFIX ${CMAKE_CURRENT_SOURCE_DIR}/open-source)
   set(ENV{PKG_CONFIG_PATH}
@@ -22,11 +21,9 @@ if (NOT OPEN_SRC_INSTALL_PREFIX)
   set(CMAKE_PREFIX_PATH ${CMAKE_PREFIX_PATH} ${OPEN_SRC_INSTALL_PREFIX})
 endif()
 
-# what happens here?
 if(NOT EXISTS ${OPEN_SRC_INSTALL_PREFIX})
   file(MAKE_DIRECTORY ${OPEN_SRC_INSTALL_PREFIX})
 endif()
-
 if(NOT EXISTS ${DEPENDENCY_DOWNLOAD_PATH})
   file(MAKE_DIRECTORY ${DEPENDENCY_DOWNLOAD_PATH})
 endif()
@@ -52,11 +49,11 @@ find_package(Threads)
 find_package(PkgConfig REQUIRED)
 find_package(AWSSDK REQUIRED COMPONENTS monitoring logs)
 
-if (WIN32)
-  find_library(LIBKVSPRODUCERCPP cppproducer REQUIRED) # changed this
-else()
-  pkg_check_modules(LIBKVSPRODUCERCPP REQUIRED libcppproducer) # changed this
-endif()
+# if (WIN32)
+#   find_library(LIBKVSPRODUCERCPP cppproducer REQUIRED) # changed this
+# else()
+#   pkg_check_modules(LIBKVSPRODUCERCPP REQUIRED libcppproducer) # changed this
+# endif()
 
 set(OPEN_SRC_INCLUDE_DIRS ${OPEN_SRC_INSTALL_PREFIX}/include)
 set(OPEN_SRC_LIBRARY_DIRS ${OPEN_SRC_INSTALL_PREFIX}/lib)
