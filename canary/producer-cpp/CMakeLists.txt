@@ -38,7 +38,7 @@ message(STATUS "Begin building dependencies.")
 
 build_dependency(autoconf)
 build_dependency(automake)
-build_dependency(kvsProducerC)
+# build_dependency(kvsProducerC)
 build_dependency(kvsProducerCPP) # changed this
 build_dependency(cppsdk)
 
