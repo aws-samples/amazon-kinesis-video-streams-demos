@@ -21,14 +21,16 @@ if (NOT OPEN_SRC_INSTALL_PREFIX)
   set(CMAKE_PREFIX_PATH ${CMAKE_PREFIX_PATH} ${OPEN_SRC_INSTALL_PREFIX})
 endif()
 
+
+
 if(NOT EXISTS ${OPEN_SRC_INSTALL_PREFIX})
   file(MAKE_DIRECTORY ${OPEN_SRC_INSTALL_PREFIX})
 endif()
-if(NOT EXISTS ${DEPENDENCY_DOWNLOAD_PATH})
-  file(MAKE_DIRECTORY ${DEPENDENCY_DOWNLOAD_PATH})
-endif()
+# if(NOT EXISTS ${DEPENDENCY_DOWNLOAD_PATH})
+#   file(MAKE_DIRECTORY ${DEPENDENCY_DOWNLOAD_PATH})
+# endif()
 
-add_subdirectory(${DEPENDENCY_DOWNLOAD_PATH}/libkvscppproducer/kvscppproducer-src EXCLUDE_FROM_ALL)
+# add_subdirectory(${DEPENDENCY_DOWNLOAD_PATH}/libkvscppproducer/kvscppproducer-src EXCLUDE_FROM_ALL)
 
 
 message(STATUS "Begin building dependencies.")
@@ -49,11 +51,11 @@ find_package(Threads)
 find_package(PkgConfig REQUIRED)
 find_package(AWSSDK REQUIRED COMPONENTS monitoring logs)
 
-# if (WIN32)
-#   find_library(LIBKVSPRODUCERCPP cppproducer REQUIRED) # changed this
-# else()
-#   pkg_check_modules(LIBKVSPRODUCERCPP REQUIRED libcppproducer) # changed this
-# endif()
+if (WIN32)
+  find_library(LIBKVSPRODUCERCPP cppproducer REQUIRED) # changed this
+else()
+  pkg_check_modules(LIBKVSPRODUCERCPP REQUIRED libcppproducer) # changed this
+endif()
 
 set(OPEN_SRC_INCLUDE_DIRS ${OPEN_SRC_INSTALL_PREFIX}/include)
 set(OPEN_SRC_LIBRARY_DIRS ${OPEN_SRC_INSTALL_PREFIX}/lib)
