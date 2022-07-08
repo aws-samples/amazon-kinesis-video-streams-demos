@@ -3,8 +3,7 @@ function(build_dependency lib_name)
   set(supported_libs
       autoconf
       automake
-      kvsProducerC
-      kvsProducerCPP
+      kvsProducerCpp
       cppsdk
       )
   list(FIND supported_libs ${lib_name} index)

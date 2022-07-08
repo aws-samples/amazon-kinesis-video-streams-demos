@@ -1,3 +1,0 @@
-/Users/stefankk/Desktop/Canary/amazon-kinesis-video-streams-demos/canary/producer-cpp/open-source/libkvsProducerCPP/CMakeFiles/libkvsProducerCPP-download.dir
-/Users/stefankk/Desktop/Canary/amazon-kinesis-video-streams-demos/canary/producer-cpp/open-source/libkvsProducerCPP/CMakeFiles/edit_cache.dir
-/Users/stefankk/Desktop/Canary/amazon-kinesis-video-streams-demos/canary/producer-cpp/open-source/libkvsProducerCPP/CMakeFiles/rebuild_cache.dir

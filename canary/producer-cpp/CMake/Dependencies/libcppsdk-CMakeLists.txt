@@ -1,4 +1,7 @@
 cmake_minimum_required(VERSION 3.10.2)
+
+message("entered cppsdk (AWS) dependency file")
+
 project(libawscpp-download NONE)
 include(ExternalProject)
 
