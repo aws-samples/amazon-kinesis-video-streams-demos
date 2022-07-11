@@ -55,11 +55,11 @@ find_package(Threads)
 find_package(PkgConfig REQUIRED)
 find_package(AWSSDK REQUIRED COMPONENTS monitoring logs)
 
-# if (WIN32)
-#   find_library(LIBKVSPRODUCERCPP libKinesisVideoProducer REQUIRED)
-# else()
-#   pkg_check_modules(${OPEN_SRC_INSTALL_PREFIX}/lib REQUIRED libKinesisVideoProducer)
-# endif()
+if (WIN32)
+  find_library(LIBKVSPRODUCERCPP libKinesisVideoProducer REQUIRED)
+else()
+  pkg_check_modules(LIBKVSPRODUCERCPP REQUIRED libKinesisVideoProducer)
+endif()
 
 
 set(LIBKVSPIC_INCLUDE_DIRS ${OPEN_SRC_INSTALL_PREFIX}/include)
