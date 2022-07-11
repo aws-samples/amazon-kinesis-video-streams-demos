@@ -82,7 +82,8 @@ target_link_libraries(
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
 add_executable(kvsProducerSampleCloudwatch
-            ${CMAKE_CURRENT_SOURCE_DIR}/src/CanaryTest.cpp # changed this
-            ${CMAKE_CURRENT_SOURCE_DIR}/src/CanaryTestTwo.cpp) # changed this
+            ${CMAKE_CURRENT_SOURCE_DIR}/src/CanaryCallbackProvider.cpp
+            ${CMAKE_CURRENT_SOURCE_DIR}/src/CanaryLogsUtils.cpp
+            ${CMAKE_CURRENT_SOURCE_DIR}/src/kvs_gstreamer_sample.cpp)
 
-target_link_libraries(kvsProducerSampleCloudwatch cppproducer ${AWSSDK_LINK_LIBRARIES}) # changed this
+target_link_libraries(kvsProducerSampleCloudwatch cppproducer ${AWSSDK_LINK_LIBRARIES})
