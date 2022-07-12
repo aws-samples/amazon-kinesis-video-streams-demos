@@ -1,21 +1,5 @@
 #include "CanaryUtils.h"
 
-typedef struct __CloudwatchLogsObject CloudwatchLogsObject;
-struct __CloudwatchLogsObject {
-    Aws::CloudWatchLogs::CloudWatchLogsClient* pCwl;
-    Aws::CloudWatchLogs::Model::CreateLogGroupRequest canaryLogGroupRequest;
-    Aws::CloudWatchLogs::Model::CreateLogStreamRequest canaryLogStreamRequest;
-    Aws::CloudWatchLogs::Model::PutLogEventsRequest canaryPutLogEventRequest;
-    Aws::CloudWatchLogs::Model::PutLogEventsResult canaryPutLogEventresult;
-    Aws::Vector<Aws::CloudWatchLogs::Model::InputLogEvent> canaryInputLogEventVec;
-    Aws::String token;
-    string logGroupName;
-    string logStreamName;
-    std::recursive_mutex mutex;
-};
-typedef struct __CloudwatchLogsObject* PCloudwatchLogsObject;
-
-
 volatile ATOMIC_BOOL sigCaptureInterrupt;
 
 VOID sigintHandler(INT32 sigNum)
