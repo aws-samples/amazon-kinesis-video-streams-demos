@@ -1,0 +1,15 @@
+cmake_minimum_required(VERSION 2.8)
+
+project(libkvsProducerCPP-download NONE)
+
+include(ExternalProject)
+
+ExternalProject_Add(libkvsProducerCPP-download # changed this
+    GIT_REPOSITORY    https://github.com/awslabs/amazon-kinesis-video-streams-producer-sdk-cpp # changed this
+    GIT_TAG           v3.3.1 # changed this
+    PREFIX            ${CMAKE_CURRENT_BINARY_DIR}/build
+    # Added the first arg below, not sure if these ones that were here for producerC should be kept... TODO: check CPP SDK cmake file
+    CMAKE_ARGS        -DBUILD_GSTREAMER_PLUGIN=ON -DCMAKE_INSTALL_PREFIX=${OPEN_SRC_INSTALL_PREFIX} -DOPEN_SRC_INSTALL_PREFIX=${OPEN_SRC_INSTALL_PREFIX}
+    BUILD_ALWAYS      TRUE
+    TEST_COMMAND      ""
+)
