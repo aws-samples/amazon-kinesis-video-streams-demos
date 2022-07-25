@@ -2,9 +2,9 @@ import jenkins.model.*
 
 WORKSPACE_PRODUCER="src"
 // WORKSPACE_CONSUMER="consumer-java"
-GIT_URL='https://github.com/awslabs/amazon-kinesis-video-streams-producer-sdk-cpp.git'
-GIT_HASH='canary-producer-cpp'
-RUNNER_JOB_NAME_PREFIX = "producer-runner"
+GIT_URL='https://github.com/aws-samples/amazon-kinesis-video-streams-demos.git'
+GIT_HASH='new-canary-producer-cpp'
+RUNNER_JOB_NAME_PREFIX = "producer-cpp-runner"
 
 // TODO: Set up configurability to run different parameter combinations
 // Run long run canary for 12 hours
