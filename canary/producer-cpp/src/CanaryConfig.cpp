@@ -13,7 +13,7 @@ CanaryConfig::CanaryConfig()
     canaryDuration = DEFAULT_CANARY_DURATION_SECONDS;
     bufferDuration = DEFAULT_BUFFER_DURATION_SECONDS;
     storageSizeInBytes = 0;
-    useAggMetrics = false;
+    useAggMetrics = true;
 }
 
 void CanaryConfig::setEnvVarsString(string &configVar, string envVar)
@@ -56,13 +56,18 @@ void CanaryConfig::initConfigWithEnvVars()
     setEnvVarsString(cpUrl, "CANARY_CP_URL");
 
     setEnvVarsInt(fragmentSize, "CANARY_FRAGMENT_SIZE");
-    setEnvVarsInt(canaryDuration, "CANARY_DURATION");
+    setEnvVarsInt(canaryDuration, "CANARY_DURATION_IN_SECONDS");
     setEnvVarsInt(bufferDuration, "CANARY_BUFFER_DURATION");
     setEnvVarsInt(storageSizeInBytes, "CANARY_STORAGE_SIZE");
     setEnvVarsInt(testVideoFps, "CANARY_FPS");
 
-    if (STRCMP(canaryRunType.c_str(), "NORMAL") == 0)
-    {
-        useAggMetrics = true;
-    }
+    cout << "CANARY_STREAM_NAME: " << streamName << endl;
+    cout << "CANARY_RUN_SCENARIO: " << canaryRunScenario << endl;
+    cout << "CANARY_STREAM_TYPE: " << streamType << endl;
+    cout << "CANARY_LABEL: " << canaryLabel << endl;
+    cout << "CANARY_CP_URL: " << cpUrl << endl;
+    cout << "CANARY_FRAGMENT_SIZE: " << fragmentSize << endl;
+    cout << "CANARY_DURATION: " << canaryDuration << endl;
+    cout << "CANARY_STORAGE_SIZE: " << storageSizeInBytes << endl;
+    cout << "CANARY_FPS: " << testVideoFps << endl;
 }

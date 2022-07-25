@@ -1,9 +1,7 @@
 # build library from source
 function(build_dependency lib_name)
   set(supported_libs
-      autoconf
-      automake
-      kvsProducerCpp
+      kvsProducerCPP # changed this
       cppsdk
       )
   list(FIND supported_libs ${lib_name} index)

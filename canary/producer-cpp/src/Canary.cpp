@@ -295,6 +295,7 @@ SampleStreamCallbackProvider::fragmentAckReceivedHandler(UINT64 custom_data, STR
                 auto currentTimestamp = duration_cast<milliseconds>(system_clock::now().time_since_epoch()).count();
                 auto persistedAckLatency = (currentTimestamp - timeOfFragmentEndSent); // [milliseconds]
                 pushMetric("PersistedAckLatency", persistedAckLatency, Aws::CloudWatch::Model::StandardUnit::Milliseconds, persistedAckLatency_datum, data->Pdimension_per_stream, cwRequest);
+                LOG_DEBUG("Persisted Ack Latency: " << persistedAckLatency);
                 if (data->pCanaryConfig->useAggMetrics)
                 {
                     pushMetric("PersistedAckLatency", persistedAckLatency, Aws::CloudWatch::Model::StandardUnit::Milliseconds, persistedAckLatency_datum, data->Paggregated_dimension, cwRequest);
@@ -311,27 +312,27 @@ SampleStreamCallbackProvider::fragmentAckReceivedHandler(UINT64 custom_data, STR
                 }
             } else if (pFragmentAck->ackType == FRAGMENT_ACK_TYPE_RECEIVED)
                 {
-                    Aws::CloudWatch::Model::MetricDatum recievedAckLatency_datum;
+                    Aws::CloudWatch::Model::MetricDatum receivedAckLatency_datum;
                     Aws::CloudWatch::Model::PutMetricDataRequest cwRequest;
                     cwRequest.SetNamespace("KinesisVideoSDKCanaryCPP");
 
                     auto currentTimestamp = duration_cast<milliseconds>(system_clock::now().time_since_epoch()).count();
-                    auto recievedAckLatency = (currentTimestamp - timeOfFragmentEndSent); // [milliseconds]
-                    pushMetric("RecievedAckLatency", recievedAckLatency, Aws::CloudWatch::Model::StandardUnit::Milliseconds, recievedAckLatency_datum, data->Pdimension_per_stream, cwRequest);
-
+                    auto receivedAckLatency = (currentTimestamp - timeOfFragmentEndSent); // [milliseconds]
+                    pushMetric("ReceivedAckLatency", receivedAckLatency, Aws::CloudWatch::Model::StandardUnit::Milliseconds, receivedAckLatency_datum, data->Pdimension_per_stream, cwRequest);
+                    LOG_DEBUG("Received Ack Latencyy: " << receivedAckLatency);
                     if (data->pCanaryConfig->useAggMetrics)
                     {
-                        pushMetric("RecievedAckLatency", recievedAckLatency, Aws::CloudWatch::Model::StandardUnit::Milliseconds, recievedAckLatency_datum, data->Paggregated_dimension, cwRequest);
+                        pushMetric("ReceivedAckLatency", receivedAckLatency, Aws::CloudWatch::Model::StandardUnit::Milliseconds, receivedAckLatency_datum, data->Paggregated_dimension, cwRequest);
                     }
 
                     auto outcome = data->pCWclient->PutMetricData(cwRequest);
                     if (!outcome.IsSuccess())
                     {
-                        cout << "Failed to put RecievedAckLatency metric data:" << outcome.GetError().GetMessage() << endl;
+                        cout << "Failed to put ReceivedAckLatency metric data:" << outcome.GetError().GetMessage() << endl;
                     }
                     else
                     {
-                        cout << "Successfully put RecievedAckLatency metric data" << endl;
+                        cout << "Successfully put ReceivedAckLatency metric data" << endl;
                     }
                 }
         } else
@@ -392,8 +393,8 @@ void updateFragmentEndTimes(UINT64 curKeyFrameTime, uint64_t &lastKeyFrameTime, 
             auto iter = mapPtr->begin();
             while (iter != mapPtr->end()) {
                 // clean up map: remove timestamps older than 5 min from now
-                // if (iter->first < (duration_cast<milliseconds>(system_clock::now().time_since_epoch()).count() - (300000)))
-                if (iter->first < (duration_cast<milliseconds>(system_clock::now().time_since_epoch()).count() - (3000000)))
+                // TODO: reset back to 5min or so
+                if (iter->first < (duration_cast<milliseconds>(system_clock::now().time_since_epoch()).count() - (300000)))
                 {
                     iter = mapPtr->erase(iter);
                     cout << "Map Debug: ereasing a map key-value pair" << endl;
@@ -419,22 +420,26 @@ void pushKeyFrameMetrics(Frame frame, CustomData *cusData)
     
     double frameRate = stream_metrics.getCurrentElementaryFrameRate();
     pushMetric("FrameRate", frameRate, Aws::CloudWatch::Model::StandardUnit::Count_Second, metricDatum, cusData->Pdimension_per_stream, cwRequest);
+    LOG_DEBUG("Frame Rate: " << frameRate);
 
     double transferRate = 8 * stream_metrics.getCurrentTransferRate() / 1024; // *8 makes it bytes->bits. /1024 bits->kilobits
     pushMetric("TransferRate", transferRate, Aws::CloudWatch::Model::StandardUnit::Kilobits_Second, metricDatum, cusData->Pdimension_per_stream, cwRequest);
+    LOG_DEBUG("Transfer Rate: " << transferRate);
 
     double currentViewDuration = stream_metrics.getCurrentViewDuration().count();
     pushMetric("CurrentViewDuration", currentViewDuration, Aws::CloudWatch::Model::StandardUnit::Milliseconds, metricDatum, cusData->Pdimension_per_stream, cwRequest);
+    LOG_DEBUG("Current View Duration: " << currentViewDuration);
 
-    double availableStoreSize = client_metrics.getContentStoreSizeSize();
-    pushMetric("ContentStoreAvailableSize", availableStoreSize, Aws::CloudWatch::Model::StandardUnit::Bytes, metricDatum, cusData->Pdimension_per_stream, cwRequest);
+    double availableStoreSize = client_metrics.getContentStoreSizeSize() / 1000; // [kilobytes]
+    pushMetric("ContentStoreAvailableSize", availableStoreSize, Aws::CloudWatch::Model::StandardUnit::Kilobytes, metricDatum, cusData->Pdimension_per_stream, cwRequest);
+    LOG_DEBUG("Content Store Available Size: " << availableStoreSize);
 
     if (cusData->pCanaryConfig->useAggMetrics)
     {
         pushMetric("FrameRate", frameRate, Aws::CloudWatch::Model::StandardUnit::Count_Second, metricDatum, cusData->Paggregated_dimension, cwRequest);
         pushMetric("TransferRate", transferRate, Aws::CloudWatch::Model::StandardUnit::Kilobits_Second, metricDatum, cusData->Paggregated_dimension, cwRequest);
         pushMetric("CurrentViewDuration", currentViewDuration, Aws::CloudWatch::Model::StandardUnit::Milliseconds, metricDatum, cusData->Paggregated_dimension, cwRequest);
-        pushMetric("ContentStoreAvailableSize", availableStoreSize, Aws::CloudWatch::Model::StandardUnit::Bytes, metricDatum, cusData->Paggregated_dimension, cwRequest);
+        pushMetric("ContentStoreAvailableSize", availableStoreSize, Aws::CloudWatch::Model::StandardUnit::Kilobytes, metricDatum, cusData->Paggregated_dimension, cwRequest);
     }
 
     // Capture error rate metrics every 60 seconds
@@ -447,14 +452,17 @@ void pushKeyFrameMetrics(Frame frame, CustomData *cusData)
         cusData->totalPutFrameErrorCount = stream_metrics_raw->putFrameErrors;
         double putFrameErrorRate = newPutFrameErrors / (double)duration;
         pushMetric("PutFrameErrorRate", putFrameErrorRate, Aws::CloudWatch::Model::StandardUnit::Count_Second, metricDatum, cusData->Pdimension_per_stream, cwRequest);
+        LOG_DEBUG("PutFrame Error Rate: " << putFrameErrorRate);
 
         double newErrorAcks = (double)stream_metrics_raw->errorAcks - cusData->totalErrorAckCount;
         cusData->totalErrorAckCount = stream_metrics_raw->errorAcks;
         double errorAckRate = newErrorAcks / (double)duration;
         pushMetric("ErrorAckRate", errorAckRate, Aws::CloudWatch::Model::StandardUnit::Count_Second, metricDatum, cusData->Pdimension_per_stream, cwRequest);
+        LOG_DEBUG("Error Ack Rate: " << errorAckRate);
 
         double totalNumberOfErrors = cusData->totalPutFrameErrorCount + cusData->totalErrorAckCount;
         pushMetric("TotalNumberOfErrors", totalNumberOfErrors, Aws::CloudWatch::Model::StandardUnit::Count, metricDatum, cusData->Pdimension_per_stream, cwRequest);
+        LOG_DEBUG("Total Number of Errors: " << totalNumberOfErrors);
 
         if (cusData->pCanaryConfig->useAggMetrics)
         {
@@ -483,10 +491,12 @@ void pushKeyFrameMetrics(Frame frame, CustomData *cusData)
  void pushStartupLatencyMetric(CustomData *data)
 {
     double currentTimestamp = duration_cast<milliseconds>(system_clock::now().time_since_epoch()).count();
-    double startUpLatency = (double)(currentTimestamp - data->producer_start_time / 1000000); // [milliseconds]
+    double startUpLatency = (double)(currentTimestamp - data->start_time / 1000000); // [milliseconds]
     Aws::CloudWatch::Model::MetricDatum startupLatency_datum;
     Aws::CloudWatch::Model::PutMetricDataRequest cwRequest;
     cwRequest.SetNamespace("KinesisVideoSDKCanaryCPP");
+
+    LOG_DEBUG("Startup Latency: " << startUpLatency);
 
     pushMetric("StartupLatency", startUpLatency, Aws::CloudWatch::Model::StandardUnit::Milliseconds, startupLatency_datum, data->Pdimension_per_stream, cwRequest);
     if (data->pCanaryConfig->useAggMetrics)
@@ -606,18 +616,19 @@ static GstFlowReturn on_new_sample(GstElement *sink, CustomData *data) {
     currTime = duration_cast<seconds>(system_clock::now().time_since_epoch()).count();
     if (currTime > (data->producer_start_time / 1000000000 + data->pCanaryConfig->canaryDuration))
     {
+        cout << "Canary has reached end of run time" << endl;
         g_main_loop_quit(data->main_loop);
     }
 
     // If intermittent run, check if Canary should be paused
-    if(data->pCanaryConfig->canaryRunScenario == "Intermittent" && duration_cast<minutes>(system_clock::now().time_since_epoch()).count() > data->runTill)
+    if(STRCMP(data->pCanaryConfig->canaryRunScenario.c_str(), "Intermittent") == 0 && 
+        duration_cast<minutes>(system_clock::now().time_since_epoch()).count() > data->runTill)
     {
         data->timeOfNextKeyFrame->clear();
         int sleepTime = ((rand() % 10) + 1); // [minutes]
         cout << "Intermittent sleep time is set to: " << sleepTime << " minutes" << endl;
         data->sleepTimeStamp = duration_cast<milliseconds>(system_clock::now().time_since_epoch()).count(); // [milliseconds]
         sleep(sleepTime * 60); // [seconds]
-        data->onFirstFrame = true;
         int runTime = (rand() % 10) + 1; // [minutes]
         cout << "Intermittent run time is set to: " << runTime << " minutes" << endl;
         // Set runTill to a new random value 1-10 minutes into the future
@@ -970,7 +981,7 @@ int main(int argc, char* argv[]) {
         aggregated_dimension.SetValue(canaryConfig.canaryLabel);
         data.Paggregated_dimension = &aggregated_dimension;
 
-
+        data.start_time = chrono::duration_cast<nanoseconds>(systemCurrentTime().time_since_epoch()).count();
         // init Kinesis Video
         try{
             kinesis_video_init(&data);
