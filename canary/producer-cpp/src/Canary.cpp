@@ -5,7 +5,7 @@
 #include <string.h>
 #include <chrono>
 #include <Logger.h>
-#include "KinesisVideoProducer.h"
+#include <KinesisVideoProducer.h>
 #include <vector>
 #include <stdlib.h>
 #include <mutex>
