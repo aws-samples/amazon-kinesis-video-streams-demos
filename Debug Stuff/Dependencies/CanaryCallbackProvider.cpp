@@ -291,6 +291,7 @@ STATUS CanaryCallbackProvider::fragmentAckReceivedHandler(UINT64 custom_data,
 }
 
 VOID CanaryCallbackProvider::logPrintHandler(UINT32 level, PCHAR tag, PCHAR fmt, ...) {
+    // std::cout << "Canary logPrintHandler worked" << std::endl;
     static log4cplus::LogLevel picLevelToLog4cplusLevel[] = {
             log4cplus::TRACE_LOG_LEVEL,
             log4cplus::TRACE_LOG_LEVEL,
@@ -344,10 +345,7 @@ VOID CanaryCallbackProvider::logPrintHandler(UINT32 level, PCHAR tag, PCHAR fmt,
         va_end(valist);
         CanaryLogs::setUpLogEventVector(cwLogFmtString);
     }
-    
 }
-
-
 
 CanaryCallbackProvider::CanaryCallbackProvider(
         unique_ptr <ClientCallbackProvider> client_callback_provider,
@@ -628,6 +626,7 @@ TagResourceFunc CanaryCallbackProvider::getTagResourceCallback() {
 }
 
 LogPrintFunc CanaryCallbackProvider::getLogPrintCallback() {
+    std::cout << "LogPrintFunc DefaultCallbackProvider::getLogPrintCallback()" << std::endl;
     return logPrintHandler;
 }
 

@@ -36,7 +36,6 @@ public:
     Aws::Client::ClientConfiguration client_config;
     Aws::CloudWatch::CloudWatchClient* pCWclient;
     Aws::CloudWatch::Model::Dimension* Pdimension_per_stream;
-    Aws::CloudWatch::Model::Dimension* Paggregated_dimension;
 
     CanaryLogs* pCanaryLogs;
     CanaryLogs::CloudwatchLogsObject* pCloudwatchLogsObject;
@@ -52,7 +51,7 @@ public:
     bool h264_stream_supported;
     char* stream_name;
 
-    map<uint64_t, uint64_t> *timeOfNextKeyFrame;
+    map<uint64_t, uint64_t>* timeOfNextKeyFrame;
     UINT64 lastKeyFrameTime;
     UINT64 curKeyFrameTime;
 
@@ -67,7 +66,7 @@ public:
     // timestamp to convert them to absolute timestamp. This way fragments dont overlap after token rotation when doing
     // file uploading.
     uint64_t producer_start_time; // [nanoSeconds]
-    uint64_t start_time;  // [nanoSeconds]
+
     volatile StreamSource streamSource;
 
     string rtsp_url;
@@ -81,5 +80,5 @@ public:
     // Pts of first video frame
     uint64_t first_pts;
 
-    CustomData();
+    CustomData(CanaryConfig canaryConfig);
 };

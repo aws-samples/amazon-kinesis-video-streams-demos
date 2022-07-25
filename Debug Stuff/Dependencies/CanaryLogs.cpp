@@ -39,6 +39,7 @@ VOID CanaryLogs::setUpLogEventVector(PCHAR logString)
         Aws::String awsCwString((Aws::String) logString);
         auto logEvent =
             Aws::CloudWatchLogs::Model::InputLogEvent().WithMessage(awsCwString).WithTimestamp(GETTIME() / HUNDREDS_OF_NANOS_IN_A_MILLISECOND);
+        
         gCloudwatchLogsObject->canaryInputLogEventVec.push_back(logEvent);
     }
 }
@@ -90,24 +91,24 @@ VOID CanaryLogs::canaryStreamSendLogSync(PCloudwatchLogsObject pCloudwatchLogsOb
     pCloudwatchLogsObject->canaryInputLogEventVec.clear();
 }
 
-// VOID CanaryLogs::cloudWatchLogger(UINT32 level, PCHAR tag, PCHAR fmt, ...)
-// {
-//     CHAR logFmtString[MAX_LOG_FORMAT_LENGTH + 1];
-//     CHAR cwLogFmtString[MAX_LOG_FORMAT_LENGTH + 1];
-//     UINT32 logLevel = GET_LOGGER_LOG_LEVEL();
-//     UNUSED_PARAM(tag);
+VOID CanaryLogs::cloudWatchLogger(UINT32 level, PCHAR tag, PCHAR fmt, ...)
+{
+    CHAR logFmtString[MAX_LOG_FORMAT_LENGTH + 1];
+    CHAR cwLogFmtString[MAX_LOG_FORMAT_LENGTH + 1];
+    UINT32 logLevel = GET_LOGGER_LOG_LEVEL();
+    UNUSED_PARAM(tag);
 
-//     if (level >= logLevel) {
-//         addLogMetadata(logFmtString, (UINT32) ARRAY_SIZE(logFmtString), fmt, level);
+    if (level >= logLevel) {
+        addLogMetadata(logFmtString, (UINT32) ARRAY_SIZE(logFmtString), fmt, level);
 
-//         // Creating a copy to store the logFmtString for cloudwatch logging purpose
-//         va_list valist, valist_cw;
-//         va_start(valist_cw, fmt);
-//         vsnprintf(cwLogFmtString, (SIZE_T) SIZEOF(cwLogFmtString), logFmtString, valist_cw);
-//         va_end(valist_cw);
-//         va_start(valist, fmt);
-//         vprintf(logFmtString, valist);
-//         va_end(valist);
-//         setUpLogEventVector(cwLogFmtString);
-//     }
-// }
+        // Creating a copy to store the logFmtString for cloudwatch logging purpose
+        va_list valist, valist_cw;
+        va_start(valist_cw, fmt);
+        vsnprintf(cwLogFmtString, (SIZE_T) SIZEOF(cwLogFmtString), logFmtString, valist_cw);
+        va_end(valist_cw);
+        va_start(valist, fmt);
+        vprintf(logFmtString, valist);
+        va_end(valist);
+        setUpLogEventVector(cwLogFmtString);
+    }
+}

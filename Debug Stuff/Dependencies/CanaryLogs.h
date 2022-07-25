@@ -48,6 +48,8 @@ class CanaryLogs
     };
     typedef class CloudwatchLogsObject* PCloudwatchLogsObject;
 
+    // STATUS initializeCloudwatchLogger(PCloudwatchLogsObject pCloudwatchLogsObject);
+
     CanaryLogs();
 
     STATUS initializeCloudwatchLogger(PCloudwatchLogsObject pCloudwatchLogsObject);
@@ -63,7 +65,7 @@ class CanaryLogs
 
     VOID canaryStreamSendLogSync(PCloudwatchLogsObject pCloudwatchLogsObject);
 
-    // VOID cloudWatchLogger(UINT32 level, PCHAR tag, PCHAR fmt, ...);
+    VOID cloudWatchLogger(UINT32 level, PCHAR tag, PCHAR fmt, ...);
 };
 
 
