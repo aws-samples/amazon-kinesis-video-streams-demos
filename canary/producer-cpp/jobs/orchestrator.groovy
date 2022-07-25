@@ -1,6 +1,6 @@
 import jenkins.model.*
 
-WORKSPACE_PRODUCER="samples"
+WORKSPACE_PRODUCER="src"
 // WORKSPACE_CONSUMER="consumer-java"
 GIT_URL='https://github.com/awslabs/amazon-kinesis-video-streams-producer-sdk-cpp.git'
 GIT_HASH='canary-producer-cpp'
