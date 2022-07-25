@@ -394,7 +394,7 @@ void updateFragmentEndTimes(UINT64 curKeyFrameTime, uint64_t &lastKeyFrameTime, 
             while (iter != mapPtr->end()) {
                 // clean up map: remove timestamps older than 5 min from now
                 // TODO: reset back to 5min or so
-                if (iter->first < (duration_cast<milliseconds>(system_clock::now().time_since_epoch()).count() - (3000000)))
+                if (iter->first < (duration_cast<milliseconds>(system_clock::now().time_since_epoch()).count() - (300000)))
                 {
                     iter = mapPtr->erase(iter);
                     cout << "Map Debug: ereasing a map key-value pair" << endl;
