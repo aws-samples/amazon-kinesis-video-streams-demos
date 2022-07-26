@@ -2,14 +2,6 @@
 
 #pragma once
 
-#include "CallbackProvider.h"
-#include "ClientCallbackProvider.h"
-#include "StreamCallbackProvider.h"
-#include "ThreadSafeMap.h"
-#include "GetTime.h"
-
-#include "Auth.h"
-
 #include <algorithm>
 #include <memory>
 #include <thread>
@@ -19,11 +11,26 @@
 #include <string>
 #include <mutex>
 #include <iostream>
+#include <ostream>
 
+#include "DefaultCallbackProvider.h"
+#include "Logger.h"
+#include "CallbackProvider.h"
+#include "ClientCallbackProvider.h"
+#include "StreamCallbackProvider.h"
+#include "ThreadSafeMap.h"
+#include "GetTime.h"
+#include "Auth.h"
 #include "CanaryLogs.h"
+
+using namespace std;
 
 
 namespace com { namespace amazonaws { namespace kinesis { namespace video {
+
+#define CURL_CLOSE_HANDLE_DELAY_IN_MILLIS               200
+#define MAX_CUSTOM_USER_AGENT_STRING_LENGTH             128
+#define CPP_SDK_CUSTOM_USERAGENT                        "CPPSDK"
 
 class CanaryCallbackProvider : public CallbackProvider {
 public:

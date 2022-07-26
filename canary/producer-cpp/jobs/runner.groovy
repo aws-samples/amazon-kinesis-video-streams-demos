@@ -23,17 +23,6 @@ def buildProducer() {
     make -j4
   """
 }
-
-// def buildConsumer(envs) {
-//   withEnv(envs) {
-//     sh '''
-//         PATH="$JAVA_HOME/bin:$PATH"
-//         export PATH="$M2_HOME/bin:$PATH"
-//         cd $WORKSPACE/consumer-java
-//         make -j4
-//     '''
-//   }
-// }
   
 def withRunnerWrapper(envs, fn) {
     withEnv(envs) {
@@ -53,10 +42,6 @@ def withRunnerWrapper(envs, fn) {
 }
 
 def runClient(isProducer, params) {
-    // def consumerEnvs = [        
-    //     'JAVA_HOME': "/opt/jdk-13.0.1",
-    //     'M2_HOME': "/opt/apache-maven-3.6.3"
-    // ].collect({k,v -> "${k}=${v}" })
 
     // TODO: get the branch and version from orchestrator
     if (params.FIRST_ITERATION) {
@@ -83,13 +68,6 @@ def runClient(isProducer, params) {
     if(isProducer) {
         buildProducer()
     }
-    // else {
-    //     // This is to make sure that the consumer does not make RUNNING_NODES
-    //     // zero before producer build starts. Should handle this in a better
-    //     // way
-    //     sleep consumerStartUpDelay
-    //     buildConsumer(consumerEnvs)
-    // }
 
     RUNNING_NODES--
     echo "Number of running nodes after build: ${RUNNING_NODES}"
@@ -120,26 +98,15 @@ def runClient(isProducer, params) {
         'CANARY_RUN_SCENARIO': params.CANARY_RUN_SCENARIO,
         // 'TRACK_TYPE': params.TRACK_TYPE,
     ].collect({k,v -> "${k}=${v}" })
-
-    // if(!isProducer) {
-    //     // Run consumer
-    //     withRunnerWrapper(envs) {
-    //         sh '''
-    //             cd $WORKSPACE/consumer-java
-    //             java -classpath target/aws-kinesisvideo-producer-sdk-canary-consumer-1.0-SNAPSHOT.jar:$(cat tmp_jar) -Daws.accessKeyId=${AWS_ACCESS_KEY_ID} -Daws.secretKey=${AWS_SECRET_ACCESS_KEY} com.amazon.kinesis.video.canary.consumer.ProducerSdkCanaryConsumer
-    //         '''
-    //     }
-    // }
-    // else {
-        withRunnerWrapper(envs) {
-            sh """
-                echo "Running producer"
-                ls ./src
-                cd ./build && 
-                ./Canary
-            """
-        }
-    //}
+  
+    withRunnerWrapper(envs) {
+        sh """
+            echo "Running producer"
+            ls ./src
+            cd ./build && 
+            ./producer_cpp_canary
+        """
+    }
 }
 
 pipeline {
@@ -182,20 +149,6 @@ pipeline {
                         }
                     }
                 }
-                // stage('Consumer') {
-                //     agent {
-                //         label params.CONSUMER_NODE_LABEL
-                //     }
-                //     steps {
-                //         script {
-
-                //             // Only run consumer if it is not intermittent scenario
-                //             if(params.CANARY_RUN_SCENARIO == "Continuous") {
-                //                     runClient(false, params)
-                //             }
-                //         }
-                //     }
-                // }
             }
         }
 

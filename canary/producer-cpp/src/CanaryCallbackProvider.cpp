@@ -1,42 +1,14 @@
 /** Copyright 2017 Amazon.com. All rights reserved. */
-#pragma once
-#include "DefaultCallbackProvider.h"
-#include "Logger.h"
-#include <ostream>
-#include <iostream>
 
-//#include "CanaryUtils.h"
 #include "CanaryCallbackProvider.h"
 
 namespace com { namespace amazonaws { namespace kinesis { namespace video {
 
 LOGGER_TAG("com.amazonaws.kinesis.video");
 
-using std::move;
-using std::unique_ptr;
-using std::string;
-using std::thread;
-using std::shared_ptr;
-using std::make_shared;
-using std::future;
-using std::function;
-using std::vector;
-using std::mutex;
-using std::lock_guard;
-using std::chrono::seconds;
-using std::future_status;
-using std::condition_variable;
-using std::tuple;
-using std::async;
-using std::launch;
-
-#define CURL_CLOSE_HANDLE_DELAY_IN_MILLIS               200
-#define MAX_CUSTOM_USER_AGENT_STRING_LENGTH             128
-#define CPP_SDK_CUSTOM_USERAGENT                        "CPPSDK"
-
 UINT64 CanaryCallbackProvider::getCurrentTimeHandler(UINT64 custom_data) {
     UNUSED_PARAM(custom_data);
-    return std::chrono::duration_cast<std::chrono::nanoseconds>(systemCurrentTime().time_since_epoch())
+    return chrono::duration_cast<std::chrono::nanoseconds>(systemCurrentTime().time_since_epoch())
             .count() / DEFAULT_TIME_UNIT_IN_NANOS;
 }
 
