@@ -61,6 +61,8 @@ void CanaryConfig::initConfigWithEnvVars()
     setEnvVarsInt(storageSizeInBytes, "CANARY_STORAGE_SIZE");
     setEnvVarsInt(testVideoFps, "CANARY_FPS");
 
+
+    // TODO: change this to log instead of cout
     cout << "CANARY_STREAM_NAME: " << streamName << endl;
     cout << "CANARY_RUN_SCENARIO: " << canaryRunScenario << endl;
     cout << "CANARY_STREAM_TYPE: " << streamType << endl;

@@ -2,7 +2,7 @@
 
 namespace com { namespace amazonaws { namespace kinesis { namespace video {
 
-class SampleClientCallbackProvider : public ClientCallbackProvider {
+class CanaryClientCallbackProvider : public ClientCallbackProvider {
 public:
     UINT64 getCallbackCustomData() override {
         return reinterpret_cast<UINT64> (this);
@@ -13,10 +13,11 @@ public:
     static STATUS storageOverflowPressure(UINT64 custom_handle, UINT64 remaining_bytes);
 };
 
-class SampleStreamCallbackProvider : public StreamCallbackProvider {
+class CanaryStreamCallbackProvider : public StreamCallbackProvider {
     UINT64 custom_data_;
 public:
-    SampleStreamCallbackProvider(UINT64 custom_data) : custom_data_(custom_data) {}
+    CanaryStreamCallbackProvider
+(UINT64 custom_data) : custom_data_(custom_data) {}
 
     UINT64 getCallbackCustomData() override {
         return custom_data_;
@@ -56,11 +57,11 @@ private:
                                 UPLOAD_HANDLE upload_handle, PFragmentAck pFragmentAck);
 };
 
-class SampleCredentialProvider : public StaticCredentialProvider {
+class CanaryCredentialProvider : public StaticCredentialProvider {
     // Test rotation period is 40 second for the grace period.
     const std::chrono::duration<uint64_t> ROTATION_PERIOD = std::chrono::seconds(DEFAULT_CREDENTIAL_ROTATION_SECONDS);
 public:
-    SampleCredentialProvider(const Credentials &credentials) :
+    CanaryCredentialProvider(const Credentials &credentials) :
             StaticCredentialProvider(credentials) {}
 
     void updateCredentials(Credentials &credentials) override {
@@ -76,7 +77,7 @@ public:
     }
 };
 
-class SampleDeviceInfoProvider : public DefaultDeviceInfoProvider {
+class CanaryDeviceInfoProvider : public DefaultDeviceInfoProvider {
 public:
     device_info_t getDeviceInfo() override {
         auto device_info = DefaultDeviceInfoProvider::getDeviceInfo();
@@ -85,7 +86,6 @@ public:
         return device_info;
     }
 };
-
 
 void pushMetric(string metricName, double metricValue, Aws::CloudWatch::Model::StandardUnit unit, Aws::CloudWatch::Model::MetricDatum datum, 
                 Aws::CloudWatch::Model::Dimension *dimension, Aws::CloudWatch::Model::PutMetricDataRequest &cwRequest)
@@ -98,14 +98,14 @@ void pushMetric(string metricName, double metricValue, Aws::CloudWatch::Model::S
 }
 
 STATUS
-SampleClientCallbackProvider::storageOverflowPressure(UINT64 custom_handle, UINT64 remaining_bytes) {
+CanaryClientCallbackProvider::storageOverflowPressure(UINT64 custom_handle, UINT64 remaining_bytes) {
     UNUSED_PARAM(custom_handle);
     LOG_WARN("Reporting storage overflow. Bytes remaining " << remaining_bytes);
     return STATUS_SUCCESS;
 }
 
 STATUS
-SampleStreamCallbackProvider::streamConnectionStaleHandler(UINT64 custom_data,
+CanaryStreamCallbackProvider::streamConnectionStaleHandler(UINT64 custom_data,
                                                                   STREAM_HANDLE stream_handle,
                                                                   UINT64 last_buffering_ack) {
     LOG_WARN("Reporting stream stale. Last ACK received " << last_buffering_ack);
@@ -113,7 +113,7 @@ SampleStreamCallbackProvider::streamConnectionStaleHandler(UINT64 custom_data,
 }
 
 STATUS
-SampleStreamCallbackProvider::streamErrorReportHandler(UINT64 custom_data, STREAM_HANDLE stream_handle,
+CanaryStreamCallbackProvider::streamErrorReportHandler(UINT64 custom_data, STREAM_HANDLE stream_handle,
                                                        UPLOAD_HANDLE upload_handle, UINT64 errored_timecode, STATUS status_code) {
     LOG_ERROR("Reporting stream error. Errored timecode: " << errored_timecode << " Status: "
                                                            << status_code);
@@ -134,14 +134,14 @@ SampleStreamCallbackProvider::streamErrorReportHandler(UINT64 custom_data, STREA
 }
 
 STATUS
-SampleStreamCallbackProvider::droppedFrameReportHandler(UINT64 custom_data, STREAM_HANDLE stream_handle,
+CanaryStreamCallbackProvider::droppedFrameReportHandler(UINT64 custom_data, STREAM_HANDLE stream_handle,
                                                         UINT64 dropped_frame_timecode) {
     LOG_WARN("Reporting dropped frame. Frame timecode " << dropped_frame_timecode);
     return STATUS_SUCCESS;
 }
 
 STATUS
-SampleStreamCallbackProvider::fragmentAckReceivedHandler(UINT64 custom_data, STREAM_HANDLE stream_handle,
+CanaryStreamCallbackProvider::fragmentAckReceivedHandler(UINT64 custom_data, STREAM_HANDLE stream_handle,
                                                          UPLOAD_HANDLE upload_handle, PFragmentAck pFragmentAck) {
     CustomData *data = reinterpret_cast<CustomData *>(custom_data);
     if (pFragmentAck->ackType != FRAGMENT_ACK_TYPE_PERSISTED && pFragmentAck->ackType != FRAGMENT_ACK_TYPE_RECEIVED)
@@ -272,8 +272,7 @@ void updateFragmentEndTimes(UINT64 curKeyFrameTime, uint64_t &lastKeyFrameTime, 
             cout << "Map Debug: with curKeyFrameTime value:  " << curKeyFrameTime / HUNDREDS_OF_NANOS_IN_A_MILLISECOND<< endl;
             auto iter = mapPtr->begin();
             while (iter != mapPtr->end()) {
-                // clean up map: remove timestamps older than 5 min from now
-                // TODO: reset back to 5min or so
+                // clean up map: removing timestamps older than 5 min from now
                 if (iter->first < (duration_cast<milliseconds>(system_clock::now().time_since_epoch()).count() - (300000)))
                 {
                     iter = mapPtr->erase(iter);
@@ -528,7 +527,6 @@ CleanUp:
     return ret;
 }
 
-
 // This function is called when an error message is posted on the bus
 static void error_cb(GstBus *bus, GstMessage *msg, CustomData *data) {
     GError *err;
@@ -545,9 +543,10 @@ static void error_cb(GstBus *bus, GstMessage *msg, CustomData *data) {
 }
 
 void kinesis_video_init(CustomData *data) {
-    unique_ptr<DeviceInfoProvider> device_info_provider(new SampleDeviceInfoProvider());
-    unique_ptr<ClientCallbackProvider> client_callback_provider(new SampleClientCallbackProvider());
-    unique_ptr<StreamCallbackProvider> stream_callback_provider(new SampleStreamCallbackProvider(reinterpret_cast<UINT64>(data)));
+    unique_ptr<DeviceInfoProvider> device_info_provider(new CanaryDeviceInfoProvider());
+    unique_ptr<ClientCallbackProvider> client_callback_provider(new CanaryClientCallbackProvider());
+    unique_ptr<StreamCallbackProvider> stream_callback_provider(new CanaryStreamCallbackProvider
+(reinterpret_cast<UINT64>(data)));
 
     char const *accessKey;
     char const *secretKey;
@@ -587,7 +586,7 @@ void kinesis_video_init(CustomData *data) {
                                                string(secretKey),
                                                sessionTokenStr,
                                                std::chrono::seconds(DEFAULT_CREDENTIAL_EXPIRATION_SECONDS)));
-        credential_provider.reset(new SampleCredentialProvider(*data->credential.get()));
+        credential_provider.reset(new CanaryCredentialProvider(*data->credential.get()));
 
     } else if (nullptr != (iot_get_credential_endpoint = getenv("IOT_GET_CREDENTIAL_ENDPOINT")) &&
                nullptr != (cert_path = getenv("CERT_PATH")) &&

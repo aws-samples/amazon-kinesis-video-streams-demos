@@ -369,10 +369,8 @@ CanaryCallbackProvider::CanaryCallbackProvider(
                 custom_user_agent,
                 cert_path,
                 is_caching_endpoint,
-                caching_update_period.count() * HUNDREDS_OF_NANOS_IN_A_SECOND) {
-                            std::cout << "DefaultCallbackProvider 1" << std::endl;
-
-}
+                caching_update_period.count() * HUNDREDS_OF_NANOS_IN_A_SECOND)
+                {}
 
 CanaryCallbackProvider::CanaryCallbackProvider(
         unique_ptr <ClientCallbackProvider> client_callback_provider,
@@ -394,10 +392,8 @@ CanaryCallbackProvider::CanaryCallbackProvider(
                 custom_user_agent,
                 cert_path,
                 api_call_caching,
-                caching_update_period.count() * HUNDREDS_OF_NANOS_IN_A_SECOND) {
-                            std::cout << "DefaultCallbackProvider 2" << std::endl;
-
-}
+                caching_update_period.count() * HUNDREDS_OF_NANOS_IN_A_SECOND)
+                {}
 
 CanaryCallbackProvider::CanaryCallbackProvider(
         unique_ptr <ClientCallbackProvider> client_callback_provider,
@@ -419,10 +415,7 @@ CanaryCallbackProvider::CanaryCallbackProvider(
                 custom_user_agent,
                 cert_path,
                 is_caching_endpoint ? API_CALL_CACHE_TYPE_ENDPOINT_ONLY : API_CALL_CACHE_TYPE_NONE,
-                caching_update_period) {
-                            std::cout << "DefaultCallbackProvider 3" << std::endl;
-
-}
+                caching_update_period) {}
 
 CanaryCallbackProvider::CanaryCallbackProvider(
         unique_ptr <ClientCallbackProvider> client_callback_provider,
@@ -438,8 +431,8 @@ CanaryCallbackProvider::CanaryCallbackProvider(
         : region_(region),
           service_(std::string(KINESIS_VIDEO_SERVICE_NAME)),
           control_plane_uri_(control_plane_uri),
-          cert_path_(cert_path) {
-                      std::cout << "DefaultCallbackProvider 4" << std::endl;
+          cert_path_(cert_path)
+{
 
     STATUS retStatus = STATUS_SUCCESS;
     client_callback_provider_ = move(client_callback_provider);
@@ -482,7 +475,6 @@ CanaryCallbackProvider::CanaryCallbackProvider(
 }
 
 CanaryCallbackProvider::~CanaryCallbackProvider() {
-    std::cout << "DefaultCallbackProvider 5" << std::endl;
     freeCallbacksProvider(&client_callbacks_);
 }
 
