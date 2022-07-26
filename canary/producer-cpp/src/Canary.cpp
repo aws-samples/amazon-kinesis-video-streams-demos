@@ -170,7 +170,7 @@ CanaryStreamCallbackProvider::fragmentAckReceivedHandler(UINT64 custom_data, STR
             {
                 Aws::CloudWatch::Model::MetricDatum persistedAckLatency_datum;
                 Aws::CloudWatch::Model::PutMetricDataRequest cwRequest;
-                cwRequest.SetNamespace("KinesisVideoSDKCanaryCPP");
+                cwRequest.SetNamespace("KinesisVideoSDKCanary");
 
                 auto currentTimestamp = duration_cast<milliseconds>(system_clock::now().time_since_epoch()).count();
                 auto persistedAckLatency = (currentTimestamp - timeOfFragmentEndSent); // [milliseconds]
@@ -194,7 +194,7 @@ CanaryStreamCallbackProvider::fragmentAckReceivedHandler(UINT64 custom_data, STR
                 {
                     Aws::CloudWatch::Model::MetricDatum receivedAckLatency_datum;
                     Aws::CloudWatch::Model::PutMetricDataRequest cwRequest;
-                    cwRequest.SetNamespace("KinesisVideoSDKCanaryCPP");
+                    cwRequest.SetNamespace("KinesisVideoSDKCanary");
 
                     auto currentTimestamp = duration_cast<milliseconds>(system_clock::now().time_since_epoch()).count();
                     auto receivedAckLatency = (currentTimestamp - timeOfFragmentEndSent); // [milliseconds]
@@ -291,7 +291,7 @@ void pushKeyFrameMetrics(Frame frame, CustomData *cusData)
     
     Aws::CloudWatch::Model::MetricDatum metricDatum;
     Aws::CloudWatch::Model::PutMetricDataRequest cwRequest;
-    cwRequest.SetNamespace("KinesisVideoSDKCanaryCPP");    
+    cwRequest.SetNamespace("KinesisVideoSDKCanary");    
 
     auto stream_metrics = cusData->kinesis_video_stream->getMetrics();
     auto client_metrics = cusData->kinesis_video_stream->getProducer().getMetrics();
@@ -373,7 +373,7 @@ void pushKeyFrameMetrics(Frame frame, CustomData *cusData)
     double startUpLatency = (double)(currentTimestamp - data->start_time / 1000000); // [milliseconds]
     Aws::CloudWatch::Model::MetricDatum startupLatency_datum;
     Aws::CloudWatch::Model::PutMetricDataRequest cwRequest;
-    cwRequest.SetNamespace("KinesisVideoSDKCanaryCPP");
+    cwRequest.SetNamespace("KinesisVideoSDKCanary");
 
     LOG_DEBUG("Startup Latency: " << startUpLatency);
 
@@ -854,13 +854,13 @@ int main(int argc, char* argv[]) {
 
         // Non-aggregate CW dimension
         Aws::CloudWatch::Model::Dimension dimension_per_stream;
-        dimension_per_stream.SetName("ProducerSDKCanaryStreamNameCPP");
+        dimension_per_stream.SetName("ProducerCppCanaryStreamName");
         dimension_per_stream.SetValue(data.stream_name);
         data.pDimension_per_stream = &dimension_per_stream;
 
         // Aggregate CW dimension
         Aws::CloudWatch::Model::Dimension aggregated_dimension;
-        aggregated_dimension.SetName("ProducerSDKCanaryType");
+        aggregated_dimension.SetName("ProducerCppCanaryType");
         aggregated_dimension.SetValue(canaryConfig.canaryLabel);
         data.pAggregated_dimension = &aggregated_dimension;
 
