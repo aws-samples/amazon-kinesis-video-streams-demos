@@ -276,7 +276,7 @@ void updateFragmentEndTimes(UINT64 curKeyFrameTime, uint64_t &lastKeyFrameTime, 
                 if (iter->first < (duration_cast<milliseconds>(system_clock::now().time_since_epoch()).count() - (300000)))
                 {
                     iter = mapPtr->erase(iter);
-                    cout << "Map Debug: ereasing a map key-value pair" << endl;
+                    cout << "Map Debug: erasing a map key-value pair" << endl;
                 } else {
                     break;
                 }
@@ -810,21 +810,25 @@ int main(int argc, char* argv[]) {
     Aws::InitAPI(options);
     {
         CanaryConfig canaryConfig;
+
+        // Option to not use env for when JSON config available
         bool useEnvVars = true;
         if (useEnvVars)
         {
             canaryConfig.initConfigWithEnvVars();
         }
+
+        CanaryLogs canaryLogs; // TODO: consider renaming to CanaryLogger
+
         CustomData data;
         data.pCanaryConfig = &canaryConfig;
-
-        const int PUTFRAME_FAILURE_RETRY_COUNT = 3;
+        data.stream_name = const_cast<char*>(data.pCanaryConfig->streamName.c_str());
+        data.pCanaryLogs = &canaryLogs;
 
         STATUS stream_status = STATUS_SUCCESS;
 
-        CanaryLogs canaryLogs; // TODO: consider renaming to CanaryLogger
-        data.pCanaryLogs = &canaryLogs;
 
+        // CloudWatch initialization steps
         Aws::CloudWatch::CloudWatchClient CWclient(data.client_config);
         data.pCWclient = &CWclient;
         STATUS retStatus = STATUS_SUCCESS;
@@ -842,26 +846,28 @@ int main(int argc, char* argv[]) {
         }
         data.pCloudwatchLogsObject = &cloudwatchLogsObject;
 
-        data.stream_name = const_cast<char*>(data.pCanaryConfig->streamName.c_str());
-
-        // set the video stream source
+        // Set the video stream source
         if (data.pCanaryConfig->sourceType == "TEST_SOURCE")
         {
             data.streamSource = CustomData::TEST_SOURCE;     
         }
 
+        // Non-aggregate CW dimension
         Aws::CloudWatch::Model::Dimension dimension_per_stream;
         dimension_per_stream.SetName("ProducerSDKCanaryStreamNameCPP");
         dimension_per_stream.SetValue(data.stream_name);
         data.Pdimension_per_stream = &dimension_per_stream;
 
+        // Aggregate CW dimension
         Aws::CloudWatch::Model::Dimension aggregated_dimension;
         aggregated_dimension.SetName("ProducerSDKCanaryType");
         aggregated_dimension.SetValue(canaryConfig.canaryLabel);
         data.Paggregated_dimension = &aggregated_dimension;
 
+        // Set start time after CW initializations
         data.start_time = chrono::duration_cast<nanoseconds>(systemCurrentTime().time_since_epoch()).count();
-        // init Kinesis Video
+        
+        // Init Kinesis Video
         try{
             kinesis_video_init(&data);
             kinesis_video_stream_init(&data);
@@ -876,7 +882,7 @@ int main(int argc, char* argv[]) {
         {
             gstreamer_init(argc, argv, &data);
             if (STATUS_SUCCEEDED(stream_status)) {
-                    // if stream_status is success after eos, send out remaining frames.
+                    // If stream_status is success after EOS, send out remaining frames.
                     data.kinesis_video_stream->stopSync();
                 } else {
                     data.kinesis_video_stream->stop();
