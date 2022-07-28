@@ -9,23 +9,23 @@ CustomData::CustomData()
     curKeyFrameTime = 0;
     onFirstFrame = true;
     streamSource = TEST_SOURCE;
-    h264_stream_supported = false;
-    synthetic_dts = 0;
-    stream_status = STATUS_SUCCESS;
-    main_loop = NULL;
-    first_pts = GST_CLOCK_TIME_NONE;
-    use_absolute_fragment_times = true;
+    h264streamSupported = false;
+    syntheticDts = 0;
+    streamStatus = STATUS_SUCCESS;
+    mainLoop = NULL;
+    firstPts = GST_CLOCK_TIME_NONE;
+    useAbsoluteFragmentTimes = true;
 
-    producer_start_time = chrono::duration_cast<nanoseconds>(systemCurrentTime().time_since_epoch()).count(); // [nanoSeconds]
-    start_time = chrono::duration_cast<nanoseconds>(systemCurrentTime().time_since_epoch()).count(); // [nanoSeconds]
-    client_config.region = "us-west-2";
+    producerStartTime = chrono::duration_cast<nanoseconds>(systemCurrentTime().time_since_epoch()).count(); // [nanoSeconds]
+    startTime = chrono::duration_cast<nanoseconds>(systemCurrentTime().time_since_epoch()).count(); // [nanoSeconds]
+    clientConfig.region = "us-west-2";
     pCWclient = nullptr;
-    pDimension_per_stream = nullptr;
-    pAggregated_dimension = nullptr;
+    pDimensionPerStream = nullptr;
+    pAggregatedDimension = nullptr;
     timeOfNextKeyFrame = new map<uint64_t, uint64_t>();
-    timeCounter = producer_start_time / 1000000000; // [seconds]
+    timeCounter = producerStartTime / 1000000000; // [seconds]
     // Default first intermittent run to 1 min for testing
-    runTill = producer_start_time / 1000000000 / 60 + 1; // [minutes]
+    runTill = producerStartTime / 1000000000 / 60 + 1; // [minutes]
     pCanaryConfig = nullptr;
     pCloudwatchLogsObject = nullptr;
     pCanaryLogs = nullptr;

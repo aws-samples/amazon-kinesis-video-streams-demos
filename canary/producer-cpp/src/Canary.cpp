@@ -133,13 +133,13 @@ CanaryStreamCallbackProvider::streamErrorReportHandler(UINT64 custom_data, STREA
     bool terminate_pipeline = false;
 
     if ((!IS_RETRIABLE_ERROR(status_code) && !IS_RECOVERABLE_ERROR(status_code))) {
-        data->stream_status = status_code;
+        data->streamStatus = status_code;
         terminate_pipeline = true;
     }
 
-    if (terminate_pipeline && data->main_loop != NULL) {
+    if (terminate_pipeline && data->mainLoop != NULL) {
         LOG_WARN("Terminating pipeline due to unrecoverable stream error: " << status_code);
-        g_main_loop_quit(data->main_loop);
+        g_main_loop_quit(data->mainLoop);
     }
 
     return STATUS_SUCCESS;
@@ -161,63 +161,53 @@ CanaryStreamCallbackProvider::fragmentAckReceivedHandler(UINT64 custom_data, STR
         return STATUS_SUCCESS;
     }
 
-    cout << "Map Debug: searching in map for a key of pFragmentAck->timestamp: " << pFragmentAck->timestamp << endl;
     map<uint64_t, uint64_t>::iterator iter;
     iter = data->timeOfNextKeyFrame->find(pFragmentAck->timestamp);
-    if(iter == data->timeOfNextKeyFrame->end())
-    {
-        cout << "Map Debug: TimeOfNextKeyFrame key-value pair not present in map" << endl;
-    }
-    else
-    {
-        cout << "Map Debug: Found TimeOfNextKeyFrame key-value pair in map" << endl;
-        uint64_t timeOfFragmentEndSent = data->timeOfNextKeyFrame->find(pFragmentAck->timestamp)->second;
-        cout << "Map Debug: with value of " << timeOfFragmentEndSent << endl;
-        cout << "Map Debug: latency: " << duration_cast<milliseconds>(system_clock::now().time_since_epoch()).count() - timeOfFragmentEndSent << endl;
+    
+    uint64_t timeOfFragmentEndSent = data->timeOfNextKeyFrame->find(pFragmentAck->timestamp)->second;
 
-        // When Canary sleeps, timeOfFragmentEndSent become less than currentTimeStamp, don't send those metrics
-        if (timeOfFragmentEndSent > pFragmentAck->timestamp)
+    if (timeOfFragmentEndSent > pFragmentAck->timestamp)
+    {
+        if (pFragmentAck->ackType == FRAGMENT_ACK_TYPE_PERSISTED)
         {
-            if (pFragmentAck->ackType == FRAGMENT_ACK_TYPE_PERSISTED)
-            {
-                Aws::CloudWatch::Model::MetricDatum persistedAckLatency_datum;
-                Aws::CloudWatch::Model::PutMetricDataRequest cwRequest;
-                cwRequest.SetNamespace("KinesisVideoSDKCanary");
+            Aws::CloudWatch::Model::MetricDatum persistedAckLatencyDatum;
+            Aws::CloudWatch::Model::PutMetricDataRequest cwRequest;
+            cwRequest.SetNamespace("KinesisVideoSDKCanary");
 
-                auto currentTimestamp = duration_cast<milliseconds>(system_clock::now().time_since_epoch()).count();
-                auto persistedAckLatency = (currentTimestamp - timeOfFragmentEndSent); // [milliseconds]
-                pushMetric("PersistedAckLatency", persistedAckLatency, Aws::CloudWatch::Model::StandardUnit::Milliseconds, persistedAckLatency_datum, data->pDimension_per_stream, cwRequest);
-                LOG_DEBUG("Persisted Ack Latency: " << persistedAckLatency);
-                if (data->pCanaryConfig->useAggMetrics)
-                {
-                    pushMetric("PersistedAckLatency", persistedAckLatency, Aws::CloudWatch::Model::StandardUnit::Milliseconds, persistedAckLatency_datum, data->pAggregated_dimension, cwRequest);
+            auto currentTimestamp = duration_cast<milliseconds>(system_clock::now().time_since_epoch()).count();
+            auto persistedAckLatency = (currentTimestamp - timeOfFragmentEndSent); // [milliseconds]
+            pushMetric("PersistedAckLatency", persistedAckLatency, Aws::CloudWatch::Model::StandardUnit::Milliseconds, persistedAckLatencyDatum, data->pDimensionPerStream, cwRequest);
+            LOG_DEBUG("Persisted Ack Latency: " << persistedAckLatency);
+            if (data->pCanaryConfig->useAggMetrics)
+            {
+                pushMetric("PersistedAckLatency", persistedAckLatency, Aws::CloudWatch::Model::StandardUnit::Milliseconds, persistedAckLatencyDatum, data->pAggregatedDimension, cwRequest);
 
-                }
-                data->pCWclient->PutMetricDataAsync(cwRequest, onPutMetricDataResponseReceivedHandler);
-            } else if (pFragmentAck->ackType == FRAGMENT_ACK_TYPE_RECEIVED)
-            {
-                Aws::CloudWatch::Model::MetricDatum receivedAckLatency_datum;
-                Aws::CloudWatch::Model::PutMetricDataRequest cwRequest;
-                cwRequest.SetNamespace("KinesisVideoSDKCanary");
-
-                auto currentTimestamp = duration_cast<milliseconds>(system_clock::now().time_since_epoch()).count();
-                auto receivedAckLatency = (currentTimestamp - timeOfFragmentEndSent); // [milliseconds]
-                pushMetric("ReceivedAckLatency", receivedAckLatency, Aws::CloudWatch::Model::StandardUnit::Milliseconds, receivedAckLatency_datum, data->pDimension_per_stream, cwRequest);
-                LOG_DEBUG("Received Ack Latencyy: " << receivedAckLatency);
-                if (data->pCanaryConfig->useAggMetrics)
-                {
-                    pushMetric("ReceivedAckLatency", receivedAckLatency, Aws::CloudWatch::Model::StandardUnit::Milliseconds, receivedAckLatency_datum, data->pAggregated_dimension, cwRequest);
-                }
-                data->pCWclient->PutMetricDataAsync(cwRequest, onPutMetricDataResponseReceivedHandler);
-            } else if (pFragmentAck->ackType == FRAGMENT_ACK_TYPE_BUFFERING)
-            {
-                cout << "FRAGMENT_ACK_TYPE_BUFFERING callback invoked" << endl;
-            } else if (pFragmentAck->ackType == FRAGMENT_ACK_TYPE_ERROR)
-            {
-                cout << "FRAGMENT_ACK_TYPE_ERROR callback invoked" << endl;
             }
+            data->pCWclient->PutMetricDataAsync(cwRequest, onPutMetricDataResponseReceivedHandler);
+        } else if (pFragmentAck->ackType == FRAGMENT_ACK_TYPE_RECEIVED)
+        {
+            Aws::CloudWatch::Model::MetricDatum receivedAckLatencyDatum;
+            Aws::CloudWatch::Model::PutMetricDataRequest cwRequest;
+            cwRequest.SetNamespace("KinesisVideoSDKCanary");
+
+            auto currentTimestamp = duration_cast<milliseconds>(system_clock::now().time_since_epoch()).count();
+            auto receivedAckLatency = (currentTimestamp - timeOfFragmentEndSent); // [milliseconds]
+            pushMetric("ReceivedAckLatency", receivedAckLatency, Aws::CloudWatch::Model::StandardUnit::Milliseconds, receivedAckLatencyDatum, data->pDimensionPerStream, cwRequest);
+            LOG_DEBUG("Received Ack Latency: " << receivedAckLatency);
+            if (data->pCanaryConfig->useAggMetrics)
+            {
+                pushMetric("ReceivedAckLatency", receivedAckLatency, Aws::CloudWatch::Model::StandardUnit::Milliseconds, receivedAckLatencyDatum, data->pAggregatedDimension, cwRequest);
+            }
+            data->pCWclient->PutMetricDataAsync(cwRequest, onPutMetricDataResponseReceivedHandler);
+        } else if (pFragmentAck->ackType == FRAGMENT_ACK_TYPE_BUFFERING)
+        {
+            cout << "FRAGMENT_ACK_TYPE_BUFFERING callback invoked" << endl;
+        } else if (pFragmentAck->ackType == FRAGMENT_ACK_TYPE_ERROR)
+        {
+            cout << "FRAGMENT_ACK_TYPE_ERROR callback invoked" << endl;
         }
     }
+
 }
 
 }  // namespace video
@@ -276,30 +266,30 @@ VOID pushErrorMetrics(Frame frame, CustomData *cusData, double duration)
     Aws::CloudWatch::Model::PutMetricDataRequest cwRequest;
     cwRequest.SetNamespace("KinesisVideoSDKCanary");   
 
-    //auto stream_metrics = cusData->kinesis_video_stream->getMetrics();
-    auto stream_metrics_raw = cusData->kinesis_video_stream->getMetrics().getRawMetrics();
+    //auto stream_metrics = cusData->kinesisVideoStream->getMetrics();
+    auto stream_metrics_raw = cusData->kinesisVideoStream->getMetrics().getRawMetrics();
 
     UINT64 newPutFrameErrors = stream_metrics_raw->putFrameErrors - cusData->totalPutFrameErrorCount;
     cusData->totalPutFrameErrorCount = stream_metrics_raw->putFrameErrors;
     double putFrameErrorRate = newPutFrameErrors / (double)duration;
-    pushMetric("PutFrameErrorRate", putFrameErrorRate, Aws::CloudWatch::Model::StandardUnit::Count_Second, metricDatum, cusData->pDimension_per_stream, cwRequest);
+    pushMetric("PutFrameErrorRate", putFrameErrorRate, Aws::CloudWatch::Model::StandardUnit::Count_Second, metricDatum, cusData->pDimensionPerStream, cwRequest);
     LOG_DEBUG("PutFrame Error Rate: " << putFrameErrorRate);
 
     UINT64 newErrorAcks = stream_metrics_raw->errorAcks - cusData->totalErrorAckCount;
     cusData->totalErrorAckCount = stream_metrics_raw->errorAcks;
     double errorAckRate = newErrorAcks / (double)duration;
-    pushMetric("ErrorAckRate", errorAckRate, Aws::CloudWatch::Model::StandardUnit::Count_Second, metricDatum, cusData->pDimension_per_stream, cwRequest);
+    pushMetric("ErrorAckRate", errorAckRate, Aws::CloudWatch::Model::StandardUnit::Count_Second, metricDatum, cusData->pDimensionPerStream, cwRequest);
     LOG_DEBUG("Error Ack Rate: " << errorAckRate);
 
     UINT64 totalNumberOfErrors = cusData->totalPutFrameErrorCount + cusData->totalErrorAckCount;
-    pushMetric("TotalNumberOfErrors", totalNumberOfErrors, Aws::CloudWatch::Model::StandardUnit::Count, metricDatum, cusData->pDimension_per_stream, cwRequest);
+    pushMetric("TotalNumberOfErrors", totalNumberOfErrors, Aws::CloudWatch::Model::StandardUnit::Count, metricDatum, cusData->pDimensionPerStream, cwRequest);
     LOG_DEBUG("Total Number of Errors: " << totalNumberOfErrors);
 
     if (cusData->pCanaryConfig->useAggMetrics)
     {
-        pushMetric("PutFrameErrorRate", putFrameErrorRate, Aws::CloudWatch::Model::StandardUnit::Count_Second, metricDatum, cusData->pAggregated_dimension, cwRequest);
-        pushMetric("ErrorAckRate", errorAckRate, Aws::CloudWatch::Model::StandardUnit::Count_Second, metricDatum, cusData->pAggregated_dimension, cwRequest);
-        pushMetric("TotalNumberOfErrors", totalNumberOfErrors, Aws::CloudWatch::Model::StandardUnit::Count, metricDatum, cusData->pAggregated_dimension, cwRequest);
+        pushMetric("PutFrameErrorRate", putFrameErrorRate, Aws::CloudWatch::Model::StandardUnit::Count_Second, metricDatum, cusData->pAggregatedDimension, cwRequest);
+        pushMetric("ErrorAckRate", errorAckRate, Aws::CloudWatch::Model::StandardUnit::Count_Second, metricDatum, cusData->pAggregatedDimension, cwRequest);
+        pushMetric("TotalNumberOfErrors", totalNumberOfErrors, Aws::CloudWatch::Model::StandardUnit::Count, metricDatum, cusData->pAggregatedDimension, cwRequest);
     }
 
     // Send metrics to CW
@@ -312,17 +302,17 @@ VOID pushClientMetrics(Frame frame, CustomData *cusData)
     Aws::CloudWatch::Model::PutMetricDataRequest cwRequest;
     cwRequest.SetNamespace("KinesisVideoSDKCanary");
 
-    auto client_metrics = cusData->kinesis_video_stream->getProducer().getMetrics();
+    auto client_metrics = cusData->kinesisVideoStream->getProducer().getMetrics();
 
     double availableStoreSize = client_metrics.getContentStoreSizeSize() / 1000; // [kilobytes]
     pushMetric("ContentStoreAvailableSize", availableStoreSize, Aws::CloudWatch::Model::StandardUnit::Kilobytes,
-        metricDatum, cusData->pDimension_per_stream, cwRequest);
+        metricDatum, cusData->pDimensionPerStream, cwRequest);
     LOG_DEBUG("Content Store Available Size: " << availableStoreSize);
 
     if (cusData->pCanaryConfig->useAggMetrics)
     {
         pushMetric("ContentStoreAvailableSize", availableStoreSize, Aws::CloudWatch::Model::StandardUnit::Kilobytes,
-            metricDatum, cusData->pAggregated_dimension, cwRequest);
+            metricDatum, cusData->pAggregatedDimension, cwRequest);
     }
 
     // Send metrics to CW
@@ -335,30 +325,30 @@ VOID pushStreamMetrics(Frame frame, CustomData *cusData)
     Aws::CloudWatch::Model::PutMetricDataRequest cwRequest;
     cwRequest.SetNamespace("KinesisVideoSDKCanary");    
 
-    auto stream_metrics = cusData->kinesis_video_stream->getMetrics();
+    auto stream_metrics = cusData->kinesisVideoStream->getMetrics();
     
     double frameRate = stream_metrics.getCurrentElementaryFrameRate();
-    pushMetric("FrameRate", frameRate, Aws::CloudWatch::Model::StandardUnit::Count_Second, metricDatum, cusData->pDimension_per_stream, cwRequest);
+    pushMetric("FrameRate", frameRate, Aws::CloudWatch::Model::StandardUnit::Count_Second, metricDatum, cusData->pDimensionPerStream, cwRequest);
     LOG_DEBUG("Frame Rate: " << frameRate);
 
     double transferRate = 8 * stream_metrics.getCurrentTransferRate() / 1024; // *8 makes it bytes->bits. /1024 bits->kilobits
     pushMetric("TransferRate", transferRate, Aws::CloudWatch::Model::StandardUnit::Kilobits_Second,
-        metricDatum, cusData->pDimension_per_stream, cwRequest);
+        metricDatum, cusData->pDimensionPerStream, cwRequest);
     LOG_DEBUG("Transfer Rate: " << transferRate);
 
     double currentViewDuration = stream_metrics.getCurrentViewDuration().count();
     pushMetric("CurrentViewDuration", currentViewDuration, Aws::CloudWatch::Model::StandardUnit::Milliseconds,
-        metricDatum, cusData->pDimension_per_stream, cwRequest);
+        metricDatum, cusData->pDimensionPerStream, cwRequest);
     LOG_DEBUG("Current View Duration: " << currentViewDuration);
 
     if (cusData->pCanaryConfig->useAggMetrics)
     {
         pushMetric("FrameRate", frameRate, Aws::CloudWatch::Model::StandardUnit::Count_Second,
-            metricDatum, cusData->pAggregated_dimension, cwRequest);
+            metricDatum, cusData->pAggregatedDimension, cwRequest);
         pushMetric("TransferRate", transferRate, Aws::CloudWatch::Model::StandardUnit::Kilobits_Second,
-            metricDatum, cusData->pAggregated_dimension, cwRequest);
+            metricDatum, cusData->pAggregatedDimension, cwRequest);
         pushMetric("CurrentViewDuration", currentViewDuration, Aws::CloudWatch::Model::StandardUnit::Milliseconds,
-            metricDatum, cusData->pAggregated_dimension, cwRequest);
+            metricDatum, cusData->pAggregatedDimension, cwRequest);
     }
 
     // Send metrics to CW
@@ -368,17 +358,17 @@ VOID pushStreamMetrics(Frame frame, CustomData *cusData)
  VOID pushStartupLatencyMetric(CustomData *data)
 {
     double currentTimestamp = duration_cast<milliseconds>(system_clock::now().time_since_epoch()).count();
-    double startUpLatency = (double)(currentTimestamp - data->start_time / 1000000); // [milliseconds]
-    Aws::CloudWatch::Model::MetricDatum startupLatency_datum;
+    double startUpLatency = (double)(currentTimestamp - data->startTime / 1000000); // [milliseconds]
+    Aws::CloudWatch::Model::MetricDatum startupLatencyDatum;
     Aws::CloudWatch::Model::PutMetricDataRequest cwRequest;
     cwRequest.SetNamespace("KinesisVideoSDKCanary");
 
     LOG_DEBUG("Startup Latency: " << startUpLatency);
 
-    pushMetric("StartupLatency", startUpLatency, Aws::CloudWatch::Model::StandardUnit::Milliseconds, startupLatency_datum, data->pDimension_per_stream, cwRequest);
+    pushMetric("StartupLatency", startUpLatency, Aws::CloudWatch::Model::StandardUnit::Milliseconds, startupLatencyDatum, data->pDimensionPerStream, cwRequest);
     if (data->pCanaryConfig->useAggMetrics)
     {
-        pushMetric("StartupLatency", startUpLatency, Aws::CloudWatch::Model::StandardUnit::Milliseconds, startupLatency_datum, data->pAggregated_dimension, cwRequest);
+        pushMetric("StartupLatency", startUpLatency, Aws::CloudWatch::Model::StandardUnit::Milliseconds, startupLatencyDatum, data->pAggregatedDimension, cwRequest);
     }
 
     // Send metrics to CW
@@ -390,7 +380,7 @@ bool put_frame(CustomData *cusData, VOID *data, size_t len, const nanoseconds &p
     Frame frame;
     create_kinesis_video_frame(&frame, pts, dts, flags, data, len);
     addCanaryMetadataToFrameData(&frame);
-    bool ret = cusData->kinesis_video_stream->putFrame(frame);
+    bool ret = cusData->kinesisVideoStream->putFrame(frame);
 
     // Push key frame metrics
     if (CHECK_FRAME_FLAG_KEY_FRAME(flags))
@@ -417,7 +407,7 @@ static GstFlowReturn on_new_sample(GstElement *sink, CustomData *data) {
     bool isDroppable, isHeader, delta;
     size_t buffer_size;
     GstFlowReturn ret = GST_FLOW_OK;
-    STATUS curr_stream_status = data->stream_status.load();
+    STATUS curr_stream_status = data->streamStatus.load();
     GstSample *sample = nullptr;
     GstMapInfo info;
 
@@ -431,13 +421,13 @@ static GstFlowReturn on_new_sample(GstElement *sink, CustomData *data) {
     sample = gst_app_sink_pull_sample(GST_APP_SINK (sink));
 
     // capture cpd at the first frame
-    if (!data->stream_started) {
-        data->stream_started = true;
+    if (!data->streamStarted) {
+        data->streamStarted = true;
         GstCaps* gstcaps  = (GstCaps*) gst_sample_get_caps(sample);
         GstStructure * gststructforcaps = gst_caps_get_structure(gstcaps, 0);
         const GValue *gstStreamFormat = gst_structure_get_value(gststructforcaps, "codec_data");
         gchar *cpd = gst_value_serialize(gstStreamFormat);
-        data->kinesis_video_stream->start(std::string(cpd));
+        data->kinesisVideoStream->start(std::string(cpd));
         g_free(cpd);
     }
 
@@ -459,25 +449,25 @@ static GstFlowReturn on_new_sample(GstElement *sink, CustomData *data) {
 
         // For some rtsp sources the dts is invalid, therefore synthesize.
         if (!GST_BUFFER_DTS_IS_VALID(buffer)) {
-            data->synthetic_dts += DEFAULT_FRAME_DURATION_MS * HUNDREDS_OF_NANOS_IN_A_MILLISECOND * DEFAULT_TIME_UNIT_IN_NANOS;
-            buffer->dts = data->synthetic_dts;
+            data->syntheticDts += DEFAULT_FRAME_DURATION_MS * HUNDREDS_OF_NANOS_IN_A_MILLISECOND * DEFAULT_TIME_UNIT_IN_NANOS;
+            buffer->dts = data->syntheticDts;
         } else if (GST_BUFFER_DTS_IS_VALID(buffer)) {
-            data->synthetic_dts = buffer->dts;
+            data->syntheticDts = buffer->dts;
         }
 
-        if (data->use_absolute_fragment_times) {
-            if (data->first_pts == GST_CLOCK_TIME_NONE) {
-                data->producer_start_time = chrono::duration_cast<nanoseconds>(systemCurrentTime().time_since_epoch()).count();
-                data->first_pts = buffer->pts;
+        if (data->useAbsoluteFragmentTimes) {
+            if (data->firstPts == GST_CLOCK_TIME_NONE) {
+                data->producerStartTime = chrono::duration_cast<nanoseconds>(systemCurrentTime().time_since_epoch()).count();
+                data->firstPts = buffer->pts;
             }
-            buffer->pts += (data->producer_start_time - data->first_pts);
+            buffer->pts += (data->producerStartTime - data->firstPts);
         }
 
         if (!gst_buffer_map(buffer, &info, GST_MAP_READ)){
             goto CleanUp;
         }
         if (CHECK_FRAME_FLAG_KEY_FRAME(kinesis_video_flags)) {
-            data->kinesis_video_stream->putEventMetadata(STREAM_EVENT_TYPE_NOTIFICATION | STREAM_EVENT_TYPE_IMAGE_GENERATION, NULL);
+            data->kinesisVideoStream->putEventMetadata(STREAM_EVENT_TYPE_NOTIFICATION | STREAM_EVENT_TYPE_IMAGE_GENERATION, NULL);
         }
 
         bool putFrameSuccess = put_frame(data, info.data, info.size, std::chrono::nanoseconds(buffer->pts),
@@ -493,10 +483,10 @@ static GstFlowReturn on_new_sample(GstElement *sink, CustomData *data) {
     
     // Check if we have reached Canary's stop time
     currTime = duration_cast<seconds>(system_clock::now().time_since_epoch()).count();
-    if (currTime > (data->producer_start_time / 1000000000 + data->pCanaryConfig->canaryDuration))
+    if (currTime > (data->producerStartTime / 1000000000 + data->pCanaryConfig->canaryDuration))
     {
         cout << "Canary has reached end of run time" << endl;
-        g_main_loop_quit(data->main_loop);
+        g_main_loop_quit(data->mainLoop);
     }
 
     // If intermittent run, check if Canary should be paused
@@ -539,7 +529,7 @@ static VOID error_cb(GstBus *bus, GstMessage *msg, CustomData *data) {
     g_clear_error(&err);
     g_free(debug_info);
 
-    g_main_loop_quit(data->main_loop);
+    g_main_loop_quit(data->mainLoop);
 }
 
 VOID kinesis_video_init(CustomData *data) {
@@ -588,7 +578,7 @@ VOID kinesis_video_init(CustomData *data) {
                                                                 data->pCanaryConfig->private_key_path,
                                                                 data->pCanaryConfig->role_alias,
                                                                 data->pCanaryConfig->ca_cert_path,
-                                                                data->stream_name));
+                                                                data->streamName));
     } else {
         LOG_AND_THROW("No valid credential method was found");
     }
@@ -604,7 +594,7 @@ VOID kinesis_video_init(CustomData *data) {
             false,
             DEFAULT_ENDPOINT_CACHE_UPDATE_PERIOD));
 
-    data->kinesis_video_producer = KinesisVideoProducer::createSync(move(device_info_provider),
+    data->kinesisVideoProducer = KinesisVideoProducer::createSync(move(device_info_provider),
                                                                     move(canary_callbacks));
 
     LOG_DEBUG("Client is ready");
@@ -619,10 +609,10 @@ VOID kinesis_video_stream_init(CustomData *data) {
     SPRINTF(tag_val, "piValue");
 
     STREAMING_TYPE streaming_type = DEFAULT_STREAMING_TYPE;
-    data->use_absolute_fragment_times = DEFAULT_ABSOLUTE_FRAGMENT_TIMES;
+    data->useAbsoluteFragmentTimes = DEFAULT_ABSOLUTE_FRAGMENT_TIMES;
 
     unique_ptr<StreamDefinition> stream_definition(new StreamDefinition(
-        data->stream_name,
+        data->streamName,
         hours(DEFAULT_RETENTION_PERIOD_HOURS),
         &tags,
         DEFAULT_KMS_KEY_ID,
@@ -633,7 +623,7 @@ VOID kinesis_video_stream_init(CustomData *data) {
         milliseconds(DEFAULT_TIMECODE_SCALE_MILLISECONDS),
         DEFAULT_KEY_FRAME_FRAGMENTATION,
         DEFAULT_FRAME_TIMECODES,
-        data->use_absolute_fragment_times,
+        data->useAbsoluteFragmentTimes,
         DEFAULT_FRAGMENT_ACKS,
         DEFAULT_RESTART_ON_ERROR,
         DEFAULT_RECALCULATE_METRICS,
@@ -647,11 +637,11 @@ VOID kinesis_video_stream_init(CustomData *data) {
         DEFAULT_TRACKNAME,
         nullptr,
         0));
-    data->kinesis_video_stream = data->kinesis_video_producer->createStreamSync(move(stream_definition));
+    data->kinesisVideoStream = data->kinesisVideoProducer->createStreamSync(move(stream_definition));
 
     // reset state
-    data->stream_status = STATUS_SUCCESS;
-    data->stream_started = false;
+    data->streamStatus = STATUS_SUCCESS;
+    data->streamStarted = false;
 
 
     LOG_DEBUG("Stream is ready");
@@ -729,7 +719,7 @@ int gstreamer_init(int argc, char* argv[], CustomData *data) {
     GstStateChangeReturn gst_ret;
 
     // Reset first frame pts
-    data->first_pts = GST_CLOCK_TIME_NONE;
+    data->firstPts = GST_CLOCK_TIME_NONE;
 
     switch (data->streamSource) {
         case TEST_SOURCE:
@@ -756,15 +746,15 @@ int gstreamer_init(int argc, char* argv[], CustomData *data) {
         return 1;
     }
 
-    data->main_loop = g_main_loop_new(NULL, FALSE);
-    g_main_loop_run(data->main_loop);
+    data->mainLoop = g_main_loop_new(NULL, FALSE);
+    g_main_loop_run(data->mainLoop);
 
     // free resources
     gst_bus_remove_signal_watch(bus);
     gst_element_set_state(pipeline, GST_STATE_NULL);
     gst_object_unref(pipeline);
-    g_main_loop_unref(data->main_loop);
-    data->main_loop = NULL;
+    g_main_loop_unref(data->mainLoop);
+    data->mainLoop = NULL;
     return 0;
 }
 
@@ -788,17 +778,17 @@ int main(int argc, char* argv[]) {
 
         CustomData data;
         data.pCanaryConfig = &canaryConfig;
-        data.stream_name = const_cast<char*>(data.pCanaryConfig->streamName.c_str());
+        data.streamName = const_cast<char*>(data.pCanaryConfig->streamName.c_str());
         data.pCanaryLogs = &canaryLogs;
 
-        STATUS stream_status = STATUS_SUCCESS;
+        STATUS streamStatus = STATUS_SUCCESS;
 
 
         // CloudWatch initialization steps
-        Aws::CloudWatch::CloudWatchClient CWclient(data.client_config);
+        Aws::CloudWatch::CloudWatchClient CWclient(data.clientConfig);
         data.pCWclient = &CWclient;
         STATUS retStatus = STATUS_SUCCESS;
-        Aws::CloudWatchLogs::CloudWatchLogsClient CWLclient(data.client_config);
+        Aws::CloudWatchLogs::CloudWatchLogsClient CWLclient(data.clientConfig);
         CanaryLogs::CloudwatchLogsObject cloudwatchLogsObject;
         cloudwatchLogsObject.logGroupName = "ProducerCppSDK";
         cloudwatchLogsObject.logStreamName = data.pCanaryConfig->streamName +"-log-" + to_string(GETTIME() / HUNDREDS_OF_NANOS_IN_A_MILLISECOND);
@@ -819,19 +809,19 @@ int main(int argc, char* argv[]) {
         }
 
         // Non-aggregate CW dimension
-        Aws::CloudWatch::Model::Dimension dimension_per_stream;
-        dimension_per_stream.SetName("ProducerCppCanaryStreamName");
-        dimension_per_stream.SetValue(data.stream_name);
-        data.pDimension_per_stream = &dimension_per_stream;
+        Aws::CloudWatch::Model::Dimension DimensionPerStream;
+        DimensionPerStream.SetName("ProducerCppCanaryStreamName");
+        DimensionPerStream.SetValue(data.streamName);
+        data.pDimensionPerStream = &DimensionPerStream;
 
         // Aggregate CW dimension
         Aws::CloudWatch::Model::Dimension aggregated_dimension;
         aggregated_dimension.SetName("ProducerCppCanaryType");
         aggregated_dimension.SetValue(canaryConfig.canaryLabel);
-        data.pAggregated_dimension = &aggregated_dimension;
+        data.pAggregatedDimension = &aggregated_dimension;
 
         // Set start time after CW initializations
-        data.start_time = chrono::duration_cast<nanoseconds>(systemCurrentTime().time_since_epoch()).count();
+        data.startTime = chrono::duration_cast<nanoseconds>(systemCurrentTime().time_since_epoch()).count();
         
         // Init Kinesis Video
         try{
@@ -845,17 +835,17 @@ int main(int argc, char* argv[]) {
         if (data.streamSource == TEST_SOURCE)
         {
             gstreamer_init(argc, argv, &data);
-            if (STATUS_SUCCEEDED(stream_status))
+            if (STATUS_SUCCEEDED(streamStatus))
             {
-                // If stream_status is success after EOS, send out remaining frames.
-                data.kinesis_video_stream->stopSync();
+                // If streamStatus is success after EOS, send out remaining frames.
+                data.kinesisVideoStream->stopSync();
             } else {
-                data.kinesis_video_stream->stop();
+                data.kinesisVideoStream->stop();
             }
         }
 
         // CleanUp
-        data.kinesis_video_producer->freeStream(data.kinesis_video_stream);
+        data.kinesisVideoProducer->freeStream(data.kinesisVideoStream);
         delete (data.timeOfNextKeyFrame);
         canaryLogs.canaryStreamSendLogSync(&cloudwatchLogsObject);
         cout << "end of canary" << endl;
