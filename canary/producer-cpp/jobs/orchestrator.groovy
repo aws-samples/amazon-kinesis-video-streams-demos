@@ -115,7 +115,7 @@ pipeline {
                         build(
                             job: NEXT_AVAILABLE_RUNNER,
                             parameters: COMMON_PARAMS + [
-                                string(name: 'CANARY_STREAM_NAME', value: "Continuous-Longrun-01"),
+                                string(name: 'CANARY_STREAM_NAME', value: "-Continuous-Longrun"),
                                 string(name: 'CANARY_DURATION_IN_SECONDS', value: LONG_RUN_DURATION_IN_SECONDS.toString()),
                                 string(name: 'PRODUCER_NODE_LABEL', value: "producer-uw2"),
                                 string(name: 'CANARY_TYPE', value: "Realtime"),
@@ -130,49 +130,7 @@ pipeline {
                         build(
                             job: NEXT_AVAILABLE_RUNNER,
                             parameters: COMMON_PARAMS + [
-                                string(name: 'CANARY_STREAM_NAME', value: "Continuous-Periodic-02"),
-                                string(name: 'CANARY_DURATION_IN_SECONDS', value: SHORT_RUN_DURATION_IN_SECONDS.toString()),
-                                string(name: 'PRODUCER_NODE_LABEL', value: "producer-uw2"),
-                                string(name: 'CANARY_TYPE', value: "Realtime"),
-                                string(name: 'RUNNER_LABEL', value: "Periodic"),
-                                string(name: 'FRAGMENT_SIZE_IN_BYTES', value: FRAGMENT_SIZE_IN_BYTES.toString()),
-                                string(name: 'AWS_DEFAULT_REGION', value: AWS_DEFAULT_REGION),
-                                string(name: 'CANARY_RUN_SCENARIO', value: "Continuous"),
-                            ],
-                            wait: false
-                        )
-                        build(
-                            job: NEXT_AVAILABLE_RUNNER,
-                            parameters: COMMON_PARAMS + [
-                                string(name: 'CANARY_STREAM_NAME', value: "Continuous-Periodic-03"),
-                                string(name: 'CANARY_DURATION_IN_SECONDS', value: SHORT_RUN_DURATION_IN_SECONDS.toString()),
-                                string(name: 'PRODUCER_NODE_LABEL', value: "producer-uw2"),
-                                string(name: 'CANARY_TYPE', value: "Realtime"),
-                                string(name: 'RUNNER_LABEL', value: "Periodic"),
-                                string(name: 'FRAGMENT_SIZE_IN_BYTES', value: FRAGMENT_SIZE_IN_BYTES.toString()),
-                                string(name: 'AWS_DEFAULT_REGION', value: AWS_DEFAULT_REGION),
-                                string(name: 'CANARY_RUN_SCENARIO', value: "Continuous"),
-                            ],
-                            wait: false
-                        )
-                        build(
-                            job: NEXT_AVAILABLE_RUNNER,
-                            parameters: COMMON_PARAMS + [
-                                string(name: 'CANARY_STREAM_NAME', value: "Continuous-Periodic-04"),
-                                string(name: 'CANARY_DURATION_IN_SECONDS', value: SHORT_RUN_DURATION_IN_SECONDS.toString()),
-                                string(name: 'PRODUCER_NODE_LABEL', value: "producer-uw2"),
-                                string(name: 'CANARY_TYPE', value: "Realtime"),
-                                string(name: 'RUNNER_LABEL', value: "Periodic"),
-                                string(name: 'FRAGMENT_SIZE_IN_BYTES', value: FRAGMENT_SIZE_IN_BYTES.toString()),
-                                string(name: 'AWS_DEFAULT_REGION', value: AWS_DEFAULT_REGION),
-                                string(name: 'CANARY_RUN_SCENARIO', value: "Continuous"),
-                            ],
-                            wait: false
-                        )
-                        build(
-                            job: NEXT_AVAILABLE_RUNNER,
-                            parameters: COMMON_PARAMS + [
-                                string(name: 'CANARY_STREAM_NAME', value: "Continuous-Periodic-05"),
+                                string(name: 'CANARY_STREAM_NAME', value: "-Continuous-Periodic"),
                                 string(name: 'CANARY_DURATION_IN_SECONDS', value: SHORT_RUN_DURATION_IN_SECONDS.toString()),
                                 string(name: 'PRODUCER_NODE_LABEL', value: "producer-uw2"),
                                 string(name: 'CANARY_TYPE', value: "Realtime"),

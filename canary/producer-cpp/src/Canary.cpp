@@ -94,6 +94,8 @@ VOID pushMetric(string metricName, double metricValue, Aws::CloudWatch::Model::S
     datum.AddDimensions(*dimension);
     datum.SetValue(metricValue);
     datum.SetUnit(unit);
+
+    // Pushes back the data array, can include no more than 20 metrics per call
     cwRequest.AddMetricData(datum);
 }
 
@@ -667,9 +669,6 @@ int gstreamer_test_source_init(CustomData *data, GstElement *pipeline) {
     h264parse = gst_element_factory_make("h264parse", "h264parse");
     appsink = gst_element_factory_make("appsink", "appsink");
     h264parse = gst_element_factory_make("h264parse", "h264parse");
-
-    // to change output video pattern to a moving ball, uncomment below
-    //g_object_set(source, "pattern", 18, NULL);
 
     // videotestsrc must be set to "live" in order for pts and dts to be incremented
     g_object_set(source, "is-live", TRUE, NULL);
