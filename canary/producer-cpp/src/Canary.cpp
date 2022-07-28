@@ -103,9 +103,9 @@ VOID onPutMetricDataResponseReceivedHandler(const Aws::CloudWatch::CloudWatchCli
                                             const std::shared_ptr<const Aws::Client::AsyncCallerContext>& context)
 {
     if (!outcome.IsSuccess()) {
-        DLOGE("Failed to put sample metric data: %s", outcome.GetError().GetMessage().c_str());
+        LOG_ERROR("Failed to put sample metric data: " << outcome.GetError().GetMessage().c_str());
     } else {
-        DLOGS("Successfully put sample metric data");
+        LOG_DEBUG("Successfully put sample metric data");
     }
 }
 
@@ -516,61 +516,49 @@ VOID kinesis_video_init(CustomData *data) {
     unique_ptr<DeviceInfoProvider> device_info_provider(new CanaryDeviceInfoProvider());
     unique_ptr<ClientCallbackProvider> client_callback_provider(new CanaryClientCallbackProvider());
     unique_ptr<StreamCallbackProvider> stream_callback_provider(new CanaryStreamCallbackProvider
-(reinterpret_cast<UINT64>(data)));
+        (reinterpret_cast<UINT64>(data)));
 
-    char const *accessKey;
-    char const *secretKey;
-    char const *sessionToken;
-    char const *defaultRegion;
+    unique_ptr<CredentialProvider> credential_provider;
     string defaultRegionStr;
     string sessionTokenStr;
 
-    char const *iot_get_credential_endpoint;
-    char const *cert_path;
-    char const *private_key_path;
-    char const *role_alias;
-    char const *ca_cert_path;
-
-    unique_ptr<CredentialProvider> credential_provider;
-
-    if (nullptr == (defaultRegion = GETENV(DEFAULT_REGION_ENV_VAR))) {
+    if (nullptr == data->pCanaryConfig->defaultRegion) {
         defaultRegionStr = DEFAULT_AWS_REGION;
     } else {
-        defaultRegionStr = string(defaultRegion);
+        defaultRegionStr = string(data->pCanaryConfig->defaultRegion);
     }
     LOG_INFO("Using region: " << defaultRegionStr);
 
-    if (nullptr != (accessKey = GETENV(ACCESS_KEY_ENV_VAR)) &&
-        nullptr != (secretKey = GETENV(SECRET_KEY_ENV_VAR))) {
+    if (nullptr != data->pCanaryConfig->accessKey &&
+        nullptr != data->pCanaryConfig->secretKey) {
 
         LOG_INFO("Using aws credentials for Kinesis Video Streams");
-        if (nullptr != (sessionToken = GETENV(SESSION_TOKEN_ENV_VAR))) {
+        if (nullptr != data->pCanaryConfig->sessionToken) {
             LOG_INFO("Session token detected.");
-            sessionTokenStr = string(sessionToken);
+            sessionTokenStr = string(data->pCanaryConfig->sessionToken);
         } else {
             LOG_INFO("No session token was detected.");
             sessionTokenStr = "";
         }
 
-        data->credential.reset(new Credentials(string(accessKey),
-                                               string(secretKey),
+        data->credential.reset(new Credentials(string(data->pCanaryConfig->accessKey),
+                                               string(data->pCanaryConfig->secretKey),
                                                sessionTokenStr,
                                                std::chrono::seconds(DEFAULT_CREDENTIAL_EXPIRATION_SECONDS)));
         credential_provider.reset(new CanaryCredentialProvider(*data->credential.get()));
 
-    } else if (nullptr != (iot_get_credential_endpoint = GETENV("IOT_GET_CREDENTIAL_ENDPOINT")) &&
-               nullptr != (cert_path = GETENV("CERT_PATH")) &&
-               nullptr != (private_key_path = GETENV("PRIVATE_KEY_PATH")) &&
-               nullptr != (role_alias = GETENV("ROLE_ALIAS")) &&
-               nullptr != (ca_cert_path = GETENV("CA_CERT_PATH"))) {
+    } else if (nullptr != data->pCanaryConfig->iot_get_credential_endpoint &&
+               nullptr != data->pCanaryConfig->cert_path &&
+               nullptr != data->pCanaryConfig->private_key_path &&
+               nullptr != data->pCanaryConfig->role_alias &&
+               nullptr != data->pCanaryConfig->ca_cert_path) {
         LOG_INFO("Using IoT credentials for Kinesis Video Streams");
-        credential_provider.reset(new IotCertCredentialProvider(iot_get_credential_endpoint,
-                                                                cert_path,
-                                                                private_key_path,
-                                                                role_alias,
-                                                                ca_cert_path,
+        credential_provider.reset(new IotCertCredentialProvider(data->pCanaryConfig->iot_get_credential_endpoint,
+                                                                data->pCanaryConfig->cert_path,
+                                                                data->pCanaryConfig->private_key_path,
+                                                                data->pCanaryConfig->role_alias,
+                                                                data->pCanaryConfig->ca_cert_path,
                                                                 data->stream_name));
-
     } else {
         LOG_AND_THROW("No valid credential method was found");
     }
@@ -651,6 +639,7 @@ int gstreamer_test_source_init(CustomData *data, GstElement *pipeline) {
     h264enc = gst_element_factory_make("x264enc", "h264enc");
     h264parse = gst_element_factory_make("h264parse", "h264parse");
     appsink = gst_element_factory_make("appsink", "appsink");
+    h264parse = gst_element_factory_make("h264parse", "h264parse");
 
     // to change output video pattern to a moving ball, uncomment below
     //g_object_set(source, "pattern", 18, NULL);
@@ -661,10 +650,6 @@ int gstreamer_test_source_init(CustomData *data, GstElement *pipeline) {
     // configure appsink
     g_object_set(G_OBJECT (appsink), "emit-signals", TRUE, "sync", FALSE, NULL);
     g_signal_connect(appsink, "new-sample", G_CALLBACK(on_new_sample), data);
-    
-    // define the elements
-    // h264enc = gst_element_factory_make("vtenc_h264_hw", "h264enc");
-    h264parse = gst_element_factory_make("h264parse", "h264parse");
 
     // define and configure video filter, we only want the specified format to pass to the sink
     // ("caps" is short for "capabilities")
@@ -717,7 +702,7 @@ int gstreamer_init(int argc, char* argv[], CustomData *data) {
     data->first_pts = GST_CLOCK_TIME_NONE;
 
     switch (data->streamSource) {
-        case CustomData::TEST_SOURCE:
+        case TEST_SOURCE:
             LOG_INFO("Streaming from test source");
             pipeline = gst_pipeline_new("test-kinesis-pipeline");
             ret = gstreamer_test_source_init(data, pipeline);
@@ -800,7 +785,7 @@ int main(int argc, char* argv[]) {
         // Set the video stream source
         if (data.pCanaryConfig->sourceType == "TEST_SOURCE")
         {
-            data.streamSource = CustomData::TEST_SOURCE;     
+            data.streamSource = TEST_SOURCE;     
         }
 
         // Non-aggregate CW dimension
@@ -827,7 +812,7 @@ int main(int argc, char* argv[]) {
             return 1;
         }
 
-        if (data.streamSource == CustomData::TEST_SOURCE)
+        if (data.streamSource == TEST_SOURCE)
         {
             gstreamer_init(argc, argv, &data);
             if (STATUS_SUCCEEDED(stream_status))

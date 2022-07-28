@@ -20,17 +20,16 @@
 #include "CanaryConfig.h"
 #include "CanaryLogs.h"
 
+typedef enum _StreamSource {
+TEST_SOURCE,
+FILE_SOURCE,
+LIVE_SOURCE,
+RTSP_SOURCE
+} StreamSource;
+
 class CustomData
 {
 public:
-
-    typedef enum _StreamSource {
-    TEST_SOURCE,
-    FILE_SOURCE,
-    LIVE_SOURCE,
-    RTSP_SOURCE
-    } StreamSource;
-
     CanaryConfig* pCanaryConfig;
 
     Aws::Client::ClientConfiguration client_config;

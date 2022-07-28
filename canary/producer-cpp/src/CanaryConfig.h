@@ -30,6 +30,18 @@ public:
     UINT32 testVideoFps;
     bool useAggMetrics;
 
+    // credential related items
+    char const *accessKey;
+    char const *secretKey;
+    char const *sessionToken;
+    char const *defaultRegion;
+    
+    char const *iot_get_credential_endpoint;
+    char const *cert_path;
+    char const *private_key_path;
+    char const *role_alias;
+    char const *ca_cert_path;
+
     CanaryConfig();
     VOID setEnvVarsString(string &configVar, string envVar);
     VOID setEnvVarsInt(PUINT32 pConfigVar, string envVar);

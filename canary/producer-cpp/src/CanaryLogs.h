@@ -60,10 +60,7 @@ class CanaryLogs
                                             const std::shared_ptr<const Aws::Client::AsyncCallerContext>& context);
 
     VOID canaryStreamSendLogs(PCloudwatchLogsObject pCloudwatchLogsObject);
-
     VOID canaryStreamSendLogSync(PCloudwatchLogsObject pCloudwatchLogsObject);
-
-    // VOID cloudWatchLogger(UINT32 level, PCHAR tag, PCHAR fmt, ...);
 };
 
 

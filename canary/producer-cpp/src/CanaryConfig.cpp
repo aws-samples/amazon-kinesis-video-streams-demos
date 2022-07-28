@@ -61,6 +61,15 @@ VOID CanaryConfig::initConfigWithEnvVars()
     setEnvVarsInt(&storageSizeInBytes, "CANARY_STORAGE_SIZE");
     setEnvVarsInt(&testVideoFps, "CANARY_FPS");
 
+    defaultRegion = GETENV(DEFAULT_REGION_ENV_VAR);
+    accessKey = GETENV(ACCESS_KEY_ENV_VAR);
+    secretKey = GETENV(SECRET_KEY_ENV_VAR);
+    sessionToken = GETENV(SESSION_TOKEN_ENV_VAR);
+    iot_get_credential_endpoint = GETENV("IOT_GET_CREDENTIAL_ENDPOINT");
+    cert_path = GETENV("CERT_PATH");
+    private_key_path = GETENV("PRIVATE_KEY_PATH");
+    role_alias = GETENV("ROLE_ALIAS");
+    ca_cert_path = GETENV("CA_CERT_PATH");
 
     // TODO: change this to log instead of cout
     cout << "CANARY_STREAM_NAME: " << streamName << endl;
