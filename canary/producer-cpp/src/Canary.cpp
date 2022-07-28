@@ -224,7 +224,6 @@ CanaryStreamCallbackProvider::fragmentAckReceivedHandler(UINT64 custom_data, STR
 }  // namespace amazonaws
 }  // namespace com;
 
-
 // add frame pts, frame index, original frame size, CRC to beginning of buffer
 VOID addCanaryMetadataToFrameData(PFrame pFrame)
 {
@@ -275,17 +274,16 @@ VOID pushErrorMetrics(Frame frame, CustomData *cusData, double duration)
     Aws::CloudWatch::Model::PutMetricDataRequest cwRequest;
     cwRequest.SetNamespace("KinesisVideoSDKCanary");   
 
-    //auto stream_metrics = cusData->kinesisVideoStream->getMetrics();
-    auto stream_metrics_raw = cusData->kinesisVideoStream->getMetrics().getRawMetrics();
+    auto rawStreamMetrics = cusData->kinesisVideoStream->getMetrics().getRawMetrics();
 
-    UINT64 newPutFrameErrors = stream_metrics_raw->putFrameErrors - cusData->totalPutFrameErrorCount;
-    cusData->totalPutFrameErrorCount = stream_metrics_raw->putFrameErrors;
+    UINT64 newPutFrameErrors = rawStreamMetrics->putFrameErrors - cusData->totalPutFrameErrorCount;
+    cusData->totalPutFrameErrorCount = rawStreamMetrics->putFrameErrors;
     double putFrameErrorRate = newPutFrameErrors / (double)duration;
     pushMetric("PutFrameErrorRate", putFrameErrorRate, Aws::CloudWatch::Model::StandardUnit::Count_Second, metricDatum, cusData->pDimensionPerStream, cwRequest);
     LOG_DEBUG("PutFrame Error Rate: " << putFrameErrorRate);
 
-    UINT64 newErrorAcks = stream_metrics_raw->errorAcks - cusData->totalErrorAckCount;
-    cusData->totalErrorAckCount = stream_metrics_raw->errorAcks;
+    UINT64 newErrorAcks = rawStreamMetrics->errorAcks - cusData->totalErrorAckCount;
+    cusData->totalErrorAckCount = rawStreamMetrics->errorAcks;
     double errorAckRate = newErrorAcks / (double)duration;
     pushMetric("ErrorAckRate", errorAckRate, Aws::CloudWatch::Model::StandardUnit::Count_Second, metricDatum, cusData->pDimensionPerStream, cwRequest);
     LOG_DEBUG("Error Ack Rate: " << errorAckRate);
@@ -311,9 +309,9 @@ VOID pushClientMetrics(Frame frame, CustomData *cusData)
     Aws::CloudWatch::Model::PutMetricDataRequest cwRequest;
     cwRequest.SetNamespace("KinesisVideoSDKCanary");
 
-    auto client_metrics = cusData->kinesisVideoStream->getProducer().getMetrics();
+    auto clientMetrics = cusData->kinesisVideoStream->getProducer().getMetrics();
 
-    double availableStoreSize = client_metrics.getContentStoreSizeSize() / 1000; // [kilobytes]
+    double availableStoreSize = clientMetrics.getContentStoreSizeSize() / 1000; // [kilobytes]
     pushMetric("ContentStoreAvailableSize", availableStoreSize, Aws::CloudWatch::Model::StandardUnit::Kilobytes,
         metricDatum, cusData->pDimensionPerStream, cwRequest);
     LOG_DEBUG("Content Store Available Size: " << availableStoreSize);
@@ -334,18 +332,18 @@ VOID pushStreamMetrics(Frame frame, CustomData *cusData)
     Aws::CloudWatch::Model::PutMetricDataRequest cwRequest;
     cwRequest.SetNamespace("KinesisVideoSDKCanary");    
 
-    auto stream_metrics = cusData->kinesisVideoStream->getMetrics();
+    auto streamMetrics = cusData->kinesisVideoStream->getMetrics();
     
-    double frameRate = stream_metrics.getCurrentElementaryFrameRate();
+    double frameRate = streamMetrics.getCurrentElementaryFrameRate();
     pushMetric("FrameRate", frameRate, Aws::CloudWatch::Model::StandardUnit::Count_Second, metricDatum, cusData->pDimensionPerStream, cwRequest);
     LOG_DEBUG("Frame Rate: " << frameRate);
 
-    double transferRate = 8 * stream_metrics.getCurrentTransferRate() / 1024; // *8 makes it bytes->bits. /1024 bits->kilobits
+    double transferRate = 8 * streamMetrics.getCurrentTransferRate() / 1024; // *8 makes it bytes->bits. /1024 bits->kilobits
     pushMetric("TransferRate", transferRate, Aws::CloudWatch::Model::StandardUnit::Kilobits_Second,
         metricDatum, cusData->pDimensionPerStream, cwRequest);
     LOG_DEBUG("Transfer Rate: " << transferRate);
 
-    double currentViewDuration = stream_metrics.getCurrentViewDuration().count();
+    double currentViewDuration = streamMetrics.getCurrentViewDuration().count();
     pushMetric("CurrentViewDuration", currentViewDuration, Aws::CloudWatch::Model::StandardUnit::Milliseconds,
         metricDatum, cusData->pDimensionPerStream, cwRequest);
     LOG_DEBUG("Current View Duration: " << currentViewDuration);
@@ -364,7 +362,7 @@ VOID pushStreamMetrics(Frame frame, CustomData *cusData)
     cusData->pCWclient->PutMetricDataAsync(cwRequest, onPutMetricDataResponseReceivedHandler);
 }
 
- VOID pushStartupLatencyMetric(CustomData *data)
+VOID pushStartupLatencyMetric(CustomData *data)
 {
     double currentTimestamp = duration_cast<milliseconds>(system_clock::now().time_since_epoch()).count();
     double startUpLatency = (double)(currentTimestamp - data->startTime / 1000000); // [milliseconds]
