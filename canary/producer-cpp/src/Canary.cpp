@@ -97,6 +97,18 @@ VOID pushMetric(string metricName, double metricValue, Aws::CloudWatch::Model::S
     cwRequest.AddMetricData(datum);
 }
 
+VOID onPutMetricDataResponseReceivedHandler(const Aws::CloudWatch::CloudWatchClient* cwClient,
+                                            const Aws::CloudWatch::Model::PutMetricDataRequest& request,
+                                            const Aws::CloudWatch::Model::PutMetricDataOutcome& outcome,
+                                            const std::shared_ptr<const Aws::Client::AsyncCallerContext>& context)
+{
+    if (!outcome.IsSuccess()) {
+        DLOGE("Failed to put sample metric data: %s", outcome.GetError().GetMessage().c_str());
+    } else {
+        DLOGS("Successfully put sample metric data");
+    }
+}
+
 STATUS
 CanaryClientCallbackProvider::storageOverflowPressure(UINT64 custom_handle, UINT64 remaining_bytes) {
     UNUSED_PARAM(custom_handle);
@@ -181,43 +193,29 @@ CanaryStreamCallbackProvider::fragmentAckReceivedHandler(UINT64 custom_data, STR
                     pushMetric("PersistedAckLatency", persistedAckLatency, Aws::CloudWatch::Model::StandardUnit::Milliseconds, persistedAckLatency_datum, data->pAggregated_dimension, cwRequest);
 
                 }
-                auto outcome = data->pCWclient->PutMetricData(cwRequest);
-                if (!outcome.IsSuccess())
-                {
-                    cout << "Failed to put PersistedAckLatency metric data:" << outcome.GetError().GetMessage() << endl;
-                }
-                else
-                {
-                    cout << "Successfully put PersistedAckLatency metric data" << endl;
-                }
+                data->pCWclient->PutMetricDataAsync(cwRequest, onPutMetricDataResponseReceivedHandler);
             } else if (pFragmentAck->ackType == FRAGMENT_ACK_TYPE_RECEIVED)
+            {
+                Aws::CloudWatch::Model::MetricDatum receivedAckLatency_datum;
+                Aws::CloudWatch::Model::PutMetricDataRequest cwRequest;
+                cwRequest.SetNamespace("KinesisVideoSDKCanary");
+
+                auto currentTimestamp = duration_cast<milliseconds>(system_clock::now().time_since_epoch()).count();
+                auto receivedAckLatency = (currentTimestamp - timeOfFragmentEndSent); // [milliseconds]
+                pushMetric("ReceivedAckLatency", receivedAckLatency, Aws::CloudWatch::Model::StandardUnit::Milliseconds, receivedAckLatency_datum, data->pDimension_per_stream, cwRequest);
+                LOG_DEBUG("Received Ack Latencyy: " << receivedAckLatency);
+                if (data->pCanaryConfig->useAggMetrics)
                 {
-                    Aws::CloudWatch::Model::MetricDatum receivedAckLatency_datum;
-                    Aws::CloudWatch::Model::PutMetricDataRequest cwRequest;
-                    cwRequest.SetNamespace("KinesisVideoSDKCanary");
-
-                    auto currentTimestamp = duration_cast<milliseconds>(system_clock::now().time_since_epoch()).count();
-                    auto receivedAckLatency = (currentTimestamp - timeOfFragmentEndSent); // [milliseconds]
-                    pushMetric("ReceivedAckLatency", receivedAckLatency, Aws::CloudWatch::Model::StandardUnit::Milliseconds, receivedAckLatency_datum, data->pDimension_per_stream, cwRequest);
-                    LOG_DEBUG("Received Ack Latencyy: " << receivedAckLatency);
-                    if (data->pCanaryConfig->useAggMetrics)
-                    {
-                        pushMetric("ReceivedAckLatency", receivedAckLatency, Aws::CloudWatch::Model::StandardUnit::Milliseconds, receivedAckLatency_datum, data->pAggregated_dimension, cwRequest);
-                    }
-
-                    auto outcome = data->pCWclient->PutMetricData(cwRequest);
-                    if (!outcome.IsSuccess())
-                    {
-                        cout << "Failed to put ReceivedAckLatency metric data:" << outcome.GetError().GetMessage() << endl;
-                    }
-                    else
-                    {
-                        cout << "Successfully put ReceivedAckLatency metric data" << endl;
-                    }
+                    pushMetric("ReceivedAckLatency", receivedAckLatency, Aws::CloudWatch::Model::StandardUnit::Milliseconds, receivedAckLatency_datum, data->pAggregated_dimension, cwRequest);
                 }
-        } else
-        {
-            cout << "Not sending Ack Latency metric because: timeOfFragmentEndSent < pFragmentAck->timestamp" << endl;
+                data->pCWclient->PutMetricDataAsync(cwRequest, onPutMetricDataResponseReceivedHandler);
+            } else if (pFragmentAck->ackType == FRAGMENT_ACK_TYPE_BUFFERING)
+            {
+                cout << "FRAGMENT_ACK_TYPE_BUFFERING callback invoked" << endl;
+            } else if (pFragmentAck->ackType == FRAGMENT_ACK_TYPE_ERROR)
+            {
+                cout << "FRAGMENT_ACK_TYPE_ERROR callback invoked" << endl;
+            }
         }
     }
 }
@@ -226,6 +224,7 @@ CanaryStreamCallbackProvider::fragmentAckReceivedHandler(UINT64 custom_data, STR
 }  // namespace kinesis
 }  // namespace amazonaws
 }  // namespace com;
+
 
 // add frame pts, frame index, original frame size, CRC to beginning of buffer
 VOID addCanaryMetadataToFrameData(PFrame pFrame)
@@ -254,25 +253,25 @@ VOID create_kinesis_video_frame(Frame *frame, const nanoseconds &pts, const nano
 
 VOID updateFragmentEndTimes(UINT64 curKeyFrameTime, uint64_t &lastKeyFrameTime, map<uint64_t, uint64_t> *mapPtr)
 {
-        if (lastKeyFrameTime != 0)
-        {
-            (*mapPtr)[lastKeyFrameTime / HUNDREDS_OF_NANOS_IN_A_MILLISECOND] = curKeyFrameTime / HUNDREDS_OF_NANOS_IN_A_MILLISECOND;
-            cout << "Map Debug: current time is              " << duration_cast<milliseconds>(system_clock::now().time_since_epoch()).count() << endl;
-            cout << "Map Debug: adding lastKeyFrameTime key: " << lastKeyFrameTime / HUNDREDS_OF_NANOS_IN_A_MILLISECOND << endl;
-            cout << "Map Debug: with curKeyFrameTime value:  " << curKeyFrameTime / HUNDREDS_OF_NANOS_IN_A_MILLISECOND<< endl;
-            auto iter = mapPtr->begin();
-            while (iter != mapPtr->end()) {
-                // clean up map: removing timestamps older than 5 min from now
-                if (iter->first < (duration_cast<milliseconds>(system_clock::now().time_since_epoch()).count() - (300000)))
-                {
-                    iter = mapPtr->erase(iter);
-                    cout << "Map Debug: erasing a map key-value pair" << endl;
-                } else {
-                    break;
-                }
+    if (lastKeyFrameTime != 0)
+    {
+        (*mapPtr)[lastKeyFrameTime / HUNDREDS_OF_NANOS_IN_A_MILLISECOND] = curKeyFrameTime / HUNDREDS_OF_NANOS_IN_A_MILLISECOND;
+        cout << "Map Debug: current time is              " << duration_cast<milliseconds>(system_clock::now().time_since_epoch()).count() << endl;
+        cout << "Map Debug: adding lastKeyFrameTime key: " << lastKeyFrameTime / HUNDREDS_OF_NANOS_IN_A_MILLISECOND << endl;
+        cout << "Map Debug: with curKeyFrameTime value:  " << curKeyFrameTime / HUNDREDS_OF_NANOS_IN_A_MILLISECOND<< endl;
+        auto iter = mapPtr->begin();
+        while (iter != mapPtr->end()) {
+            // clean up map: removing timestamps older than 5 min from now
+            if (iter->first < (duration_cast<milliseconds>(system_clock::now().time_since_epoch()).count() - (300000)))
+            {
+                iter = mapPtr->erase(iter);
+                cout << "Map Debug: erasing a map key-value pair" << endl;
+            } else {
+                break;
             }
         }
-        lastKeyFrameTime = curKeyFrameTime;
+    }
+    lastKeyFrameTime = curKeyFrameTime;
 }
 
 VOID pushKeyFrameMetrics(Frame frame, CustomData *cusData)
@@ -344,17 +343,7 @@ VOID pushKeyFrameMetrics(Frame frame, CustomData *cusData)
     }
 
     // Send metrics to CW
-    auto outcome = cusData->pCWclient->PutMetricData(cwRequest);
-    if (!outcome.IsSuccess())
-    {
-        std::cout << "Failed to put sample metric data:" <<
-            outcome.GetError().GetMessage() << std::endl;
-    }
-    else
-    {
-        std::cout << "Successfully put sample metric data" << std::endl;
-    }
-
+    cusData->pCWclient->PutMetricDataAsync(cwRequest, onPutMetricDataResponseReceivedHandler);
 }
 
  VOID pushStartupLatencyMetric(CustomData *data)
@@ -373,16 +362,7 @@ VOID pushKeyFrameMetrics(Frame frame, CustomData *cusData)
         pushMetric("StartupLatency", startUpLatency, Aws::CloudWatch::Model::StandardUnit::Milliseconds, startupLatency_datum, data->pAggregated_dimension, cwRequest);
     }
 
-    auto outcome = data->pCWclient->PutMetricData(cwRequest);
-    if (!outcome.IsSuccess())
-    {
-        std::cout << "Failed to put StartupLatency metric data:" <<
-            outcome.GetError().GetMessage() << std::endl;
-    }
-    else
-    {
-        std::cout << "Successfully put StartupLatency metric data" << std::endl;
-    }
+    data->pCWclient->PutMetricDataAsync(cwRequest, onPutMetricDataResponseReceivedHandler);
 }
 
 bool put_frame(CustomData *cusData, VOID *data, size_t len, const nanoseconds &pts, const nanoseconds &dts, FRAME_FLAGS flags)
