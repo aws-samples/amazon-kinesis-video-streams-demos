@@ -78,7 +78,7 @@ def runClient(isProducer, params) {
     
     echo "Done waiting in NODE_NAME = ${env.NODE_NAME}"
 
-    def scripts_dir = "$WORKSPACE/src"
+    def scripts_dir = "$WORKSPACE/canary/producer-cpp"
     def endpoint = "${scripts_dir}/iot-credential-provider.txt"
     def core_cert_file = "${scripts_dir}/p${env.NODE_NAME}_certificate.pem"
     def private_key_file = "${scripts_dir}/p${env.NODE_NAME}_private.key"
@@ -100,8 +100,8 @@ def runClient(isProducer, params) {
     withRunnerWrapper(envs) {
         sh """
             echo "Running producer"
-            ls ./src
-            cd ./build && 
+            ls ./canary/producer-cpp
+            cd ./canary/producer-cpp/build && 
             ./producer_cpp_canary
         """
     }
