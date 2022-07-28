@@ -7,6 +7,8 @@
 
 #define LOG_CLASS "CanaryStreamLogs"
 
+LOGGER_TAG("com.amazonaws.kinesis.video");
+
 CanaryLogs::PCloudwatchLogsObject gCloudwatchLogsObject = NULL;
 std::mutex gLogLock; // Protect access to gCloudwatchLogsObject
 
@@ -49,9 +51,9 @@ VOID CanaryLogs::onPutLogEventResponseReceivedHandler(const Aws::CloudWatchLogs:
                                           const std::shared_ptr<const Aws::Client::AsyncCallerContext>& context)
 {
     if (!outcome.IsSuccess()) {
-        DLOGE("Failed to push logs: %s", outcome.GetError().GetMessage().c_str());
+        LOG_ERROR("Failed to push logs: " << outcome.GetError().GetMessage().c_str());
     } else {
-        DLOGS("Successfully pushed logs to cloudwatch");
+        LOG_DEBUG("Successfully pushed logs to cloudwatch");
         gCloudwatchLogsObject->token = outcome.GetResult().GetNextSequenceToken();
     }
 }
@@ -83,9 +85,9 @@ VOID CanaryLogs::canaryStreamSendLogSync(PCloudwatchLogsObject pCloudwatchLogsOb
     }
     auto outcome = pCloudwatchLogsObject->pCwl->PutLogEvents(request);
     if (!outcome.IsSuccess()) {
-        DLOGE("Failed to push logs: %s", outcome.GetError().GetMessage().c_str());
+        LOG_ERROR("Failed to push logs: " << outcome.GetError().GetMessage().c_str());
     } else {
-        DLOGS("Successfully pushed logs to cloudwatch");
+        LOG_DEBUG("Successfully pushed logs to cloudwatch");
     }
     pCloudwatchLogsObject->canaryInputLogEventVec.clear();
 }
