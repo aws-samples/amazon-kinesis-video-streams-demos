@@ -168,46 +168,55 @@ CanaryStreamCallbackProvider::fragmentAckReceivedHandler(UINT64 custom_data, STR
 
     if (timeOfFragmentEndSent > pFragmentAck->timestamp)
     {
-        if (pFragmentAck->ackType == FRAGMENT_ACK_TYPE_PERSISTED)
+        switch (pFragmentAck->ackType)
         {
-            Aws::CloudWatch::Model::MetricDatum persistedAckLatencyDatum;
-            Aws::CloudWatch::Model::PutMetricDataRequest cwRequest;
-            cwRequest.SetNamespace("KinesisVideoSDKCanary");
-
-            auto currentTimestamp = duration_cast<milliseconds>(system_clock::now().time_since_epoch()).count();
-            auto persistedAckLatency = (currentTimestamp - timeOfFragmentEndSent); // [milliseconds]
-            pushMetric("PersistedAckLatency", persistedAckLatency, Aws::CloudWatch::Model::StandardUnit::Milliseconds, persistedAckLatencyDatum, data->pDimensionPerStream, cwRequest);
-            LOG_DEBUG("Persisted Ack Latency: " << persistedAckLatency);
-            if (data->pCanaryConfig->useAggMetrics)
+            case FRAGMENT_ACK_TYPE_PERSISTED:
             {
-                pushMetric("PersistedAckLatency", persistedAckLatency, Aws::CloudWatch::Model::StandardUnit::Milliseconds, persistedAckLatencyDatum, data->pAggregatedDimension, cwRequest);
+                Aws::CloudWatch::Model::MetricDatum persistedAckLatencyDatum;
+                Aws::CloudWatch::Model::PutMetricDataRequest cwRequest;
+                cwRequest.SetNamespace("KinesisVideoSDKCanary");
 
+                auto currentTimestamp = duration_cast<milliseconds>(system_clock::now().time_since_epoch()).count();
+                auto persistedAckLatency = (currentTimestamp - timeOfFragmentEndSent); // [milliseconds]
+                pushMetric("PersistedAckLatency", persistedAckLatency, Aws::CloudWatch::Model::StandardUnit::Milliseconds, persistedAckLatencyDatum, data->pDimensionPerStream, cwRequest);
+                LOG_DEBUG("Persisted Ack Latency: " << persistedAckLatency);
+                if (data->pCanaryConfig->useAggMetrics)
+                {
+                    pushMetric("PersistedAckLatency", persistedAckLatency, Aws::CloudWatch::Model::StandardUnit::Milliseconds, persistedAckLatencyDatum, data->pAggregatedDimension, cwRequest);
+
+                }
+                data->pCWclient->PutMetricDataAsync(cwRequest, onPutMetricDataResponseReceivedHandler);
+                break;
             }
-            data->pCWclient->PutMetricDataAsync(cwRequest, onPutMetricDataResponseReceivedHandler);
-        } else if (pFragmentAck->ackType == FRAGMENT_ACK_TYPE_RECEIVED)
-        {
-            Aws::CloudWatch::Model::MetricDatum receivedAckLatencyDatum;
-            Aws::CloudWatch::Model::PutMetricDataRequest cwRequest;
-            cwRequest.SetNamespace("KinesisVideoSDKCanary");
-
-            auto currentTimestamp = duration_cast<milliseconds>(system_clock::now().time_since_epoch()).count();
-            auto receivedAckLatency = (currentTimestamp - timeOfFragmentEndSent); // [milliseconds]
-            pushMetric("ReceivedAckLatency", receivedAckLatency, Aws::CloudWatch::Model::StandardUnit::Milliseconds, receivedAckLatencyDatum, data->pDimensionPerStream, cwRequest);
-            LOG_DEBUG("Received Ack Latency: " << receivedAckLatency);
-            if (data->pCanaryConfig->useAggMetrics)
+            case FRAGMENT_ACK_TYPE_RECEIVED:
             {
-                pushMetric("ReceivedAckLatency", receivedAckLatency, Aws::CloudWatch::Model::StandardUnit::Milliseconds, receivedAckLatencyDatum, data->pAggregatedDimension, cwRequest);
+                Aws::CloudWatch::Model::MetricDatum receivedAckLatencyDatum;
+                Aws::CloudWatch::Model::PutMetricDataRequest cwRequest;
+                cwRequest.SetNamespace("KinesisVideoSDKCanary");
+
+                auto currentTimestamp = duration_cast<milliseconds>(system_clock::now().time_since_epoch()).count();
+                auto receivedAckLatency = (currentTimestamp - timeOfFragmentEndSent); // [milliseconds]
+                pushMetric("ReceivedAckLatency", receivedAckLatency, Aws::CloudWatch::Model::StandardUnit::Milliseconds, receivedAckLatencyDatum, data->pDimensionPerStream, cwRequest);
+                LOG_DEBUG("Received Ack Latency: " << receivedAckLatency);
+                if (data->pCanaryConfig->useAggMetrics)
+                {
+                    pushMetric("ReceivedAckLatency", receivedAckLatency, Aws::CloudWatch::Model::StandardUnit::Milliseconds, receivedAckLatencyDatum, data->pAggregatedDimension, cwRequest);
+                }
+                data->pCWclient->PutMetricDataAsync(cwRequest, onPutMetricDataResponseReceivedHandler);
+                break;
             }
-            data->pCWclient->PutMetricDataAsync(cwRequest, onPutMetricDataResponseReceivedHandler);
-        } else if (pFragmentAck->ackType == FRAGMENT_ACK_TYPE_BUFFERING)
-        {
-            cout << "FRAGMENT_ACK_TYPE_BUFFERING callback invoked" << endl;
-        } else if (pFragmentAck->ackType == FRAGMENT_ACK_TYPE_ERROR)
-        {
-            cout << "FRAGMENT_ACK_TYPE_ERROR callback invoked" << endl;
+            case FRAGMENT_ACK_TYPE_BUFFERING:
+            {
+                cout << "FRAGMENT_ACK_TYPE_BUFFERING callback invoked" << endl;
+                break;
+            }
+            case FRAGMENT_ACK_TYPE_ERROR:
+            {
+                cout << "FRAGMENT_ACK_TYPE_ERROR callback invoked" << endl;
+                break;
+            }
         }
     }
-
 }
 
 }  // namespace video
@@ -774,7 +783,7 @@ int main(int argc, char* argv[]) {
             canaryConfig.initConfigWithEnvVars();
         }
 
-        CanaryLogs canaryLogs; // TODO: consider renaming to CanaryLogger
+        CanaryLogs canaryLogs;
 
         CustomData data;
         data.pCanaryConfig = &canaryConfig;

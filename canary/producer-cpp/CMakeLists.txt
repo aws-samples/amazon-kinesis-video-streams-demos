@@ -1,5 +1,4 @@
 cmake_minimum_required(VERSION 3.16)
-# set(CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/CMake;${CMAKE_MODULE_PATH}")
 
 include(FetchContent)
 
@@ -8,15 +7,9 @@ if(APPLE AND NOT DEFINED ENV{MACOSX_DEPLOYMENT_TARGET} AND NOT DEFINED ENV{SDKRO
   set(CMAKE_OSX_DEPLOYMENT_TARGET ${CMAKE_SYSTEM_VERSION})
 endif()
 
-# include(Utilities)
-project(KinesisVideoProducerCloudwatch LANGUAGES C CXX) # what to do here, take out C? why is cpp called CXX in this case?
+project(KinesisVideoProducerCloudwatch LANGUAGES C CXX)
 
-# set(CMAKE_MACOSX_RPATH TRUE)
-# get_filename_component(ROOT "${CMAKE_CURRENT_SOURCE_DIR}" ABSOLUTE)
-
-
-set(BUILD_GSTREAMER_PLUGIN ON CACHE BOOL "Tell SDK to ..." FORCE)
-
+set(BUILD_GSTREAMER_PLUGIN ON CACHE BOOL "Tell KVS Producer CPP SDK to build with GStreamer Plugin" FORCE)
 set(CUSTOM_MEMORY_MANAGEMENT OFF CACHE BOOL "Tell AWS SDK to not use custom memory management" FORCE)
 set(ENABLE_TESTING OFF CACHE BOOL "Disable building tests for AWS SDK" FORCE)
 set(BUILD_ONLY "monitoring;logs" CACHE STRING "Tell AWS SDK to only build monitoring and logs" FORCE)
