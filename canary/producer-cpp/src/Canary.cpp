@@ -317,19 +317,19 @@ VOID pushKeyFrameMetrics(Frame frame, CustomData *cusData)
     {
         cusData->timeCounter = duration_cast<seconds>(system_clock::now().time_since_epoch()).count();
 
-        double newPutFrameErrors = (double)stream_metrics_raw->putFrameErrors - cusData->totalPutFrameErrorCount;
+        UINT64 newPutFrameErrors = stream_metrics_raw->putFrameErrors - cusData->totalPutFrameErrorCount;
         cusData->totalPutFrameErrorCount = stream_metrics_raw->putFrameErrors;
         double putFrameErrorRate = newPutFrameErrors / (double)duration;
         pushMetric("PutFrameErrorRate", putFrameErrorRate, Aws::CloudWatch::Model::StandardUnit::Count_Second, metricDatum, cusData->pDimension_per_stream, cwRequest);
         LOG_DEBUG("PutFrame Error Rate: " << putFrameErrorRate);
 
-        double newErrorAcks = (double)stream_metrics_raw->errorAcks - cusData->totalErrorAckCount;
+        UINT64 newErrorAcks = stream_metrics_raw->errorAcks - cusData->totalErrorAckCount;
         cusData->totalErrorAckCount = stream_metrics_raw->errorAcks;
         double errorAckRate = newErrorAcks / (double)duration;
         pushMetric("ErrorAckRate", errorAckRate, Aws::CloudWatch::Model::StandardUnit::Count_Second, metricDatum, cusData->pDimension_per_stream, cwRequest);
         LOG_DEBUG("Error Ack Rate: " << errorAckRate);
 
-        double totalNumberOfErrors = cusData->totalPutFrameErrorCount + cusData->totalErrorAckCount;
+        UINT64 totalNumberOfErrors = cusData->totalPutFrameErrorCount + cusData->totalErrorAckCount;
         pushMetric("TotalNumberOfErrors", totalNumberOfErrors, Aws::CloudWatch::Model::StandardUnit::Count, metricDatum, cusData->pDimension_per_stream, cwRequest);
         LOG_DEBUG("Total Number of Errors: " << totalNumberOfErrors);
 
@@ -657,25 +657,6 @@ VOID kinesis_video_stream_init(CustomData *data) {
 
 
     LOG_DEBUG("Stream is ready");
-}
-
-// callback when each RTSP stream has been created
-static VOID pad_added_cb(GstElement *element, GstPad *pad, GstElement *target) {
-    GstPad *target_sink = gst_element_get_static_pad(GST_ELEMENT(target), "sink");
-    GstPadLinkReturn link_ret;
-    gchar *pad_name = gst_pad_get_name(pad);
-    g_print("New pad found: %s\n", pad_name);
-
-    link_ret = gst_pad_link(pad, target_sink);
-
-    if (link_ret == GST_PAD_LINK_OK) {
-        LOG_INFO("Pad link successful");
-    } else {
-        LOG_INFO("Pad link failed");
-    }
-
-    gst_object_unref(target_sink);
-    g_free(pad_name);
 }
 
 int gstreamer_test_source_init(CustomData *data, GstElement *pipeline) {
