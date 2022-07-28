@@ -4,7 +4,7 @@ import org.jenkinsci.plugins.scriptsecurity.scripts.*;
 import org.jenkinsci.plugins.scriptsecurity.sandbox.whitelists.*;
 
 WORKSPACE="."
-GROOVY_SCRIPT_DIR="$WORKSPACE/jobs"
+GROOVY_SCRIPT_DIR="$WORKSPACE/canary/producer-cpp/jobs"
 DAYS_TO_KEEP_LOGS=2
 NUMBER_OF_LOGS=1
 MAX_EXECUTION_PER_NODE=1
