@@ -64,7 +64,7 @@ public:
     CanaryCredentialProvider(const Credentials &credentials) :
             StaticCredentialProvider(credentials) {}
 
-    void updateCredentials(Credentials &credentials) override {
+    VOID updateCredentials(Credentials &credentials) override {
         // Copy the stored creds forward
         credentials = credentials_;
 
@@ -87,7 +87,7 @@ public:
     }
 };
 
-void pushMetric(string metricName, double metricValue, Aws::CloudWatch::Model::StandardUnit unit, Aws::CloudWatch::Model::MetricDatum datum, 
+VOID pushMetric(string metricName, double metricValue, Aws::CloudWatch::Model::StandardUnit unit, Aws::CloudWatch::Model::MetricDatum datum, 
                 Aws::CloudWatch::Model::Dimension *dimension, Aws::CloudWatch::Model::PutMetricDataRequest &cwRequest)
 {
     datum.SetMetricName(metricName);
@@ -240,18 +240,8 @@ VOID addCanaryMetadataToFrameData(PFrame pFrame)
     putUnalignedInt32BigEndian((PINT32) pCurPtr, COMPUTE_CRC32(pFrame->frameData, pFrame->size));
 }
 
-VOID createCanaryFrameData(PFrame pFrame)
-{
-    UINT32 i;
-
-    for (i = CANARY_METADATA_SIZE; i < pFrame->size; i++) {
-        pFrame->frameData[i] = RAND();
-    }
-    addCanaryMetadataToFrameData(pFrame);
-}
-
-void create_kinesis_video_frame(Frame *frame, const nanoseconds &pts, const nanoseconds &dts, FRAME_FLAGS flags,
-                                void *data, size_t len) {
+VOID create_kinesis_video_frame(Frame *frame, const nanoseconds &pts, const nanoseconds &dts, FRAME_FLAGS flags,
+                                VOID *data, size_t len) {
     frame->flags = flags;
     frame->decodingTs = static_cast<UINT64>(dts.count()) / DEFAULT_TIME_UNIT_IN_NANOS;
     frame->presentationTs = static_cast<UINT64>(pts.count()) / DEFAULT_TIME_UNIT_IN_NANOS;
@@ -262,7 +252,7 @@ void create_kinesis_video_frame(Frame *frame, const nanoseconds &pts, const nano
     frame->trackId = DEFAULT_TRACK_ID;
 }
 
-void updateFragmentEndTimes(UINT64 curKeyFrameTime, uint64_t &lastKeyFrameTime, map<uint64_t, uint64_t> *mapPtr)
+VOID updateFragmentEndTimes(UINT64 curKeyFrameTime, uint64_t &lastKeyFrameTime, map<uint64_t, uint64_t> *mapPtr)
 {
         if (lastKeyFrameTime != 0)
         {
@@ -285,7 +275,7 @@ void updateFragmentEndTimes(UINT64 curKeyFrameTime, uint64_t &lastKeyFrameTime, 
         lastKeyFrameTime = curKeyFrameTime;
 }
 
-void pushKeyFrameMetrics(Frame frame, CustomData *cusData)
+VOID pushKeyFrameMetrics(Frame frame, CustomData *cusData)
 {
     updateFragmentEndTimes(frame.presentationTs, cusData->lastKeyFrameTime, cusData->timeOfNextKeyFrame);
     
@@ -367,7 +357,7 @@ void pushKeyFrameMetrics(Frame frame, CustomData *cusData)
 
 }
 
- void pushStartupLatencyMetric(CustomData *data)
+ VOID pushStartupLatencyMetric(CustomData *data)
 {
     double currentTimestamp = duration_cast<milliseconds>(system_clock::now().time_since_epoch()).count();
     double startUpLatency = (double)(currentTimestamp - data->start_time / 1000000); // [milliseconds]
@@ -395,11 +385,11 @@ void pushKeyFrameMetrics(Frame frame, CustomData *cusData)
     }
 }
 
-bool put_frame(CustomData *cusData, void *data, size_t len, const nanoseconds &pts, const nanoseconds &dts, FRAME_FLAGS flags)
+bool put_frame(CustomData *cusData, VOID *data, size_t len, const nanoseconds &pts, const nanoseconds &dts, FRAME_FLAGS flags)
 {
     Frame frame;
     create_kinesis_video_frame(&frame, pts, dts, flags, data, len);
-    createCanaryFrameData(&frame);
+    addCanaryMetadataToFrameData(&frame);
     bool ret = cusData->kinesis_video_stream->putFrame(frame);
 
     // push stream metrics on key frames
@@ -528,7 +518,7 @@ CleanUp:
 }
 
 // This function is called when an error message is posted on the bus
-static void error_cb(GstBus *bus, GstMessage *msg, CustomData *data) {
+static VOID error_cb(GstBus *bus, GstMessage *msg, CustomData *data) {
     GError *err;
     gchar *debug_info;
 
@@ -542,7 +532,7 @@ static void error_cb(GstBus *bus, GstMessage *msg, CustomData *data) {
     g_main_loop_quit(data->main_loop);
 }
 
-void kinesis_video_init(CustomData *data) {
+VOID kinesis_video_init(CustomData *data) {
     unique_ptr<DeviceInfoProvider> device_info_provider(new CanaryDeviceInfoProvider());
     unique_ptr<ClientCallbackProvider> client_callback_provider(new CanaryClientCallbackProvider());
     unique_ptr<StreamCallbackProvider> stream_callback_provider(new CanaryStreamCallbackProvider
@@ -563,18 +553,18 @@ void kinesis_video_init(CustomData *data) {
 
     unique_ptr<CredentialProvider> credential_provider;
 
-    if (nullptr == (defaultRegion = getenv(DEFAULT_REGION_ENV_VAR))) {
+    if (nullptr == (defaultRegion = GETENV(DEFAULT_REGION_ENV_VAR))) {
         defaultRegionStr = DEFAULT_AWS_REGION;
     } else {
         defaultRegionStr = string(defaultRegion);
     }
     LOG_INFO("Using region: " << defaultRegionStr);
 
-    if (nullptr != (accessKey = getenv(ACCESS_KEY_ENV_VAR)) &&
-        nullptr != (secretKey = getenv(SECRET_KEY_ENV_VAR))) {
+    if (nullptr != (accessKey = GETENV(ACCESS_KEY_ENV_VAR)) &&
+        nullptr != (secretKey = GETENV(SECRET_KEY_ENV_VAR))) {
 
         LOG_INFO("Using aws credentials for Kinesis Video Streams");
-        if (nullptr != (sessionToken = getenv(SESSION_TOKEN_ENV_VAR))) {
+        if (nullptr != (sessionToken = GETENV(SESSION_TOKEN_ENV_VAR))) {
             LOG_INFO("Session token detected.");
             sessionTokenStr = string(sessionToken);
         } else {
@@ -588,11 +578,11 @@ void kinesis_video_init(CustomData *data) {
                                                std::chrono::seconds(DEFAULT_CREDENTIAL_EXPIRATION_SECONDS)));
         credential_provider.reset(new CanaryCredentialProvider(*data->credential.get()));
 
-    } else if (nullptr != (iot_get_credential_endpoint = getenv("IOT_GET_CREDENTIAL_ENDPOINT")) &&
-               nullptr != (cert_path = getenv("CERT_PATH")) &&
-               nullptr != (private_key_path = getenv("PRIVATE_KEY_PATH")) &&
-               nullptr != (role_alias = getenv("ROLE_ALIAS")) &&
-               nullptr != (ca_cert_path = getenv("CA_CERT_PATH"))) {
+    } else if (nullptr != (iot_get_credential_endpoint = GETENV("IOT_GET_CREDENTIAL_ENDPOINT")) &&
+               nullptr != (cert_path = GETENV("CERT_PATH")) &&
+               nullptr != (private_key_path = GETENV("PRIVATE_KEY_PATH")) &&
+               nullptr != (role_alias = GETENV("ROLE_ALIAS")) &&
+               nullptr != (ca_cert_path = GETENV("CA_CERT_PATH"))) {
         LOG_INFO("Using IoT credentials for Kinesis Video Streams");
         credential_provider.reset(new IotCertCredentialProvider(iot_get_credential_endpoint,
                                                                 cert_path,
@@ -622,7 +612,7 @@ void kinesis_video_init(CustomData *data) {
     LOG_DEBUG("Client is ready");
 }
 
-void kinesis_video_stream_init(CustomData *data) {
+VOID kinesis_video_stream_init(CustomData *data) {
     // create a test stream
     map<string, string> tags;
     char tag_name[MAX_TAG_NAME_LEN];
@@ -670,7 +660,7 @@ void kinesis_video_stream_init(CustomData *data) {
 }
 
 // callback when each RTSP stream has been created
-static void pad_added_cb(GstElement *element, GstPad *pad, GstElement *target) {
+static VOID pad_added_cb(GstElement *element, GstPad *pad, GstElement *target) {
     GstPad *target_sink = gst_element_get_static_pad(GST_ELEMENT(target), "sink");
     GstPadLinkReturn link_ret;
     gchar *pad_name = gst_pad_get_name(pad);

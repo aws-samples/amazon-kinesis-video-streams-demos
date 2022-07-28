@@ -16,27 +16,27 @@ CanaryConfig::CanaryConfig()
     useAggMetrics = true;
 }
 
-void CanaryConfig::setEnvVarsString(string &configVar, string envVar)
+VOID CanaryConfig::setEnvVarsString(string &configVar, string envVar)
 {
-    if (getenv(envVar.c_str()) != NULL)
+    if (GETENV(envVar.c_str()) != NULL)
     {
-        configVar = getenv(envVar.c_str());
+        configVar = GETENV(envVar.c_str());
     }
 }
 
-void CanaryConfig::setEnvVarsInt(int &configVar, string envVar)
+VOID CanaryConfig::setEnvVarsInt(PUINT32 pConfigVar, string envVar)
 {
-    if (getenv(envVar.c_str()) != NULL)
+    if (GETENV(envVar.c_str()) != NULL)
     {
-        configVar = stoi(getenv(envVar.c_str()));
+        strtoui32(GETENV(envVar.c_str()), NULL, 10, pConfigVar);
     }
 }
 
-void CanaryConfig::setEnvVarsBool(bool &configVar, string envVar)
+VOID CanaryConfig::setEnvVarsBool(bool &configVar, string envVar)
 {
-    if (getenv(envVar.c_str()) != NULL)
+    if (GETENV(envVar.c_str()) != NULL)
     {
-        if (getenv(envVar.c_str()) == "TRUE" || getenv(envVar.c_str()) == "true" || getenv(envVar.c_str()) == "True")
+        if (GETENV(envVar.c_str()) == "TRUE" || GETENV(envVar.c_str()) == "true" || GETENV(envVar.c_str()) == "True")
         {
             configVar = true;
         } else
@@ -46,7 +46,7 @@ void CanaryConfig::setEnvVarsBool(bool &configVar, string envVar)
     }
 }
 
-void CanaryConfig::initConfigWithEnvVars()
+VOID CanaryConfig::initConfigWithEnvVars()
 {
     setEnvVarsString(streamName, "CANARY_STREAM_NAME");
     //setEnvVarsString(sourceType, "CANARY_SOURCE_TYPE");
@@ -55,11 +55,11 @@ void CanaryConfig::initConfigWithEnvVars()
     setEnvVarsString(canaryLabel, "CANARY_LABEL");
     setEnvVarsString(cpUrl, "CANARY_CP_URL");
 
-    setEnvVarsInt(fragmentSize, "CANARY_FRAGMENT_SIZE");
-    setEnvVarsInt(canaryDuration, "CANARY_DURATION_IN_SECONDS");
-    setEnvVarsInt(bufferDuration, "CANARY_BUFFER_DURATION");
-    setEnvVarsInt(storageSizeInBytes, "CANARY_STORAGE_SIZE");
-    setEnvVarsInt(testVideoFps, "CANARY_FPS");
+    setEnvVarsInt(&fragmentSize, "CANARY_FRAGMENT_SIZE");
+    setEnvVarsInt(&canaryDuration, "CANARY_DURATION_IN_SECONDS");
+    setEnvVarsInt(&bufferDuration, "CANARY_BUFFER_DURATION");
+    setEnvVarsInt(&storageSizeInBytes, "CANARY_STORAGE_SIZE");
+    setEnvVarsInt(&testVideoFps, "CANARY_FPS");
 
 
     // TODO: change this to log instead of cout

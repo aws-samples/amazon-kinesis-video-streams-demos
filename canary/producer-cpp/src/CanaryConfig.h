@@ -23,17 +23,17 @@ public:
     string streamType; // real-time or offline
     string canaryLabel; // typically: longrun or shortrun
     string cpUrl;
-    int fragmentSize; // [milliseconds]
-    int canaryDuration; // [seconds]
-    int bufferDuration; // [seconds]
-    int storageSizeInBytes;
-    int testVideoFps;
+    UINT32 fragmentSize; // [milliseconds]
+    UINT32 canaryDuration; // [seconds]
+    UINT32 bufferDuration; // [seconds]
+    UINT32 storageSizeInBytes;
+    UINT32 testVideoFps;
     bool useAggMetrics;
 
     CanaryConfig();
-    void setEnvVarsString(string &configVar, string envVar);
-    void setEnvVarsInt(int &configVar, string envVar);
-    void setEnvVarsBool(bool &configVar, string envVar);
-    void initConfigWithEnvVars();
+    VOID setEnvVarsString(string &configVar, string envVar);
+    VOID setEnvVarsInt(PUINT32 pConfigVar, string envVar);
+    VOID setEnvVarsBool(bool &configVar, string envVar);
+    VOID initConfigWithEnvVars();
 
 };
