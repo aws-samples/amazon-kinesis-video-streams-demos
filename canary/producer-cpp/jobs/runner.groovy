@@ -85,10 +85,8 @@ def runClient(isProducer, params) {
     def thing_name = "p${env.NODE_NAME}_thing"
 
     def envs = [
-        // 'JAVA_HOME': "/opt/jdk-13.0.1",
         'M2_HOME': "/opt/apache-maven-3.6.3",
         'AWS_KVS_LOG_LEVEL': params.AWS_KVS_LOG_LEVEL,
-        // 'CANARY_STREAM_NAME_PRE': "${env.JOB_NAME}",
         'CANARY_STREAM_NAME' : "${env.JOB_NAME}" + params.CANARY_STREAM_NAME,
         'CANARY_LABEL': params.RUNNER_LABEL,
         'CANARY_TYPE': params.CANARY_TYPE,
@@ -96,7 +94,6 @@ def runClient(isProducer, params) {
         'CANARY_DURATION_IN_SECONDS': params.CANARY_DURATION_IN_SECONDS,
         'AWS_DEFAULT_REGION': params.AWS_DEFAULT_REGION,
         'CANARY_RUN_SCENARIO': params.CANARY_RUN_SCENARIO,
-        // 'TRACK_TYPE': params.TRACK_TYPE,
     ].collect({k,v -> "${k}=${v}" })
   
     withRunnerWrapper(envs) {
@@ -118,7 +115,6 @@ pipeline {
         string(name: 'CANARY_STREAM_NAME')
         choice(name: 'AWS_KVS_LOG_LEVEL', choices: ["1", "2", "3", "4", "5"])
         string(name: 'PRODUCER_NODE_LABEL')
-        //string(name: 'CONSUMER_NODE_LABEL')
         string(name: 'GIT_URL')
         string(name: 'GIT_HASH')
         string(name: 'CANARY_TYPE')
@@ -128,9 +124,7 @@ pipeline {
         string(name: 'MIN_RETRY_DELAY_IN_SECONDS')
         string(name: 'AWS_DEFAULT_REGION')
         string(name: 'CANARY_RUN_SCENARIO')
-        // string(name: 'TRACK_TYPE')
         booleanParam(name: 'FIRST_ITERATION', defaultValue: true)
-        // booleanParam(name: 'USE_IOT')
     }
 
     stages {
@@ -157,7 +151,6 @@ pipeline {
             when {
                 equals expected: true, actual: HAS_ERROR
             }
-
             steps {
                 sleep Math.max(0, params.MIN_RETRY_DELAY_IN_SECONDS.toInteger() - currentBuild.duration.intdiv(1000))
             }
