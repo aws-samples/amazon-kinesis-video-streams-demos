@@ -17,7 +17,7 @@ CREDENTIALS = [
 
 def buildProducer() {
   sh  """ 
-    cd ./canary/producer-c &&
+    cd ./canary/producer-cpp &&
     mkdir -p build &&
     cd build && 
     cmake .. -DBUILD_GSTREAMER_PLUGIN=ON && 
