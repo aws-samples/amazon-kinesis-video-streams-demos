@@ -8,7 +8,7 @@ GROOVY_SCRIPT_DIR="$WORKSPACE/canary/producer-cpp/jobs"
 DAYS_TO_KEEP_LOGS=2
 NUMBER_OF_LOGS=1
 MAX_EXECUTION_PER_NODE=1
-NAMESPACE="producer"
+NAMESPACE="producercpp"
 
 void approveSignatures(ArrayList<String> signatures) {
     scriptApproval = ScriptApproval.get()
