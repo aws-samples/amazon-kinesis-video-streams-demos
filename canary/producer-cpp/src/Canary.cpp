@@ -227,21 +227,6 @@ CanaryStreamCallbackProvider::fragmentAckReceivedHandler(UINT64 custom_data, STR
 }  // namespace com;
 
 // add frame pts, frame index, original frame size, CRC to beginning of buffer
-VOID addCanaryMetadataToFrameData(PFrame pFrame)
-{
-    PBYTE pBuf = new BYTE[CANARY_METADATA_SIZE + pFrame->size];
-    PBYTE pCurPtr = pBuf;
-    putUnalignedInt64BigEndian((PINT64) pCurPtr, pFrame->presentationTs / HUNDREDS_OF_NANOS_IN_A_MILLISECOND);
-    pCurPtr += SIZEOF(UINT64);
-    putUnalignedInt32BigEndian((PINT32) pCurPtr, pFrame->index);
-    pCurPtr += SIZEOF(UINT32);
-    putUnalignedInt32BigEndian((PINT32) pCurPtr, pFrame->size);
-    pCurPtr += SIZEOF(UINT32);
-    putUnalignedInt32BigEndian((PINT32) pCurPtr, COMPUTE_CRC32(pFrame->frameData, pFrame->size));
-    memcpy(pBuf + CANARY_METADATA_SIZE, pFrame->frameData, pFrame->size);
-    pFrame->frameData = pBuf;
-    pFrame->size = CANARY_METADATA_SIZE + pFrame->size;
-}
 
 VOID create_kinesis_video_frame(Frame *frame, const nanoseconds &pts, const nanoseconds &dts, FRAME_FLAGS flags,
                                 VOID *data, size_t len) {
@@ -250,8 +235,17 @@ VOID create_kinesis_video_frame(Frame *frame, const nanoseconds &pts, const nano
     frame->presentationTs = static_cast<UINT64>(pts.count()) / DEFAULT_TIME_UNIT_IN_NANOS;
     // set duration to 0 due to potential high spew from rtsp streams
     frame->duration = 0;
-    frame->size = static_cast<UINT32>(len);
-    frame->frameData = reinterpret_cast<PBYTE>(data);
+    frame->size = static_cast<UINT32>(len) + CANARY_METADATA_SIZE;
+    frame->frameData = new BYTE[frame->size];
+    MEMCPY(frame->frameData + CANARY_METADATA_SIZE, reinterpret_cast<PBYTE>(data), len);
+    PBYTE pCurPtr = frame->frameData;
+    putUnalignedInt64BigEndian((PINT64) pCurPtr, frame->presentationTs / HUNDREDS_OF_NANOS_IN_A_MILLISECOND);
+    pCurPtr += SIZEOF(UINT64);
+    putUnalignedInt32BigEndian((PINT32) pCurPtr, frame->index);
+    pCurPtr += SIZEOF(UINT32);
+    putUnalignedInt32BigEndian((PINT32) pCurPtr, frame->size);
+    pCurPtr += SIZEOF(UINT32);
+    putUnalignedInt32BigEndian((PINT32) pCurPtr, COMPUTE_CRC32(frame->frameData, frame->size));
     frame->trackId = DEFAULT_TRACK_ID;
 }
 
@@ -274,7 +268,7 @@ VOID updateFragmentEndTimes(UINT64 curKeyFrameTime, uint64_t &lastKeyFrameTime, 
     lastKeyFrameTime = curKeyFrameTime;
 }
 
-VOID pushErrorMetrics(Frame frame, CustomData *cusData, double duration)
+VOID pushErrorMetrics(CustomData *cusData, double duration)
 {
     Aws::CloudWatch::Model::MetricDatum metricDatum;
     Aws::CloudWatch::Model::PutMetricDataRequest cwRequest;
@@ -309,7 +303,7 @@ VOID pushErrorMetrics(Frame frame, CustomData *cusData, double duration)
     cusData->pCWclient->PutMetricDataAsync(cwRequest, onPutMetricDataResponseReceivedHandler);
 }
 
-VOID pushClientMetrics(Frame frame, CustomData *cusData)
+VOID pushClientMetrics(CustomData *cusData)
 {
     Aws::CloudWatch::Model::MetricDatum metricDatum;
     Aws::CloudWatch::Model::PutMetricDataRequest cwRequest;
@@ -332,7 +326,7 @@ VOID pushClientMetrics(Frame frame, CustomData *cusData)
     cusData->pCWclient->PutMetricDataAsync(cwRequest, onPutMetricDataResponseReceivedHandler);
 }
 
-VOID pushStreamMetrics(Frame frame, CustomData *cusData)
+VOID pushStreamMetrics(CustomData *cusData)
 {    
     Aws::CloudWatch::Model::MetricDatum metricDatum;
     Aws::CloudWatch::Model::PutMetricDataRequest cwRequest;
@@ -392,24 +386,25 @@ bool put_frame(CustomData *cusData, VOID *data, size_t len, const nanoseconds &p
 {
     Frame frame;
     create_kinesis_video_frame(&frame, pts, dts, flags, data, len);
-    addCanaryMetadataToFrameData(&frame);
     bool ret = cusData->kinesisVideoStream->putFrame(frame);
 
     // Push key frame metrics
     if (CHECK_FRAME_FLAG_KEY_FRAME(flags))
     {
         updateFragmentEndTimes(frame.presentationTs, cusData->lastKeyFrameTime, cusData->timeOfNextKeyFrame);
-        pushStreamMetrics(frame, cusData);
-        pushClientMetrics(frame, cusData);
+        pushStreamMetrics(cusData);
+        pushClientMetrics(cusData);
         double duration = duration_cast<seconds>(system_clock::now().time_since_epoch()).count() - cusData->timeCounter;
         // Push error metrics and logs every 60 seconds
         if(duration > 60)
         {
-            pushErrorMetrics(frame, cusData, duration);
+            pushErrorMetrics(cusData, duration);
             cusData->pCanaryLogs->canaryStreamSendLogs(cusData->pCloudwatchLogsObject);
             cusData->timeCounter = duration_cast<seconds>(system_clock::now().time_since_epoch()).count();
         }
     }
+
+    delete frame.frameData;
 
     return ret;
 }
