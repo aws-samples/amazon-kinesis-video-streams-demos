@@ -18,7 +18,7 @@ Refer to platform specific instructions for help with GStreamer installation, bu
 ### Configure
 Create a build directory in the newly checked out repository, and execute CMake from it.
 
-`mkdir -p amazon-kinesis-video-streams-demos/canary/webrtc-c/build; cd amazon-kinesis-video-streams-demo/canary/webrtc-c/build; cmake .. `
+`mkdir -p amazon-kinesis-video-streams-demos/gst/gst-kvs-plugin/build; cd amazon-kinesis-video-streams-demos/gst/gst-kvs-plugin/build; cmake .. `
 
 ### Build
 To build the library and the provided samples run make in the build directory you executed CMake.
@@ -31,7 +31,7 @@ A very basic example of a GStreamer pipeline to run on Mac
 
 
 ```sh
-export GTS_PLUGIN_PATH=`pwd`/build
+export GST_PLUGIN_PATH=`pwd`/build
 gst-launch-1.0 autovideosrc !  vtenc_h264_hw max-keyframe-interval=30 bitrate=500 ! kvsplugin stream-name=ScaryTestStream channel-name="ScaryTestChannel" log-level=3
 ```
 
