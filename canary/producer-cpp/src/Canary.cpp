@@ -229,7 +229,8 @@ CanaryStreamCallbackProvider::fragmentAckReceivedHandler(UINT64 custom_data, STR
 // add frame pts, frame index, original frame size, CRC to beginning of buffer
 VOID addCanaryMetadataToFrameData(PFrame pFrame)
 {
-    PBYTE pCurPtr = pFrame->frameData;
+    PBYTE pBuf = new BYTE[CANARY_METADATA_SIZE + pFrame->size];
+    PBYTE pCurPtr = pBuf;
     putUnalignedInt64BigEndian((PINT64) pCurPtr, pFrame->presentationTs / HUNDREDS_OF_NANOS_IN_A_MILLISECOND);
     pCurPtr += SIZEOF(UINT64);
     putUnalignedInt32BigEndian((PINT32) pCurPtr, pFrame->index);
@@ -237,6 +238,9 @@ VOID addCanaryMetadataToFrameData(PFrame pFrame)
     putUnalignedInt32BigEndian((PINT32) pCurPtr, pFrame->size);
     pCurPtr += SIZEOF(UINT32);
     putUnalignedInt32BigEndian((PINT32) pCurPtr, COMPUTE_CRC32(pFrame->frameData, pFrame->size));
+    memcpy(pBuf + CANARY_METADATA_SIZE, pFrame->frameData, pFrame->size);
+    pFrame->frameData = pBuf;
+    pFrame->size = CANARY_METADATA_SIZE + pFrame->size;
 }
 
 VOID create_kinesis_video_frame(Frame *frame, const nanoseconds &pts, const nanoseconds &dts, FRAME_FLAGS flags,
