@@ -33,6 +33,7 @@
     "aws-sdk": "^2.814.0",
     "aws4": "^1.10.0",
     "glob-parent": "^6.0.2",
+    "json-schema": "^0.4.0",
     "node-notifier": "^10.0.1",
     "nth-check": "^2.1.1",
     "recordrtc": "^5.6.1"
