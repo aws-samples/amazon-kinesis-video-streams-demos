@@ -5,14 +5,19 @@
 #include <string.h>
 #include <mutex>
 #include <iostream>
+#include <Logger.h>
 
 #include "com/amazonaws/kinesis/video/cproducer/Include.h"
+#include "CanaryCallbackProvider.h"
 
 using namespace std;
 
 #define DEFAULT_FRAGMENT_DURATION_MILLISECONDS 2000
 #define DEFAULT_CANARY_DURATION_SECONDS (12 * 60 * 60)
 #define DEFAULT_BUFFER_DURATION_SECONDS 120
+
+LOGGER_TAG("com.amazonaws.kinesis.video");
+
 
 class CanaryConfig{
 

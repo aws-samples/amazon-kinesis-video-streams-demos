@@ -43,7 +43,7 @@ int gstreamer_init(int, char **);
 }
 #endif
 
-LOGGER_TAG("com.amazonaws.kinesis.video.gstreamer");
+// LOGGER_TAG("com.amazonaws.kinesis.video.gstreamer");
 
 #define DEFAULT_RETENTION_PERIOD_HOURS 2
 #define DEFAULT_KMS_KEY_ID ""

@@ -209,12 +209,12 @@ CanaryStreamCallbackProvider::fragmentAckReceivedHandler(UINT64 custom_data, STR
             }
             case FRAGMENT_ACK_TYPE_BUFFERING:
             {
-                cout << "FRAGMENT_ACK_TYPE_BUFFERING callback invoked" << endl;
+                LOG_DEBUG("FRAGMENT_ACK_TYPE_BUFFERING callback invoked");
                 break;
             }
             case FRAGMENT_ACK_TYPE_ERROR:
             {
-                cout << "FRAGMENT_ACK_TYPE_ERROR callback invoked" << endl;
+                LOG_DEBUG("FRAGMENT_ACK_TYPE_ERROR callback invoked");
                 break;
             }
         }
@@ -498,7 +498,7 @@ static GstFlowReturn on_new_sample(GstElement *sink, CustomData *data) {
     currTime = duration_cast<seconds>(system_clock::now().time_since_epoch()).count();
     if (currTime > (data->producerStartTime / 1000000000 + data->pCanaryConfig->canaryDuration))
     {
-        cout << "Canary has reached end of run time" << endl;
+        LOG_DEBUG("Canary has reached end of run time");
         g_main_loop_quit(data->mainLoop);
     }
 
@@ -508,11 +508,11 @@ static GstFlowReturn on_new_sample(GstElement *sink, CustomData *data) {
     {
         data->timeOfNextKeyFrame->clear();
         int sleepTime = ((rand() % 10) + 1); // [minutes]
-        cout << "Intermittent sleep time is set to: " << sleepTime << " minutes" << endl;
+        LOG_DEBUG("Intermittent sleep time is set to: " << sleepTime << " minutes");
         data->sleepTimeStamp = duration_cast<milliseconds>(system_clock::now().time_since_epoch()).count(); // [milliseconds]
         sleep(sleepTime * 60); // [seconds]
         int runTime = (rand() % 10) + 1; // [minutes]
-        cout << "Intermittent run time is set to: " << runTime << " minutes" << endl;
+        LOG_DEBUG("Intermittent run time is set to: " << runTime << " minutes");
         // Set runTill to a new random value 1-10 minutes into the future
         data->runTill = duration_cast<minutes>(system_clock::now().time_since_epoch()).count() + runTime; // [minutes]
     }
@@ -804,11 +804,11 @@ int main(int argc, char* argv[]) {
         cloudwatchLogsObject.logStreamName = data.pCanaryConfig->streamName +"-log-" + to_string(GETTIME() / HUNDREDS_OF_NANOS_IN_A_MILLISECOND);
         cloudwatchLogsObject.pCwl = &CWLclient;
         if ((retStatus = canaryLogs.initializeCloudwatchLogger(&cloudwatchLogsObject)) != STATUS_SUCCESS) {
-            cout << "Cloudwatch logger failed to be initialized with 0x" << retStatus << ">> error code." << endl;
+            LOG_DEBUG("Cloudwatch logger failed to be initialized with 0x" << retStatus << ">> error code.");
         }
         else
         {
-            cout << "Cloudwatch logger initialization success" << endl;;
+            LOG_DEBUG("Cloudwatch logger initialization success");
         }
         data.pCloudwatchLogsObject = &cloudwatchLogsObject;
 
@@ -858,7 +858,7 @@ int main(int argc, char* argv[]) {
         data.kinesisVideoProducer->freeStream(data.kinesisVideoStream);
         delete (data.timeOfNextKeyFrame);
         canaryLogs.canaryStreamSendLogSync(&cloudwatchLogsObject);
-        cout << "end of canary" << endl;
+        LOG_DEBUG("end of canary");
     }
 
     return 0;

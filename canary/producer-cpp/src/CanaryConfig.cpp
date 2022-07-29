@@ -71,14 +71,13 @@ VOID CanaryConfig::initConfigWithEnvVars()
     role_alias = GETENV("ROLE_ALIAS");
     ca_cert_path = GETENV("CA_CERT_PATH");
 
-    // TODO: change this to log instead of cout
-    cout << "CANARY_STREAM_NAME: " << streamName << endl;
-    cout << "CANARY_RUN_SCENARIO: " << canaryRunScenario << endl;
-    cout << "CANARY_STREAM_TYPE: " << streamType << endl;
-    cout << "CANARY_LABEL: " << canaryLabel << endl;
-    cout << "CANARY_CP_URL: " << cpUrl << endl;
-    cout << "CANARY_FRAGMENT_SIZE: " << fragmentSize << endl;
-    cout << "CANARY_DURATION: " << canaryDuration << endl;
-    cout << "CANARY_STORAGE_SIZE: " << storageSizeInBytes << endl;
-    cout << "CANARY_FPS: " << testVideoFps << endl;
+    LOG_DEBUG("CANARY_STREAM_NAME: " << streamName);
+    LOG_DEBUG("CANARY_RUN_SCENARIO: " << canaryRunScenario);
+    LOG_DEBUG("CANARY_STREAM_TYPE: " << streamType);
+    LOG_DEBUG("CANARY_LABEL: " << canaryLabel);
+    LOG_DEBUG("CANARY_CP_URL: " << cpUrl);
+    LOG_DEBUG("CANARY_FRAGMENT_SIZE: " << fragmentSize);
+    LOG_DEBUG("CANARY_DURATION: " << canaryDuration);
+    LOG_DEBUG("CANARY_STORAGE_SIZE: " << storageSizeInBytes);
+    LOG_DEBUG("CANARY_FPS: " << testVideoFps);
 }
