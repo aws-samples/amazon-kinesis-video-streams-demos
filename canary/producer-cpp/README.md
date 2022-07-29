@@ -10,10 +10,10 @@ Welcome to Kinesis Video Streams CPP Producer SDK integration with AWS Cloudwatc
 
 ## Build Steps
 
-`git clone https://github.com/aws-samples/amazon-kinesis-video-streams-demos.git -b new-canary-producer-c`
-`mkdir -p amazon-kinesis-video-streams-demos/canary/producer-cpp/build`
-`cd amazon-kinesis-video-streams-demos/canary/producer-cpp/build`
-`cmake ..`
+1. `git clone https://github.com/aws-samples/amazon-kinesis-video-streams-demos.git -b new-canary-producer-c`
+2. `mkdir -p amazon-kinesis-video-streams-demos/canary/producer-cpp/build`
+3. `cd amazon-kinesis-video-streams-demos/canary/producer-cpp/build`
+4. `cmake ..`
 
 
 NOTE: This project requires setting up of AWS SDK CPP Libraries. The specific components being used are:
