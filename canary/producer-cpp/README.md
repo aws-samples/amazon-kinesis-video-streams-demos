@@ -16,7 +16,7 @@ Note 2: Currently, this demo is tested on Linux.
 
 ## Build
 
-To download the repository run the following command:
+To download the repository, run the following command:
 
 `git clone https://github.com/aws-samples/amazon-kinesis-video-streams-demos.git`
 
@@ -45,9 +45,9 @@ The following environment variables can be set to configure the Canary.
 * `CANARY_STREAM_TYPE` --  Continuous/Intermittent
 * `CANARY_LABEL` -- CloudWatch dimension for aggregate metrics to be grouped to
 * `CANARY_CP_URL` -- Specified cpUrl
-* `CANARY_FRAGMENT_SIZE` --  Size of fragements sent in milliseconds
+* `CANARY_FRAGMENT_SIZE` --  Size of fragments sent in milliseconds
 * `CANARY_DURATION` -- Duration in seconds
 * `CANARY_STORAGE_SIZE` -- Size in bytes
-* `CANARY_FPS` -- Frames per second of genereated test video
+* `CANARY_FPS` -- Frames per second of generated test video
 
-On running the application, the metrics are geenrated and posted in the `KinesisVideoSDKCanary` namespace with stream name format:  `<stream-name-prefix>-<Realtime/Offline>-<canary-type>`, where `canary-type` signifies the type of run of the application, for example, `periodic`, `longrun`, etc.
+On running the application, the metrics are generated and posted in the `KinesisVideoSDKCanary` namespace with stream name format:  `<stream-name-prefix>-<Realtime/Offline>-<canary-type>`, where `canary-type` signifies the type of run of the application, for example, `periodic`, `longrun`, etc.
