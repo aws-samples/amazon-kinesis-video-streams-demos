@@ -22,7 +22,6 @@
 #include <aws/logs/model/DeleteLogStreamRequest.h>
 #include <aws/logs/model/DescribeLogStreamsRequest.h>
 
-#include "CanaryCallbackProvider.h"
 #include "CanaryConfig.h"
 #include "CanaryLogs.h"
 #include "CustomData.h"
