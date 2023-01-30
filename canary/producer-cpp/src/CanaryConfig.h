@@ -8,7 +8,6 @@
 #include <Logger.h>
 
 #include "com/amazonaws/kinesis/video/cproducer/Include.h"
-#include "CanaryCallbackProvider.h"
 
 using namespace std;
 
