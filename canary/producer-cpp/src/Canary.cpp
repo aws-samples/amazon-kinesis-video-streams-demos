@@ -411,36 +411,10 @@ bool put_frame(CustomData *cusData, VOID *data, size_t len, const nanoseconds &p
     return ret;
 }
 
-void determine_credentials(GstElement *kvssink, CustomData *data) {
-
-    char const *iot_credential_endpoint;
-    char const *cert_path;
-    char const *private_key_path;
-    char const *role_alias;
-    char const *ca_cert_path;
-    char const *credential_path;
-    if (nullptr != (iot_credential_endpoint = getenv("IOT_GET_CREDENTIAL_ENDPOINT")) &&
-        nullptr != (cert_path = getenv("CERT_PATH")) &&
-        nullptr != (private_key_path = getenv("PRIVATE_KEY_PATH")) &&
-        nullptr != (role_alias = getenv("ROLE_ALIAS")) &&
-        nullptr != (ca_cert_path = getenv("CA_CERT_PATH"))) {
-        // set the IoT Credentials if provided in envvar
-        GstStructure *iot_credentials =  gst_structure_new(
-                "iot-certificate",
-                "iot-thing-name", G_TYPE_STRING, data->streamName,
-                "endpoint", G_TYPE_STRING, iot_credential_endpoint,
-                "cert-path", G_TYPE_STRING, cert_path,
-                "key-path", G_TYPE_STRING, private_key_path,
-                "ca-path", G_TYPE_STRING, ca_cert_path,
-                "role-aliases", G_TYPE_STRING, role_alias, NULL);
-
-        g_object_set(G_OBJECT (kvssink), "iot-certificate", iot_credentials, NULL);
-        gst_structure_free(iot_credentials);
-        // kvssink will search for long term credentials in envvar automatically so no need to include here
-        // if no long credentials or IoT credentials provided will look for credential file as last resort
-    } else if(nullptr != (credential_path = getenv("AWS_CREDENTIAL_PATH"))){
-        g_object_set(G_OBJECT (kvssink), "credential-path", credential_path, NULL);
-    }
+//Test function to check signal connect
+static VOID streamCheck(GstElement *kvssink, CustomData *customData){
+    CustomData *data = reinterpret_cast<CustomData *>(customData);
+    LOG_DEBUG("stream check received handler");
 }
 
 // This function is called when an error message is posted on the bus
@@ -477,7 +451,7 @@ int gstreamer_test_source_init(CustomData *data, GstElement *pipeline) {
 
     // configure kvssink
     g_object_set(G_OBJECT (kvssink), "stream-name", data->streamName, "storage-size", 128, NULL);
-//    determine_credentials(kvssink, data);
+    g_signal_connect(G_OBJECT(kvssink), "persisted-ack", (GCallback) streamCheck, data);
 
     // define and configure video filter, we only want the specified format to pass to the sink
     // ("caps" is short for "capabilities")
