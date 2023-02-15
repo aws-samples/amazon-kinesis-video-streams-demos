@@ -57,25 +57,6 @@ namespace com { namespace amazonaws { namespace kinesis { namespace video {
                                                 UPLOAD_HANDLE upload_handle, PFragmentAck pFragmentAck);
                 };
 
-//class CanaryCredentialProvider : public StaticCredentialProvider {
-//    // Test rotation period is 40 second for the grace period.
-//    const std::chrono::duration<uint64_t> ROTATION_PERIOD = std::chrono::seconds(DEFAULT_CREDENTIAL_ROTATION_SECONDS);
-//public:
-//    CanaryCredentialProvider(const Credentials &credentials) :
-//            StaticCredentialProvider(credentials) {}
-//
-//    VOID updateCredentials(Credentials &credentials) override {
-//        // Copy the stored creds forward
-//        credentials = credentials_;
-//
-//        // Update only the expiration
-//        auto now_time = std::chrono::duration_cast<std::chrono::seconds>(
-//                systemCurrentTime().time_since_epoch());
-//        auto expiration_seconds = now_time + ROTATION_PERIOD;
-//        credentials.setExpiration(std::chrono::seconds(expiration_seconds.count()));
-//        LOG_INFO("New credentials expiration is " << credentials.getExpiration().count());
-//    }
-//};
 
                 class CanaryDeviceInfoProvider : public DefaultDeviceInfoProvider {
                 public:
@@ -410,11 +391,116 @@ bool put_frame(CustomData *cusData, VOID *data, size_t len, const nanoseconds &p
 
     return ret;
 }
+// push metric function to publish metrics to cloudwatch after getting g signal from producer sdk cpp
+VOID pushStreamMetrics(CustomData *cusData, KinesisVideoStreamMetrics streamMetrics)
+{
+    Aws::CloudWatch::Model::MetricDatum metricDatum;
+    Aws::CloudWatch::Model::PutMetricDataRequest cwRequest;
+    cwRequest.SetNamespace("KinesisVideoSDKCanary");
 
-//Test function to check signal connect
-static VOID streamCheck(GstElement *kvssink, CustomData *customData){
-    CustomData *data = reinterpret_cast<CustomData *>(customData);
-    LOG_DEBUG("stream check received handler");
+    double frameRate = streamMetrics.getCurrentElementaryFrameRate();
+    pushMetric("FrameRate", frameRate, Aws::CloudWatch::Model::StandardUnit::Count_Second, metricDatum, cusData->pDimensionPerStream, cwRequest);
+    LOG_DEBUG("Frame Rate: " << frameRate);
+
+    double transferRate = 8 * streamMetrics.getCurrentTransferRate() / 1024; // *8 makes it bytes->bits. /1024 bits->kilobits
+    pushMetric("TransferRate", transferRate, Aws::CloudWatch::Model::StandardUnit::Kilobits_Second,
+               metricDatum, cusData->pDimensionPerStream, cwRequest);
+    LOG_DEBUG("Transfer Rate: " << transferRate);
+
+    double currentViewDuration = streamMetrics.getCurrentViewDuration().count();
+    pushMetric("CurrentViewDuration", currentViewDuration, Aws::CloudWatch::Model::StandardUnit::Milliseconds,
+               metricDatum, cusData->pDimensionPerStream, cwRequest);
+    LOG_DEBUG("Current View Duration: " << currentViewDuration);
+
+    if (cusData->pCanaryConfig->useAggMetrics)
+    {
+        pushMetric("FrameRate", frameRate, Aws::CloudWatch::Model::StandardUnit::Count_Second,
+                   metricDatum, cusData->pAggregatedDimension, cwRequest);
+        pushMetric("TransferRate", transferRate, Aws::CloudWatch::Model::StandardUnit::Kilobits_Second,
+                   metricDatum, cusData->pAggregatedDimension, cwRequest);
+        pushMetric("CurrentViewDuration", currentViewDuration, Aws::CloudWatch::Model::StandardUnit::Milliseconds,
+                   metricDatum, cusData->pAggregatedDimension, cwRequest);
+    }
+
+    // Send metrics to CW
+    cusData->pCWclient->PutMetricDataAsync(cwRequest, onPutMetricDataResponseReceivedHandler);
+}
+
+// put frame function to publish metrics to cloudwatch after getting g signal from producer sdk cpp
+static VOID put_frame_kvs(GstElement *kvssink, KinesisVideoStreamMetrics metrics, gpointer data)
+{
+    CustomData *cusData = (CustomData*) data;
+    std::cout<<(data == nullptr)<<" put frame"<<std::endl;
+    LOG_DEBUG("put frame at canary " << metrics.getCurrentElementaryFrameRate());
+}
+
+//Test function to check signal connect and fragment ack
+static STATUS streamCheck(GstElement *kvssink, PFragmentAck pFragmentAck, gpointer custom_data){
+
+    CustomData *data = reinterpret_cast<CustomData *>(custom_data);
+    LOG_DEBUG("Persisted act fragment ack received handler stream check " << pFragmentAck->timestamp);
+
+    if (pFragmentAck->ackType != FRAGMENT_ACK_TYPE_PERSISTED && pFragmentAck->ackType != FRAGMENT_ACK_TYPE_RECEIVED)
+    {
+        return STATUS_SUCCESS;
+    }
+
+    map<uint64_t, uint64_t>::iterator iter;
+    iter = data->timeOfNextKeyFrame->find(pFragmentAck->timestamp);
+
+    uint64_t timeOfFragmentEndSent = data->timeOfNextKeyFrame->find(pFragmentAck->timestamp)->second;
+
+    if (timeOfFragmentEndSent > pFragmentAck->timestamp)
+    {
+        switch (pFragmentAck->ackType)
+        {
+            case FRAGMENT_ACK_TYPE_PERSISTED:
+            {
+                Aws::CloudWatch::Model::MetricDatum persistedAckLatencyDatum;
+                Aws::CloudWatch::Model::PutMetricDataRequest cwRequest;
+                cwRequest.SetNamespace("KinesisVideoSDKCanary");
+
+                auto currentTimestamp = duration_cast<milliseconds>(system_clock::now().time_since_epoch()).count();
+                auto persistedAckLatency = (currentTimestamp - timeOfFragmentEndSent); // [milliseconds]
+                pushMetric("PersistedAckLatency", persistedAckLatency, Aws::CloudWatch::Model::StandardUnit::Milliseconds, persistedAckLatencyDatum, data->pDimensionPerStream, cwRequest);
+                LOG_DEBUG("Persisted Ack Latency: " << persistedAckLatency);
+                if (data->pCanaryConfig->useAggMetrics)
+                {
+                    pushMetric("PersistedAckLatency", persistedAckLatency, Aws::CloudWatch::Model::StandardUnit::Milliseconds, persistedAckLatencyDatum, data->pAggregatedDimension, cwRequest);
+
+                }
+                data->pCWclient->PutMetricDataAsync(cwRequest, onPutMetricDataResponseReceivedHandler);
+                break;
+            }
+            case FRAGMENT_ACK_TYPE_RECEIVED:
+            {
+                Aws::CloudWatch::Model::MetricDatum receivedAckLatencyDatum;
+                Aws::CloudWatch::Model::PutMetricDataRequest cwRequest;
+                cwRequest.SetNamespace("KinesisVideoSDKCanary");
+
+                auto currentTimestamp = duration_cast<milliseconds>(system_clock::now().time_since_epoch()).count();
+                auto receivedAckLatency = (currentTimestamp - timeOfFragmentEndSent); // [milliseconds]
+                pushMetric("ReceivedAckLatency", receivedAckLatency, Aws::CloudWatch::Model::StandardUnit::Milliseconds, receivedAckLatencyDatum, data->pDimensionPerStream, cwRequest);
+                LOG_DEBUG("Received Ack Latency: " << receivedAckLatency);
+                if (data->pCanaryConfig->useAggMetrics)
+                {
+                    pushMetric("ReceivedAckLatency", receivedAckLatency, Aws::CloudWatch::Model::StandardUnit::Milliseconds, receivedAckLatencyDatum, data->pAggregatedDimension, cwRequest);
+                }
+                data->pCWclient->PutMetricDataAsync(cwRequest, onPutMetricDataResponseReceivedHandler);
+                break;
+            }
+            case FRAGMENT_ACK_TYPE_BUFFERING:
+            {
+                LOG_DEBUG("FRAGMENT_ACK_TYPE_BUFFERING callback invoked");
+                break;
+            }
+            case FRAGMENT_ACK_TYPE_ERROR:
+            {
+                LOG_DEBUG("FRAGMENT_ACK_TYPE_ERROR callback invoked");
+                break;
+            }
+        }
+    }
 }
 
 // This function is called when an error message is posted on the bus
@@ -433,7 +519,6 @@ static VOID error_cb(GstBus *bus, GstMessage *msg, CustomData *data) {
 }
 
 int gstreamer_test_source_init(CustomData *data, GstElement *pipeline) {
-
     GstElement *kvssink, *source, *video_src_filter, *h264parse, *video_filter, *h264enc, *autovidcon;
 
     GstCaps *caps;
@@ -451,6 +536,7 @@ int gstreamer_test_source_init(CustomData *data, GstElement *pipeline) {
 
     // configure kvssink
     g_object_set(G_OBJECT (kvssink), "stream-name", data->streamName, "storage-size", 128, NULL);
+    g_signal_connect(G_OBJECT(kvssink), "stream-metric", (GCallback) put_frame_kvs, data);
     g_signal_connect(G_OBJECT(kvssink), "persisted-ack", (GCallback) streamCheck, data);
 
     // define and configure video filter, we only want the specified format to pass to the sink
