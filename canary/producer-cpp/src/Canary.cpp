@@ -429,12 +429,21 @@ VOID pushStreamMetrics(CustomData *cusData, KinesisVideoStreamMetrics streamMetr
 // put frame function to publish metrics to cloudwatch after getting g signal from producer sdk cpp
 static VOID put_frame_kvs(GstElement *kvsSink, KvsSinkMetric *gMetrics, gpointer data)
 {
+    LOG_DEBUG("put frame at canary");
     CustomData *cusData = (CustomData*) data;
     auto kvsMetric = gMetrics->metrics;
     auto pts = gMetrics->framePTS;
+    updateFragmentEndTimes(pts, cusData->lastKeyFrameTime, cusData->timeOfNextKeyFrame);
     pushStreamMetrics(cusData, kvsMetric);
-    std::cout<<kvsMetric.getCurrentElementaryFrameRate()<<" "<<pts<<std::endl;
-    LOG_DEBUG("put frame at canary");
+
+    double duration = duration_cast<seconds>(system_clock::now().time_since_epoch()).count() - cusData->timeCounter;
+    // Push error metrics and logs every 60 seconds
+    if(duration > 60)
+    {
+        pushErrorMetrics(cusData, duration);
+        cusData->pCanaryLogs->canaryStreamSendLogs(cusData->pCloudwatchLogsObject);
+        cusData->timeCounter = duration_cast<seconds>(system_clock::now().time_since_epoch()).count();
+    }
 }
 
 //Test function to check signal connect and fragment ack
