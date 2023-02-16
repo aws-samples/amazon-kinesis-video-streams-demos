@@ -391,6 +391,63 @@ bool put_frame(CustomData *cusData, VOID *data, size_t len, const nanoseconds &p
 
     return ret;
 }
+
+VOID pushErrorMetrics(CustomData *cusData, double duration, KinesisVideoStreamMetrics streamMetrics)
+{
+    Aws::CloudWatch::Model::MetricDatum metricDatum;
+    Aws::CloudWatch::Model::PutMetricDataRequest cwRequest;
+    cwRequest.SetNamespace("KinesisVideoSDKCanary");
+
+    auto rawStreamMetrics = streamMetrics.getRawMetrics();
+
+    UINT64 newPutFrameErrors = rawStreamMetrics->putFrameErrors - cusData->totalPutFrameErrorCount;
+    cusData->totalPutFrameErrorCount = rawStreamMetrics->putFrameErrors;
+    double putFrameErrorRate = newPutFrameErrors / (double)duration;
+    pushMetric("PutFrameErrorRate", putFrameErrorRate, Aws::CloudWatch::Model::StandardUnit::Count_Second, metricDatum, cusData->pDimensionPerStream, cwRequest);
+    LOG_DEBUG("PutFrame Error Rate: " << putFrameErrorRate);
+
+    UINT64 newErrorAcks = rawStreamMetrics->errorAcks - cusData->totalErrorAckCount;
+    cusData->totalErrorAckCount = rawStreamMetrics->errorAcks;
+    double errorAckRate = newErrorAcks / (double)duration;
+    pushMetric("ErrorAckRate", errorAckRate, Aws::CloudWatch::Model::StandardUnit::Count_Second, metricDatum, cusData->pDimensionPerStream, cwRequest);
+    LOG_DEBUG("Error Ack Rate: " << errorAckRate);
+
+    UINT64 totalNumberOfErrors = cusData->totalPutFrameErrorCount + cusData->totalErrorAckCount;
+    pushMetric("TotalNumberOfErrors", totalNumberOfErrors, Aws::CloudWatch::Model::StandardUnit::Count, metricDatum, cusData->pDimensionPerStream, cwRequest);
+    LOG_DEBUG("Total Number of Errors: " << totalNumberOfErrors);
+
+    if (cusData->pCanaryConfig->useAggMetrics)
+    {
+        pushMetric("PutFrameErrorRate", putFrameErrorRate, Aws::CloudWatch::Model::StandardUnit::Count_Second, metricDatum, cusData->pAggregatedDimension, cwRequest);
+        pushMetric("ErrorAckRate", errorAckRate, Aws::CloudWatch::Model::StandardUnit::Count_Second, metricDatum, cusData->pAggregatedDimension, cwRequest);
+        pushMetric("TotalNumberOfErrors", totalNumberOfErrors, Aws::CloudWatch::Model::StandardUnit::Count, metricDatum, cusData->pAggregatedDimension, cwRequest);
+    }
+
+    // Send metrics to CW
+    cusData->pCWclient->PutMetricDataAsync(cwRequest, onPutMetricDataResponseReceivedHandler);
+}
+
+VOID pushClientMetrics(CustomData *cusData, KinesisVideoProducerMetrics clientMetrics)
+{
+    Aws::CloudWatch::Model::MetricDatum metricDatum;
+    Aws::CloudWatch::Model::PutMetricDataRequest cwRequest;
+    cwRequest.SetNamespace("KinesisVideoSDKCanary");
+
+    double availableStoreSize = clientMetrics.getContentStoreSizeSize() / 1000; // [kilobytes]
+    pushMetric("ContentStoreAvailableSize", availableStoreSize, Aws::CloudWatch::Model::StandardUnit::Kilobytes,
+               metricDatum, cusData->pDimensionPerStream, cwRequest);
+    LOG_DEBUG("Content Store Available Size: " << availableStoreSize);
+
+    if (cusData->pCanaryConfig->useAggMetrics)
+    {
+        pushMetric("ContentStoreAvailableSize", availableStoreSize, Aws::CloudWatch::Model::StandardUnit::Kilobytes,
+                   metricDatum, cusData->pAggregatedDimension, cwRequest);
+    }
+
+    // Send metrics to CW
+    cusData->pCWclient->PutMetricDataAsync(cwRequest, onPutMetricDataResponseReceivedHandler);
+}
+
 // push metric function to publish metrics to cloudwatch after getting g signal from producer sdk cpp
 VOID pushStreamMetrics(CustomData *cusData, KinesisVideoStreamMetrics streamMetrics)
 {
@@ -431,16 +488,15 @@ static VOID put_frame_kvs(GstElement *kvsSink, KvsSinkMetric *gMetrics, gpointer
 {
     LOG_DEBUG("put frame at canary");
     CustomData *cusData = (CustomData*) data;
-    auto kvsMetric = gMetrics->metrics;
-    auto pts = gMetrics->framePTS;
-    updateFragmentEndTimes(pts, cusData->lastKeyFrameTime, cusData->timeOfNextKeyFrame);
-    pushStreamMetrics(cusData, kvsMetric);
+    updateFragmentEndTimes(gMetrics->framePTS, cusData->lastKeyFrameTime, cusData->timeOfNextKeyFrame);
+    pushStreamMetrics(cusData, gMetrics->streamMetrics);
+    pushClientMetrics(cusData, gMetrics->clientMetrics);
 
     double duration = duration_cast<seconds>(system_clock::now().time_since_epoch()).count() - cusData->timeCounter;
     // Push error metrics and logs every 60 seconds
     if(duration > 60)
     {
-        pushErrorMetrics(cusData, duration);
+        pushErrorMetrics(cusData, duration, gMetrics->streamMetrics);
         cusData->pCanaryLogs->canaryStreamSendLogs(cusData->pCloudwatchLogsObject);
         cusData->timeCounter = duration_cast<seconds>(system_clock::now().time_since_epoch()).count();
     }
