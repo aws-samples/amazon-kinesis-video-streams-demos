@@ -427,18 +427,21 @@ VOID pushStreamMetrics(CustomData *cusData, KinesisVideoStreamMetrics streamMetr
 }
 
 // put frame function to publish metrics to cloudwatch after getting g signal from producer sdk cpp
-static VOID put_frame_kvs(GstElement *kvssink, KinesisVideoStreamMetrics metrics, gpointer data)
+static VOID put_frame_kvs(GstElement *kvsSink, KvsSinkMetric *gMetrics, gpointer data)
 {
     CustomData *cusData = (CustomData*) data;
-    std::cout<<(data == nullptr)<<" put frame"<<std::endl;
-    LOG_DEBUG("put frame at canary " << metrics.getCurrentElementaryFrameRate());
+    auto kvsMetric = gMetrics->metrics;
+    auto pts = gMetrics->framePTS;
+    pushStreamMetrics(cusData, kvsMetric);
+    std::cout<<kvsMetric.getCurrentElementaryFrameRate()<<" "<<pts<<std::endl;
+    LOG_DEBUG("put frame at canary");
 }
 
 //Test function to check signal connect and fragment ack
 static STATUS streamCheck(GstElement *kvssink, PFragmentAck pFragmentAck, gpointer custom_data){
 
     CustomData *data = reinterpret_cast<CustomData *>(custom_data);
-    LOG_DEBUG("Persisted act fragment ack received handler stream check " << pFragmentAck->timestamp);
+    LOG_DEBUG("Fragment ack received handler stream check " << pFragmentAck->timestamp);
 
     if (pFragmentAck->ackType != FRAGMENT_ACK_TYPE_PERSISTED && pFragmentAck->ackType != FRAGMENT_ACK_TYPE_RECEIVED)
     {
@@ -449,6 +452,7 @@ static STATUS streamCheck(GstElement *kvssink, PFragmentAck pFragmentAck, gpoint
     iter = data->timeOfNextKeyFrame->find(pFragmentAck->timestamp);
 
     uint64_t timeOfFragmentEndSent = data->timeOfNextKeyFrame->find(pFragmentAck->timestamp)->second;
+    std::cout<<timeOfFragmentEndSent<<" time fragment"<<std::endl;
 
     if (timeOfFragmentEndSent > pFragmentAck->timestamp)
     {
