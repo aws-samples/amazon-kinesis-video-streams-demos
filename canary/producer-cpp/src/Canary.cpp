@@ -1,4 +1,5 @@
 #include "Include.h"
+#include <fstream>
 
 namespace com { namespace amazonaws { namespace kinesis { namespace video {
 
@@ -271,7 +272,6 @@ static VOID put_frame_kvs(GstElement *kvsSink, KvsSinkMetric *gMetrics, gpointer
 {
     LOG_DEBUG("put frame at canary");
     CustomData *cusData = (CustomData*) data;
-//    std::cout<<cusData->timeOfNextKeyFrame->first<<" here to see the value "<<cusData->timeOfNextKeyFrame->second<<std::endl;
     updateFragmentEndTimes(gMetrics->framePTS, cusData->lastKeyFrameTime, cusData->timeOfNextKeyFrame);
     pushStreamMetrics(cusData, gMetrics->streamMetrics);
     pushClientMetrics(cusData, gMetrics->clientMetrics);
@@ -287,10 +287,10 @@ static VOID put_frame_kvs(GstElement *kvsSink, KvsSinkMetric *gMetrics, gpointer
 }
 
 //Test function to check signal connect and fragment ack
-static STATUS streamCheck(GstElement *kvssink, PFragmentAck pFragmentAck, gpointer custom_data){
+static STATUS fragmentAckHandler(GstElement *kvssink, PFragmentAck pFragmentAck, gpointer custom_data){
 
+    LOG_DEBUG("Fragment ack received handler canary cpp invoked " << pFragmentAck->timestamp);
     CustomData *data = reinterpret_cast<CustomData *>(custom_data);
-    LOG_DEBUG("Fragment ack received handler stream check " << pFragmentAck->timestamp);
 
     if (pFragmentAck->ackType != FRAGMENT_ACK_TYPE_PERSISTED && pFragmentAck->ackType != FRAGMENT_ACK_TYPE_RECEIVED)
     {
@@ -301,7 +301,6 @@ static STATUS streamCheck(GstElement *kvssink, PFragmentAck pFragmentAck, gpoint
     iter = data->timeOfNextKeyFrame->find(pFragmentAck->timestamp);
 
     uint64_t timeOfFragmentEndSent = data->timeOfNextKeyFrame->find(pFragmentAck->timestamp)->second;
-    std::cout<<timeOfFragmentEndSent<<" time fragment"<<std::endl;
 
     if (timeOfFragmentEndSent > pFragmentAck->timestamp)
     {
@@ -389,8 +388,8 @@ int gstreamer_test_source_init(CustomData *data, GstElement *pipeline) {
 
     // configure kvssink
     g_object_set(G_OBJECT (kvssink), "stream-name", data->streamName, "storage-size", 128, NULL);
-    g_signal_connect(G_OBJECT(kvssink), "stream-metric", (GCallback) put_frame_kvs, data);
-    g_signal_connect(G_OBJECT(kvssink), "persisted-ack", (GCallback) streamCheck, data);
+    g_signal_connect(G_OBJECT(kvssink), "stream-client-metric", (GCallback) put_frame_kvs, data);
+    g_signal_connect(G_OBJECT(kvssink), "fragment-ack", (GCallback) fragmentAckHandler, data);
 
     // define and configure video filter, we only want the specified format to pass to the sink
     // ("caps" is short for "capabilities")
