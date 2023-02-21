@@ -1,5 +1,4 @@
 #include "Include.h"
-#include <fstream>
 
 namespace com { namespace amazonaws { namespace kinesis { namespace video {
 
@@ -12,57 +11,6 @@ namespace com { namespace amazonaws { namespace kinesis { namespace video {
                         return storageOverflowPressure;
                     }
                     static STATUS storageOverflowPressure(UINT64 custom_handle, UINT64 remaining_bytes);
-                };
-
-                class CanaryStreamCallbackProvider : public StreamCallbackProvider {
-                    UINT64 custom_data_;
-                public:
-                    CanaryStreamCallbackProvider
-                            (UINT64 custom_data) : custom_data_(custom_data) {}
-
-                    UINT64 getCallbackCustomData() override {
-                        return custom_data_;
-                    }
-
-                    StreamConnectionStaleFunc getStreamConnectionStaleCallback() override {
-                        return streamConnectionStaleHandler;
-                    };
-
-                    StreamErrorReportFunc getStreamErrorReportCallback() override {
-                        return streamErrorReportHandler;
-                    };
-
-                    DroppedFrameReportFunc getDroppedFrameReportCallback() override {
-                        return droppedFrameReportHandler;
-                    };
-
-                private:
-                    static STATUS
-                    streamConnectionStaleHandler(UINT64 custom_data, STREAM_HANDLE stream_handle,
-                                                 UINT64 last_buffering_ack);
-
-                    static STATUS
-                    streamErrorReportHandler(UINT64 custom_data, STREAM_HANDLE stream_handle, UPLOAD_HANDLE upload_handle, UINT64 errored_timecode,
-                                             STATUS status_code);
-
-                    static STATUS
-                    droppedFrameReportHandler(UINT64 custom_data, STREAM_HANDLE stream_handle,
-                                              UINT64 dropped_frame_timecode);
-
-                    static STATUS
-                    fragmentAckReceivedHandler( UINT64 custom_data, STREAM_HANDLE stream_handle,
-                                                UPLOAD_HANDLE upload_handle, PFragmentAck pFragmentAck);
-                };
-
-
-                class CanaryDeviceInfoProvider : public DefaultDeviceInfoProvider {
-                public:
-                    device_info_t getDeviceInfo() override {
-                        auto device_info = DefaultDeviceInfoProvider::getDeviceInfo();
-                        // Set the storage size to 128mb
-                        device_info.storageInfo.storageSize = 128 * 1024 * 1024;
-                        return device_info;
-                    }
                 };
 
                 VOID pushMetric(string metricName, double metricValue, Aws::CloudWatch::Model::StandardUnit unit, Aws::CloudWatch::Model::MetricDatum datum,
@@ -93,42 +41,6 @@ namespace com { namespace amazonaws { namespace kinesis { namespace video {
                 CanaryClientCallbackProvider::storageOverflowPressure(UINT64 custom_handle, UINT64 remaining_bytes) {
                     UNUSED_PARAM(custom_handle);
                     LOG_WARN("Reporting storage overflow. Bytes remaining " << remaining_bytes);
-                    return STATUS_SUCCESS;
-                }
-
-                STATUS
-                CanaryStreamCallbackProvider::streamConnectionStaleHandler(UINT64 custom_data,
-                                                                           STREAM_HANDLE stream_handle,
-                                                                           UINT64 last_buffering_ack) {
-                    LOG_WARN("Reporting stream stale. Last ACK received " << last_buffering_ack);
-                    return STATUS_SUCCESS;
-                }
-
-                STATUS
-                CanaryStreamCallbackProvider::streamErrorReportHandler(UINT64 custom_data, STREAM_HANDLE stream_handle,
-                                                                       UPLOAD_HANDLE upload_handle, UINT64 errored_timecode, STATUS status_code) {
-                    LOG_ERROR("Reporting stream error. Errored timecode: " << errored_timecode << " Status: "
-                                                                           << status_code);
-                    CustomData *data = reinterpret_cast<CustomData *>(custom_data);
-                    bool terminate_pipeline = false;
-
-                    if ((!IS_RETRIABLE_ERROR(status_code) && !IS_RECOVERABLE_ERROR(status_code))) {
-                        data->streamStatus = status_code;
-                        terminate_pipeline = true;
-                    }
-
-                    if (terminate_pipeline && data->mainLoop != NULL) {
-                        LOG_WARN("Terminating pipeline due to unrecoverable stream error: " << status_code);
-                        g_main_loop_quit(data->mainLoop);
-                    }
-
-                    return STATUS_SUCCESS;
-                }
-
-                STATUS
-                CanaryStreamCallbackProvider::droppedFrameReportHandler(UINT64 custom_data, STREAM_HANDLE stream_handle,
-                                                                        UINT64 dropped_frame_timecode) {
-                    LOG_WARN("Reporting dropped frame. Frame timecode " << dropped_frame_timecode);
                     return STATUS_SUCCESS;
                 }
             }  // namespace video
@@ -268,19 +180,20 @@ VOID pushStreamMetrics(CustomData *cusData, KinesisVideoStreamMetrics streamMetr
 }
 
 // put frame function to publish metrics to cloudwatch after getting g signal from producer sdk cpp
-static VOID put_frame_kvs(GstElement *kvsSink, KvsSinkMetric *gMetrics, gpointer data)
+static VOID put_frame_kvs(GstElement *kvsSink, VOID *gMetrics, gpointer data)
 {
     LOG_DEBUG("put frame at canary");
     CustomData *cusData = (CustomData*) data;
-    updateFragmentEndTimes(gMetrics->framePTS, cusData->lastKeyFrameTime, cusData->timeOfNextKeyFrame);
-    pushStreamMetrics(cusData, gMetrics->streamMetrics);
-    pushClientMetrics(cusData, gMetrics->clientMetrics);
+    KvsSinkMetric *kvsSinkMetric = reinterpret_cast<KvsSinkMetric *> (gMetrics);
+    updateFragmentEndTimes(kvsSinkMetric->framePTS, cusData->lastKeyFrameTime, cusData->timeOfNextKeyFrame);
+    pushStreamMetrics(cusData, kvsSinkMetric->streamMetrics);
+    pushClientMetrics(cusData, kvsSinkMetric->clientMetrics);
 
     double duration = duration_cast<seconds>(system_clock::now().time_since_epoch()).count() - cusData->timeCounter;
     // Push error metrics and logs every 60 seconds
     if(duration > 60)
     {
-        pushErrorMetrics(cusData, duration, gMetrics->streamMetrics);
+        pushErrorMetrics(cusData, duration, kvsSinkMetric->streamMetrics);
         cusData->pCanaryLogs->canaryStreamSendLogs(cusData->pCloudwatchLogsObject);
         cusData->timeCounter = duration_cast<seconds>(system_clock::now().time_since_epoch()).count();
     }
@@ -299,8 +212,11 @@ static STATUS fragmentAckHandler(GstElement *kvssink, PFragmentAck pFragmentAck,
 
     map<uint64_t, uint64_t>::iterator iter;
     iter = data->timeOfNextKeyFrame->find(pFragmentAck->timestamp);
+    auto temp = (iter == data->timeOfNextKeyFrame->end());
+    LOG_DEBUG("iter check "<< temp);
 
-    uint64_t timeOfFragmentEndSent = data->timeOfNextKeyFrame->find(pFragmentAck->timestamp)->second;
+    uint64_t timeOfFragmentEndSent = 0;
+    timeOfFragmentEndSent = temp ? 0 : data->timeOfNextKeyFrame->find(pFragmentAck->timestamp)->second;
 
     if (timeOfFragmentEndSent > pFragmentAck->timestamp)
     {

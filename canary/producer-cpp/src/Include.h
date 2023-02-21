@@ -2,7 +2,6 @@
 
 #include <gst/gst.h>
 #include <gst/app/gstappsink.h>
-#include <gstreamer/gstkvssink.h>
 #include <string.h>
 #include <chrono>
 #include <Logger.h>
