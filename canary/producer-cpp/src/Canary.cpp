@@ -48,6 +48,39 @@ namespace com { namespace amazonaws { namespace kinesis { namespace video {
     }  // namespace amazonaws
 }  // namespace com;
 
+void determine_credentials(GstElement *kvsSink, CustomData *data) {
+
+    char const *iot_credential_endpoint;
+    char const *cert_path;
+    char const *private_key_path;
+    char const *role_alias;
+    char const *ca_cert_path;
+    char const *credential_path;
+    if (nullptr != (iot_credential_endpoint = data->pCanaryConfig->iot_get_credential_endpoint) &&
+        nullptr != (cert_path = data->pCanaryConfig->cert_path) &&
+        nullptr != (private_key_path = data->pCanaryConfig->private_key_path) &&
+        nullptr != (role_alias = data->pCanaryConfig->role_alias) &&
+        nullptr != (ca_cert_path = data->pCanaryConfig->ca_cert_path)) {
+        // set the IoT Credentials if provided in envvar
+        LOG_DEBUG("Setting IOT Credentials");
+        GstStructure *iot_credentials =  gst_structure_new(
+                "iot-certificate",
+                "iot-thing-name", G_TYPE_STRING, data->streamName,
+                "endpoint", G_TYPE_STRING, iot_credential_endpoint,
+                "cert-path", G_TYPE_STRING, cert_path,
+                "key-path", G_TYPE_STRING, private_key_path,
+                "ca-path", G_TYPE_STRING, ca_cert_path,
+                "role-aliases", G_TYPE_STRING, role_alias, NULL);
+
+        g_object_set(G_OBJECT (kvsSink), "iot-certificate", iot_credentials, NULL);
+        gst_structure_free(iot_credentials);
+        // kvssink will search for long term credentials in envvar automatically so no need to include here
+        // if no long credentials or IoT credentials provided will look for credential file as last resort
+    } else if(nullptr != (credential_path = getenv("AWS_CREDENTIAL_PATH"))){
+        g_object_set(G_OBJECT (kvsSink), "credential-path", credential_path, NULL);
+    }
+}
+
 VOID updateFragmentEndTimes(UINT64 curKeyFrameTime, uint64_t &lastKeyFrameTime, map<uint64_t, uint64_t> *mapPtr)
 {
     if (lastKeyFrameTime != 0)
@@ -304,6 +337,7 @@ int gstreamer_test_source_init(CustomData *data, GstElement *pipeline) {
 
     // configure kvssink
     g_object_set(G_OBJECT (kvssink), "stream-name", data->streamName, "storage-size", 128, NULL);
+    determine_credentials(kvssink, data);
     g_signal_connect(G_OBJECT(kvssink), "stream-client-metric", (GCallback) put_frame_kvs, data);
     g_signal_connect(G_OBJECT(kvssink), "fragment-ack", (GCallback) fragmentAckHandler, data);
 
