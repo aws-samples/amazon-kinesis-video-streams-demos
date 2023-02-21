@@ -20,6 +20,7 @@
 #include "CanaryConfig.h"
 #include "CanaryLogs.h"
 
+typedef struct _KvsSinkMetric KvsSinkMetric;
 typedef enum _StreamSource {
 TEST_SOURCE,
 FILE_SOURCE,
@@ -81,4 +82,12 @@ public:
     uint64_t firstPts;
 
     CustomData();
+};
+
+struct _KvsSinkMetric {
+    _KvsSinkMetric():
+            framePTS(0) {}
+    KinesisVideoStreamMetrics streamMetrics = KinesisVideoStreamMetrics();
+    KinesisVideoProducerMetrics clientMetrics = KinesisVideoProducerMetrics();
+    UINT64 framePTS;
 };
