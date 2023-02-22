@@ -213,11 +213,9 @@ VOID pushStreamMetrics(CustomData *cusData, KinesisVideoStreamMetrics streamMetr
 }
 
 // put frame function to publish metrics to cloudwatch after getting g signal from producer sdk cpp
-static VOID put_frame_kvs(GstElement *kvsSink, VOID *gMetrics, gpointer data)
+static bool put_frame_kvs(GstElement *kvsSink, KvsSinkMetric *kvsSinkMetric, CustomData *cusData)
 {
     LOG_DEBUG("put frame at canary");
-    CustomData *cusData = (CustomData*) data;
-    KvsSinkMetric *kvsSinkMetric = reinterpret_cast<KvsSinkMetric *> (gMetrics);
     updateFragmentEndTimes(kvsSinkMetric->framePTS, cusData->lastKeyFrameTime, cusData->timeOfNextKeyFrame);
     pushStreamMetrics(cusData, kvsSinkMetric->streamMetrics);
     pushClientMetrics(cusData, kvsSinkMetric->clientMetrics);
@@ -229,6 +227,18 @@ static VOID put_frame_kvs(GstElement *kvsSink, VOID *gMetrics, gpointer data)
         pushErrorMetrics(cusData, duration, kvsSinkMetric->streamMetrics);
         cusData->pCanaryLogs->canaryStreamSendLogs(cusData->pCloudwatchLogsObject);
         cusData->timeCounter = duration_cast<seconds>(system_clock::now().time_since_epoch()).count();
+    }
+    return kvsSinkMetric->putFrameSuccess;
+}
+
+static VOID start_put_frame_kvs(GstElement *kvsSink, VOID *gMetrics, gpointer data){
+
+    CustomData *cusData = (CustomData*) data;
+    KvsSinkMetric *kvsSinkMetric = reinterpret_cast<KvsSinkMetric *> (gMetrics);
+    bool ret = put_frame_kvs(kvsSink, kvsSinkMetric, cusData);
+    if(kvsSinkMetric->onFirstFrame && ret){
+        pushStartupLatencyMetric(cusData);
+        cusData->onFirstFrame = false;
     }
 }
 
@@ -338,7 +348,7 @@ int gstreamer_test_source_init(CustomData *data, GstElement *pipeline) {
     // configure kvssink
     g_object_set(G_OBJECT (kvssink), "stream-name", data->streamName, "storage-size", 128, NULL);
     determine_credentials(kvssink, data);
-    g_signal_connect(G_OBJECT(kvssink), "stream-client-metric", (GCallback) put_frame_kvs, data);
+    g_signal_connect(G_OBJECT(kvssink), "stream-client-metric", (GCallback) start_put_frame_kvs, data);
     g_signal_connect(G_OBJECT(kvssink), "fragment-ack", (GCallback) fragmentAckHandler, data);
 
     // define and configure video filter, we only want the specified format to pass to the sink
