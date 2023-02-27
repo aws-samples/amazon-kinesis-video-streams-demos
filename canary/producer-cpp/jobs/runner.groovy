@@ -95,6 +95,12 @@ def runClient(isProducer, params) {
         'CANARY_DURATION_IN_SECONDS': params.CANARY_DURATION_IN_SECONDS,
         'AWS_DEFAULT_REGION': params.AWS_DEFAULT_REGION,
         'CANARY_RUN_SCENARIO': params.CANARY_RUN_SCENARIO,
+        'CANARY_USE_IOT_PROVIDER': params.USE_IOT,
+        'AWS_IOT_CORE_CREDENTIAL_ENDPOINT': "${endpoint}",
+        'AWS_IOT_CORE_CERT': "${core_cert_file}",
+        'AWS_IOT_CORE_PRIVATE_KEY': "${private_key_file}",
+        'AWS_IOT_CORE_ROLE_ALIAS': "${role_alias}",
+        'AWS_IOT_CORE_THING_NAME': "${thing_name}"
     ].collect({k,v -> "${k}=${v}" })
   
     withRunnerWrapper(envs) {
@@ -126,6 +132,7 @@ pipeline {
         string(name: 'AWS_DEFAULT_REGION')
         string(name: 'CANARY_RUN_SCENARIO')
         booleanParam(name: 'FIRST_ITERATION', defaultValue: true)
+        booleanParam(name: 'USE_IOT')
     }
 
     stages {
@@ -165,6 +172,7 @@ pipeline {
                             parameters: [
                                 string(name: 'CANARY_STREAM_NAME', value: params.CANARY_STREAM_NAME),
                                 string(name: 'AWS_KVS_LOG_LEVEL', value: params.AWS_KVS_LOG_LEVEL),
+                                booleanParam(name: 'USE_IOT', value: params.USE_IOT),
                                 string(name: 'PRODUCER_NODE_LABEL', value: params.PRODUCER_NODE_LABEL),
                                 string(name: 'GIT_URL', value: params.GIT_URL),
                                 string(name: 'GIT_HASH', value: params.GIT_HASH),
