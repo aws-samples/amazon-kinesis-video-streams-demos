@@ -3,8 +3,8 @@ import jenkins.model.*
 WORKSPACE_PRODUCER="src"
 GIT_URL='https://github.com/aws-samples/amazon-kinesis-video-streams-demos.git'
 GIT_HASH='new-canary-producer-cpp'
-// RUNNER_JOB_NAME_PREFIX = "producer-cpp-runner"
-RUNNER_JOB_NAME_PREFIX = "producer-runner"
+RUNNER_JOB_NAME_PREFIX = "producer-cpp-runner"
+// RUNNER_JOB_NAME_PREFIX = "producer-runner"
 
 LONG_RUN_DURATION_IN_SECONDS = 12 * 60 * 60
 SHORT_RUN_DURATION_IN_SECONDS = 30
@@ -55,7 +55,7 @@ ACTIVE_RUNNERS = []
 
 pipeline {
     agent {
-        label 'producer-uw2'
+        label 'producer-cpp-uw2'
     }
 
     options {

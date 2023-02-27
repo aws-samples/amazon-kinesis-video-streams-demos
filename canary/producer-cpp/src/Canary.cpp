@@ -258,8 +258,9 @@ static STATUS fragmentAckHandler(GstElement *kvssink, PFragmentAck pFragmentAck,
     auto temp = (iter == data->timeOfNextKeyFrame->end());
     LOG_DEBUG("iter check "<< temp);
 
-    uint64_t timeOfFragmentEndSent = 0;
-    timeOfFragmentEndSent = temp ? 0 : data->timeOfNextKeyFrame->find(pFragmentAck->timestamp)->second;
+    uint64_t timeOfFragmentEndSent;
+    timeOfFragmentEndSent = data->timeOfNextKeyFrame->find(pFragmentAck->timestamp)->second;
+    LOG_DEBUG("timeOfFragmentEndSent "<<timeOfFragmentEndSent);
 
     if (timeOfFragmentEndSent > pFragmentAck->timestamp)
     {
@@ -308,6 +309,16 @@ static STATUS fragmentAckHandler(GstElement *kvssink, PFragmentAck pFragmentAck,
             case FRAGMENT_ACK_TYPE_ERROR:
             {
                 LOG_DEBUG("FRAGMENT_ACK_TYPE_ERROR callback invoked");
+                break;
+            }
+            case FRAGMENT_ACK_TYPE_UNDEFINED:
+            {
+                LOG_DEBUG("FRAGMENT_ACK_TYPE_UNDEFINED callback invoked");
+                break;
+            }
+            case  FRAGMENT_ACK_TYPE_IDLE:
+            {
+                LOG_DEBUG("FRAGMENT_ACK_TYPE_IDLE callback invoked");
                 break;
             }
         }
