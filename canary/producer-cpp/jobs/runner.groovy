@@ -20,7 +20,7 @@ def buildProducer() {
     cd ./canary/producer-cpp &&
     mkdir -p build &&
     cd build && 
-    cmake .. -DBUILD_GSTREAMER_PLUGIN=ON && 
+    cmake .. &&
     make -j4
   """
 }
