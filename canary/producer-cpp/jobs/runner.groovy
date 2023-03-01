@@ -16,8 +16,10 @@ CREDENTIALS = [
 ]
 
 def buildProducer() {
-  sh  """ 
+  sh  """
     cd ./canary/producer-cpp &&
+    export GST_PLUGIN_PATH=`pwd`/build:/usr/local/lib/gstreamer-1.0 &&
+    export LD_LIBRARY_PATH=`pwd`/open-source/local/lib &&
     mkdir -p build &&
     cd build && 
     cmake .. &&
