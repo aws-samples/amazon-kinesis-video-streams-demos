@@ -18,8 +18,6 @@ CREDENTIALS = [
 def buildProducer() {
   sh  """
     cd ./canary/producer-cpp &&
-    export GST_PLUGIN_PATH=`pwd`/build:/usr/include/gstreamer-1.0 &&
-    export LD_LIBRARY_PATH=`pwd`/open-source/local/lib &&
     mkdir -p build &&
     cd build && 
     cmake .. &&
@@ -103,7 +101,8 @@ def runClient(isProducer, params) {
         'AWS_IOT_CORE_PRIVATE_KEY': "${private_key_file}",
         'AWS_IOT_CORE_ROLE_ALIAS': "${role_alias}",
         'AWS_IOT_CORE_THING_NAME': "${thing_name}",
-        'GST_PLUGIN_PATH': ""
+        'GST_PLUGIN_PATH': "$WORKSPACE/canary/producer-cpp/build:/usr/include/gstreamer-1.0",
+        'LD_LIBRARY_PATH': "$WORKSPACE/canary/producer-cpp/open-source/local/lib"
     ].collect({k,v -> "${k}=${v}" })
   
     withRunnerWrapper(envs) {
