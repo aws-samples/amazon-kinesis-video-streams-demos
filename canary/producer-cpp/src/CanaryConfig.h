@@ -44,6 +44,7 @@ public:
     char const *private_key_path;
     char const *role_alias;
     char const *ca_cert_path;
+    char const *thing_name;
 
     CanaryConfig();
     VOID setEnvVarsString(string &configVar, string envVar);
