@@ -70,6 +70,7 @@ VOID CanaryConfig::initConfigWithEnvVars()
     private_key_path = GETENV("PRIVATE_KEY_PATH");
     role_alias = GETENV("ROLE_ALIAS");
     ca_cert_path = GETENV("CA_CERT_PATH");
+    thing_name = GETENV("IOT_THING_NAME");
 
     LOG_DEBUG("CANARY_STREAM_NAME: " << streamName);
     LOG_DEBUG("CANARY_RUN_SCENARIO: " << canaryRunScenario);

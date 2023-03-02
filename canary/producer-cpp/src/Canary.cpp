@@ -56,16 +56,18 @@ void determine_credentials(GstElement *kvsSink, CustomData *data) {
     char const *role_alias;
     char const *ca_cert_path;
     char const *credential_path;
+    char const *thing_name;
     if (nullptr != (iot_credential_endpoint = data->pCanaryConfig->iot_get_credential_endpoint) &&
         nullptr != (cert_path = data->pCanaryConfig->cert_path) &&
         nullptr != (private_key_path = data->pCanaryConfig->private_key_path) &&
         nullptr != (role_alias = data->pCanaryConfig->role_alias) &&
+        nullptr != (thing_name = data->pCanaryConfig->thing_name) &&
         nullptr != (ca_cert_path = data->pCanaryConfig->ca_cert_path)) {
         // set the IoT Credentials if provided in envvar
         LOG_DEBUG("Setting IOT Credentials");
         GstStructure *iot_credentials =  gst_structure_new(
                 "iot-certificate",
-                "iot-thing-name", G_TYPE_STRING, data->streamName,
+                "iot-thing-name", G_TYPE_STRING, thing_name,
                 "endpoint", G_TYPE_STRING, iot_credential_endpoint,
                 "cert-path", G_TYPE_STRING, cert_path,
                 "key-path", G_TYPE_STRING, private_key_path,
