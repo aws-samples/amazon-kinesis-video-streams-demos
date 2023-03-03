@@ -65,12 +65,19 @@ VOID CanaryConfig::initConfigWithEnvVars()
     accessKey = GETENV(ACCESS_KEY_ENV_VAR);
     secretKey = GETENV(SECRET_KEY_ENV_VAR);
     sessionToken = GETENV(SESSION_TOKEN_ENV_VAR);
+    use_Iot_Credential_Provider = GETENV("USE_IOT_PROVIDER");
     iot_get_credential_endpoint = GETENV("IOT_GET_CREDENTIAL_ENDPOINT");
     cert_path = GETENV("CERT_PATH");
     private_key_path = GETENV("PRIVATE_KEY_PATH");
     role_alias = GETENV("ROLE_ALIAS");
     ca_cert_path = GETENV("CA_CERT_PATH");
     thing_name = GETENV("IOT_THING_NAME");
+
+    string flag = use_Iot_Credential_Provider;
+
+    if(flag == "TRUE"){
+        streamName = thing_name;
+    }
 
     LOG_DEBUG("CANARY_STREAM_NAME: " << streamName);
     LOG_DEBUG("CANARY_RUN_SCENARIO: " << canaryRunScenario);
@@ -81,4 +88,13 @@ VOID CanaryConfig::initConfigWithEnvVars()
     LOG_DEBUG("CANARY_DURATION: " << canaryDuration);
     LOG_DEBUG("CANARY_STORAGE_SIZE: " << storageSizeInBytes);
     LOG_DEBUG("CANARY_FPS: " << testVideoFps);
+
+    if(flag == "TRUE"){
+        LOG_DEBUG("IOT_ENDPOINT: "<< iot_get_credential_endpoint);
+        LOG_DEBUG("IOT_CERT_FILE: "<< cert_path);
+        LOG_DEBUG("IOT_PRIVATE_KEY: "<< private_key_path);
+        LOG_DEBUG("IOT_ROLE_ALIAS: "<< role_alias);
+        LOG_DEBUG("IOT_CA_CERT_FILE: "<< ca_cert_path);
+        LOG_DEBUG("IOT_THING_NAME: "<< thing_name);
+    }
 }

@@ -261,7 +261,7 @@ static STATUS fragmentAckHandler(GstElement *kvssink, PFragmentAck pFragmentAck,
     LOG_DEBUG("iter check "<< temp);
 
     uint64_t timeOfFragmentEndSent;
-    timeOfFragmentEndSent = data->timeOfNextKeyFrame->find(pFragmentAck->timestamp)->second;
+    timeOfFragmentEndSent = (temp == true) ? 0 : data->timeOfNextKeyFrame->find(pFragmentAck->timestamp)->second;
     LOG_DEBUG("timeOfFragmentEndSent "<<timeOfFragmentEndSent);
 
     if (timeOfFragmentEndSent > pFragmentAck->timestamp)
