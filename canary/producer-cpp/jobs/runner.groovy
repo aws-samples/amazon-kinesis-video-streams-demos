@@ -83,9 +83,10 @@ def runClient(isProducer, params) {
 
     def scripts_dir = "$WORKSPACE/canary/producer-cpp"
     def endpoint = "${scripts_dir}/iot-credential-provider.txt"
-    def core_cert_file = "${scripts_dir}/p${env.NODE_NAME}_certificate.pem"
-    def private_key_file = "${scripts_dir}/p${env.NODE_NAME}_private.key"
+    def core_cert_file = "${scripts_dir}/sink_${env.NODE_NAME}_certificate.pem"
+    def private_key_file = "${scripts_dir}/sink_${env.NODE_NAME}_private.key"
     def role_alias = "p${env.NODE_NAME}_role_alias"
+    def ca_cert_file = "${scripts_dir}/cacert.pem"
     def thing_name = "p${env.NODE_NAME}_thing"
 
     def envs = [
@@ -104,7 +105,7 @@ def runClient(isProducer, params) {
         'AWS_IOT_CORE_PRIVATE_KEY': "${private_key_file}",
         'AWS_IOT_CORE_ROLE_ALIAS': "${role_alias}",
         'AWS_IOT_CORE_THING_NAME': "${thing_name}",
-        'AWS_IOT_CORE_CA_CERT_PATH': "$"/"cacert.pem"""
+        'AWS_IOT_CORE_CA_CERT_PATH': "${ca_cert_file}"
         'GST_PLUGIN_PATH': "$WORKSPACE/canary/producer-cpp/build:/usr/include/gstreamer-1.0",
         'LD_LIBRARY_PATH': "$WORKSPACE/canary/producer-cpp/open-source/local/lib"
     ].collect({k,v -> "${k}=${v}" })
