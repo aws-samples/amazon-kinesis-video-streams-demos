@@ -68,17 +68,17 @@ VOID CanaryConfig::initConfigWithEnvVars()
     std::cout<<"here at setting env"<<endl;
     use_Iot_Credential_Provider = GETENV("CANARY_USE_IOT_PROVIDER");
     std::cout<<"here at setting env use iot set "<<use_Iot_Credential_Provider<<endl;
-    iot_get_credential_endpoint = GETENV("IOT_GET_CREDENTIAL_ENDPOINT");
+    iot_get_credential_endpoint = GETENV("AWS_IOT_CORE_CREDENTIAL_ENDPOINT");
     std::cout<<"here at setting env iot cred set "<<iot_get_credential_endpoint<<endl;
-    cert_path = GETENV("CERT_PATH");
+    cert_path = GETENV("AWS_IOT_CORE_CERT");
     std::cout<<"here at setting env cert path set "<<cert_path<<endl;
-    private_key_path = GETENV("PRIVATE_KEY_PATH");
+    private_key_path = GETENV("AWS_IOT_CORE_PRIVATE_KEY");
     std::cout<<"here at setting env private key set "<<private_key_path<<endl;
-    role_alias = GETENV("ROLE_ALIAS");
+    role_alias = GETENV("AWS_IOT_CORE_ROLE_ALIAS");
     std::cout<<"here at setting env role alias set "<<role_alias<<endl;
-    ca_cert_path = GETENV("CA_CERT_PATH");
+    ca_cert_path = GETENV("AWS_IOT_CORE_CA_CERT_PATH");
     std::cout<<"here at setting env ca cert set "<<ca_cert_path<<endl;
-    thing_name = GETENV("IOT_THING_NAME");
+    thing_name = GETENV("AWS_IOT_CORE_THING_NAME");
     std::cout<<"here at setting env iot thing name set "<<thing_name<<endl;
 
     string flag(use_Iot_Credential_Provider);
