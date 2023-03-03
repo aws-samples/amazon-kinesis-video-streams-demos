@@ -82,6 +82,7 @@ VOID CanaryConfig::initConfigWithEnvVars()
     std::cout<<"here at setting env iot thing name set"<<endl;
 
     string flag = use_Iot_Credential_Provider;
+    std::cout<<"here at setting env initializing flag"<<endl;
 
     if(flag == "TRUE"){
         streamName = thing_name;
