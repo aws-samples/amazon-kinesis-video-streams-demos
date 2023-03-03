@@ -138,7 +138,7 @@ pipeline {
         string(name: 'AWS_DEFAULT_REGION')
         string(name: 'CANARY_RUN_SCENARIO')
         booleanParam(name: 'FIRST_ITERATION', defaultValue: true)
-        string(name: 'USE_IOT')
+        booleanParam(name: 'USE_IOT')
     }
 
     stages {
@@ -178,7 +178,7 @@ pipeline {
                             parameters: [
                                 string(name: 'CANARY_STREAM_NAME', value: params.CANARY_STREAM_NAME),
                                 string(name: 'AWS_KVS_LOG_LEVEL', value: params.AWS_KVS_LOG_LEVEL),
-                                string(name: 'USE_IOT', value: params.USE_IOT),
+                                booleanParam(name: 'USE_IOT', value: params.USE_IOT),
                                 string(name: 'PRODUCER_NODE_LABEL', value: params.PRODUCER_NODE_LABEL),
                                 string(name: 'GIT_URL', value: params.GIT_URL),
                                 string(name: 'GIT_HASH', value: params.GIT_HASH),
