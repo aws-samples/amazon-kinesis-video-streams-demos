@@ -65,13 +65,21 @@ VOID CanaryConfig::initConfigWithEnvVars()
     accessKey = GETENV(ACCESS_KEY_ENV_VAR);
     secretKey = GETENV(SECRET_KEY_ENV_VAR);
     sessionToken = GETENV(SESSION_TOKEN_ENV_VAR);
+    std::cout<<"here at setting env"<<endl;
     use_Iot_Credential_Provider = GETENV("USE_IOT_PROVIDER");
+    std::cout<<"here at setting env use iot set"<<endl;
     iot_get_credential_endpoint = GETENV("IOT_GET_CREDENTIAL_ENDPOINT");
+    std::cout<<"here at setting env iot cred set"<<endl;
     cert_path = GETENV("CERT_PATH");
+    std::cout<<"here at setting env cert path set"<<endl;
     private_key_path = GETENV("PRIVATE_KEY_PATH");
+    std::cout<<"here at setting env private key set"<<endl;
     role_alias = GETENV("ROLE_ALIAS");
+    std::cout<<"here at setting env role alias set"<<endl;
     ca_cert_path = GETENV("CA_CERT_PATH");
+    std::cout<<"here at setting env ca cert set"<<endl;
     thing_name = GETENV("IOT_THING_NAME");
+    std::cout<<"here at setting env iot thing name set"<<endl;
 
     string flag = use_Iot_Credential_Provider;
 
