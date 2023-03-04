@@ -20,7 +20,6 @@ def buildProducer() {
     cd ./canary/producer-cpp &&
     chmod a+x cert_setup.sh &&
     ./cert_setup.sh ${NODE_NAME} &&
-    printenv &&
     mkdir -p build &&
     cd build && 
     cmake .. &&
@@ -115,7 +114,6 @@ def runClient(isProducer, params) {
             echo "Running producer"
             ls ./canary/producer-cpp
             cd ./canary/producer-cpp/build &&
-            printenv &&
             ./producer_cpp_canary
         """
     }
