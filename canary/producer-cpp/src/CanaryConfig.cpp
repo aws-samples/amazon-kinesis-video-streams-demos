@@ -48,7 +48,25 @@ VOID CanaryConfig::setEnvVarsBool(bool &configVar, string envVar)
 
 VOID CanaryConfig::initConfigWithEnvVars()
 {
-    setEnvVarsString(streamName, "CANARY_STREAM_NAME");
+
+    use_Iot_Credential_Provider = GETENV("CANARY_USE_IOT_PROVIDER");
+    string use_IOT_Cred(use_Iot_Credential_Provider);
+    transform(use_IOT_Cred.begin(), use_IOT_Cred.end(),use_IOT_Cred.begin(), ::tolower);
+
+    if(use_IOT_Cred.compare("true") == 0){
+        streamName = thing_name;
+        iot_get_credential_endpoint = GETENV("AWS_IOT_CORE_CREDENTIAL_ENDPOINT");
+        cert_path = GETENV("AWS_IOT_CORE_CERT");
+        private_key_path = GETENV("AWS_IOT_CORE_PRIVATE_KEY");
+        role_alias = GETENV("AWS_IOT_CORE_ROLE_ALIAS");
+        ca_cert_path = GETENV("AWS_IOT_CORE_CA_CERT_PATH");
+        thing_name = GETENV("AWS_IOT_CORE_THING_NAME");
+    }
+    else {
+        setEnvVarsString(streamName, "CANARY_STREAM_NAME");
+        accessKey = GETENV(ACCESS_KEY_ENV_VAR);
+        secretKey = GETENV(SECRET_KEY_ENV_VAR);
+    }
     //setEnvVarsString(sourceType, "CANARY_SOURCE_TYPE");
     setEnvVarsString(canaryRunScenario, "CANARY_RUN_SCENARIO");
     setEnvVarsString(streamType, "CANARY_STREAM_TYPE");
@@ -62,34 +80,7 @@ VOID CanaryConfig::initConfigWithEnvVars()
     setEnvVarsInt(&testVideoFps, "CANARY_FPS");
 
     defaultRegion = GETENV(DEFAULT_REGION_ENV_VAR);
-    accessKey = GETENV(ACCESS_KEY_ENV_VAR);
-    secretKey = GETENV(SECRET_KEY_ENV_VAR);
     sessionToken = GETENV(SESSION_TOKEN_ENV_VAR);
-    std::cout<<"here at setting env"<<endl;
-    use_Iot_Credential_Provider = GETENV("CANARY_USE_IOT_PROVIDER");
-    std::cout<<"here at setting env use iot set "<<use_Iot_Credential_Provider<<endl;
-    iot_get_credential_endpoint = GETENV("AWS_IOT_CORE_CREDENTIAL_ENDPOINT");
-    std::cout<<"here at setting env iot cred set "<<iot_get_credential_endpoint<<endl;
-    cert_path = GETENV("AWS_IOT_CORE_CERT");
-    std::cout<<"here at setting env cert path set "<<cert_path<<endl;
-    private_key_path = GETENV("AWS_IOT_CORE_PRIVATE_KEY");
-    std::cout<<"here at setting env private key set "<<private_key_path<<endl;
-    role_alias = GETENV("AWS_IOT_CORE_ROLE_ALIAS");
-    std::cout<<"here at setting env role alias set "<<role_alias<<endl;
-    ca_cert_path = GETENV("AWS_IOT_CORE_CA_CERT_PATH");
-    std::cout<<"here at setting env ca cert set "<<ca_cert_path<<endl;
-    thing_name = GETENV("AWS_IOT_CORE_THING_NAME");
-    std::cout<<"here at setting env iot thing name set "<<thing_name<<endl;
-
-    string flag(use_Iot_Credential_Provider);
-    std::cout<<"here at setting env initializing flag "<<flag<<endl;
-    transform(flag.begin(), flag.end(),flag.begin(), ::tolower);
-
-    if(flag.compare("true") == 0){
-        std::cout<<"here at setting env initializing flag "<<flag<<endl;
-        streamName = thing_name;
-        std::cout<<"here at setting env initializing flag "<<streamName<<endl;
-    }
 
     LOG_DEBUG("CANARY_STREAM_NAME: " << streamName);
     LOG_DEBUG("CANARY_RUN_SCENARIO: " << canaryRunScenario);
@@ -101,7 +92,7 @@ VOID CanaryConfig::initConfigWithEnvVars()
     LOG_DEBUG("CANARY_STORAGE_SIZE: " << storageSizeInBytes);
     LOG_DEBUG("CANARY_FPS: " << testVideoFps);
 
-    if(flag == "TRUE"){
+    if(use_IOT_Cred.compare("true") == 0){
         LOG_DEBUG("IOT_ENDPOINT: "<< iot_get_credential_endpoint);
         LOG_DEBUG("IOT_CERT_FILE: "<< cert_path);
         LOG_DEBUG("IOT_PRIVATE_KEY: "<< private_key_path);
