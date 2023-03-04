@@ -85,9 +85,9 @@ def runClient(isProducer, params) {
     def endpoint = "${scripts_dir}/iot-credential-provider.txt"
     def core_cert_file = "${scripts_dir}/sink_${env.NODE_NAME}_certificate.pem"
     def private_key_file = "${scripts_dir}/sink_${env.NODE_NAME}_private.key"
-    def role_alias = "p${env.NODE_NAME}_role_alias"
+    def role_alias = "sink_${env.NODE_NAME}_role_alias"
     def ca_cert_file = "${scripts_dir}/cacert.pem"
-    def thing_name = "p${env.NODE_NAME}_thing"
+    def thing_name = "sink_${env.NODE_NAME}_thing"
 
     def envs = [
         'M2_HOME': "/opt/apache-maven-3.6.3",
