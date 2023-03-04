@@ -49,7 +49,6 @@ namespace com { namespace amazonaws { namespace kinesis { namespace video {
 }  // namespace com;
 
 void determine_credentials(GstElement *kvsSink, CustomData *data) {
-
     char const *iot_credential_endpoint;
     char const *cert_path;
     char const *private_key_path;
@@ -360,7 +359,14 @@ int gstreamer_test_source_init(CustomData *data, GstElement *pipeline) {
 
     // configure kvssink
     g_object_set(G_OBJECT (kvssink), "stream-name", data->streamName, "storage-size", 128, NULL);
-    determine_credentials(kvssink, data);
+
+    string use_IOT_Cred(data->pCanaryConfig->use_Iot_Credential_Provider);
+    transform(use_IOT_Cred.begin(), use_IOT_Cred.end(),use_IOT_Cred.begin(), ::tolower);
+
+    if(use_IOT_Cred.compare("true") == 0){
+        determine_credentials(kvssink, data);
+    }
+
     g_signal_connect(G_OBJECT(kvssink), "stream-client-metric", (GCallback) start_put_frame_kvs, data);
     g_signal_connect(G_OBJECT(kvssink), "fragment-ack", (GCallback) fragmentAckHandler, data);
 
