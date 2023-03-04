@@ -51,14 +51,12 @@ VOID CanaryConfig::initConfigWithEnvVars()
 
     std::cout<<"here"<<std::endl;
     use_Iot_Credential_Provider = GETENV("CANARY_USE_IOT_PROVIDER");
-    std::cout<<"here"<<std::endl;
+    std::cout<<"here "<<use_Iot_Credential_Provider<<std::endl;
     string use_IOT_Cred(use_Iot_Credential_Provider);
     std::cout<<"here"<<std::endl;
     transform(use_IOT_Cred.begin(), use_IOT_Cred.end(),use_IOT_Cred.begin(), ::tolower);
 
     if(use_IOT_Cred.compare("true") == 0){
-        std::cout<<"here"<<std::endl;
-        streamName = thing_name;
         std::cout<<"here"<<std::endl;
         iot_get_credential_endpoint = GETENV("AWS_IOT_CORE_CREDENTIAL_ENDPOINT");
         std::cout<<"here"<<std::endl;
@@ -71,6 +69,8 @@ VOID CanaryConfig::initConfigWithEnvVars()
         ca_cert_path = GETENV("AWS_IOT_CORE_CA_CERT_PATH");
         std::cout<<"here"<<std::endl;
         thing_name = GETENV("AWS_IOT_CORE_THING_NAME");
+        std::cout<<"here"<<std::endl;
+        streamName = thing_name;
         std::cout<<"here"<<std::endl;
     }
     else {
