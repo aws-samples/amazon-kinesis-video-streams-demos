@@ -108,7 +108,7 @@ VOID pushStartupLatencyMetric(CustomData *data)
     double startUpLatency = (double)(currentTimestamp - data->startTime / 1000000); // [milliseconds]
     Aws::CloudWatch::Model::MetricDatum startupLatencyDatum;
     Aws::CloudWatch::Model::PutMetricDataRequest cwRequest;
-    cwRequest.SetNamespace("KinesisVideoSDKCanary");
+    cwRequest.SetNamespace("KinesisVideoSDKCanaryTest");
 
     LOG_DEBUG("Startup Latency: " << startUpLatency);
 
@@ -126,7 +126,7 @@ VOID pushErrorMetrics(CustomData *cusData, double duration, KinesisVideoStreamMe
 {
     Aws::CloudWatch::Model::MetricDatum metricDatum;
     Aws::CloudWatch::Model::PutMetricDataRequest cwRequest;
-    cwRequest.SetNamespace("KinesisVideoSDKCanary");
+    cwRequest.SetNamespace("KinesisVideoSDKCanaryTest");
 
     auto rawStreamMetrics = streamMetrics.getRawMetrics();
 
@@ -161,7 +161,7 @@ VOID pushClientMetrics(CustomData *cusData, KinesisVideoProducerMetrics clientMe
 {
     Aws::CloudWatch::Model::MetricDatum metricDatum;
     Aws::CloudWatch::Model::PutMetricDataRequest cwRequest;
-    cwRequest.SetNamespace("KinesisVideoSDKCanary");
+    cwRequest.SetNamespace("KinesisVideoSDKCanaryTest");
 
     double availableStoreSize = clientMetrics.getContentStoreSizeSize() / 1000; // [kilobytes]
     pushMetric("ContentStoreAvailableSize", availableStoreSize, Aws::CloudWatch::Model::StandardUnit::Kilobytes,
@@ -183,7 +183,7 @@ VOID pushStreamMetrics(CustomData *cusData, KinesisVideoStreamMetrics streamMetr
 {
     Aws::CloudWatch::Model::MetricDatum metricDatum;
     Aws::CloudWatch::Model::PutMetricDataRequest cwRequest;
-    cwRequest.SetNamespace("KinesisVideoSDKCanary");
+    cwRequest.SetNamespace("KinesisVideoSDKCanaryTest");
 
     double frameRate = streamMetrics.getCurrentElementaryFrameRate();
     pushMetric("FrameRate", frameRate, Aws::CloudWatch::Model::StandardUnit::Count_Second, metricDatum, cusData->pDimensionPerStream, cwRequest);
@@ -271,7 +271,7 @@ static STATUS fragmentAckHandler(GstElement *kvssink, PFragmentAck pFragmentAck,
             {
                 Aws::CloudWatch::Model::MetricDatum persistedAckLatencyDatum;
                 Aws::CloudWatch::Model::PutMetricDataRequest cwRequest;
-                cwRequest.SetNamespace("KinesisVideoSDKCanary");
+                cwRequest.SetNamespace("KinesisVideoSDKCanaryTest");
 
                 auto currentTimestamp = duration_cast<milliseconds>(system_clock::now().time_since_epoch()).count();
                 auto persistedAckLatency = (currentTimestamp - timeOfFragmentEndSent); // [milliseconds]
@@ -289,7 +289,7 @@ static STATUS fragmentAckHandler(GstElement *kvssink, PFragmentAck pFragmentAck,
             {
                 Aws::CloudWatch::Model::MetricDatum receivedAckLatencyDatum;
                 Aws::CloudWatch::Model::PutMetricDataRequest cwRequest;
-                cwRequest.SetNamespace("KinesisVideoSDKCanary");
+                cwRequest.SetNamespace("KinesisVideoSDKCanaryTest");
 
                 auto currentTimestamp = duration_cast<milliseconds>(system_clock::now().time_since_epoch()).count();
                 auto receivedAckLatency = (currentTimestamp - timeOfFragmentEndSent); // [milliseconds]
