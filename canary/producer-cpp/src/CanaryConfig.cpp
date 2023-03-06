@@ -48,11 +48,11 @@ VOID CanaryConfig::setEnvVarsBool(bool &configVar, string envVar)
 
 VOID CanaryConfig::initConfigWithEnvVars()
 {
-    use_Iot_Credential_Provider = GETENV("CANARY_USE_IOT_PROVIDER");
-    string use_IOT_Cred(use_Iot_Credential_Provider);
-    transform(use_IOT_Cred.begin(), use_IOT_Cred.end(),use_IOT_Cred.begin(), ::tolower);
+    use_iot_credential_provider = GETENV("CANARY_USE_IOT_PROVIDER");
+    string use_iot_cred(use_iot_credential_provider);
+    transform(use_iot_cred.begin(), use_iot_cred.end(),use_iot_cred.begin(), ::tolower);
 
-    if(use_IOT_Cred.compare("true") == 0){
+    if(use_iot_cred.compare("true") == 0){
         iot_get_credential_endpoint = GETENV("AWS_IOT_CORE_CREDENTIAL_ENDPOINT");
         cert_path = GETENV("AWS_IOT_CORE_CERT");
         private_key_path = GETENV("AWS_IOT_CORE_PRIVATE_KEY");
@@ -91,7 +91,7 @@ VOID CanaryConfig::initConfigWithEnvVars()
     LOG_DEBUG("CANARY_STORAGE_SIZE: " << storageSizeInBytes);
     LOG_DEBUG("CANARY_FPS: " << testVideoFps);
 
-    if(use_IOT_Cred.compare("true") == 0){
+    if(use_iot_cred.compare("true") == 0){
         LOG_DEBUG("IOT_ENDPOINT: "<< iot_get_credential_endpoint);
         LOG_DEBUG("IOT_CERT_FILE: "<< cert_path);
         LOG_DEBUG("IOT_PRIVATE_KEY: "<< private_key_path);
