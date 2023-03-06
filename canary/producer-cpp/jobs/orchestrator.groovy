@@ -132,7 +132,7 @@ pipeline {
                         build(
                             job: NEXT_AVAILABLE_RUNNER,
                             parameters: COMMON_PARAMS + [
-                                booleanParam(name: 'USE_IOT', value: true),
+                                booleanParam(name: 'USE_IOT', value: false),
                                 string(name: 'CANARY_STREAM_NAME', value: "-Continuous-Periodic"),
                                 string(name: 'CANARY_DURATION_IN_SECONDS', value: SHORT_RUN_DURATION_IN_SECONDS.toString()),
                                 string(name: 'PRODUCER_NODE_LABEL', value: "producer-cpp-uw2"),
