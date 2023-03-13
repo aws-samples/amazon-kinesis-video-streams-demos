@@ -2,17 +2,6 @@
 
 namespace com { namespace amazonaws { namespace kinesis { namespace video {
 
-                class CanaryClientCallbackProvider : public ClientCallbackProvider {
-                public:
-                    UINT64 getCallbackCustomData() override {
-                        return reinterpret_cast<UINT64> (this);
-                    }
-                    StorageOverflowPressureFunc getStorageOverflowPressureCallback() override {
-                        return storageOverflowPressure;
-                    }
-                    static STATUS storageOverflowPressure(UINT64 custom_handle, UINT64 remaining_bytes);
-                };
-
                 VOID pushMetric(string metricName, double metricValue, Aws::CloudWatch::Model::StandardUnit unit, Aws::CloudWatch::Model::MetricDatum datum,
                                 Aws::CloudWatch::Model::Dimension *dimension, Aws::CloudWatch::Model::PutMetricDataRequest &cwRequest)
                 {
@@ -36,19 +25,12 @@ namespace com { namespace amazonaws { namespace kinesis { namespace video {
                         LOG_DEBUG("Successfully put sample metric data");
                     }
                 }
-
-                STATUS
-                CanaryClientCallbackProvider::storageOverflowPressure(UINT64 custom_handle, UINT64 remaining_bytes) {
-                    UNUSED_PARAM(custom_handle);
-                    LOG_WARN("Reporting storage overflow. Bytes remaining " << remaining_bytes);
-                    return STATUS_SUCCESS;
-                }
             }  // namespace video
         }  // namespace kinesis
     }  // namespace amazonaws
 }  // namespace com;
 
-void determine_credentials(GstElement *kvsSink, CustomData *data) {
+VOID determineCredentials(GstElement *kvsSink, CustomData *cusData) {
     char const *iot_credential_endpoint;
     char const *cert_path;
     char const *private_key_path;
@@ -56,12 +38,12 @@ void determine_credentials(GstElement *kvsSink, CustomData *data) {
     char const *ca_cert_path;
     char const *credential_path;
     char const *thing_name;
-    if (nullptr != (iot_credential_endpoint = data->pCanaryConfig->iot_get_credential_endpoint) &&
-        nullptr != (cert_path = data->pCanaryConfig->cert_path) &&
-        nullptr != (private_key_path = data->pCanaryConfig->private_key_path) &&
-        nullptr != (role_alias = data->pCanaryConfig->role_alias) &&
-        nullptr != (thing_name = data->pCanaryConfig->thing_name) &&
-        nullptr != (ca_cert_path = data->pCanaryConfig->ca_cert_path)) {
+    if (nullptr != (iot_credential_endpoint = cusData->pCanaryConfig->iot_get_credential_endpoint) &&
+        nullptr != (cert_path = cusData->pCanaryConfig->cert_path) &&
+        nullptr != (private_key_path = cusData->pCanaryConfig->private_key_path) &&
+        nullptr != (role_alias = cusData->pCanaryConfig->role_alias) &&
+        nullptr != (thing_name = cusData->pCanaryConfig->thing_name) &&
+        nullptr != (ca_cert_path = cusData->pCanaryConfig->ca_cert_path)) {
         // set the IoT Credentials if provided in envvar
         LOG_DEBUG("Setting IOT Credentials");
         GstStructure *iot_credentials =  gst_structure_new(
@@ -102,24 +84,24 @@ VOID updateFragmentEndTimes(UINT64 curKeyFrameTime, uint64_t &lastKeyFrameTime, 
 }
 
 
-VOID pushStartupLatencyMetric(CustomData *data)
+VOID pushStartupLatencyMetric(CustomData *cusData)
 {
     double currentTimestamp = duration_cast<milliseconds>(system_clock::now().time_since_epoch()).count();
-    double startUpLatency = (double)(currentTimestamp - data->startTime / 1000000); // [milliseconds]
+    double startUpLatency = (double)(currentTimestamp - cusData->startTime / 1000000); // [milliseconds]
     Aws::CloudWatch::Model::MetricDatum startupLatencyDatum;
     Aws::CloudWatch::Model::PutMetricDataRequest cwRequest;
     cwRequest.SetNamespace("KinesisVideoSDKCanary");
 
     LOG_DEBUG("Startup Latency: " << startUpLatency);
 
-    pushMetric("StartupLatency", startUpLatency, Aws::CloudWatch::Model::StandardUnit::Milliseconds, startupLatencyDatum, data->pDimensionPerStream, cwRequest);
-    if (data->pCanaryConfig->useAggMetrics)
+    pushMetric("StartupLatency", startUpLatency, Aws::CloudWatch::Model::StandardUnit::Milliseconds, startupLatencyDatum, cusData->pDimensionPerStream, cwRequest);
+    if (cusData->pCanaryConfig->useAggMetrics)
     {
-        pushMetric("StartupLatency", startUpLatency, Aws::CloudWatch::Model::StandardUnit::Milliseconds, startupLatencyDatum, data->pAggregatedDimension, cwRequest);
+        pushMetric("StartupLatency", startUpLatency, Aws::CloudWatch::Model::StandardUnit::Milliseconds, startupLatencyDatum, cusData->pAggregatedDimension, cwRequest);
     }
 
     // Send metrics to CW
-    data->pCWclient->PutMetricDataAsync(cwRequest, onPutMetricDataResponseReceivedHandler);
+    cusData->pCWclient->PutMetricDataAsync(cwRequest, onPutMetricDataResponseReceivedHandler);
 }
 
 VOID pushErrorMetrics(CustomData *cusData, double duration, KinesisVideoStreamMetrics streamMetrics)
@@ -214,7 +196,7 @@ VOID pushStreamMetrics(CustomData *cusData, KinesisVideoStreamMetrics streamMetr
 }
 
 // put frame function to publish metrics to cloudwatch after getting g signal from producer sdk cpp
-static bool put_frame_kvs(GstElement *kvsSink, KvsSinkMetric *kvsSinkMetric, CustomData *cusData)
+static bool metricHandler(GstElement *kvsSink, KvsSinkMetric *kvsSinkMetric, CustomData *cusData)
 {
     LOG_DEBUG("put frame at canary");
     updateFragmentEndTimes(kvsSinkMetric->framePTS, cusData->lastKeyFrameTime, cusData->timeOfNextKeyFrame);
@@ -222,21 +204,20 @@ static bool put_frame_kvs(GstElement *kvsSink, KvsSinkMetric *kvsSinkMetric, Cus
     pushClientMetrics(cusData, kvsSinkMetric->clientMetrics);
 
     double duration = duration_cast<seconds>(system_clock::now().time_since_epoch()).count() - cusData->timeCounter;
-    // Push error metrics and logs every 60 seconds
+    // Push error metrics every 60 seconds
     if(duration > 60)
     {
         pushErrorMetrics(cusData, duration, kvsSinkMetric->streamMetrics);
-        cusData->pCanaryLogs->canaryStreamSendLogs(cusData->pCloudwatchLogsObject);
         cusData->timeCounter = duration_cast<seconds>(system_clock::now().time_since_epoch()).count();
     }
     return kvsSinkMetric->putFrameSuccess;
 }
 
-static VOID start_put_frame_kvs(GstElement *kvsSink, VOID *gMetrics, gpointer data){
+static VOID putFrameHandler(GstElement *kvsSink, VOID *gMetrics, gpointer data){
 
     CustomData *cusData = (CustomData*) data;
     KvsSinkMetric *kvsSinkMetric = reinterpret_cast<KvsSinkMetric *> (gMetrics);
-    bool ret = put_frame_kvs(kvsSink, kvsSinkMetric, cusData);
+    bool ret = metricHandler(kvsSink, kvsSinkMetric, cusData);
     if(kvsSinkMetric->onFirstFrame && ret){
         pushStartupLatencyMetric(cusData);
         cusData->onFirstFrame = false;
@@ -244,7 +225,7 @@ static VOID start_put_frame_kvs(GstElement *kvsSink, VOID *gMetrics, gpointer da
 }
 
 //Test function to check signal connect and fragment ack
-static STATUS fragmentAckHandler(GstElement *kvssink, PFragmentAck pFragmentAck, gpointer custom_data){
+static STATUS fragmentAckReceivedHandler(GstElement *kvssink, PFragmentAck pFragmentAck, gpointer custom_data){
 
     LOG_DEBUG("Fragment ack received handler canary cpp invoked " << pFragmentAck->timestamp);
     CustomData *data = reinterpret_cast<CustomData *>(custom_data);
@@ -359,16 +340,10 @@ int gstreamer_test_source_init(CustomData *data, GstElement *pipeline) {
 
     // configure kvssink
     g_object_set(G_OBJECT (kvssink), "stream-name", data->streamName, "storage-size", 128, NULL);
+    determineCredentials(kvssink, data);
 
-    string use_iot_cred(data->pCanaryConfig->use_iot_credential_provider);
-    transform(use_iot_cred.begin(), use_iot_cred.end(),use_iot_cred.begin(), ::tolower);
-
-    if(use_iot_cred.compare("true") == 0){
-        determine_credentials(kvssink, data);
-    }
-
-    g_signal_connect(G_OBJECT(kvssink), "stream-client-metric", (GCallback) start_put_frame_kvs, data);
-    g_signal_connect(G_OBJECT(kvssink), "fragment-ack", (GCallback) fragmentAckHandler, data);
+    g_signal_connect(G_OBJECT(kvssink), "stream-client-metric", (GCallback) putFrameHandler, data);
+    g_signal_connect(G_OBJECT(kvssink), "fragment-ack", (GCallback) fragmentAckReceivedHandler, data);
 
     // define and configure video filter, we only want the specified format to pass to the sink
     // ("caps" is short for "capabilities")
@@ -473,12 +448,9 @@ int main(int argc, char* argv[]) {
             canaryConfig.initConfigWithEnvVars();
         }
 
-        CanaryLogs canaryLogs;
-
         CustomData data;
         data.pCanaryConfig = &canaryConfig;
         data.streamName = const_cast<char*>(data.pCanaryConfig->streamName.c_str());
-        data.pCanaryLogs = &canaryLogs;
 
         STATUS streamStatus = STATUS_SUCCESS;
 
@@ -487,25 +459,6 @@ int main(int argc, char* argv[]) {
         Aws::CloudWatch::CloudWatchClient CWclient(data.clientConfig);
         data.pCWclient = &CWclient;
         STATUS retStatus = STATUS_SUCCESS;
-        Aws::CloudWatchLogs::CloudWatchLogsClient CWLclient(data.clientConfig);
-        CanaryLogs::CloudwatchLogsObject cloudwatchLogsObject;
-        cloudwatchLogsObject.logGroupName = "ProducerCppSDK";
-        cloudwatchLogsObject.logStreamName = data.pCanaryConfig->streamName +"-log-" + to_string(GETTIME() / HUNDREDS_OF_NANOS_IN_A_MILLISECOND);
-        cloudwatchLogsObject.pCwl = &CWLclient;
-        if ((retStatus = canaryLogs.initializeCloudwatchLogger(&cloudwatchLogsObject)) != STATUS_SUCCESS) {
-            LOG_DEBUG("Cloudwatch logger failed to be initialized with 0x" << retStatus << ">> error code.");
-        }
-        else
-        {
-            LOG_DEBUG("Cloudwatch logger initialization success");
-        }
-        data.pCloudwatchLogsObject = &cloudwatchLogsObject;
-
-        // Set the video stream source
-        if (data.pCanaryConfig->sourceType == "TEST_SOURCE")
-        {
-            data.streamSource = TEST_SOURCE;
-        }
 
         // Non-aggregate CW dimension
         Aws::CloudWatch::Model::Dimension DimensionPerStream;
@@ -537,7 +490,6 @@ int main(int argc, char* argv[]) {
         // CleanUp
         data.kinesisVideoProducer->freeStream(data.kinesisVideoStream);
         delete (data.timeOfNextKeyFrame);
-        canaryLogs.canaryStreamSendLogSync(&cloudwatchLogsObject);
         LOG_DEBUG("end of canary");
     }
 

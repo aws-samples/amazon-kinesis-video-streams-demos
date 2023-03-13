@@ -9,7 +9,6 @@ endif()
 
 project(KinesisVideoProducerCloudwatch LANGUAGES C CXX)
 
-#set(BUILD_GSTREAMER_PLUGIN ON CACHE BOOL "Tell KVS Producer CPP SDK to build with GStreamer Plugin" FORCE)
 set(CUSTOM_MEMORY_MANAGEMENT OFF CACHE BOOL "Tell AWS SDK to not use custom memory management" FORCE)
 set(ENABLE_TESTING OFF CACHE BOOL "Disable building tests for AWS SDK" FORCE)
 set(BUILD_ONLY "monitoring;logs" CACHE STRING "Tell AWS SDK to only build monitoring and logs" FORCE)
@@ -17,7 +16,7 @@ set(BUILD_ONLY "monitoring;logs" CACHE STRING "Tell AWS SDK to only build monito
 FetchContent_Declare(
         producercpp
         GIT_REPOSITORY https://github.com/awslabs/amazon-kinesis-video-streams-producer-sdk-cpp.git
-        GIT_TAG        kvssink-canary-cpp-latency
+        GIT_TAG        kvssink-canary-producer-cpp
 )
 
 FetchContent_Declare(
