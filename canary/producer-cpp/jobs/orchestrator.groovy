@@ -2,7 +2,7 @@ import jenkins.model.*
 
 WORKSPACE_PRODUCER="src"
 GIT_URL='https://github.com/aws-samples/amazon-kinesis-video-streams-demos.git'
-GIT_HASH='kvssink-canary-cpp-demos-latency'
+GIT_HASH='kvssink-canary-producer-cpp-demos'
 RUNNER_JOB_NAME_PREFIX = "producercpp-runner"
 // RUNNER_JOB_NAME_PREFIX = "producer-runner"
 
