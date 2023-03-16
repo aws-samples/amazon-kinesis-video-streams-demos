@@ -27,6 +27,4 @@ CustomData::CustomData()
     // Default first intermittent run to 1 min for testing
     runTill = producerStartTime / 1000000000 / 60 + 1; // [minutes]
     pCanaryConfig = nullptr;
-    pCloudwatchLogsObject = nullptr;
-    pCanaryLogs = nullptr;
 }

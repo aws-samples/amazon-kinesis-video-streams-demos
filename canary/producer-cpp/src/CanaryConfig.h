@@ -35,17 +35,17 @@ public:
     bool useAggMetrics;
 
     // credential related items
-    char const *accessKey;
-    char const *secretKey;
-    char const *sessionToken;
-    char const *defaultRegion;
-    char const *use_iot_credential_provider;
-    char const *iot_get_credential_endpoint;
-    char const *cert_path;
-    char const *private_key_path;
-    char const *role_alias;
-    char const *ca_cert_path;
-    char const *thing_name;
+    char const *accessKey = nullptr;
+    char const *secretKey = nullptr;
+    char const *sessionToken = nullptr;
+    char const *defaultRegion = nullptr;
+    char const *use_iot_credential_provider = nullptr;
+    char const *iot_get_credential_endpoint = nullptr;
+    char const *cert_path = nullptr;
+    char const *private_key_path = nullptr;
+    char const *role_alias = nullptr;
+    char const *ca_cert_path = nullptr;
+    char const *thing_name = nullptr;
 
     CanaryConfig();
     VOID setEnvVarsString(string &configVar, string envVar);

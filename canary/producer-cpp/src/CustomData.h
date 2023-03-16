@@ -38,9 +38,6 @@ public:
     Aws::CloudWatch::Model::Dimension* pDimensionPerStream;
     Aws::CloudWatch::Model::Dimension* pAggregatedDimension;
 
-    CanaryLogs* pCanaryLogs;
-    CanaryLogs::CloudwatchLogsObject* pCloudwatchLogsObject;
-
     double timeCounter;
     double totalPutFrameErrorCount;
     double totalErrorAckCount;
