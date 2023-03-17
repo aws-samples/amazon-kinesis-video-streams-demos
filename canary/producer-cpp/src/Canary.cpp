@@ -32,12 +32,12 @@ VOID determineCredentials(GstElement *kvsSink, CustomData *cusData) {
         LOG_DEBUG("Setting IOT Credentials");
         GstStructure *iot_credentials = gst_structure_new(
                 "iot-certificate",
-                "iot-thing-name", G_TYPE_STRING, cusData->pCanaryConfig->thing_name,
-                "endpoint", G_TYPE_STRING, cusData->pCanaryConfig->iot_get_credential_endpoint,
-                "cert-path", G_TYPE_STRING, cusData->pCanaryConfig->cert_path,
-                "key-path", G_TYPE_STRING, cusData->pCanaryConfig->private_key_path,
-                "ca-path", G_TYPE_STRING, cusData->pCanaryConfig->ca_cert_path,
-                "role-aliases", G_TYPE_STRING, cusData->pCanaryConfig->role_alias, NULL);
+                "iot-thing-name", G_TYPE_STRING, cusData->pCanaryConfig->thingName,
+                "endpoint", G_TYPE_STRING, cusData->pCanaryConfig->iotGetCredentialEndpoint,
+                "cert-path", G_TYPE_STRING, cusData->pCanaryConfig->certPath,
+                "key-path", G_TYPE_STRING, cusData->pCanaryConfig->privateKeyPath,
+                "ca-path", G_TYPE_STRING, cusData->pCanaryConfig->caCertPath,
+                "role-aliases", G_TYPE_STRING, cusData->pCanaryConfig->roleAlias, NULL);
 
         g_object_set(G_OBJECT(kvsSink), "iot-certificate", iot_credentials, NULL);
         gst_structure_free(iot_credentials);
