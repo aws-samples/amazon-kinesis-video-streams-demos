@@ -32,7 +32,7 @@ public:
     UINT32 bufferDuration; // [seconds]
     UINT32 storageSizeInBytes;
     UINT32 testVideoFps;
-    bool useAggMetrics;
+    BOOL useAggMetrics;
 
     // credential related items
     char const *accessKey = nullptr;

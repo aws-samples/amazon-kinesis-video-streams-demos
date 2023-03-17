@@ -19,7 +19,7 @@ CustomData::CustomData()
     producerStartTime = chrono::duration_cast<nanoseconds>(systemCurrentTime().time_since_epoch()).count(); // [nanoSeconds]
     startTime = chrono::duration_cast<nanoseconds>(systemCurrentTime().time_since_epoch()).count(); // [nanoSeconds]
     clientConfig.region = "us-west-2";
-    pCWclient = nullptr;
+    pCwClient = nullptr;
     pDimensionPerStream = nullptr;
     pAggregatedDimension = nullptr;
     timeOfNextKeyFrame = new map<uint64_t, uint64_t>();
