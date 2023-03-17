@@ -50,6 +50,10 @@ VOID determineCredentials(GstElement *kvsSink, CustomData *cusData) {
 
 VOID updateFragmentEndTimes(UINT64 curKeyFrameTime, UINT64 &lastKeyFrameTime, map<UINT64, UINT64> *mapPtr)
 {
+    LOG_DEBUG("Frame presentation time at updateFragmentEndTimes: "<<curKeyFrameTime);
+    LOG_DEBUG("Last key frame time: "<<lastKeyFrameTime);
+    LOG_DEBUG("last key frame time/HUNDREDS_OF_NANOS_IN_A_MILLISECOND: "<<(lastKeyFrameTime / HUNDREDS_OF_NANOS_IN_A_MILLISECOND));
+    LOG_DEBUG("Frame presentation time at updateFragmentEndTimes/HUNDREDS_OF_NANOS_IN_A_MILLISECOND: "<<(curKeyFrameTime / HUNDREDS_OF_NANOS_IN_A_MILLISECOND));
     if (lastKeyFrameTime != 0)
     {
         (*mapPtr)[lastKeyFrameTime / HUNDREDS_OF_NANOS_IN_A_MILLISECOND] = curKeyFrameTime / HUNDREDS_OF_NANOS_IN_A_MILLISECOND;
@@ -183,6 +187,7 @@ VOID pushStreamMetrics(CustomData *cusData, KinesisVideoStreamMetrics streamMetr
 static VOID metricHandler(GstElement *kvsSink, KvsSinkMetric *kvsSinkMetric, CustomData *cusData)
 {
     LOG_DEBUG("put frame at canary");
+    LOG_DEBUG("Frame presentation time stamp at canary: "<<kvsSinkMetric->framePTS);
     updateFragmentEndTimes(kvsSinkMetric->framePTS, cusData->lastKeyFrameTime, cusData->timeOfNextKeyFrame);
     pushStreamMetrics(cusData, kvsSinkMetric->streamMetrics);
     pushClientMetrics(cusData, kvsSinkMetric->clientMetrics);
@@ -427,6 +432,7 @@ int main(int argc, char* argv[]) {
     Aws::SDKOptions options;
 
     STATUS retStatus = STATUS_SUCCESS;
+    std::cout<<"HUNDREDS_OF_NANOS_IN_A_MILLISECOND: "<<HUNDREDS_OF_NANOS_IN_A_MILLISECOND<<std::endl;
 
     Aws::InitAPI(options);
     {
