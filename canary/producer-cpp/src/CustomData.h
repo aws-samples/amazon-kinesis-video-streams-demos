@@ -84,12 +84,10 @@ public:
 struct _KvsSinkMetric {
     _KvsSinkMetric():
             framePTS(0),
-            onFirstFrame(true),
-            putFrameSuccess(true)
+            onFirstFrame(true)
             {}
     KinesisVideoStreamMetrics streamMetrics = KinesisVideoStreamMetrics();
     KinesisVideoProducerMetrics clientMetrics = KinesisVideoProducerMetrics();
     UINT64 framePTS;
     bool onFirstFrame;
-    bool putFrameSuccess;
 };

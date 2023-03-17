@@ -188,7 +188,7 @@ VOID pushStreamMetrics(CustomData *cusData, KinesisVideoStreamMetrics streamMetr
 }
 
 // put frame function to publish metrics to cloudwatch after getting g signal from producer sdk cpp
-static bool metricHandler(GstElement *kvsSink, KvsSinkMetric *kvsSinkMetric, CustomData *cusData)
+static VOID metricHandler(GstElement *kvsSink, KvsSinkMetric *kvsSinkMetric, CustomData *cusData)
 {
     LOG_DEBUG("put frame at canary");
     updateFragmentEndTimes(kvsSinkMetric->framePTS, cusData->lastKeyFrameTime, cusData->timeOfNextKeyFrame);
@@ -202,15 +202,14 @@ static bool metricHandler(GstElement *kvsSink, KvsSinkMetric *kvsSinkMetric, Cus
         pushErrorMetrics(cusData, duration, kvsSinkMetric->streamMetrics);
         cusData->timeCounter = duration_cast<seconds>(system_clock::now().time_since_epoch()).count();
     }
-    return kvsSinkMetric->putFrameSuccess;
 }
 
 static VOID putFrameHandler(GstElement *kvsSink, VOID *gMetrics, gpointer data){
 
     CustomData *cusData = (CustomData*) data;
     KvsSinkMetric *kvsSinkMetric = reinterpret_cast<KvsSinkMetric *> (gMetrics);
-    bool ret = metricHandler(kvsSink, kvsSinkMetric, cusData);
-    if(kvsSinkMetric->onFirstFrame && ret){
+    metricHandler(kvsSink, kvsSinkMetric, cusData);
+    if(kvsSinkMetric->onFirstFrame){
         pushStartupLatencyMetric(cusData);
         cusData->onFirstFrame = false;
     }
