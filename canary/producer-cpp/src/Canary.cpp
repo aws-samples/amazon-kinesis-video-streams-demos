@@ -1,34 +1,26 @@
 #include "Include.h"
 
-namespace com { namespace amazonaws { namespace kinesis { namespace video {
+VOID pushMetric(string metricName, double metricValue, Aws::CloudWatch::Model::StandardUnit unit, Aws::CloudWatch::Model::MetricDatum datum,
+                Aws::CloudWatch::Model::Dimension *dimension, Aws::CloudWatch::Model::PutMetricDataRequest &cwRequest) {
+    datum.SetMetricName(metricName);
+    datum.AddDimensions(*dimension);
+    datum.SetValue(metricValue);
+    datum.SetUnit(unit);
 
-                VOID pushMetric(string metricName, double metricValue, Aws::CloudWatch::Model::StandardUnit unit, Aws::CloudWatch::Model::MetricDatum datum,
-                                Aws::CloudWatch::Model::Dimension *dimension, Aws::CloudWatch::Model::PutMetricDataRequest &cwRequest)
-                {
-                    datum.SetMetricName(metricName);
-                    datum.AddDimensions(*dimension);
-                    datum.SetValue(metricValue);
-                    datum.SetUnit(unit);
+    // Pushes back the data array, can include no more than 20 metrics per call
+    cwRequest.AddMetricData(datum);
+}
 
-                    // Pushes back the data array, can include no more than 20 metrics per call
-                    cwRequest.AddMetricData(datum);
-                }
-
-                VOID onPutMetricDataResponseReceivedHandler(const Aws::CloudWatch::CloudWatchClient* cwClient,
-                                                            const Aws::CloudWatch::Model::PutMetricDataRequest& request,
-                                                            const Aws::CloudWatch::Model::PutMetricDataOutcome& outcome,
-                                                            const std::shared_ptr<const Aws::Client::AsyncCallerContext>& context)
-                {
-                    if (!outcome.IsSuccess()) {
-                        LOG_ERROR("Failed to put sample metric data: " << outcome.GetError().GetMessage().c_str());
-                    } else {
-                        LOG_DEBUG("Successfully put sample metric data");
-                    }
-                }
-            }  // namespace video
-        }  // namespace kinesis
-    }  // namespace amazonaws
-}  // namespace com;
+VOID onPutMetricDataResponseReceivedHandler(const Aws::CloudWatch::CloudWatchClient* cwClient,
+                                            const Aws::CloudWatch::Model::PutMetricDataRequest& request,
+                                            const Aws::CloudWatch::Model::PutMetricDataOutcome& outcome,
+                                            const std::shared_ptr<const Aws::Client::AsyncCallerContext>& context) {
+    if (!outcome.IsSuccess()) {
+        LOG_ERROR("Failed to put sample metric data: " << outcome.GetError().GetMessage().c_str());
+    } else {
+        LOG_DEBUG("Successfully put sample metric data");
+    }
+}
 
 void determineCredentials(GstElement *kvsSink, CustomData *cusData) {
     char const *iot_credential_endpoint;
@@ -222,6 +214,16 @@ static VOID putFrameHandler(GstElement *kvsSink, VOID *gMetrics, gpointer data){
         pushStartupLatencyMetric(cusData);
         cusData->onFirstFrame = false;
     }
+
+    // Check if we have reached Canary's stop time
+    int currTime;
+    currTime = duration_cast<seconds>(system_clock::now().time_since_epoch()).count();
+    if (currTime > (cusData->producerStartTime / 1000000000 + cusData->pCanaryConfig->canaryDuration))
+    {
+        LOG_DEBUG("Canary has reached end of run time");
+        gst_element_send_event(kvsSink, gst_event_new_eos());
+        g_main_loop_quit(cusData->mainLoop);
+    }
 }
 
 //Test function to check signal connect and fragment ack
@@ -230,19 +232,18 @@ static STATUS fragmentAckReceivedHandler(GstElement *kvssink, PFragmentAck pFrag
     LOG_DEBUG("Fragment ack received handler canary cpp invoked " << pFragmentAck->timestamp);
     CustomData *data = reinterpret_cast<CustomData *>(custom_data);
 
-    if (pFragmentAck->ackType != FRAGMENT_ACK_TYPE_PERSISTED && pFragmentAck->ackType != FRAGMENT_ACK_TYPE_RECEIVED)
-    {
-        return STATUS_SUCCESS;
-    }
+//    if (pFragmentAck->ackType != FRAGMENT_ACK_TYPE_PERSISTED && pFragmentAck->ackType != FRAGMENT_ACK_TYPE_RECEIVED)
+//    {
+//        return STATUS_SUCCESS;
+//    }
 
     map<uint64_t, uint64_t>::iterator iter;
     iter = data->timeOfNextKeyFrame->find(pFragmentAck->timestamp);
     auto temp = (iter == data->timeOfNextKeyFrame->end());
-    LOG_DEBUG("iter check "<< temp);
 
     uint64_t timeOfFragmentEndSent;
     timeOfFragmentEndSent = (temp == true) ? 0 : data->timeOfNextKeyFrame->find(pFragmentAck->timestamp)->second;
-    LOG_DEBUG("timeOfFragmentEndSent "<<timeOfFragmentEndSent);
+    LOG_DEBUG("Time Of Fragment End Sent "<<timeOfFragmentEndSent);
 
     if (timeOfFragmentEndSent > pFragmentAck->timestamp)
     {
@@ -342,7 +343,7 @@ int gstreamer_test_source_init(CustomData *data, GstElement *pipeline) {
     g_object_set(G_OBJECT (kvssink), "stream-name", data->streamName, "storage-size", 128, NULL);
     determineCredentials(kvssink, data);
 
-    g_signal_connect(G_OBJECT(kvssink), "stream-client-metric", (GCallback) putFrameHandler(), data);
+    g_signal_connect(G_OBJECT(kvssink), "stream-client-metric", (GCallback) putFrameHandler, data);
     g_signal_connect(G_OBJECT(kvssink), "fragment-ack", (GCallback) fragmentAckReceivedHandler, data);
 
     // define and configure video filter, we only want the specified format to pass to the sink
@@ -424,6 +425,7 @@ int gstreamer_init(int argc, char* argv[], CustomData *data) {
     g_main_loop_run(data->mainLoop);
 
     // free resources
+    LOG_INFO("Cleaning up for stream "<<data->streamName);
     gst_bus_remove_signal_watch(bus);
     gst_element_set_state(pipeline, GST_STATE_NULL);
     gst_object_unref(pipeline);
@@ -452,13 +454,9 @@ int main(int argc, char* argv[]) {
         data.pCanaryConfig = &canaryConfig;
         data.streamName = const_cast<char*>(data.pCanaryConfig->streamName.c_str());
 
-        STATUS streamStatus = STATUS_SUCCESS;
-
-
         // CloudWatch initialization steps
         Aws::CloudWatch::CloudWatchClient CWclient(data.clientConfig);
         data.pCWclient = &CWclient;
-        STATUS retStatus = STATUS_SUCCESS;
 
         // Set the video stream source
         if (data.pCanaryConfig->sourceType == "TEST_SOURCE")
@@ -484,17 +482,9 @@ int main(int argc, char* argv[]) {
         if (data.streamSource == TEST_SOURCE)
         {
             gstreamer_init(argc, argv, &data);
-            if (STATUS_SUCCEEDED(streamStatus))
-            {
-                // If streamStatus is success after EOS, send out remaining frames.
-                data.kinesisVideoStream->stopSync();
-            } else {
-                data.kinesisVideoStream->stop();
-            }
         }
 
         // CleanUp
-        data.kinesisVideoProducer->freeStream(data.kinesisVideoStream);
         delete (data.timeOfNextKeyFrame);
         LOG_DEBUG("end of canary");
     }
