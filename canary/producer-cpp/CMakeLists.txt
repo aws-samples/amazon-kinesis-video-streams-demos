@@ -76,5 +76,3 @@ target_link_libraries(producer_cpp_canary ${GST_APP_LIBRARIES} KinesisVideoProdu
         aws-cpp-sdk-core
         aws-cpp-sdk-monitoring
         aws-cpp-sdk-logs)
-
-file(COPY "${producercpp_SOURCE_DIR}/kvs_log_configuration" DESTINATION ${CMAKE_CURRENT_SOURCE_DIR})
