@@ -57,6 +57,7 @@ VOID updateFragmentEndTimes(UINT64 curKeyFrameTime, UINT64 &lastKeyFrameTime, ma
     if (lastKeyFrameTime != 0)
     {
         (*mapPtr)[lastKeyFrameTime / HUNDREDS_OF_NANOS_IN_A_MILLISECOND] = curKeyFrameTime / HUNDREDS_OF_NANOS_IN_A_MILLISECOND;
+        LOG_DEBUG("Stored value in map: "<<((*mapPtr)[lastKeyFrameTime / HUNDREDS_OF_NANOS_IN_A_MILLISECOND]));
         auto iter = mapPtr->begin();
         while (iter != mapPtr->end()) {
             // clean up map: removing timestamps older than 5 min from now
@@ -68,6 +69,7 @@ VOID updateFragmentEndTimes(UINT64 curKeyFrameTime, UINT64 &lastKeyFrameTime, ma
             }
         }
     }
+    LOG_DEBUG("Stored value in map after deletion: "<<((*mapPtr)[lastKeyFrameTime / HUNDREDS_OF_NANOS_IN_A_MILLISECOND]));
     lastKeyFrameTime = curKeyFrameTime;
 }
 
@@ -229,8 +231,8 @@ STATUS fragmentAckReceivedHandler(GstElement *kvsSink, PFragmentAck pFragmentAck
 
     map<UINT64, UINT64>::iterator iter;
     iter = cusData->timeOfNextKeyFrame->find(pFragmentAck->timestamp);
-    auto temp = (iter == cusData->timeOfNextKeyFrame->end());
-    LOG_DEBUG("Timestamp present in map: "<<temp);
+    BOOL temp = (iter == cusData->timeOfNextKeyFrame->end());
+    LOG_DEBUG("Timestamp found(0) in map: "<<temp);
 
     UINT64 timeOfFragmentEndSent;
     timeOfFragmentEndSent = (temp == true) ? 0 : cusData->timeOfNextKeyFrame->find(pFragmentAck->timestamp)->second;
