@@ -34,10 +34,9 @@ public:
     CanaryConfig* pCanaryConfig;
 
     Aws::Client::ClientConfiguration clientConfig;
-    Aws::CloudWatch::CloudWatchClient* pCWclient;
+    Aws::CloudWatch::CloudWatchClient* pCwClient;
     Aws::CloudWatch::Model::Dimension* pDimensionPerStream;
     Aws::CloudWatch::Model::Dimension* pAggregatedDimension;
-
 
     double timeCounter;
     double totalPutFrameErrorCount;
@@ -58,7 +57,7 @@ public:
     char* streamName;
     string rtspUrl;
 
-    map<uint64_t, uint64_t> *timeOfNextKeyFrame;
+    map<UINT64, UINT64> *timeOfNextKeyFrame;
     UINT64 lastKeyFrameTime;
     UINT64 curKeyFrameTime;
 
@@ -68,16 +67,15 @@ public:
     // Used in file uploading only. Assuming frame timestamp are relative. Add producerStartTime to each frame's
     // timestamp to convert them to absolute timestamp. This way fragments dont overlap after token rotation when doing
     // file uploading.
-    uint64_t producerStartTime; // [nanoSeconds]
-    uint64_t startTime;  // [nanoSeconds]
+    UINT64 producerStartTime; // [nanoSeconds]
+    UINT64 startTime;  // [nanoSeconds]
     volatile StreamSource streamSource;
 
     unique_ptr<Credentials> credential;
 
-    uint64_t syntheticDts;
-    
+    UINT64 syntheticDts;
     // Pts of first video frame
-    uint64_t firstPts;
+    UINT64 firstPts;
 
     CustomData();
 };
@@ -85,12 +83,10 @@ public:
 struct _KvsSinkMetric {
     _KvsSinkMetric():
             framePTS(0),
-            onFirstFrame(true),
-            putFrameSuccess(true)
+            onFirstFrame(true)
             {}
     KinesisVideoStreamMetrics streamMetrics = KinesisVideoStreamMetrics();
     KinesisVideoProducerMetrics clientMetrics = KinesisVideoProducerMetrics();
     UINT64 framePTS;
-    bool onFirstFrame;
-    bool putFrameSuccess;
+    BOOL onFirstFrame;
 };

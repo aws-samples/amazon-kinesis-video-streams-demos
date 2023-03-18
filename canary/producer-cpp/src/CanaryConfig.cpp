@@ -46,57 +46,71 @@ VOID CanaryConfig::setEnvVarsBool(bool &configVar, string envVar)
     }
 }
 
-VOID CanaryConfig::initConfigWithEnvVars()
+STATUS CanaryConfig::initConfigWithEnvVars()
 {
-    use_iot_credential_provider = GETENV("CANARY_USE_IOT_PROVIDER");
-    string use_iot_cred(use_iot_credential_provider);
-    transform(use_iot_cred.begin(), use_iot_cred.end(),use_iot_cred.begin(), ::tolower);
+    useIotCredentialProvider = GETENV("CANARY_USE_IOT_PROVIDER");
+    string useIotCred(useIotCredentialProvider);
+    transform(useIotCred.begin(), useIotCred.end(),useIotCred.begin(), ::tolower);
 
-    if(use_iot_cred.compare("true") == 0){
-        iot_get_credential_endpoint = GETENV("AWS_IOT_CORE_CREDENTIAL_ENDPOINT");
-        cert_path = GETENV("AWS_IOT_CORE_CERT");
-        private_key_path = GETENV("AWS_IOT_CORE_PRIVATE_KEY");
-        role_alias = GETENV("AWS_IOT_CORE_ROLE_ALIAS");
-        ca_cert_path = GETENV("AWS_IOT_CORE_CA_CERT_PATH");
-        thing_name = GETENV("AWS_IOT_CORE_THING_NAME");
-        streamName = thing_name;
+    STATUS retStatus = STATUS_SUCCESS;
+
+    if(useIotCred.compare("true") == 0){
+        if (nullptr != (iotGetCredentialEndpoint = GETENV("AWS_IOT_CORE_CREDENTIAL_ENDPOINT")) &&
+            nullptr != (certPath = GETENV("AWS_IOT_CORE_CERT")) &&
+            nullptr != (privateKeyPath = GETENV("AWS_IOT_CORE_PRIVATE_KEY")) &&
+            nullptr != (roleAlias = GETENV("AWS_IOT_CORE_ROLE_ALIAS")) &&
+            nullptr != (caCertPath = GETENV("AWS_IOT_CORE_CA_CERT_PATH")) &&
+            nullptr != (thingName = GETENV("AWS_IOT_CORE_THING_NAME"))) {
+            streamName = thingName;
+        }
+        else{
+            retStatus = STATUS_NOT_FOUND;
+            LOG_ERROR("Missing Credential: IOT Credential");
+        }
     }
     else {
-        setEnvVarsString(streamName, "CANARY_STREAM_NAME");
-        accessKey = GETENV(ACCESS_KEY_ENV_VAR);
-        secretKey = GETENV(SECRET_KEY_ENV_VAR);
+        if(nullptr != (accessKey = GETENV(ACCESS_KEY_ENV_VAR)) &&
+           nullptr != (secretKey = GETENV(SECRET_KEY_ENV_VAR))){
+            setEnvVarsString(streamName, "CANARY_STREAM_NAME");
+        }
+        else{
+            retStatus = STATUS_NOT_FOUND;
+            LOG_ERROR("Missing Credential: AWS Credential");
+        }
     }
-    //setEnvVarsString(sourceType, "CANARY_SOURCE_TYPE");
-    setEnvVarsString(canaryRunScenario, "CANARY_RUN_SCENARIO");
-    setEnvVarsString(streamType, "CANARY_STREAM_TYPE");
-    setEnvVarsString(canaryLabel, "CANARY_LABEL");
-    setEnvVarsString(cpUrl, "CANARY_CP_URL");
+    if(STATUS_SUCCEEDED(retStatus)){
+        setEnvVarsString(canaryRunScenario, "CANARY_RUN_SCENARIO");
+        setEnvVarsString(streamType, "CANARY_STREAM_TYPE");
+        setEnvVarsString(canaryLabel, "CANARY_LABEL");
+        setEnvVarsString(cpUrl, "CANARY_CP_URL");
 
-    setEnvVarsInt(&fragmentSize, "CANARY_FRAGMENT_SIZE");
-    setEnvVarsInt(&canaryDuration, "CANARY_DURATION_IN_SECONDS");
-    setEnvVarsInt(&bufferDuration, "CANARY_BUFFER_DURATION");
-    setEnvVarsInt(&storageSizeInBytes, "CANARY_STORAGE_SIZE");
-    setEnvVarsInt(&testVideoFps, "CANARY_FPS");
+        setEnvVarsInt(&fragmentSize, "CANARY_FRAGMENT_SIZE");
+        setEnvVarsInt(&canaryDuration, "CANARY_DURATION_IN_SECONDS");
+        setEnvVarsInt(&bufferDuration, "CANARY_BUFFER_DURATION");
+        setEnvVarsInt(&storageSizeInBytes, "CANARY_STORAGE_SIZE");
+        setEnvVarsInt(&testVideoFps, "CANARY_FPS");
 
-    defaultRegion = GETENV(DEFAULT_REGION_ENV_VAR);
-    sessionToken = GETENV(SESSION_TOKEN_ENV_VAR);
+        defaultRegion = GETENV(DEFAULT_REGION_ENV_VAR);
+        sessionToken = GETENV(SESSION_TOKEN_ENV_VAR);
 
-    LOG_DEBUG("CANARY_STREAM_NAME: " << streamName);
-    LOG_DEBUG("CANARY_RUN_SCENARIO: " << canaryRunScenario);
-    LOG_DEBUG("CANARY_STREAM_TYPE: " << streamType);
-    LOG_DEBUG("CANARY_LABEL: " << canaryLabel);
-    LOG_DEBUG("CANARY_CP_URL: " << cpUrl);
-    LOG_DEBUG("CANARY_FRAGMENT_SIZE: " << fragmentSize);
-    LOG_DEBUG("CANARY_DURATION: " << canaryDuration);
-    LOG_DEBUG("CANARY_STORAGE_SIZE: " << storageSizeInBytes);
-    LOG_DEBUG("CANARY_FPS: " << testVideoFps);
+        LOG_DEBUG("CANARY_STREAM_NAME: " << streamName);
+        LOG_DEBUG("CANARY_RUN_SCENARIO: " << canaryRunScenario);
+        LOG_DEBUG("CANARY_STREAM_TYPE: " << streamType);
+        LOG_DEBUG("CANARY_LABEL: " << canaryLabel);
+        LOG_DEBUG("CANARY_CP_URL: " << cpUrl);
+        LOG_DEBUG("CANARY_FRAGMENT_SIZE: " << fragmentSize);
+        LOG_DEBUG("CANARY_DURATION: " << canaryDuration);
+        LOG_DEBUG("CANARY_STORAGE_SIZE: " << storageSizeInBytes);
+        LOG_DEBUG("CANARY_FPS: " << testVideoFps);
 
-    if(use_iot_cred.compare("true") == 0){
-        LOG_DEBUG("IOT_ENDPOINT: "<< iot_get_credential_endpoint);
-        LOG_DEBUG("IOT_CERT_FILE: "<< cert_path);
-        LOG_DEBUG("IOT_PRIVATE_KEY: "<< private_key_path);
-        LOG_DEBUG("IOT_ROLE_ALIAS: "<< role_alias);
-        LOG_DEBUG("IOT_CA_CERT_FILE: "<< ca_cert_path);
-        LOG_DEBUG("IOT_THING_NAME: "<< thing_name);
+        if(useIotCred.compare("true") == 0){
+            LOG_DEBUG("IOT_ENDPOINT: "<< iotGetCredentialEndpoint);
+            LOG_DEBUG("IOT_CERT_FILE: "<< certPath);
+            LOG_DEBUG("IOT_PRIVATE_KEY: "<< privateKeyPath);
+            LOG_DEBUG("IOT_ROLE_ALIAS: "<< roleAlias);
+            LOG_DEBUG("IOT_CA_CERT_FILE: "<< caCertPath);
+            LOG_DEBUG("IOT_THING_NAME: "<< thingName);
+        }
     }
+    return retStatus;
 }

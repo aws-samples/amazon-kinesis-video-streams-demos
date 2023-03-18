@@ -39,18 +39,18 @@ public:
     char const *secretKey = nullptr;
     char const *sessionToken = nullptr;
     char const *defaultRegion = nullptr;
-    char const *use_iot_credential_provider = nullptr;
-    char const *iot_get_credential_endpoint = nullptr;
-    char const *cert_path = nullptr;
-    char const *private_key_path = nullptr;
-    char const *role_alias = nullptr;
-    char const *ca_cert_path = nullptr;
-    char const *thing_name = nullptr;
+    char const *useIotCredentialProvider = nullptr;
+    char const *iotGetCredentialEndpoint = nullptr;
+    char const *certPath = nullptr;
+    char const *privateKeyPath = nullptr;
+    char const *roleAlias = nullptr;
+    char const *caCertPath = nullptr;
+    char const *thingName = nullptr;
 
     CanaryConfig();
     VOID setEnvVarsString(string &configVar, string envVar);
     VOID setEnvVarsInt(PUINT32 pConfigVar, string envVar);
     VOID setEnvVarsBool(bool &configVar, string envVar);
-    VOID initConfigWithEnvVars();
+    STATUS initConfigWithEnvVars();
 
 };

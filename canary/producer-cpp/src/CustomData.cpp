@@ -19,10 +19,10 @@ CustomData::CustomData()
     producerStartTime = chrono::duration_cast<nanoseconds>(systemCurrentTime().time_since_epoch()).count(); // [nanoSeconds]
     startTime = chrono::duration_cast<nanoseconds>(systemCurrentTime().time_since_epoch()).count(); // [nanoSeconds]
     clientConfig.region = "us-west-2";
-    pCWclient = nullptr;
+    pCwClient = nullptr;
     pDimensionPerStream = nullptr;
     pAggregatedDimension = nullptr;
-    timeOfNextKeyFrame = new map<uint64_t, uint64_t>();
+    timeOfNextKeyFrame = new map<UINT64, UINT64>();
     timeCounter = producerStartTime / 1000000000; // [seconds]
     // Default first intermittent run to 1 min for testing
     runTill = producerStartTime / 1000000000 / 60 + 1; // [minutes]
