@@ -209,6 +209,7 @@ static VOID putFrameHandler(GstElement *kvsSink, VOID *gMetrics, gpointer data){
     KvsSinkMetric *kvsSinkMetric = reinterpret_cast<KvsSinkMetric *> (gMetrics);
     metricHandler(kvsSink, kvsSinkMetric, cusData);
     if(kvsSinkMetric->onFirstFrame){
+        LOG_DEBUG("Getting first frame at canary")
         pushStartupLatencyMetric(cusData);
         cusData->onFirstFrame = false;
     }
