@@ -53,16 +53,16 @@ VOID updateFragmentEndTimes(UINT64 curKeyFrameTime, UINT64 &lastKeyFrameTime, ma
     if (lastKeyFrameTime != 0)
     {
         (*mapPtr)[lastKeyFrameTime / HUNDREDS_OF_NANOS_IN_A_MILLISECOND] = curKeyFrameTime / HUNDREDS_OF_NANOS_IN_A_MILLISECOND;
-        auto iter = mapPtr->begin();
-        while (iter != mapPtr->end()) {
-            // clean up map: removing timestamps older than 5 min from now
-            if (iter->first < (duration_cast<milliseconds>(system_clock::now().time_since_epoch()).count() - (300000)))
-            {
-                iter = mapPtr->erase(iter);
-            } else {
-                break;
-            }
-        }
+//        auto iter = mapPtr->begin();
+//        while (iter != mapPtr->end()) {
+//            // clean up map: removing timestamps older than 5 min from now
+//            if (iter->first < (duration_cast<milliseconds>(system_clock::now().time_since_epoch()).count() - (300000)))
+//            {
+//                iter = mapPtr->erase(iter);
+//            } else {
+//                break;
+//            }
+//        }
     }
     lastKeyFrameTime = curKeyFrameTime;
 }
@@ -242,6 +242,7 @@ STATUS fragmentAckReceivedHandler(GstElement *kvsSink, PFragmentAck pFragmentAck
 
                 auto currentTimestamp = duration_cast<milliseconds>(system_clock::now().time_since_epoch()).count();
                 auto persistedAckLatency = (currentTimestamp - timeOfFragmentEndSent); // [milliseconds]
+                cusData->timeOfNextKeyFrame->erase(iter);
                 pushMetric("PersistedAckLatency", persistedAckLatency, Aws::CloudWatch::Model::StandardUnit::Milliseconds, persistedAckLatencyDatum, cusData->pDimensionPerStream, cwRequest);
                 LOG_DEBUG("Persisted Ack Latency: " << persistedAckLatency);
                 if (cusData->pCanaryConfig->useAggMetrics)
