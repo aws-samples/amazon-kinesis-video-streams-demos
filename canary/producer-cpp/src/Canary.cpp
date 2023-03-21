@@ -234,10 +234,12 @@ STATUS fragmentAckReceivedHandler(GstElement *kvsSink, PFragmentAck pFragmentAck
     iter = cusData->timeOfNextKeyFrame->find(pFragmentAck->timestamp);
     BOOL temp = (iter == cusData->timeOfNextKeyFrame->end());
     LOG_DEBUG("Timestamp found(0) in map: "<<temp);
+    LOG_DEBUG("Timestamp value: "<<iter->second);
 
     UINT64 timeOfFragmentEndSent;
     timeOfFragmentEndSent = (temp == true) ? 0 : cusData->timeOfNextKeyFrame->find(pFragmentAck->timestamp)->second;
     LOG_DEBUG("Time of the fragment end sent "<<timeOfFragmentEndSent);
+    LOG_DEBUG("Time of fragment in map: "<<cusData->timeOfNextKeyFrame->find(pFragmentAck->timestamp)->second);
 
     if (timeOfFragmentEndSent > pFragmentAck->timestamp)
     {
