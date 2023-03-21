@@ -63,6 +63,7 @@ VOID updateFragmentEndTimes(UINT64 curKeyFrameTime, UINT64 &lastKeyFrameTime, ma
             // clean up map: removing timestamps older than 5 min from now
             if (iter->first < (duration_cast<milliseconds>(system_clock::now().time_since_epoch()).count() - (300000)))
             {
+                LOG_DEBUG("Map entry erased: "<<iter->first<<" "<<iter->second);
                 iter = mapPtr->erase(iter);
             } else {
                 break;
