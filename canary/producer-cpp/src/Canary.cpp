@@ -50,6 +50,11 @@ VOID determineCredentials(GstElement *kvsSink, CustomData *cusData) {
 
 VOID updateFragmentEndTimes(UINT64 curKeyFrameTime, UINT64 &lastKeyFrameTime, map<UINT64, UINT64> *mapPtr)
 {
+    auto map = mapPtr;
+    LOG_DEBUG("Map in updateFragmentEndTimes: ");
+    for(auto iter : *map){
+        LOG_DEBUG("Elements: "<<iter.first<<" "<<iter.second);
+    }
     LOG_DEBUG("Frame presentation time at updateFragmentEndTimes: "<<curKeyFrameTime);
     LOG_DEBUG("Last key frame time: "<<lastKeyFrameTime);
     LOG_DEBUG("last key frame time/HUNDREDS_OF_NANOS_IN_A_MILLISECOND: "<<(lastKeyFrameTime / HUNDREDS_OF_NANOS_IN_A_MILLISECOND));
@@ -73,6 +78,10 @@ VOID updateFragmentEndTimes(UINT64 curKeyFrameTime, UINT64 &lastKeyFrameTime, ma
     }
     LOG_DEBUG("Stored value in map after deletion: "<<((*mapPtr)[lastKeyFrameTime / HUNDREDS_OF_NANOS_IN_A_MILLISECOND]));
     lastKeyFrameTime = curKeyFrameTime;
+    LOG_DEBUG("Map in updateFragmentEndTimes after updates: ");
+    for(auto iter : *map){
+        LOG_DEBUG("Elements: "<<iter.first<<" "<<iter.second);
+    }
 }
 
 
@@ -192,10 +201,19 @@ static VOID metricHandler(GstElement *kvsSink, KvsSinkMetric *kvsSinkMetric, Cus
 {
     LOG_DEBUG("put frame at canary");
     LOG_DEBUG("Frame presentation time stamp at canary: "<<kvsSinkMetric->framePTS);
+    auto map = *cusData->timeOfNextKeyFrame;
+    LOG_DEBUG("Map in metric handler: ");
+    for(auto iter : map){
+        LOG_DEBUG("Elements: "<<iter.first<<" "<<iter.second);
+    }
     updateFragmentEndTimes(kvsSinkMetric->framePTS, cusData->lastKeyFrameTime, cusData->timeOfNextKeyFrame);
     pushStreamMetrics(cusData, kvsSinkMetric->streamMetrics);
     pushClientMetrics(cusData, kvsSinkMetric->clientMetrics);
 
+    LOG_DEBUG("Map in metric handler after updates: ");
+    for(auto iter : map){
+        LOG_DEBUG("Elements: "<<iter.first<<" "<<iter.second);
+    }
     double duration = duration_cast<seconds>(system_clock::now().time_since_epoch()).count() - cusData->timeCounter;
     // Push error metrics every 60 seconds
     if(duration > 60)
@@ -439,7 +457,6 @@ int main(int argc, char* argv[]) {
     Aws::SDKOptions options;
 
     STATUS retStatus = STATUS_SUCCESS;
-    std::cout<<"HUNDREDS_OF_NANOS_IN_A_MILLISECOND: "<<HUNDREDS_OF_NANOS_IN_A_MILLISECOND<<std::endl;
 
     Aws::InitAPI(options);
     {
