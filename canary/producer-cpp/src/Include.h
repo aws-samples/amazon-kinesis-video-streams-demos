@@ -15,12 +15,6 @@
 #include <aws/core/Aws.h>
 #include <aws/monitoring/CloudWatchClient.h>
 #include <aws/monitoring/model/PutMetricDataRequest.h>
-#include <aws/logs/CloudWatchLogsClient.h>
-#include <aws/logs/model/CreateLogGroupRequest.h>
-#include <aws/logs/model/CreateLogStreamRequest.h>
-#include <aws/logs/model/PutLogEventsRequest.h>
-#include <aws/logs/model/DeleteLogStreamRequest.h>
-#include <aws/logs/model/DescribeLogStreamsRequest.h>
 
 #include "CanaryConfig.h"
 #include "CanaryLogs.h"
