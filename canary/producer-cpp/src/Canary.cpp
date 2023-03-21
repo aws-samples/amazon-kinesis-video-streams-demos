@@ -50,38 +50,21 @@ VOID determineCredentials(GstElement *kvsSink, CustomData *cusData) {
 
 VOID updateFragmentEndTimes(UINT64 curKeyFrameTime, UINT64 &lastKeyFrameTime, map<UINT64, UINT64> *mapPtr)
 {
-    auto map = mapPtr;
-    LOG_DEBUG("Map in updateFragmentEndTimes: ");
-    for(auto iter : *map){
-        LOG_DEBUG("Elements: "<<iter.first<<" "<<iter.second);
-    }
-    LOG_DEBUG("Frame presentation time at updateFragmentEndTimes: "<<curKeyFrameTime);
-    LOG_DEBUG("Last key frame time: "<<lastKeyFrameTime);
-    LOG_DEBUG("last key frame time/HUNDREDS_OF_NANOS_IN_A_MILLISECOND: "<<(lastKeyFrameTime / HUNDREDS_OF_NANOS_IN_A_MILLISECOND));
-    LOG_DEBUG("Frame presentation time at updateFragmentEndTimes/HUNDREDS_OF_NANOS_IN_A_MILLISECOND: "<<(curKeyFrameTime / HUNDREDS_OF_NANOS_IN_A_MILLISECOND));
     if (lastKeyFrameTime != 0)
     {
         (*mapPtr)[lastKeyFrameTime / HUNDREDS_OF_NANOS_IN_A_MILLISECOND] = curKeyFrameTime / HUNDREDS_OF_NANOS_IN_A_MILLISECOND;
-        LOG_DEBUG("Stored value in map: "<<((*mapPtr)[lastKeyFrameTime / HUNDREDS_OF_NANOS_IN_A_MILLISECOND]));
         auto iter = mapPtr->begin();
         while (iter != mapPtr->end()) {
             // clean up map: removing timestamps older than 5 min from now
-            LOG_DEBUG("Present time - 5 min: "<<(duration_cast<milliseconds>(system_clock::now().time_since_epoch()).count() - (300000)));
             if (iter->first < (duration_cast<milliseconds>(system_clock::now().time_since_epoch()).count() - (300000)))
             {
-                LOG_DEBUG("Map entry erased: "<<iter->first<<" "<<iter->second);
                 iter = mapPtr->erase(iter);
             } else {
                 break;
             }
         }
     }
-    LOG_DEBUG("Stored value in map after deletion: "<<((*mapPtr)[lastKeyFrameTime / HUNDREDS_OF_NANOS_IN_A_MILLISECOND]));
     lastKeyFrameTime = curKeyFrameTime;
-    LOG_DEBUG("Map in updateFragmentEndTimes after updates: ");
-    for(auto iter : *map){
-        LOG_DEBUG("Elements: "<<iter.first<<" "<<iter.second);
-    }
 }
 
 
@@ -199,21 +182,11 @@ VOID pushStreamMetrics(CustomData *cusData, KinesisVideoStreamMetrics streamMetr
 // put frame function to publish metrics to cloudwatch after getting g signal from producer sdk cpp
 static VOID metricHandler(GstElement *kvsSink, KvsSinkMetric *kvsSinkMetric, CustomData *cusData)
 {
-    LOG_DEBUG("put frame at canary");
-    LOG_DEBUG("Frame presentation time stamp at canary: "<<kvsSinkMetric->framePTS);
-    auto map = *cusData->timeOfNextKeyFrame;
-    LOG_DEBUG("Map in metric handler: ");
-    for(auto iter : map){
-        LOG_DEBUG("Elements: "<<iter.first<<" "<<iter.second);
-    }
+    LOG_DEBUG("At metricHandler canary");
     updateFragmentEndTimes(kvsSinkMetric->framePTS, cusData->lastKeyFrameTime, cusData->timeOfNextKeyFrame);
     pushStreamMetrics(cusData, kvsSinkMetric->streamMetrics);
     pushClientMetrics(cusData, kvsSinkMetric->clientMetrics);
 
-    LOG_DEBUG("Map in metric handler after updates: ");
-    for(auto iter : map){
-        LOG_DEBUG("Elements: "<<iter.first<<" "<<iter.second);
-    }
     double duration = duration_cast<seconds>(system_clock::now().time_since_epoch()).count() - cusData->timeCounter;
     // Push error metrics every 60 seconds
     if(duration > 60)
@@ -229,7 +202,6 @@ static VOID putFrameHandler(GstElement *kvsSink, VOID *gMetrics, gpointer data){
     KvsSinkMetric *kvsSinkMetric = reinterpret_cast<KvsSinkMetric *> (gMetrics);
     metricHandler(kvsSink, kvsSinkMetric, cusData);
     if(kvsSinkMetric->onFirstFrame){
-        LOG_DEBUG("Getting first frame at canary")
         pushStartupLatencyMetric(cusData);
         cusData->onFirstFrame = false;
     }
@@ -254,12 +226,9 @@ STATUS fragmentAckReceivedHandler(GstElement *kvsSink, PFragmentAck pFragmentAck
     iter = cusData->timeOfNextKeyFrame->find(pFragmentAck->timestamp);
     BOOL temp = (iter == cusData->timeOfNextKeyFrame->end());
     LOG_DEBUG("Timestamp found(0) in map: "<<temp);
-    LOG_DEBUG("Timestamp value: "<<iter->second);
 
     UINT64 timeOfFragmentEndSent;
     timeOfFragmentEndSent = (temp == true) ? 0 : cusData->timeOfNextKeyFrame->find(pFragmentAck->timestamp)->second;
-    LOG_DEBUG("Time of the fragment end sent "<<timeOfFragmentEndSent);
-    LOG_DEBUG("Time of fragment in map: "<<cusData->timeOfNextKeyFrame->find(pFragmentAck->timestamp)->second);
 
     if (timeOfFragmentEndSent > pFragmentAck->timestamp)
     {
@@ -272,7 +241,6 @@ STATUS fragmentAckReceivedHandler(GstElement *kvsSink, PFragmentAck pFragmentAck
                 cwRequest.SetNamespace("KinesisVideoSDKCanary");
 
                 auto currentTimestamp = duration_cast<milliseconds>(system_clock::now().time_since_epoch()).count();
-                LOG_DEBUG("Present time: "<<currentTimestamp);
                 auto persistedAckLatency = (currentTimestamp - timeOfFragmentEndSent); // [milliseconds]
                 pushMetric("PersistedAckLatency", persistedAckLatency, Aws::CloudWatch::Model::StandardUnit::Milliseconds, persistedAckLatencyDatum, cusData->pDimensionPerStream, cwRequest);
                 LOG_DEBUG("Persisted Ack Latency: " << persistedAckLatency);
