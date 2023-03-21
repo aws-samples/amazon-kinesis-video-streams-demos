@@ -272,6 +272,7 @@ STATUS fragmentAckReceivedHandler(GstElement *kvsSink, PFragmentAck pFragmentAck
                 cwRequest.SetNamespace("KinesisVideoSDKCanary");
 
                 auto currentTimestamp = duration_cast<milliseconds>(system_clock::now().time_since_epoch()).count();
+                LOG_DEBUG("Present time: "<<currentTimestamp);
                 auto persistedAckLatency = (currentTimestamp - timeOfFragmentEndSent); // [milliseconds]
                 pushMetric("PersistedAckLatency", persistedAckLatency, Aws::CloudWatch::Model::StandardUnit::Milliseconds, persistedAckLatencyDatum, cusData->pDimensionPerStream, cwRequest);
                 LOG_DEBUG("Persisted Ack Latency: " << persistedAckLatency);
