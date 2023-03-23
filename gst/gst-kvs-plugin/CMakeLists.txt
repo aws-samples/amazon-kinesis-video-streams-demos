@@ -16,15 +16,13 @@ include(FetchContent)
 FetchContent_Declare(
         webrtc
         GIT_REPOSITORY https://github.com/awslabs/amazon-kinesis-video-streams-webrtc-sdk-c
-        #GIT_TAG v1.5.0
-        GIT_TAG 8b8b2bdf064f6cb2b6495339d31efc3518b12eb9
+        GIT_TAG v1.7.3
 )
 
 FetchContent_Declare(
         cproducer
         GIT_REPOSITORY https://github.com/awslabs/amazon-kinesis-video-streams-producer-c
-        #GIT_TAG v1.1.0
-        GIT_TAG 58e1c6a1cb191f947d904784503b506e04525682
+        GIT_TAG v1.4.0
 )
 
 FetchContent_GetProperties(webrtc)
