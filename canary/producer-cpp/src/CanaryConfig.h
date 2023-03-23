@@ -8,7 +8,6 @@
 #include <Logger.h>
 
 #include "com/amazonaws/kinesis/video/cproducer/Include.h"
-#include "CanaryCallbackProvider.h"
 
 using namespace std;
 
@@ -36,20 +35,22 @@ public:
     bool useAggMetrics;
 
     // credential related items
-    char const *accessKey;
-    char const *secretKey;
-    char const *sessionToken;
-    char const *defaultRegion;
-    char const *iot_get_credential_endpoint;
-    char const *cert_path;
-    char const *private_key_path;
-    char const *role_alias;
-    char const *ca_cert_path;
+    char const *accessKey = nullptr;
+    char const *secretKey = nullptr;
+    char const *sessionToken = nullptr;
+    char const *defaultRegion = nullptr;
+    char const *useIotCredentialProvider = nullptr;
+    char const *iotGetCredentialEndpoint = nullptr;
+    char const *certPath = nullptr;
+    char const *privateKeyPath = nullptr;
+    char const *roleAlias = nullptr;
+    char const *caCertPath = nullptr;
+    char const *thingName = nullptr;
 
     CanaryConfig();
     VOID setEnvVarsString(string &configVar, string envVar);
     VOID setEnvVarsInt(PUINT32 pConfigVar, string envVar);
     VOID setEnvVarsBool(bool &configVar, string envVar);
-    VOID initConfigWithEnvVars();
+    STATUS initConfigWithEnvVars();
 
 };

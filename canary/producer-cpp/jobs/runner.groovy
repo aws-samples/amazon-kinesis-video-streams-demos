@@ -16,11 +16,13 @@ CREDENTIALS = [
 ]
 
 def buildProducer() {
-  sh  """ 
+  sh  """
     cd ./canary/producer-cpp &&
+    chmod a+x cert_setup.sh &&
+    ./cert_setup.sh ${NODE_NAME} &&
     mkdir -p build &&
     cd build && 
-    cmake .. -DBUILD_GSTREAMER_PLUGIN=ON && 
+    cmake .. &&
     make -j4
   """
 }
@@ -80,10 +82,11 @@ def runClient(isProducer, params) {
 
     def scripts_dir = "$WORKSPACE/canary/producer-cpp"
     def endpoint = "${scripts_dir}/iot-credential-provider.txt"
-    def core_cert_file = "${scripts_dir}/p${env.NODE_NAME}_certificate.pem"
-    def private_key_file = "${scripts_dir}/p${env.NODE_NAME}_private.key"
-    def role_alias = "p${env.NODE_NAME}_role_alias"
-    def thing_name = "p${env.NODE_NAME}_thing"
+    def core_cert_file = "${scripts_dir}/sink_${env.NODE_NAME}_certificate.pem"
+    def private_key_file = "${scripts_dir}/sink_${env.NODE_NAME}_private.key"
+    def role_alias = "sink_${env.NODE_NAME}_role_alias"
+    def ca_cert_file = "${scripts_dir}/cacert.pem"
+    def thing_name = "sink_${env.NODE_NAME}_thing"
 
     def envs = [
         'M2_HOME': "/opt/apache-maven-3.6.3",
@@ -95,13 +98,22 @@ def runClient(isProducer, params) {
         'CANARY_DURATION_IN_SECONDS': params.CANARY_DURATION_IN_SECONDS,
         'AWS_DEFAULT_REGION': params.AWS_DEFAULT_REGION,
         'CANARY_RUN_SCENARIO': params.CANARY_RUN_SCENARIO,
+        'CANARY_USE_IOT_PROVIDER': params.USE_IOT,
+        'AWS_IOT_CORE_CREDENTIAL_ENDPOINT': "${endpoint}",
+        'AWS_IOT_CORE_CERT': "${core_cert_file}",
+        'AWS_IOT_CORE_PRIVATE_KEY': "${private_key_file}",
+        'AWS_IOT_CORE_ROLE_ALIAS': "${role_alias}",
+        'AWS_IOT_CORE_THING_NAME': "${thing_name}",
+        'AWS_IOT_CORE_CA_CERT_PATH': "${ca_cert_file}",
+        'GST_PLUGIN_PATH': "$WORKSPACE/canary/producer-cpp/build:/usr/include/gstreamer-1.0",
+        'LD_LIBRARY_PATH': "$WORKSPACE/canary/producer-cpp/open-source/local/lib"
     ].collect({k,v -> "${k}=${v}" })
   
     withRunnerWrapper(envs) {
         sh """
             echo "Running producer"
             ls ./canary/producer-cpp
-            cd ./canary/producer-cpp/build && 
+            cd ./canary/producer-cpp/build &&
             ./producer_cpp_canary
         """
     }
@@ -126,6 +138,7 @@ pipeline {
         string(name: 'AWS_DEFAULT_REGION')
         string(name: 'CANARY_RUN_SCENARIO')
         booleanParam(name: 'FIRST_ITERATION', defaultValue: true)
+        booleanParam(name: 'USE_IOT')
     }
 
     stages {
@@ -165,6 +178,7 @@ pipeline {
                             parameters: [
                                 string(name: 'CANARY_STREAM_NAME', value: params.CANARY_STREAM_NAME),
                                 string(name: 'AWS_KVS_LOG_LEVEL', value: params.AWS_KVS_LOG_LEVEL),
+                                booleanParam(name: 'USE_IOT', value: params.USE_IOT),
                                 string(name: 'PRODUCER_NODE_LABEL', value: params.PRODUCER_NODE_LABEL),
                                 string(name: 'GIT_URL', value: params.GIT_URL),
                                 string(name: 'GIT_HASH', value: params.GIT_HASH),
