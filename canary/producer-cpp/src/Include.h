@@ -1,42 +1,29 @@
 #pragma once
 
-#include <gst/gst.h>
-#include <gst/app/gstappsink.h>
+
 #include <string.h>
 #include <chrono>
 #include <Logger.h>
-#include "KinesisVideoProducer.h"
 #include <vector>
 #include <stdlib.h>
 #include <mutex>
+#include <unistd.h>
+
 #include <IotCertCredentialProvider.h>
-#include <unistd.h> 
 #include <com/amazonaws/kinesis/video/cproducer/Include.h>
 #include <aws/core/Aws.h>
 #include <aws/monitoring/CloudWatchClient.h>
 #include <aws/monitoring/model/PutMetricDataRequest.h>
 
+#include <gstreamer/gstkvssink.h>
+#include <gst/gst.h>
+#include <gst/app/gstappsink.h>
+
 #include "CanaryConfig.h"
-#include "CanaryLogs.h"
 #include "CustomData.h"
 
-
-using namespace std;
-using namespace com::amazonaws::kinesis::video;
-using namespace log4cplus;
-
-
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 int gstreamer_init(int, char **);
-
-#ifdef __cplusplus
-}
-#endif
-
-// LOGGER_TAG("com.amazonaws.kinesis.video.gstreamer");
+LOGGER_TAG("com.amazonaws.kinesis.video.canarycpp");
 
 #define DEFAULT_RETENTION_PERIOD_HOURS 2
 #define DEFAULT_KMS_KEY_ID ""
@@ -58,5 +45,7 @@ int gstreamer_init(int, char **);
 #define DEFAULT_FRAME_DURATION_MS 1
 #define DEFAULT_CREDENTIAL_ROTATION_SECONDS 3600
 #define DEFAULT_CREDENTIAL_EXPIRATION_SECONDS 180
+
+#define CANARY_USER_AGENT_NAME  "KVS-CPP-CANARY-CLIENT"
 
 #define CANARY_METADATA_SIZE  (SIZEOF(INT64) + SIZEOF(UINT32) + SIZEOF(UINT32) + SIZEOF(UINT64))

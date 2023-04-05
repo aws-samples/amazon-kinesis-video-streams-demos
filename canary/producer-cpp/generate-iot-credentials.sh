@@ -61,7 +61,7 @@ cat > iam-permission-document.json <<EOF
                 "kinesisvideo:TagStream",
                 "kinesisvideo:GetDataEndpoint"
             ],
-            "Resource": "arn:aws:kinesisvideo:*:*:stream/\${credentials-iot:ThingName}/*"
+            "Resource": "arn:aws:kinesisvideo:*:*:stream/*/*"
         }
     ]
 }

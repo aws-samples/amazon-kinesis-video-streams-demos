@@ -16,7 +16,7 @@ CanaryConfig::CanaryConfig()
     useAggMetrics = true;
 }
 
-VOID CanaryConfig::setEnvVarsString(string &configVar, string envVar)
+VOID CanaryConfig::setEnvVarsString(std::string &configVar, std::string envVar)
 {
     if (GETENV(envVar.c_str()) != NULL)
     {
@@ -24,7 +24,7 @@ VOID CanaryConfig::setEnvVarsString(string &configVar, string envVar)
     }
 }
 
-VOID CanaryConfig::setEnvVarsInt(PUINT32 pConfigVar, string envVar)
+VOID CanaryConfig::setEnvVarsInt(PUINT32 pConfigVar, std::string envVar)
 {
     if (GETENV(envVar.c_str()) != NULL)
     {
@@ -32,11 +32,11 @@ VOID CanaryConfig::setEnvVarsInt(PUINT32 pConfigVar, string envVar)
     }
 }
 
-VOID CanaryConfig::setEnvVarsBool(bool &configVar, string envVar)
+VOID CanaryConfig::setEnvVarsBool(BOOL &configVar, std::string envVar)
 {
     if (GETENV(envVar.c_str()) != NULL)
     {
-        if (GETENV(envVar.c_str()) == "TRUE" || GETENV(envVar.c_str()) == "true" || GETENV(envVar.c_str()) == "True")
+        if (STRCMP(GETENV(envVar.c_str()), "TRUE") || STRCMP(GETENV(envVar.c_str()), "true") || STRCMP(GETENV(envVar.c_str()), "True"))
         {
             configVar = true;
         } else
@@ -49,7 +49,7 @@ VOID CanaryConfig::setEnvVarsBool(bool &configVar, string envVar)
 STATUS CanaryConfig::initConfigWithEnvVars()
 {
     useIotCredentialProvider = GETENV("CANARY_USE_IOT_PROVIDER");
-    string useIotCred(useIotCredentialProvider);
+    std::string useIotCred(useIotCredentialProvider);
     transform(useIotCred.begin(), useIotCred.end(),useIotCred.begin(), ::tolower);
 
     STATUS retStatus = STATUS_SUCCESS;

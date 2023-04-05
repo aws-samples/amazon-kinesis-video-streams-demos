@@ -1,8 +1,7 @@
 import jenkins.model.*
 
-WORKSPACE_PRODUCER="src"
 GIT_URL='https://github.com/aws-samples/amazon-kinesis-video-streams-demos.git'
-GIT_HASH='master'
+GIT_HASH='update-cpp-canary'
 RUNNER_JOB_NAME_PREFIX = "producercpp-runner"
 
 LONG_RUN_DURATION_IN_SECONDS = 12 * 60 * 60
@@ -116,7 +115,7 @@ pipeline {
                             job: NEXT_AVAILABLE_RUNNER,
                             parameters: COMMON_PARAMS + [
                                 booleanParam(name: 'USE_IOT', value: false),
-                                string(name: 'CANARY_STREAM_NAME', value: "-Continuous-Longrun"),
+                                string(name: 'CANARY_STREAM_NAME', value: "ContinuousLongrun"),
                                 string(name: 'CANARY_DURATION_IN_SECONDS', value: LONG_RUN_DURATION_IN_SECONDS.toString()),
                                 string(name: 'PRODUCER_NODE_LABEL', value: "producer-cpp-uw2"),
                                 string(name: 'CANARY_TYPE', value: "Realtime"),
@@ -132,7 +131,7 @@ pipeline {
                             job: NEXT_AVAILABLE_RUNNER,
                             parameters: COMMON_PARAMS + [
                                 booleanParam(name: 'USE_IOT', value: false),
-                                string(name: 'CANARY_STREAM_NAME', value: "-Continuous-Periodic"),
+                                string(name: 'CANARY_STREAM_NAME', value: "ContinuousPeriodic"),
                                 string(name: 'CANARY_DURATION_IN_SECONDS', value: SHORT_RUN_DURATION_IN_SECONDS.toString()),
                                 string(name: 'PRODUCER_NODE_LABEL', value: "producer-cpp-uw2"),
                                 string(name: 'CANARY_TYPE', value: "Realtime"),
@@ -148,7 +147,7 @@ pipeline {
                             job: NEXT_AVAILABLE_RUNNER,
                             parameters: COMMON_PARAMS + [
                                 booleanParam(name: 'USE_IOT', value: true),
-                                string(name: 'CANARY_STREAM_NAME', value: "-Continuous-Longrun"),
+                                string(name: 'CANARY_STREAM_NAME', value: "ContinuousLongrun"),
                                 string(name: 'CANARY_DURATION_IN_SECONDS', value: LONG_RUN_DURATION_IN_SECONDS.toString()),
                                 string(name: 'PRODUCER_NODE_LABEL', value: "producer-cpp-uw2"),
                                 string(name: 'CANARY_TYPE', value: "Realtime"),

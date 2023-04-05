@@ -1,0 +1,35 @@
+log4cplus.rootLogger=DEBUG
+
+log4cplus.logger.com.amazonaws.kinesis.video=DEBUG, KvsStreamFileAppender
+log4cplus.logger.com.amazonaws.kinesis.video.canarycpp=DEBUG, KvsCppCanaryFileAppender
+log4cplus.logger.com.amazonaws.kinesis.video.gstkvs=DEBUG, KvsSinkFileAppender
+
+log4cplus.additivity.com.amazonaws.kinesis.video.canarycpp=false
+log4cplus.additivity.com.amazonaws.kinesis.video.gstkvs=false
+
+#KvsStreamFileAppender
+log4cplus.appender.KvsStreamFileAppender=log4cplus::RollingFileAppender
+log4cplus.appender.KvsStreamFileAppender.File=log/cpp_kvs_streams.log
+log4cplus.appender.KvsStreamFileAppender.MaxFileSize=10MB
+log4cplus.appender.KvsStreamFileAppender.MaxBackupIndex=10
+log4cplus.appender.KvsStreamFileAppender.CreateDirs=true
+log4cplus.appender.KvsStreamFileAppender.layout=log4cplus::PatternLayout
+log4cplus.appender.KvsStreamFileAppender.layout.ConversionPattern=[%-5p] [%d{%d-%m-%Y %H:%M:%S:%Q %Z}] [%-l][%t] %m%n
+
+#KvsCppCanaryFileAppender
+log4cplus.appender.KvsCppCanaryFileAppender=log4cplus::RollingFileAppender
+log4cplus.appender.KvsCppCanaryFileAppender.File=log/cpp_canary.log
+log4cplus.appender.KvsCppCanaryFileAppender.MaxFileSize=10MB
+log4cplus.appender.KvsCppCanaryFileAppender.MaxBackupIndex=10
+log4cplus.appender.KvsCppCanaryFileAppender.CreateDirs=true
+log4cplus.appender.KvsCppCanaryFileAppender.layout=log4cplus::PatternLayout
+log4cplus.appender.KvsCppCanaryFileAppender.layout.ConversionPattern=[%-5p] [%d{%d-%m-%Y %H:%M:%S:%Q %Z}] [%-l][%t] %m%n
+
+#KvsSinkFileAppender
+log4cplus.appender.KvsSinkFileAppender=log4cplus::RollingFileAppender
+log4cplus.appender.KvsSinkFileAppender.File=log/cpp_kvssink.log
+log4cplus.appender.KvsSinkFileAppender.MaxFileSize=10MB
+log4cplus.appender.KvsSinkFileAppender.MaxBackupIndex=10
+log4cplus.appender.KvsSinkFileAppender.CreateDirs=true
+log4cplus.appender.KvsSinkFileAppender.layout=log4cplus::PatternLayout
+log4cplus.appender.KvsSinkFileAppender.layout.ConversionPattern=[%-5p] [%d{%d-%m-%Y %H:%M:%S:%Q %Z}] [%-l][%t] %m%n
