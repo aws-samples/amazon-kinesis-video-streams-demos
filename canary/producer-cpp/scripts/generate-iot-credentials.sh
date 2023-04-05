@@ -1,4 +1,11 @@
 #!/bin/bash
+
+# Exit if any of the command fails
+set -e
+
+# Add log line to detail the command that failed
+trap 'last_command=$current_command; current_command=$BASH_COMMAND' DEBUG
+trap 'echo "\"${last_command}\" command led to exit code $?."' EXIT
 # You need to setup your aws cli first, because this script is based on aws cli.
 # You can use this script to setup environment variables in the shell which samples run on.
 # https://docs.aws.amazon.com/kinesisvideostreams/latest/dg/how-iot.html
@@ -48,8 +55,10 @@ cat > iam-permission-document.json <<EOF
         {
             "Effect": "Allow",
             "Action": [
-                "kinesisvideo:ListStreams",
-                "kinesisvideo:CreateStream"
+                "iot:Receive",
+                "iot:Subscribe",
+                "iot:Connect",
+                "iot:Publish"
             ],
             "Resource": "*"
         },
@@ -58,10 +67,12 @@ cat > iam-permission-document.json <<EOF
             "Action": [
                 "kinesisvideo:DescribeStream",
                 "kinesisvideo:PutMedia",
-                "kinesisvideo:TagStream",
-                "kinesisvideo:GetDataEndpoint"
+                "kinesisvideo:GetDataEndpoint",
+                "kinesisvideo:CreateStream"
             ],
-            "Resource": "arn:aws:kinesisvideo:*:*:stream/*/*"
+            "Resource": [
+                "arn:aws:kinesisvideo:*:*:stream/*/*"
+            ]
         }
     ]
 }
@@ -80,7 +91,11 @@ cat > iot-policy-document.json << EOF
       {
      "Effect":"Allow",
      "Action":[
-        "iot:Connect"
+        "iot:Connect",
+        "iot:Publish",
+        "iot:Subscribe",
+        "iot:Receive",
+        "iot:Allow"
      ],
      "Resource":"*"
  },

@@ -2,18 +2,20 @@
 
 CanaryConfig::CanaryConfig()
 {
-    testVideoFps = 25;
-    streamName = "DefaultStreamName";
-    sourceType = "TEST_SOURCE";
-    canaryRunScenario = "Continuous"; // (or intermittent)
-    streamType = "REALTIME";
-    canaryLabel = "DEFAULT_CANARY_LABEL"; // need to decide on a default value
-    cpUrl = "";
-    fragmentSize = DEFAULT_FRAGMENT_DURATION_MILLISECONDS;
-    canaryDuration = DEFAULT_CANARY_DURATION_SECONDS;
-    bufferDuration = DEFAULT_BUFFER_DURATION_SECONDS;
-    storageSizeInBytes = 0;
-    useAggMetrics = true;
+    this->streamName = DEFAULT_CANARY_STREAM_NAME;
+    this->sourceType = DEFAULT_SOURCE_TYPE;
+    this->canaryRunScenario = DEFAULT_RUN_SCENARIO; // (or intermittent)
+    this->streamType = DEFAULT_STREAM_TYPE_REALTIME;
+    this->canaryLabel = DEFAULT_CANARY_RUN_LABEL; // need to decide on a default value
+
+    this->fragmentSize = DEFAULT_FRAGMENT_DURATION_MILLISECONDS;
+    this->canaryDuration = DEFAULT_CANARY_DURATION_SECONDS;
+    this->bufferDuration = DEFAULT_BUFFER_DURATION_SECONDS;
+    this->storageSizeInMB = DEFAULT_STORAGE_MB;
+    this->testVideoFps = DEFAULT_CANARY_FRAME_RATE;
+    this->useAggMetrics = true;
+
+    this->defaultRegion = DEFAULT_CANARY_REGION;
 }
 
 VOID CanaryConfig::setEnvVarsString(std::string &configVar, std::string envVar)
@@ -32,85 +34,99 @@ VOID CanaryConfig::setEnvVarsInt(PUINT32 pConfigVar, std::string envVar)
     }
 }
 
+BOOL strtobool(const CHAR* value)
+{
+    if (STRCMPI(value, "on") == 0 || STRCMPI(value, "true") == 0) {
+        return TRUE;
+    }
+
+    return FALSE;
+}
+
 VOID CanaryConfig::setEnvVarsBool(BOOL &configVar, std::string envVar)
 {
-    if (GETENV(envVar.c_str()) != NULL)
-    {
-        if (STRCMP(GETENV(envVar.c_str()), "TRUE") || STRCMP(GETENV(envVar.c_str()), "true") || STRCMP(GETENV(envVar.c_str()), "True"))
-        {
-            configVar = true;
-        } else
-        {
-            configVar = false;
-        }
+    if (GETENV(envVar.c_str()) != NULL) {
+        configVar = strtobool(GETENV(envVar.c_str()));
     }
 }
 
 STATUS CanaryConfig::initConfigWithEnvVars()
 {
-    useIotCredentialProvider = GETENV("CANARY_USE_IOT_PROVIDER");
-    std::string useIotCred(useIotCredentialProvider);
-    transform(useIotCred.begin(), useIotCred.end(),useIotCred.begin(), ::tolower);
-
     STATUS retStatus = STATUS_SUCCESS;
+    setEnvVarsBool(this->useIotCredentialProvider, CANARY_USE_IOT_ENV_VAR);
 
-    if(useIotCred.compare("true") == 0){
-        if (nullptr != (iotGetCredentialEndpoint = GETENV("AWS_IOT_CORE_CREDENTIAL_ENDPOINT")) &&
-            nullptr != (certPath = GETENV("AWS_IOT_CORE_CERT")) &&
-            nullptr != (privateKeyPath = GETENV("AWS_IOT_CORE_PRIVATE_KEY")) &&
-            nullptr != (roleAlias = GETENV("AWS_IOT_CORE_ROLE_ALIAS")) &&
-            nullptr != (caCertPath = GETENV("AWS_IOT_CORE_CA_CERT_PATH")) &&
-            nullptr != (thingName = GETENV("AWS_IOT_CORE_THING_NAME"))) {
-            streamName = thingName;
+    if(this->useIotCredentialProvider) {
+        if (nullptr != (this->iotGetCredentialEndpointFile = GETENV(IOT_CORE_CREDENTIAL_ENDPOINT_ENV_VAR)) &&
+            nullptr != (this->certPath = GETENV(IOT_CORE_CERT_ENV_VAR)) &&
+            nullptr != (this->privateKeyPath = GETENV(IOT_CORE_PRIVATE_KEY_ENV_VAR)) &&
+            nullptr != (this->roleAlias = GETENV(IOT_CORE_ROLE_ALIAS_ENV_VAR)) &&
+            nullptr != (this->caCertPath = GETENV(IOT_CORE_CA_CERT_PATH_ENV_VAR)) &&
+            nullptr != (this->thingName = GETENV(IOT_CORE_THING_NAME_ENV_VAR))) {
+            UINT64 fileSize;
+            CHK_STATUS(readFile(this->iotGetCredentialEndpointFile, TRUE, NULL, &fileSize));
+            CHK_ERR(fileSize != 0, STATUS_EMPTY_IOT_CRED_FILE, "Empty credential file");
+            CHK_STATUS(readFile((PCHAR)this->iotGetCredentialEndpointFile, TRUE, this->iotGetCredentialEndpoint, &fileSize));
+            this->iotGetCredentialEndpoint[fileSize - 1] = '\0';
+            this->streamName = this->thingName;
         }
-        else{
-            retStatus = STATUS_NOT_FOUND;
+        else {
             LOG_ERROR("Missing Credential: IOT Credential");
+            CHK(FALSE, STATUS_NOT_FOUND);
         }
-    }
-    else {
-        if(nullptr != (accessKey = GETENV(ACCESS_KEY_ENV_VAR)) &&
-           nullptr != (secretKey = GETENV(SECRET_KEY_ENV_VAR))){
+    } else {
+        if(nullptr != (this->accessKey = GETENV(ACCESS_KEY_ENV_VAR)) &&
+           nullptr != (this->secretKey = GETENV(SECRET_KEY_ENV_VAR))){
             setEnvVarsString(streamName, "CANARY_STREAM_NAME");
         }
         else{
-            retStatus = STATUS_NOT_FOUND;
             LOG_ERROR("Missing Credential: AWS Credential");
+            CHK(FALSE, STATUS_NOT_FOUND);
         }
     }
-    if(STATUS_SUCCEEDED(retStatus)){
-        setEnvVarsString(canaryRunScenario, "CANARY_RUN_SCENARIO");
-        setEnvVarsString(streamType, "CANARY_STREAM_TYPE");
-        setEnvVarsString(canaryLabel, "CANARY_LABEL");
-        setEnvVarsString(cpUrl, "CANARY_CP_URL");
 
-        setEnvVarsInt(&fragmentSize, "CANARY_FRAGMENT_SIZE");
-        setEnvVarsInt(&canaryDuration, "CANARY_DURATION_IN_SECONDS");
-        setEnvVarsInt(&bufferDuration, "CANARY_BUFFER_DURATION");
-        setEnvVarsInt(&storageSizeInBytes, "CANARY_STORAGE_SIZE");
-        setEnvVarsInt(&testVideoFps, "CANARY_FPS");
+    setEnvVarsString(this->canaryRunScenario, CANARY_RUN_SCENARIO_ENV_VAR);
+    setEnvVarsString(this->streamType, CANARY_STREAM_TYPE_ENV_VAR);
 
-        defaultRegion = GETENV(DEFAULT_REGION_ENV_VAR);
-        sessionToken = GETENV(SESSION_TOKEN_ENV_VAR);
-
-        LOG_DEBUG("CANARY_STREAM_NAME: " << streamName);
-        LOG_DEBUG("CANARY_RUN_SCENARIO: " << canaryRunScenario);
-        LOG_DEBUG("CANARY_STREAM_TYPE: " << streamType);
-        LOG_DEBUG("CANARY_LABEL: " << canaryLabel);
-        LOG_DEBUG("CANARY_CP_URL: " << cpUrl);
-        LOG_DEBUG("CANARY_FRAGMENT_SIZE: " << fragmentSize);
-        LOG_DEBUG("CANARY_DURATION: " << canaryDuration);
-        LOG_DEBUG("CANARY_STORAGE_SIZE: " << storageSizeInBytes);
-        LOG_DEBUG("CANARY_FPS: " << testVideoFps);
-
-        if(useIotCred.compare("true") == 0){
-            LOG_DEBUG("IOT_ENDPOINT: "<< iotGetCredentialEndpoint);
-            LOG_DEBUG("IOT_CERT_FILE: "<< certPath);
-            LOG_DEBUG("IOT_PRIVATE_KEY: "<< privateKeyPath);
-            LOG_DEBUG("IOT_ROLE_ALIAS: "<< roleAlias);
-            LOG_DEBUG("IOT_CA_CERT_FILE: "<< caCertPath);
-            LOG_DEBUG("IOT_THING_NAME: "<< thingName);
-        }
+    if(this->streamType.compare(DEFAULT_STREAM_TYPE_REALTIME) && this->streamType.compare(DEFAULT_STREAM_TYPE_OFFLINE)) {
+        LOG_ERROR("Unsupported stream type provided. Supported types are Realtime and Offline..." << this->streamType << " found");
+        CHK(FALSE, STATUS_INVALID_ARG);
     }
+
+    setEnvVarsString(this->canaryLabel, CANARY_LABEL_ENV_VAR);
+
+
+    setEnvVarsInt(&this->fragmentSize, CANARY_FRAGMENT_SIZE_ENV_VAR);
+    setEnvVarsInt(&this->canaryDuration, CANARY_RUN_DURATION_ENV_VAR);
+    setEnvVarsInt(&this->bufferDuration, CANARY_BUFFER_DURATION_ENV_VAR);
+    setEnvVarsInt(&this->storageSizeInMB, CANARY_STORAGE_SIZE_MB_ENV_VAR);
+    setEnvVarsInt(&this->testVideoFps, CANARY_FRAME_RATE_ENV_VAR);
+    setEnvVarsString(this->defaultRegion, DEFAULT_REGION_ENV_VAR);
+
+CleanUp:
     return retStatus;
+}
+
+VOID CanaryConfig::print() {
+    LOG_DEBUG("Applied configuration:\n\n"
+          "\tRegion             : " << this->defaultRegion <<
+          "\n\tLabel              : " << this->canaryLabel <<
+          "\n\tStream Name        : " << this->streamName <<
+          "\n\tDuration           : " << this->canaryDuration << " seconds" <<
+          "\n\tCanary run scenario: " << this->canaryRunScenario <<
+          "\n\tSource type:       : " << this->sourceType <<
+          "\n\tStreaming type:    : " << this->streamType <<
+          "\n\tCredential type    : " << (this->useIotCredentialProvider ? "IoT" : "Static") <<
+          "\n");
+
+    LOG_INFO("Canary label: " << this->canaryLabel);
+    if(this->useIotCredentialProvider) {
+        LOG_DEBUG("IoT specific configuration:\n\n"
+                  "\tEndpoint             : " << (PCHAR) this->iotGetCredentialEndpoint <<
+                  "\n\tCert file path       : " << this->certPath <<
+                  "\n\tPrivate key path     : " << this->privateKeyPath <<
+                  "\n\tRole Alias           : " << this->roleAlias <<
+                  "\n\tCA cert file path    : " << this->caCertPath <<
+                  "\n\tThing name:          : " << this->thingName <<
+                  "\n")
+    }
 }

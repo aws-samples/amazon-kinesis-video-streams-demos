@@ -22,29 +22,25 @@ VOID onPutMetricDataResponseReceivedHandler(const Aws::CloudWatch::CloudWatchCli
     }
 }
 
-VOID determineCredentials(GstElement *kvssink, CustomData *cusData) {
-
-    std::string useIotCred(cusData->pCanaryConfig->useIotCredentialProvider);
-    transform(useIotCred.begin(), useIotCred.end(),useIotCred.begin(), ::tolower);
-
-    if(useIotCred.compare("true") == 0) {
-        LOG_DEBUG("Setting IOT Credentials");
+VOID determineCredentials(GstElement *kvssink, CanaryConfig* config) {
+    if(config->useIotCredentialProvider) {
+        LOG_DEBUG("Setting Gstreamer IOT Credentials");
         GstStructure *iot_credentials = gst_structure_new(
                 "iot-certificate",
-                "iot-thing-name", G_TYPE_STRING, cusData->pCanaryConfig->thingName,
-                "endpoint", G_TYPE_STRING, cusData->pCanaryConfig->iotGetCredentialEndpoint,
-                "cert-path", G_TYPE_STRING, cusData->pCanaryConfig->certPath,
-                "key-path", G_TYPE_STRING, cusData->pCanaryConfig->privateKeyPath,
-                "ca-path", G_TYPE_STRING, cusData->pCanaryConfig->caCertPath,
-                "role-aliases", G_TYPE_STRING, cusData->pCanaryConfig->roleAlias, NULL);
+                "iot-thing-name", G_TYPE_STRING, config->thingName,
+                "endpoint", G_TYPE_STRING, (PCHAR) config->iotGetCredentialEndpoint,
+                "cert-path", G_TYPE_STRING, config->certPath,
+                "key-path", G_TYPE_STRING, config->privateKeyPath,
+                "ca-path", G_TYPE_STRING, config->caCertPath,
+                "role-aliases", G_TYPE_STRING, config->roleAlias, NULL);
 
         g_object_set(G_OBJECT (kvssink), "iot-certificate", iot_credentials, NULL);
         gst_structure_free(iot_credentials);
     }
     else {
         LOG_DEBUG("Setting AWS Credentials");
-        g_object_set(G_OBJECT(kvssink), "access-key", cusData->pCanaryConfig->accessKey, NULL);
-        g_object_set(G_OBJECT(kvssink), "secret-key", cusData->pCanaryConfig->secretKey, NULL);
+        g_object_set(G_OBJECT(kvssink), "access-key", config->accessKey, NULL);
+        g_object_set(G_OBJECT(kvssink), "secret-key", config->secretKey, NULL);
     }
 }
 
@@ -328,13 +324,19 @@ int gstreamer_test_source_init(CustomData *cusData, GstElement *pipeline) {
 
     // configure kvssink
     g_object_set(G_OBJECT (kvssink), "stream-name", cusData->streamName, NULL);
-    g_object_set(G_OBJECT (kvssink), "storage-size", 256, NULL);
+    g_object_set(G_OBJECT (kvssink), "storage-size", cusData->pCanaryConfig->storageSizeInMB, NULL);
     g_object_set(G_OBJECT (kvssink), "get-kvs-metrics", TRUE, NULL);
     g_object_set(G_OBJECT (kvssink), "user-agent", CANARY_USER_AGENT_NAME, NULL);
     g_object_set(G_OBJECT (kvssink), "log-config", NULL, NULL);
+
+    if(cusData->pCanaryConfig->streamType == "Realtime") {
+        g_object_set(G_OBJECT (kvssink), "streaming-type", STREAMING_TYPE_REALTIME, NULL);
+    } else if (cusData->pCanaryConfig->streamType == "Offline") {
+        g_object_set(G_OBJECT (kvssink), "streaming-type", STREAMING_TYPE_OFFLINE, NULL);
+    }
     g_signal_connect(G_OBJECT(kvssink), "stream-client-metric", (GCallback) putFrameHandler, cusData);
     g_signal_connect(G_OBJECT(kvssink), "fragment-ack", (GCallback) fragmentAckReceivedHandler, cusData);
-    determineCredentials(kvssink, cusData);
+    determineCredentials(kvssink, cusData->pCanaryConfig);
 
     // define and configure video filter, we only want the specified format to pass to the sink
     // ("caps" is short for "capabilities")
@@ -435,7 +437,7 @@ int gstreamer_init(int argc, char* argv[], CustomData *cusData) {
 
 int main(int argc, char* argv[]) {
     log4cplus::initialize();
-    log4cplus::PropertyConfigurator::doConfigure("../canary_cpp_config");
+    log4cplus::PropertyConfigurator::doConfigure("../kvs_log_configuration");
     initializeEndianness();
     srand(time(0));
     Aws::SDKOptions options;
@@ -452,8 +454,11 @@ int main(int argc, char* argv[]) {
             retStatus = canaryConfig.initConfigWithEnvVars();
         }
         if (STATUS_FAILED(retStatus)) {
+            LOG_ERROR("Failed to set up canary configs..exiting");
             goto CleanUp;
         }
+
+        canaryConfig.print();
 
         CustomData cusData;
         cusData.pCanaryConfig = &canaryConfig;
@@ -493,5 +498,4 @@ int main(int argc, char* argv[]) {
     }
     CleanUp:
     Aws::ShutdownAPI(options);
-    return (retStatus == STATUS_SUCCESS) ? 0 : -1;
 }

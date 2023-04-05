@@ -12,7 +12,7 @@ set(BUILD_ONLY "monitoring;logs" CACHE STRING "Tell AWS SDK to only build monito
 FetchContent_Declare(
         producercpp
         GIT_REPOSITORY https://github.com/awslabs/amazon-kinesis-video-streams-producer-sdk-cpp.git
-        GIT_TAG        e586c9988550f2457990d812e15e967b8922dfe2
+        GIT_TAG        70b3d6c1300f354a52870841cc3aeb14a11010f3
 )
 
 FetchContent_Declare(

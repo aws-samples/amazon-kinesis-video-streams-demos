@@ -1,5 +1,12 @@
 #!/bin/bash
 
+# Exit if any of the command fails
+set -e
+
+# Add log line to detail the command that failed
+trap 'last_command=$current_command; current_command=$BASH_COMMAND' DEBUG
+trap 'echo "\"${last_command}\" command led to exit code $?."' EXIT
+
 prefix=$1
 thingName="sink_${prefix}_thing"
 thingTypeName="sink_${prefix}_thing_type"
@@ -11,6 +18,7 @@ iotCert="sink_${prefix}_certificate.pem"
 iotPublicKey="sink_${prefix}_public.key"
 iotPrivateKey="sink_${prefix}_private.key"
 
+
 # Create the certificate to which you must attach the policy for IoT that you created above.
 aws --profile default  iot create-keys-and-certificate --set-as-active --certificate-pem-outfile $iotCert --public-key-outfile $iotPublicKey --private-key-outfile $iotPrivateKey > certificate
 # Attach the policy for IoT (KvsCameraIoTPolicy created above) to this certificate.
@@ -21,3 +29,10 @@ aws --profile default  iot attach-thing-principal --thing-name $thingName --prin
 aws --profile default  iot describe-endpoint --endpoint-type iot:CredentialProvider --output text > iot-credential-provider.txt
 # In addition to the X.509 cerficiate created above, you must also have a CA certificate to establish trust with the back-end service through TLS. You can get the CA certificate using the following command:
 curl 'https://www.amazontrust.com/repository/SFSRootCAG2.pem' --output cacert.pem
+
+#export AWS_IOT_CORE_CREDENTIAL_ENDPOINT=$(cat iot-credential-provider.txt)
+#export AWS_IOT_CORE_CERT=${PWD}"/"${iotCert}
+#export AWS_IOT_CORE_PRIVATE_KEY=${PWD}"/"${iotPrivateKey}
+#export AWS_IOT_CORE_ROLE_ALIAS=${iotRoleAlias}
+#export AWS_IOT_CORE_THING_NAME=${thingName}
+#export AWS_IOT_CA_CERT=${PWD}"/"cacert.pem""

@@ -17,9 +17,10 @@ CREDENTIALS = [
 
 def buildProducer() {
   sh  """
-    cd ./canary/producer-cpp &&
+    cd ./canary/producer-cpp/scripts &&
     chmod a+x cert_setup.sh &&
     ./cert_setup.sh ${NODE_NAME} &&
+    cd .. &&
     mkdir -p build &&
     cd build && 
     cmake .. &&
@@ -80,7 +81,8 @@ def runClient(isProducer, params) {
     
     echo "Done waiting in NODE_NAME = ${env.NODE_NAME}"
 
-    def scripts_dir = "$WORKSPACE/canary/producer-cpp"
+    def scripts_dir = "$WORKSPACE/canary/producer-cpp/scripts"
+    def creds_file = "${scripts_dir}/iot-credential-provider.txt"
     def endpoint = "${scripts_dir}/iot-credential-provider.txt"
     def core_cert_file = "${scripts_dir}/sink_${env.NODE_NAME}_certificate.pem"
     def private_key_file = "${scripts_dir}/sink_${env.NODE_NAME}_private.key"
@@ -91,20 +93,20 @@ def runClient(isProducer, params) {
     def envs = [
         'M2_HOME': "/opt/apache-maven-3.6.3",
         'AWS_KVS_LOG_LEVEL': params.AWS_KVS_LOG_LEVEL,
-        'CANARY_STREAM_NAME' : "${env.JOB_NAME}" + params.CANARY_STREAM_NAME,
+        'CANARY_STREAM_NAME' : "${env.JOB_NAME}" + "-" + params.CANARY_STREAM_NAME,
         'CANARY_LABEL': params.RUNNER_LABEL,
-        'CANARY_TYPE': params.CANARY_TYPE,
+        'CANARY_STREAM_TYPE': params.CANARY_TYPE,
         'FRAGMENT_SIZE_IN_BYTES' : params.FRAGMENT_SIZE_IN_BYTES,
         'CANARY_DURATION_IN_SECONDS': params.CANARY_DURATION_IN_SECONDS,
         'AWS_DEFAULT_REGION': params.AWS_DEFAULT_REGION,
         'CANARY_RUN_SCENARIO': params.CANARY_RUN_SCENARIO,
-        'CANARY_USE_IOT_PROVIDER': params.USE_IOT,
+        'CANARY_USE_IOT': params.USE_IOT,
         'AWS_IOT_CORE_CREDENTIAL_ENDPOINT': "${endpoint}",
         'AWS_IOT_CORE_CERT': "${core_cert_file}",
         'AWS_IOT_CORE_PRIVATE_KEY': "${private_key_file}",
         'AWS_IOT_CORE_ROLE_ALIAS': "${role_alias}",
         'AWS_IOT_CORE_THING_NAME': "${thing_name}",
-        'AWS_IOT_CORE_CA_CERT_PATH': "${ca_cert_file}",
+        'AWS_IOT_CA_CERT': "${ca_cert_file}",
         'GST_PLUGIN_PATH': "$WORKSPACE/canary/producer-cpp/build:/usr/include/gstreamer-1.0",
         'LD_LIBRARY_PATH': "$WORKSPACE/canary/producer-cpp/open-source/local/lib"
     ].collect({k,v -> "${k}=${v}" })
@@ -178,11 +180,11 @@ pipeline {
                             parameters: [
                                 string(name: 'CANARY_STREAM_NAME', value: params.CANARY_STREAM_NAME),
                                 string(name: 'AWS_KVS_LOG_LEVEL', value: params.AWS_KVS_LOG_LEVEL),
-                                booleanParam(name: 'USE_IOT', value: params.USE_IOT),
+                                booleanParam(name: 'CANARY_USE_IOT', value: params.USE_IOT),
                                 string(name: 'PRODUCER_NODE_LABEL', value: params.PRODUCER_NODE_LABEL),
                                 string(name: 'GIT_URL', value: params.GIT_URL),
                                 string(name: 'GIT_HASH', value: params.GIT_HASH),
-                                string(name: 'CANARY_TYPE', value: params.CANARY_TYPE),
+                                string(name: 'CANARY_STREAM_TYPE', value: params.CANARY_TYPE),
                                 string(name: 'FRAGMENT_SIZE_IN_BYTES', value: params.FRAGMENT_SIZE_IN_BYTES),
                                 string(name: 'CANARY_DURATION_IN_SECONDS', value: params.CANARY_DURATION_IN_SECONDS),
                                 string(name: 'MIN_RETRY_DELAY_IN_SECONDS', value: params.MIN_RETRY_DELAY_IN_SECONDS),
