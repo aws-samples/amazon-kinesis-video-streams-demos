@@ -1,0 +1,9 @@
+{
+  "AWS_KVS_LOG_LEVEL": 1,
+  "CANARY_USE_TURN": true,
+  "CANARY_TRICKLE_ICE": true,
+  "CANARY_CLIENT_ID": "LoadTesting",
+  "CANARY_IS_MASTER": false,
+  "CANARY_CHANNEL_NAME": "test-channel-xyz-sdk-mac-local",
+  "CANARY_LOG_GROUP_NAME": "canary_test"
+}
