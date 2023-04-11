@@ -139,6 +139,60 @@ def buildSignaling(params) {
     }
 }
 
+def buildPeer(isMaster, params) {
+    def clientID = "Master"
+    RUNNING_NODES_IN_BUILDING++
+
+    // TODO: get the branch and version from orchestrator
+    if (params.FIRST_ITERATION) {
+        deleteDir()
+    }
+
+    def thing_prefix = "${env.JOB_NAME}-${params.RUNNER_LABEL}"
+    buildProject(params.USE_MBEDTLS, thing_prefix)
+
+    RUNNING_NODES_IN_BUILDING--
+
+    waitUntil {
+        RUNNING_NODES_IN_BUILDING == 0
+    }
+
+    def scripts_dir = "$WORKSPACE/canary/webrtc-c/scripts"
+    def endpoint = "${scripts_dir}/iot-credential-provider.txt"
+    def core_cert_file = "${scripts_dir}/${thing_prefix}_certificate.pem"
+    def private_key_file = "${scripts_dir}/${thing_prefix}_private.key"
+    def role_alias = "${thing_prefix}_role_alias"
+    def thing_name = "${thing_prefix}_thing"
+
+    def envs = [
+      'AWS_KVS_LOG_LEVEL': params.AWS_KVS_LOG_LEVEL,
+      'CANARY_USE_TURN': params.USE_TURN,
+      'CANARY_TRICKLE_ICE': params.TRICKLE_ICE,
+      'CANARY_USE_IOT_PROVIDER': params.USE_IOT,
+      'CANARY_LOG_GROUP_NAME': params.LOG_GROUP_NAME,
+      'CANARY_LOG_STREAM_NAME': "${params.RUNNER_LABEL}-${clientID}-${START_TIMESTAMP}",
+      'CANARY_CHANNEL_NAME': "test-channel-xyz-sdk-mac-local",
+      'CANARY_LABEL': params.SCENARIO_LABEL,
+      'CANARY_CLIENT_ID': clientID,
+      'CANARY_IS_MASTER': isMaster,
+      'CANARY_DURATION_IN_SECONDS': params.DURATION_IN_SECONDS,
+      'AWS_IOT_CORE_CREDENTIAL_ENDPOINT': "${endpoint}",
+      'AWS_IOT_CORE_CERT': "${core_cert_file}",
+      'AWS_IOT_CORE_PRIVATE_KEY': "${private_key_file}",
+      'AWS_IOT_CORE_ROLE_ALIAS': "${role_alias}",
+      'AWS_IOT_CORE_THING_NAME': "${thing_name}",
+      'CANARY_USE_MEDIA_STORAGE': params.USE_MEDIA_STORAGE,
+      'CANARY_STORAGE_STREAM_ARN': "arn:aws:kinesisvideo:us-west-2:403080233248:stream/test-stream-xyz-sdk-mac-local/1680642462543"
+    ].collect{ k, v -> "${k}=${v}" }
+
+    withRunnerWrapper(envs) {
+        sh """
+            cd ./canary/webrtc-c/build &&
+            ${isMaster ? "" : "sleep 10 &&"}
+            ./kvsWebrtcCanaryWebrtcIngestion"""
+    }
+}
+
 pipeline {
     agent {
         label params.MASTER_NODE_LABEL

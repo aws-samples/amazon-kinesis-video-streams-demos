@@ -95,6 +95,8 @@ STATUS Peer::initSignaling(const Canary::PConfig pConfig)
     channelInfo.reconnect = TRUE;
     channelInfo.pCertPath = (PCHAR) DEFAULT_KVS_CACERT_PATH;
     channelInfo.messageTtl = 0; // Default is 60 seconds
+    channelInfo.useMediaStorage = pConfig->useMediaStorage;
+    channelInfo.pStorageStreamArn = (PCHAR) CANARY_STORAGE_STREAM_ARN;
 
     this->clientInfo.signalingClientCreationMaxRetryAttempts = MAX_CALL_RETRY_COUNT;
 
@@ -391,6 +393,20 @@ CleanUp:
     return retStatus;
 }
 
+STATUS Peer::jointSession()
+{
+    DLOGI("Call to signaling client Join Session");
+    STATUS retStatus = STATUS_SUCCESS;
+    retStatus = signalingClientJoinSessionSync(signalingClientHandle);
+    if (retStatus != STATUS_SUCCESS) {
+        printf("[KVS Master] signalingClientConnectSync(): operation returned status code: 0x%08x", retStatus);
+        goto CleanUp;
+    }
+CleanUp:
+
+    return retStatus;
+}
+
 STATUS Peer::send(PSignalingMessage pMsg)
 {
     STATUS retStatus = STATUS_SUCCESS;
@@ -536,6 +552,8 @@ STATUS Peer::addTransceiver(RtcMediaStreamTrack& track)
         DLOGV("received bitrate suggestion: %f", maxiumBitrate);
     };
 
+    auto sampleFrameHandler = [](UINT64 customData, PFrame pFrame) -> VOID {};
+
     auto handleVideoFrame = [](UINT64 customData, PFrame pFrame) -> VOID {
         PPeer pPeer = (Canary::PPeer)(customData);
         std::unique_lock<std::recursive_mutex> lock(pPeer->mutex);
@@ -574,7 +592,7 @@ STATUS Peer::addTransceiver(RtcMediaStreamTrack& track)
         this->videoTransceivers.push_back(pTransceiver);
 
         // As part of canaries, we will only be monitoring video transceiver as we do for every other metrics
-        CHK_STATUS(transceiverOnFrame(pTransceiver, (UINT64) this, handleVideoFrame));
+        CHK_STATUS(transceiverOnFrame(pTransceiver, (UINT64) this, sampleFrameHandler));
     } else {
         this->audioTransceivers.push_back(pTransceiver);
     }

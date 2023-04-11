@@ -190,6 +190,11 @@ STATUS Config::initWithEnvVars()
     CHK_STATUS(optenv(SESSION_TOKEN_ENV_VAR, &sessionToken, ""));
     CHK_STATUS(optenv(DEFAULT_REGION_ENV_VAR, &region, DEFAULT_AWS_REGION));
 
+    CHK_STATUS(optenvBool(CANARY_USE_MEDIA_STORAGE, &useMediaStorage, FALSE));
+    if(useMediaStorage.value == TRUE){
+        CHK_STATUS(mustenv(CANARY_STORAGE_STREAM_ARN, &storageStreamArn));
+    }
+
     // Set the logger log level
     if (!logLevel.initialized) {
         CHK_STATUS(optenvUint64(DEBUG_LOG_LEVEL_ENV_VAR, &logLevel64, LOG_LEVEL_WARN));

@@ -35,6 +35,10 @@ class Config {
     Value<std::string> iotCorePrivateKey;
     Value<std::string> iotCoreRoleAlias;
 
+    //Media Storage
+    Value<BOOL> useMediaStorage;
+    Value<std::string> storageStreamArn;
+
     // logging
     Value<UINT32> logLevel;
     Value<std::string> logGroupName;

@@ -13,13 +13,13 @@ set(BUILD_ONLY "monitoring;logs" CACHE STRING "Tell AWS SDK to only build monito
 FetchContent_Declare(
   webrtc
   GIT_REPOSITORY https://github.com/awslabs/amazon-kinesis-video-streams-webrtc-sdk-c
-  GIT_TAG        565854cc111c6e75ed125877fb3c7379b9955825
+  GIT_TAG        Release-WebRTC-Streams-Ingestion-Public-Preview
 )
 
 FetchContent_Declare(
   cloudwatch
   GIT_REPOSITORY https://github.com/aws/aws-sdk-cpp
-  GIT_TAG        1.9.67
+  GIT_TAG        1.10.9
 )
 
 FetchContent_GetProperties(webrtc)
@@ -60,6 +60,8 @@ target_link_libraries(
   aws-cpp-sdk-monitoring
   aws-cpp-sdk-logs)
 
+file(COPY "${CMAKE_CURRENT_SOURCE_DIR}/samples/h264SampleFrames" DESTINATION ./samples)
+
 add_executable(
   kvsWebrtcCanaryWebrtc
   src/CanaryWebrtc.cpp)
@@ -73,5 +75,12 @@ add_executable(
 target_link_libraries(
   kvsWebrtcCanarySignaling
   kvsWebrtcCanary)
+
+add_executable(
+        kvsWebrtcCanaryWebrtcIngestion
+        src/CanaryWebrtcIngestion.cpp)
+target_link_libraries(
+        kvsWebrtcCanaryWebrtcIngestion
+        kvsWebrtcCanary)
 
 file(COPY "${CMAKE_CURRENT_SOURCE_DIR}/assets" DESTINATION .)

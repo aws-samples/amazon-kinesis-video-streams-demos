@@ -54,6 +54,9 @@ class Peer {
     STATUS init(const Canary::PConfig, const Callbacks&);
     STATUS shutdown();
     STATUS connect();
+    STATUS jointSession();
+    VOID sampleFrameHandler(UINT64, PFrame);
+    VOID sampleBandwidthEstimationHandler(UINT64, DOUBLE);
     STATUS addTransceiver(RtcMediaStreamTrack&);
     STATUS addSupportedCodec(RTC_CODEC);
     STATUS writeFrame(PFrame, MEDIA_STREAM_TRACK_KIND);
