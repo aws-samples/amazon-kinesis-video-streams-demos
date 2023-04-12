@@ -190,7 +190,9 @@ STATUS Config::initWithEnvVars()
     CHK_STATUS(optenv(SESSION_TOKEN_ENV_VAR, &sessionToken, ""));
     CHK_STATUS(optenv(DEFAULT_REGION_ENV_VAR, &region, DEFAULT_AWS_REGION));
 
+    std::cout<<"here at use media storage before"<<std::endl;
     CHK_STATUS(optenvBool(CANARY_USE_MEDIA_STORAGE, &useMediaStorage, FALSE));
+    std::cout<<"here at use media storage"<<std::endl;
     if(useMediaStorage.value == TRUE){
         std::cout<<"here at media storage"<<std::endl;
         CHK_STATUS(mustenv(CANARY_STORAGE_STREAM_ARN, &storageStreamArn));
