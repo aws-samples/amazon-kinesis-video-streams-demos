@@ -139,9 +139,9 @@ def buildSignaling(params) {
     }
 }
 
-def buildIngestionPeer(isMaster, params) {
-    def clientID = "Master"
-    RUNNING_NODES_IN_BUILDING++
+def buildIngestionPeer(params) {
+//     def clientID = "Master"
+//     RUNNING_NODES_IN_BUILDING++
 
     // TODO: get the branch and version from orchestrator
     if (params.FIRST_ITERATION) {
@@ -151,11 +151,11 @@ def buildIngestionPeer(isMaster, params) {
     def thing_prefix = "${env.JOB_NAME}-${params.RUNNER_LABEL}"
     buildProject(params.USE_MBEDTLS, thing_prefix)
 
-    RUNNING_NODES_IN_BUILDING--
+//     RUNNING_NODES_IN_BUILDING--
 
-    waitUntil {
-        RUNNING_NODES_IN_BUILDING == 0
-    }
+//     waitUntil {
+//         RUNNING_NODES_IN_BUILDING == 0
+//     }
 
     def scripts_dir = "$WORKSPACE/canary/webrtc-c/scripts"
     def endpoint = "${scripts_dir}/iot-credential-provider.txt"
@@ -173,8 +173,8 @@ def buildIngestionPeer(isMaster, params) {
       'CANARY_LOG_STREAM_NAME': "${params.RUNNER_LABEL}-${clientID}-${START_TIMESTAMP}",
       'CANARY_CHANNEL_NAME': "test-channel-xyz-sdk-mac-local",
       'CANARY_LABEL': params.SCENARIO_LABEL,
-      'CANARY_CLIENT_ID': clientID,
-      'CANARY_IS_MASTER': isMaster,
+      'CANARY_CLIENT_ID': "Master",
+      'CANARY_IS_MASTER': true,
       'CANARY_DURATION_IN_SECONDS': params.DURATION_IN_SECONDS,
       'AWS_IOT_CORE_CREDENTIAL_ENDPOINT': "${endpoint}",
       'AWS_IOT_CORE_CERT': "${core_cert_file}",
@@ -188,7 +188,6 @@ def buildIngestionPeer(isMaster, params) {
     withRunnerWrapper(envs) {
         sh """
             cd ./canary/webrtc-c/build &&
-            ${isMaster ? "" : "sleep 10 &&"}
             ./kvsWebrtcCanaryWebrtcIngestion"""
     }
 }
@@ -275,7 +274,7 @@ pipeline {
 //                         stage('Master') {
                             steps {
                                 script {
-                                    buildIngestionPeer(true, params)
+                                    buildIngestionPeer(params)
                                 }
                             }
 //                         }
