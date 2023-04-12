@@ -192,6 +192,7 @@ STATUS Config::initWithEnvVars()
 
     CHK_STATUS(optenvBool(CANARY_USE_MEDIA_STORAGE, &useMediaStorage, FALSE));
     if(useMediaStorage.value == TRUE){
+        std::cout<<"here at media storage"<<std::endl;
         CHK_STATUS(mustenv(CANARY_STORAGE_STREAM_ARN, &storageStreamArn));
     }
 
