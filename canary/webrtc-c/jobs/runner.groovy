@@ -272,13 +272,13 @@ pipeline {
                     }
 
 //                     parallel {
-                        stage('Master') {
+//                         stage('Master') {
                             steps {
                                 script {
                                     buildIngestionPeer(true, params)
                                 }
                             }
-                        }
+//                         }
 
 //                         stage('Viewer') {
 //                             agent {
