@@ -44,14 +44,17 @@ VOID createCanaryFrameData(PBYTE buffer, PFrame pFrame)
 
 INT32 main(INT32 argc, CHAR* argv[])
 {
+    std::cout<<"here at main"<<std::endl;
 #ifndef _WIN32
     signal(SIGINT, handleSignal);
 #endif
 
+    std::cout<<"here at main signal"<<std::endl;
     STATUS retStatus = STATUS_SUCCESS;
     initializeEndianness();
     SET_INSTRUMENTED_ALLOCATORS();
     SRAND(time(0));
+    std::cout<<"here at main rand"<<std::endl;
     // Make sure that all destructors have been called first before resetting the instrumented allocators
     CHK_STATUS([&]() -> STATUS {
         STATUS retStatus = STATUS_SUCCESS;
