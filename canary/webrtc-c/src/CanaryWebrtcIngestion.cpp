@@ -59,8 +59,10 @@ INT32 main(INT32 argc, CHAR* argv[])
 
         Aws::SDKOptions options;
         Aws::InitAPI(options);
+        std::cout<<"here at main"<<std::endl;
 
         CHK_STATUS(config.init(argc, argv));
+        std::cout<<"here at main config"<<std::endl;
         CHK_STATUS(run(&config));
 
     CleanUp:
@@ -86,6 +88,7 @@ CleanUp:
 
 STATUS run(Canary::PConfig pConfig)
 {
+    std::cout<<"here at run"<<std::endl;
     STATUS retStatus = STATUS_SUCCESS;
     BOOL initialized = FALSE;
     TIMER_QUEUE_HANDLE timerQueueHandle = 0;
