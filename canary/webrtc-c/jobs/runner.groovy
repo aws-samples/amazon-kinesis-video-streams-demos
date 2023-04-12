@@ -271,7 +271,7 @@ pipeline {
                         equals expected: false, actual: params.IS_SIGNALING
                     }
 
-                    parallel {
+//                     parallel {
                         stage('Master') {
                             steps {
                                 script {
@@ -280,18 +280,18 @@ pipeline {
                             }
                         }
 
-                        stage('Viewer') {
-                            agent {
-                                label params.VIEWER_NODE_LABEL
-                            }
-
-                            steps {
-                                script {
-                                    buildPeer(false, params)
-                                }
-                            }
-                        }
-                    }
+//                         stage('Viewer') {
+//                             agent {
+//                                 label params.VIEWER_NODE_LABEL
+//                             }
+//
+//                             steps {
+//                                 script {
+//                                     buildPeer(false, params)
+//                                 }
+//                             }
+//                         }
+//                     }
                 }
 
         // In case of failures, we should add some delays so that we don't get into a tight loop of retrying
