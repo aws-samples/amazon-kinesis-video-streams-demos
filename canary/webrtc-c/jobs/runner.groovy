@@ -139,8 +139,8 @@ def buildSignaling(params) {
     }
 }
 
-def buildIngestionPeer(params) {
-//     def clientID = "Master"
+def buildIngestionPeer(isMaster, params) {
+    def clientID = "Master"
 //     RUNNING_NODES_IN_BUILDING++
 
     // TODO: get the branch and version from orchestrator
@@ -188,6 +188,7 @@ def buildIngestionPeer(params) {
     withRunnerWrapper(envs) {
         sh """
             cd ./canary/webrtc-c/build &&
+            ${isMaster ? "" : "sleep 10 &&"}
             ./kvsWebrtcCanaryWebrtcIngestion"""
     }
 }
@@ -276,7 +277,7 @@ pipeline {
 //                         stage('Master') {
                             steps {
                                 script {
-                                    buildIngestionPeer(params)
+                                    buildIngestionPeer(true, params)
                                 }
                             }
 //                         }
