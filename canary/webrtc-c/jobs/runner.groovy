@@ -141,7 +141,6 @@ def buildSignaling(params) {
 
 def buildIngestionPeer(isMaster, params) {
     def clientID = "Master"
-//     RUNNING_NODES_IN_BUILDING++
 
     // TODO: get the branch and version from orchestrator
     if (params.FIRST_ITERATION) {
@@ -151,11 +150,6 @@ def buildIngestionPeer(isMaster, params) {
     def thing_prefix = "${env.JOB_NAME}-${params.RUNNER_LABEL}"
     buildProject(params.USE_MBEDTLS, thing_prefix)
 
-//     RUNNING_NODES_IN_BUILDING--
-
-//     waitUntil {
-//         RUNNING_NODES_IN_BUILDING == 0
-//     }
 
     def scripts_dir = "$WORKSPACE/canary/webrtc-c/scripts"
     def endpoint = "${scripts_dir}/iot-credential-provider.txt"
@@ -273,28 +267,13 @@ pipeline {
                 equals expected: true, actual: params.IS_WEBRTC_INGESTION
             }
 
-//                     parallel {
-//                         stage('Master') {
-                            steps {
-                                script {
-                                    buildIngestionPeer(true, params)
-                                }
-                            }
-//                         }
-
-//                         stage('Viewer') {
-//                             agent {
-//                                 label params.VIEWER_NODE_LABEL
-//                             }
-//
-//                             steps {
-//                                 script {
-//                                     buildPeer(false, params)
-//                                 }
-//                             }
-//                         }
-//                     }
+            steps {
+                script {
+                    buildIngestionPeer(true, params)
                 }
+            }
+
+        }
 
         // In case of failures, we should add some delays so that we don't get into a tight loop of retrying
         stage('Throttling Retry') {
