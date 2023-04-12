@@ -29,7 +29,7 @@ def buildProject(useMbedTLS, thing_prefix) {
         mkdir -p build && 
         cd build && 
         ${configureCmd} && 
-        make -j"""
+        make"""
 }
 
 def withRunnerWrapper(envs, fn) {
