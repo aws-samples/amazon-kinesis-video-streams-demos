@@ -139,7 +139,7 @@ def buildSignaling(params) {
     }
 }
 
-def buildPeer(isMaster, params) {
+def buildIngestionPeer(isMaster, params) {
     def clientID = "Master"
     RUNNING_NODES_IN_BUILDING++
 
@@ -264,6 +264,35 @@ pipeline {
                 }
             }
         }
+
+        stage('Build and Run Webrtc Ingestion Canary') {
+                    failFast true
+                    when {
+                        equals expected: false, actual: params.IS_SIGNALING
+                    }
+
+                    parallel {
+                        stage('Master') {
+                            steps {
+                                script {
+                                    buildIngestionPeer(true, params)
+                                }
+                            }
+                        }
+
+                        stage('Viewer') {
+                            agent {
+                                label params.VIEWER_NODE_LABEL
+                            }
+
+                            steps {
+                                script {
+                                    buildPeer(false, params)
+                                }
+                            }
+                        }
+                    }
+                }
 
         // In case of failures, we should add some delays so that we don't get into a tight loop of retrying
         stage('Throttling Retry') {
