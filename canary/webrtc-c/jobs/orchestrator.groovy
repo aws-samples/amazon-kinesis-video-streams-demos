@@ -119,6 +119,7 @@ pipeline {
                         build(
                             job: NEXT_AVAILABLE_RUNNER,
                             parameters: COMMON_PARAMS + [
+                                booleanParam(name: 'IS_WEBRTC', value: true),
                                 booleanParam(name: 'USE_TURN', value: true),
                                 booleanParam(name: 'TRICKLE_ICE', value: true),
                                 booleanParam(name: 'USE_IOT', value: true),
@@ -134,6 +135,7 @@ pipeline {
                         build(
                             job: NEXT_AVAILABLE_RUNNER,
                             parameters: COMMON_PARAMS + [
+                                booleanParam(name: 'IS_WEBRTC', value: true),
                                 booleanParam(name: 'USE_TURN', value: true),
                                 booleanParam(name: 'TRICKLE_ICE', value: true),
                                 booleanParam(name: 'USE_IOT', value: true),
@@ -149,6 +151,7 @@ pipeline {
                         build(
                             job: NEXT_AVAILABLE_RUNNER,
                             parameters: COMMON_PARAMS + [
+                                booleanParam(name: 'IS_WEBRTC', value: true),
                                 booleanParam(name: 'USE_TURN', value: true),
                                 booleanParam(name: 'TRICKLE_ICE', value: true),
                                 booleanParam(name: 'USE_IOT', value: false),
@@ -165,6 +168,7 @@ pipeline {
                         build(
                             job: NEXT_AVAILABLE_RUNNER,
                             parameters: COMMON_PARAMS + [
+                                booleanParam(name: 'IS_WEBRTC', value: true),
                                 booleanParam(name: 'USE_TURN', value: true),
                                 booleanParam(name: 'TRICKLE_ICE', value: true),
                                 booleanParam(name: 'USE_IOT', value: false),
@@ -213,6 +217,7 @@ pipeline {
                         build(
                         job: NEXT_AVAILABLE_RUNNER,
                         parameters: COMMON_PARAMS + [
+                            booleanParam(name: 'IS_WEBRTC_INGESTION', value: true),
                             booleanParam(name: 'USE_TURN', value: true),
                             booleanParam(name: 'TRICKLE_ICE', value: true),
                             booleanParam(name: 'USE_IOT', value: false),

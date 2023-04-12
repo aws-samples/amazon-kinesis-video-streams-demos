@@ -199,7 +199,9 @@ pipeline {
 
     parameters {
         choice(name: 'AWS_KVS_LOG_LEVEL', choices: ["1", "2", "3", "4", "5"])
+        booleanParam(name: 'IS_WEBRTC')
         booleanParam(name: 'IS_SIGNALING')
+        booleanParam(name: 'IS_WEBRTC_INGESTION')
         booleanParam(name: 'USE_TURN')
         booleanParam(name: 'TRICKLE_ICE')
         booleanParam(name: 'USE_MBEDTLS', defaultValue: false)
@@ -225,7 +227,7 @@ pipeline {
         stage('Build and Run Webrtc Canary') {
             failFast true
             when {
-                equals expected: false, actual: params.IS_SIGNALING
+                equals expected: true, actual: params.IS_WEBRTC
             }
 
             parallel {
@@ -265,10 +267,10 @@ pipeline {
         }
 
         stage('Build and Run Webrtc Ingestion Canary') {
-                    failFast true
-                    when {
-                        equals expected: false, actual: params.IS_SIGNALING
-                    }
+            failFast true
+            when {
+                equals expected: true, actual: params.IS_WEBRTC_INGESTION
+            }
 
 //                     parallel {
 //                         stage('Master') {
@@ -311,7 +313,9 @@ pipeline {
                     job: env.JOB_NAME,
                     parameters: [
                       string(name: 'AWS_KVS_LOG_LEVEL', value: params.AWS_KVS_LOG_LEVEL),
+                      booleanParam(name: 'IS_WEBRTC', value: params.IS_WEBRTC),
                       booleanParam(name: 'IS_SIGNALING', value: params.IS_SIGNALING),
+                      booleanParam(name: 'IS_WEBRTC_INGESTION', value: params.IS_WEBRTC_INGESTION),
                       booleanParam(name: 'USE_TURN', value: params.USE_TURN),
                       booleanParam(name: 'USE_IOT', value: params.USE_IOT),
                       booleanParam(name: 'TRICKLE_ICE', value: params.TRICKLE_ICE),
