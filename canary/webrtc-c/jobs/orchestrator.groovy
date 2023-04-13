@@ -32,7 +32,7 @@ def cancelJob(jobName) {
     job.setDisabled(true)
     job.getBuilds()
        .findAll({ build -> build.isBuilding() })
-       .each({ build -> 
+       .each({ build ->
             echo "Kill $build"
             build.doKill()
         })
@@ -46,7 +46,7 @@ def findRunners() {
 }
 
 NEXT_AVAILABLE_RUNNER = null
-ACTIVE_RUNNERS = [] 
+ACTIVE_RUNNERS = []
 
 pipeline {
     agent {
@@ -77,7 +77,7 @@ pipeline {
                     steps {
                         script {
                             def runners = findRunners()
-                            def nextRunner = null 
+                            def nextRunner = null
                             def oldestTimestamp = Long.MAX_VALUE
 
                             // find the least active runner
@@ -102,7 +102,7 @@ pipeline {
                         }
                     }
                 }
-            
+
                 stage("Spawn new runners") {
                     steps {
                         script {
@@ -119,7 +119,6 @@ pipeline {
                         build(
                             job: NEXT_AVAILABLE_RUNNER,
                             parameters: COMMON_PARAMS + [
-                                booleanParam(name: 'IS_WEBRTC', value: true),
                                 booleanParam(name: 'USE_TURN', value: true),
                                 booleanParam(name: 'TRICKLE_ICE', value: true),
                                 booleanParam(name: 'USE_IOT', value: true),
@@ -135,7 +134,6 @@ pipeline {
                         build(
                             job: NEXT_AVAILABLE_RUNNER,
                             parameters: COMMON_PARAMS + [
-                                booleanParam(name: 'IS_WEBRTC', value: true),
                                 booleanParam(name: 'USE_TURN', value: true),
                                 booleanParam(name: 'TRICKLE_ICE', value: true),
                                 booleanParam(name: 'USE_IOT', value: true),
@@ -151,7 +149,6 @@ pipeline {
                         build(
                             job: NEXT_AVAILABLE_RUNNER,
                             parameters: COMMON_PARAMS + [
-                                booleanParam(name: 'IS_WEBRTC', value: true),
                                 booleanParam(name: 'USE_TURN', value: true),
                                 booleanParam(name: 'TRICKLE_ICE', value: true),
                                 booleanParam(name: 'USE_IOT', value: false),
@@ -168,7 +165,6 @@ pipeline {
                         build(
                             job: NEXT_AVAILABLE_RUNNER,
                             parameters: COMMON_PARAMS + [
-                                booleanParam(name: 'IS_WEBRTC', value: true),
                                 booleanParam(name: 'USE_TURN', value: true),
                                 booleanParam(name: 'TRICKLE_ICE', value: true),
                                 booleanParam(name: 'USE_IOT', value: false),
@@ -210,24 +206,6 @@ pipeline {
                                 string(name: 'VIEWER_NODE_LABEL', value: "ec2-us-west-2"),
                                 string(name: 'RUNNER_LABEL', value: "SignalingLongRunning"),
                                 string(name: 'SCENARIO_LABEL', value: "SignalingLongRunning"),
-                            ],
-                            wait: false
-                        )
-
-                        build(
-                        job: NEXT_AVAILABLE_RUNNER,
-                        parameters: COMMON_PARAMS + [
-                            booleanParam(name: 'IS_WEBRTC_INGESTION', value: true),
-                            booleanParam(name: 'USE_TURN', value: true),
-                            booleanParam(name: 'TRICKLE_ICE', value: true),
-                            booleanParam(name: 'USE_IOT', value: false),
-                            booleanParam(name: 'USE_MBEDTLS', value: true),
-                            booleanParam(name: 'CANARY_USE_MEDIA_STORAGE', value: true),
-                            string(name: 'DURATION_IN_SECONDS', value: LONG_RUNNING_DURATION_IN_SECONDS.toString()),
-                            string(name: 'MASTER_NODE_LABEL', value: "ec2-us-west-2"),
-                            string(name: 'VIEWER_NODE_LABEL', value: "ec2-us-west-2"),
-                            string(name: 'RUNNER_LABEL', value: "WebrtcIngestionLongRunningStaticMbedTLS"),
-                            string(name: 'SCENARIO_LABEL', value: "WebrtcIngestionLongRunning"),
                             ],
                             wait: false
                         )
