@@ -60,7 +60,7 @@ target_link_libraries(
   aws-cpp-sdk-monitoring
   aws-cpp-sdk-logs)
 
-file(COPY "${CMAKE_CURRENT_SOURCE_DIR}/samples/h264SampleFrames" DESTINATION ./samples)
+#file(COPY "${CMAKE_CURRENT_SOURCE_DIR}/samples/h264SampleFrames" DESTINATION ./samples)
 
 add_executable(
   kvsWebrtcCanaryWebrtc
