@@ -8,7 +8,7 @@ COLD_STARTUP_DELAY_IN_SECONDS = 60 * 60
 GIT_URL = 'https://github.com/aws-samples/amazon-kinesis-video-streams-demos.git'
 GIT_HASH = 'canary-webrtc-ingestion'
 COMMON_PARAMS = [
-    string(name: 'AWS_KVS_LOG_LEVEL', value: "2"),
+    string(name: 'AWS_KVS_LOG_LEVEL', value: "1"),
     string(name: 'MIN_RETRY_DELAY_IN_SECONDS', value: MIN_RETRY_DELAY_IN_SECONDS.toString()),
     string(name: 'GIT_URL', value: GIT_URL),
     string(name: 'LOG_GROUP_NAME', value: "WebrtcSDK"),
