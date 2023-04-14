@@ -274,14 +274,11 @@ pipeline {
                             when {
                                 equals expected: true, actual: params.IS_WEBRTC_INGESTION
                             }
-
-                            stage('Master') {
                                     steps {
                                         script {
                                             buildIngestionPeer(true, params)
                                         }
                                     }
-                                }
                         }
 
         // In case of failures, we should add some delays so that we don't get into a tight loop of retrying
