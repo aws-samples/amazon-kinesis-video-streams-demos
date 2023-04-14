@@ -96,6 +96,7 @@ def buildPeer(isMaster, params) {
     withRunnerWrapper(envs) {
         sh """
             cd ./canary/webrtc-c/build &&
+            printenv &&
             ${isMaster ? "" : "sleep 10 &&"}
             ./kvsWebrtcCanaryWebrtc"""
     }
@@ -134,7 +135,8 @@ def buildSignaling(params) {
 
     withRunnerWrapper(envs) {
         sh """
-            cd ./canary/webrtc-c/build && 
+            cd ./canary/webrtc-c/build &&
+            printenv &&
             ./kvsWebrtcCanarySignaling"""
     }
 }
