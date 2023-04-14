@@ -202,9 +202,9 @@ pipeline {
 
     parameters {
         choice(name: 'AWS_KVS_LOG_LEVEL', choices: ["1", "2", "3", "4", "5"])
-        booleanParam(name: 'IS_WEBRTC'),
+        booleanParam(name: 'IS_WEBRTC')
         booleanParam(name: 'IS_SIGNALING')
-        booleanParam(name: 'IS_WEBRTC_INGESTION'),
+        booleanParam(name: 'IS_WEBRTC_INGESTION')
         booleanParam(name: 'USE_TURN')
         booleanParam(name: 'TRICKLE_ICE')
         booleanParam(name: 'USE_MBEDTLS', defaultValue: false)
