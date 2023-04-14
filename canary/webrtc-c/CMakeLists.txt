@@ -74,4 +74,12 @@ target_link_libraries(
   kvsWebrtcCanarySignaling
   kvsWebrtcCanary)
 
+add_executable(
+        kvsWebrtcCanaryWebrtcIngestion
+        src/CanaryWebrtcIngestion.cpp)
+target_link_libraries(
+        kvsWebrtcCanaryWebrtcIngestion
+        kvsWebrtcCanary)
+
+file(COPY "${CMAKE_CURRENT_SOURCE_DIR}/samples/h264SampleFrames" DESTINATION ./samples)
 file(COPY "${CMAKE_CURRENT_SOURCE_DIR}/assets" DESTINATION .)
