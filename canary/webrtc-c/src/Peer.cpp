@@ -421,15 +421,16 @@ STATUS Peer::jointSession()
 
     DLOGI("Call to signaling client Join Session");
     STATUS retStatus = STATUS_SUCCESS;
+    CHK_STATUS(signalingClientConnectSync(signalingClientHandle));
     retStatus = signalingClientJoinSessionSync(signalingClientHandle);
     if (retStatus != STATUS_SUCCESS) {
         printf("[KVS Master] signalingClientConnectSync(): operation returned status code: 0x%08x", retStatus);
         goto CleanUp;
     }
-//    this->foundPeerId = TRUE;
-//    this->peerId = DEFAULT_VIEWER_PEER_ID;
-//    CHK_STATUS(this->initPeerConnection());
-//    CHK_STATUS(connectPeerConnection());
+    this->foundPeerId = TRUE;
+    this->peerId = DEFAULT_VIEWER_PEER_ID;
+    CHK_STATUS(this->initPeerConnection());
+    CHK_STATUS(connectPeerConnection());
 CleanUp:
 
     return retStatus;
