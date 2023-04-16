@@ -270,16 +270,30 @@ pipeline {
         }
 
         stage('Build and Run Webrtc Ingestion Canary') {
-                            failFast true
-                            when {
-                                equals expected: true, actual: params.IS_WEBRTC_INGESTION
-                            }
-                            steps {
-                                script {
-                                    buildIngestionPeer(true, params)
-                                }
-                            }
+            failFast true
+            when {
+                equals expected: true, actual: params.IS_WEBRTC_INGESTION
+            }
+            parallel {
+                stage('Master') {
+                    steps {
+                        script {
+                            buildIngestionPeer(true, params)
                         }
+                    }
+                }
+                stage('Viewer') {
+                    agent {
+                        label params.VIEWER_NODE_LABEL
+                    }
+
+                    steps {
+                        script {
+                            buildIngestionPeer(false, params)
+                        }
+                    }
+                }
+            }
 
         // In case of failures, we should add some delays so that we don't get into a tight loop of retrying
         stage('Throttling Retry') {

@@ -427,10 +427,10 @@ STATUS Peer::jointSession()
         printf("[KVS Master] signalingClientConnectSync(): operation returned status code: 0x%08x", retStatus);
         goto CleanUp;
     }
-    this->foundPeerId = TRUE;
-    this->peerId = DEFAULT_VIEWER_PEER_ID;
-    CHK_STATUS(this->initPeerConnection());
-    CHK_STATUS(connectPeerConnection());
+//    this->foundPeerId = TRUE;
+//    this->peerId = DEFAULT_VIEWER_PEER_ID;
+//    CHK_STATUS(this->initPeerConnection());
+//    CHK_STATUS(connectPeerConnection());
 CleanUp:
 
     return retStatus;
