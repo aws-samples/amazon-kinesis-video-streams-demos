@@ -395,6 +395,30 @@ CleanUp:
 
 STATUS Peer::jointSession()
 {
+    auto connectPeerConnection = [this]() -> STATUS {
+        STATUS retStatus = STATUS_SUCCESS;
+        RtcSessionDescriptionInit offerSDPInit;
+        UINT32 buffLen;
+        SignalingMessage msg;
+
+        MEMSET(&offerSDPInit, 0, SIZEOF(offerSDPInit));
+        CHK_STATUS(createOffer(this->pPeerConnection, &offerSDPInit));
+        CHK_STATUS(setLocalDescription(this->pPeerConnection, &offerSDPInit));
+
+        if (!this->trickleIce) {
+            CHK_STATUS(this->awaitIceGathering(&offerSDPInit));
+        }
+
+        msg.messageType = SIGNALING_MESSAGE_TYPE_OFFER;
+        CHK_STATUS(serializeSessionDescriptionInit(&offerSDPInit, NULL, &buffLen));
+        CHK_STATUS(serializeSessionDescriptionInit(&offerSDPInit, msg.payload, &buffLen));
+        CHK_STATUS(this->send(&msg));
+
+    CleanUp:
+
+        return retStatus;
+    };
+
     DLOGI("Call to signaling client Join Session");
     STATUS retStatus = STATUS_SUCCESS;
     retStatus = signalingClientJoinSessionSync(signalingClientHandle);
@@ -402,6 +426,10 @@ STATUS Peer::jointSession()
         printf("[KVS Master] signalingClientConnectSync(): operation returned status code: 0x%08x", retStatus);
         goto CleanUp;
     }
+//    this->foundPeerId = TRUE;
+//    this->peerId = DEFAULT_VIEWER_PEER_ID;
+//    CHK_STATUS(this->initPeerConnection());
+//    CHK_STATUS(connectPeerConnection());
 CleanUp:
 
     return retStatus;

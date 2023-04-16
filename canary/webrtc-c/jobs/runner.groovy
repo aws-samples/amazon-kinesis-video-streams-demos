@@ -274,12 +274,28 @@ pipeline {
                             when {
                                 equals expected: true, actual: params.IS_WEBRTC_INGESTION
                             }
-                                    steps {
-                                        script {
-                                            buildIngestionPeer(true, params)
-                                        }
-                                    }
-                        }
+                            parallel {
+                                            stage('Master') {
+                                                steps {
+                                                    script {
+                                                        buildPeer(true, params)
+                                                    }
+                                                }
+                                            }
+
+                                            stage('Viewer') {
+                                                agent {
+                                                    label params.VIEWER_NODE_LABEL
+                                                }
+
+                                                steps {
+                                                    script {
+                                                        buildPeer(false, params)
+                                                    }
+                                                }
+                                            }
+                            }
+        }
 
         // In case of failures, we should add some delays so that we don't get into a tight loop of retrying
         stage('Throttling Retry') {
