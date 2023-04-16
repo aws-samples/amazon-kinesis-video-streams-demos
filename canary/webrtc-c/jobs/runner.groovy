@@ -278,7 +278,7 @@ pipeline {
                                             stage('Master') {
                                                 steps {
                                                     script {
-                                                        buildPeer(true, params)
+                                                        buildIngestionPeer(true, params)
                                                     }
                                                 }
                                             }
@@ -290,7 +290,7 @@ pipeline {
 
                                                 steps {
                                                     script {
-                                                        buildPeer(false, params)
+                                                        buildIngestionPeer(false, params)
                                                     }
                                                 }
                                             }
