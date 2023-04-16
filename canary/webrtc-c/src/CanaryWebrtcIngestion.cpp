@@ -192,6 +192,7 @@ VOID runPeer(Canary::PConfig pConfig, TIMER_QUEUE_HANDLE timerQueueHandle, STATU
         //        std::thread videoThread(sendCustomFrames, &peer, MEDIA_STREAM_TRACK_KIND_VIDEO, pConfig->bitRate.value, pConfig->frameRate.value);
         std::thread videoThread(sendLocalFrames, &peer, MEDIA_STREAM_TRACK_KIND_VIDEO, "./samples/h264SampleFrames/frame-%04d.h264",
                                 NUMBER_OF_H264_FRAME_FILES, SAMPLE_VIDEO_FRAME_DURATION);
+        CHK_STATUS(peer.jointSession());
         // All metrics tracking will happen on a time queue to simplify handling periodicity
         CHK_STATUS(timerQueueAddTimer(timerQueueHandle, METRICS_INVOCATION_PERIOD, METRICS_INVOCATION_PERIOD, canaryRtpOutboundStats, (UINT64) &peer,
                                       &timeoutTimerId));
@@ -201,7 +202,6 @@ VOID runPeer(Canary::PConfig pConfig, TIMER_QUEUE_HANDLE timerQueueHandle, STATU
                                       canaryEndToEndStats, (UINT64) &peer, &timeoutTimerId));
         videoThread.join();
     }
-    CHK_STATUS(peer.jointSession());
 
     CHK_STATUS(peer.shutdown());
 
