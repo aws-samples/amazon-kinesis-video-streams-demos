@@ -294,6 +294,7 @@ pipeline {
                     }
                 }
             }
+        }
 
         // In case of failures, we should add some delays so that we don't get into a tight loop of retrying
         stage('Throttling Retry') {
