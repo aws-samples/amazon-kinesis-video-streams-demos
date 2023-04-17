@@ -192,7 +192,13 @@ STATUS Config::initWithEnvVars()
 
     CHK_STATUS(optenvBool(CANARY_USE_MEDIA_STORAGE, &useMediaStorage, FALSE));
     if(useMediaStorage.value == TRUE){
-        CHK_STATUS(mustenv(CANARY_STORAGE_STREAM_ARN, &storageStreamArn));
+        if(channelName == "webrtc-canary-runner-0-WebrtcIngestionLongRunningStaticMbedTLS"){
+            storageStreamArn = "arn:aws:kinesisvideo:us-west-2:403080233248:stream/webrtc-canary-runner-0-WebrtcIngestionLongRunningStaticMbedTLS/1681748314423";
+        }
+        else {
+            storageStreamArn= "arn:aws:kinesisvideo:us-west-2:403080233248:stream/webrtc-canary-runner-1-WebrtcIngestionLongRunningStaticMbedTLS/1681748276351";
+        }
+//        CHK_STATUS(mustenv(CANARY_STORAGE_STREAM_ARN, &storageStreamArn));
     }
 
     // Set the logger log level
