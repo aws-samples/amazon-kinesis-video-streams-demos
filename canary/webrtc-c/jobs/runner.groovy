@@ -173,7 +173,7 @@ def buildIngestionPeer(isMaster, params) {
       'CANARY_USE_IOT_PROVIDER': params.USE_IOT,
       'CANARY_LOG_GROUP_NAME': params.LOG_GROUP_NAME,
       'CANARY_LOG_STREAM_NAME': "${params.RUNNER_LABEL}-${clientID}-${START_TIMESTAMP}",
-      'CANARY_CHANNEL_NAME': "test-channel-xyz-sdk-mac-local",
+      'CANARY_CHANNEL_NAME': "${env.JOB_NAME}-${params.RUNNER_LABEL}",
       'CANARY_LABEL': params.SCENARIO_LABEL,
       'CANARY_CLIENT_ID': clientID,
       'CANARY_IS_MASTER': isMaster,
