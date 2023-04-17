@@ -185,7 +185,7 @@ VOID runPeer(Canary::PConfig pConfig, TIMER_QUEUE_HANDLE timerQueueHandle, STATU
                                   canaryKvsStats, (UINT64) &peer, &timeoutTimerId));
     CHK_STATUS(peer.init(pConfig, callbacks));
     CHK_STATUS(peer.connect());
-    if(pConfig->isMaster.value){CHK_STATUS(peer.jointSession());}
+//    if(pConfig->isMaster.value){CHK_STATUS(peer.jointSession());}
 
     {
         // Since the goal of the canary is to test robustness of the SDK, there is not an immediate need
