@@ -192,11 +192,11 @@ STATUS Config::initWithEnvVars()
 
     CHK_STATUS(optenvBool(CANARY_USE_MEDIA_STORAGE, &useMediaStorage, FALSE));
     if(useMediaStorage.value == TRUE){
-        if(channelName == "webrtc-canary-runner-0-WebrtcIngestionLongRunningStaticMbedTLS"){
-            storageStreamArn = (PCHAR)"arn:aws:kinesisvideo:us-west-2:403080233248:stream/webrtc-canary-runner-0-WebrtcIngestionLongRunningStaticMbedTLS/1681748314423";
+        if(channelName.value == "webrtc-canary-runner-0-WebrtcIngestionLongRunningStaticMbedTLS"){
+            storageStreamArn.value = "arn:aws:kinesisvideo:us-west-2:403080233248:stream/webrtc-canary-runner-0-WebrtcIngestionLongRunningStaticMbedTLS/1681748314423";
         }
         else {
-            storageStreamArn= (PCHAR)"arn:aws:kinesisvideo:us-west-2:403080233248:stream/webrtc-canary-runner-1-WebrtcIngestionLongRunningStaticMbedTLS/1681748276351";
+            storageStreamArn.value = "arn:aws:kinesisvideo:us-west-2:403080233248:stream/webrtc-canary-runner-1-WebrtcIngestionLongRunningStaticMbedTLS/1681748276351";
         }
 //        CHK_STATUS(mustenv(CANARY_STORAGE_STREAM_ARN, &storageStreamArn));
     }
