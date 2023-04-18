@@ -96,7 +96,7 @@ STATUS Peer::initSignaling(const Canary::PConfig pConfig)
     channelInfo.pCertPath = (PCHAR) DEFAULT_KVS_CACERT_PATH;
     channelInfo.messageTtl = 0; // Default is 60 seconds
     channelInfo.useMediaStorage = pConfig->useMediaStorage.value;
-    channelInfo.pStorageStreamArn = (PCHAR) pConfig->storageStreamArn.value;
+    channelInfo.pStorageStreamArn = (PCHAR) pConfig->storageStreamArn.value.c_str();
 
     this->clientInfo.signalingClientCreationMaxRetryAttempts = MAX_CALL_RETRY_COUNT;
 
