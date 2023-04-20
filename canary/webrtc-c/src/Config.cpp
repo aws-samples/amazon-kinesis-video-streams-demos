@@ -190,8 +190,8 @@ STATUS Config::initWithEnvVars()
     CHK_STATUS(optenv(SESSION_TOKEN_ENV_VAR, &sessionToken, ""));
     CHK_STATUS(optenv(DEFAULT_REGION_ENV_VAR, &region, DEFAULT_AWS_REGION));
 
-    DLOGV("use media storage env variable: %d", CANARY_USE_MEDIA_STORAGE);
-    CHK_STATUS(optenvBool(CANARY_USE_MEDIA_STORAGE, &useMediaStorage, FALSE));
+    DLOGV("use media storage env variable: %d", CANARY_USE_MEDIA_STORAGE_ENV_VAR);
+    CHK_STATUS(optenvBool(CANARY_USE_MEDIA_STORAGE_ENV_VAR, &useMediaStorage, FALSE));
     DLOGV("use media storage: %d", useMediaStorage.value);
     if(useMediaStorage.value == TRUE){
         DLOGV("use media storage True config.cpp");
@@ -206,7 +206,7 @@ STATUS Config::initWithEnvVars()
         else{
             storageStreamArn.value = "arn:aws:kinesisvideo:us-west-2:403080233248:stream/test-stream-xyz-sdk-mac-local/1680642462543";
         }
-//        CHK_STATUS(mustenv(CANARY_STORAGE_STREAM_ARN, &storageStreamArn));
+//        CHK_STATUS(mustenv(CANARY_STORAGE_STREAM_ARN_ENV_VAR, &storageStreamArn));
     }
 
     // Set the logger log level
@@ -369,9 +369,9 @@ STATUS Config::initWithJSON(PCHAR filePath)
             jsonUint64(raw, tokens[++i], &logLevel64);
             logLevel.value = (UINT32) logLevel64.value;
             logLevel.initialized = TRUE;
-        } else if (compareJsonString((PCHAR) raw, &tokens[i], JSMN_STRING, (PCHAR) CANARY_USE_MEDIA_STORAGE)){
+        } else if (compareJsonString((PCHAR) raw, &tokens[i], JSMN_STRING, (PCHAR) CANARY_USE_MEDIA_STORAGE_ENV_VAR)){
             jsonBool(raw, tokens[++i], &useMediaStorage);
-        } else if(compareJsonString((PCHAR) raw, &tokens[i], JSMN_STRING, (PCHAR) CANARY_STORAGE_STREAM_ARN)){
+        } else if(compareJsonString((PCHAR) raw, &tokens[i], JSMN_STRING, (PCHAR) CANARY_STORAGE_STREAM_ARN_ENV_VAR)){
             jsonString(raw, tokens[++i], &storageStreamArn);
         }
 
