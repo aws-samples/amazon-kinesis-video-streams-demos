@@ -358,6 +358,10 @@ STATUS Config::initWithJSON(PCHAR filePath)
             jsonUint64(raw, tokens[++i], &logLevel64);
             logLevel.value = (UINT32) logLevel64.value;
             logLevel.initialized = TRUE;
+        } else if (compareJsonString((PCHAR) raw, &tokens[i], JSMN_STRING, (PCHAR) CANARY_USE_MEDIA_STORAGE)){
+            jsonString(raw, tokens[++i], &useMediaStorage);
+        } else if(compareJsonString((PCHAR) raw, &tokens[i], JSMN_STRING, (PCHAR) CANARY_STORAGE_STREAM_ARN)){
+            jsonString(raw, tokens[++i], &storageStreamArn);
         }
 
         // IoT credential provider related tokens

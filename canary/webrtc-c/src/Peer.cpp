@@ -39,6 +39,7 @@ STATUS Peer::init(const Canary::PConfig pConfig, const Callbacks& callbacks)
     this->firstFrame = TRUE;
     this->useIotCredentialProvider = pConfig->useIotCredentialProvider.value;
     if(this->useIotCredentialProvider) {
+        DLOGV("Initializing IOT Cred peer.cpp");
         CHK_STATUS(createLwsIotCredentialProvider((PCHAR) pConfig->iotEndpoint,
                                                   (PCHAR) pConfig->iotCoreCert.value.c_str(),
                                                   (PCHAR) pConfig->iotCorePrivateKey.value.c_str(),
@@ -46,6 +47,7 @@ STATUS Peer::init(const Canary::PConfig pConfig, const Callbacks& callbacks)
                                                   (PCHAR) pConfig->iotCoreRoleAlias.value.c_str(),
                                                   (PCHAR) pConfig->channelName.value.c_str(),
                                                   &pAwsCredentialProvider));
+        DLOGV("Initialization completed");
     }
     else {
         CHK_STATUS(createStaticCredentialProvider((PCHAR) pConfig->accessKey.value.c_str(), 0, (PCHAR) pConfig->secretKey.value.c_str(), 0,
@@ -97,6 +99,7 @@ STATUS Peer::initSignaling(const Canary::PConfig pConfig)
     channelInfo.messageTtl = 0; // Default is 60 seconds
     channelInfo.useMediaStorage = pConfig->useMediaStorage.value;
     channelInfo.pStorageStreamArn = (PCHAR) pConfig->storageStreamArn.value.c_str();
+    DLOGV("Storage stream arn: %s", channelInfo.pStorageStreamArn);
 
     this->clientInfo.signalingClientCreationMaxRetryAttempts = MAX_CALL_RETRY_COUNT;
 
@@ -397,7 +400,7 @@ STATUS Peer::jointSession()
 {
     DLOGI("Call to signaling client Join Session");
     STATUS retStatus = STATUS_SUCCESS;
-    CHK_STATUS(signalingClientConnectSync(signalingClientHandle));
+//    CHK_STATUS(signalingClientConnectSync(signalingClientHandle));
     retStatus = signalingClientJoinSessionSync(signalingClientHandle);
     if (retStatus != STATUS_SUCCESS) {
         printf("[KVS Master] signalingClientConnectSync(): operation returned status code: 0x%08x", retStatus);
