@@ -98,6 +98,7 @@ STATUS Peer::initSignaling(const Canary::PConfig pConfig)
     channelInfo.pCertPath = (PCHAR) DEFAULT_KVS_CACERT_PATH;
     channelInfo.messageTtl = 0; // Default is 60 seconds
     channelInfo.useMediaStorage = pConfig->useMediaStorage.value;
+    DLOGV("Env storage stream arn: %s", pConfig->storageStreamArn.value.c_str());
     channelInfo.pStorageStreamArn = (PCHAR) pConfig->storageStreamArn.value.c_str();
     DLOGV("Storage stream arn: %s", channelInfo.pStorageStreamArn);
 
