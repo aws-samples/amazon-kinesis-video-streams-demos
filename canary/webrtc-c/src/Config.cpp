@@ -195,11 +195,11 @@ STATUS Config::initWithEnvVars()
         DLOGV("use media storage True config.cpp");
         if(channelName.value == "webrtc-canary-runner-0-WebrtcIngestionLongRunningStaticMbedTLS"){
             storageStreamArn.value = "arn:aws:kinesisvideo:us-west-2:403080233248:stream/webrtc-canary-runner-0-WebrtcIngestionLongRunningStaticMbedTLS/1681748314423";
-            DLOGV("storage stream arn: %s", storageStreamArn.value);
+            DLOGV("storage stream arn: %s", storageStreamArn.value.c_str());
         }
         else {
             storageStreamArn.value = "arn:aws:kinesisvideo:us-west-2:403080233248:stream/webrtc-canary-runner-1-WebrtcIngestionLongRunningStaticMbedTLS/1681748276351";
-            DLOGV("storage stream arn: %s", storageStreamArn.value);
+            DLOGV("storage stream arn: %s", storageStreamArn.value.c_str());
         }
 //        CHK_STATUS(mustenv(CANARY_STORAGE_STREAM_ARN, &storageStreamArn));
     }
