@@ -190,7 +190,9 @@ STATUS Config::initWithEnvVars()
     CHK_STATUS(optenv(SESSION_TOKEN_ENV_VAR, &sessionToken, ""));
     CHK_STATUS(optenv(DEFAULT_REGION_ENV_VAR, &region, DEFAULT_AWS_REGION));
 
+    DLOGV("use media storage env variable: %d", CANARY_USE_MEDIA_STORAGE);
     CHK_STATUS(optenvBool(CANARY_USE_MEDIA_STORAGE, &useMediaStorage, FALSE));
+    DLOGV("use media storage: %d", useMediaStorage.value);
     if(useMediaStorage.value == TRUE){
         DLOGV("use media storage True config.cpp");
         if(channelName.value == "webrtc-canary-runner-0-WebrtcIngestionLongRunningStaticMbedTLS"){
