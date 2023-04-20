@@ -13,7 +13,7 @@ set(BUILD_ONLY "monitoring;logs" CACHE STRING "Tell AWS SDK to only build monito
 FetchContent_Declare(
   webrtc
   GIT_REPOSITORY https://github.com/awslabs/amazon-kinesis-video-streams-webrtc-sdk-c
-  GIT_TAG        Release-WebRTC-Streams-Ingestion-Public-Preview
+  GIT_TAG        WebRTC-Ingestion-Branch-Out-From-Release-WebRTC-Streams-Ingestion-Public-Preview
 )
 
 FetchContent_Declare(
