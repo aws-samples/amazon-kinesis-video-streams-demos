@@ -184,7 +184,7 @@ def buildIngestionPeer(isMaster, params) {
       'AWS_IOT_CORE_ROLE_ALIAS': "${role_alias}",
       'AWS_IOT_CORE_THING_NAME': "${thing_name}",
       'CANARY_USE_MEDIA_STORAGE': params.USE_MEDIA_STORAGE,
-      'CANARY_STORAGE_STREAM_ARN': "arn:aws:kinesisvideo:us-west-2:403080233248:stream/test-stream-xyz-sdk-mac-local/1680642462543"
+      'CANARY_STORAGE_STREAM_ARN': params.STORAGE_STREAM_ARN
     ].collect{ k, v -> "${k}=${v}" }
 
     withRunnerWrapper(envs) {
@@ -321,6 +321,8 @@ pipeline {
                       booleanParam(name: 'USE_IOT', value: params.USE_IOT),
                       booleanParam(name: 'TRICKLE_ICE', value: params.TRICKLE_ICE),
                       booleanParam(name: 'USE_MBEDTLS', value: params.USE_MBEDTLS),
+                      booleanParam(name: 'USE_MEDIA_STORAGE', value: params.USE_MEDIA_STORAGE),
+                      string(name: 'STORAGE_STREAM_ARN', value: params.STORAGE_STREAM_ARN),
                       string(name: 'LOG_GROUP_NAME', value: params.LOG_GROUP_NAME),
                       string(name: 'MASTER_NODE_LABEL', value: params.MASTER_NODE_LABEL),
                       string(name: 'VIEWER_NODE_LABEL', value: params.VIEWER_NODE_LABEL),

@@ -223,6 +223,7 @@ pipeline {
                                 booleanParam(name: 'USE_IOT', value: false),
                                 booleanParam(name: 'USE_MBEDTLS', value: true),
                                 booleanParam(name: 'USE_MEDIA_STORAGE', value: true),
+                                string(name: 'STORAGE_STREAM_ARN', value: ""),
                                 string(name: 'DURATION_IN_SECONDS', value: LONG_RUNNING_DURATION_IN_SECONDS.toString()),
                                 string(name: 'MASTER_NODE_LABEL', value: "ec2-us-west-2"),
                                 string(name: 'VIEWER_NODE_LABEL', value: "ec2-us-west-2"),
