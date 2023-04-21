@@ -232,6 +232,24 @@ pipeline {
                             ],
                             wait: false
                          )
+
+                         build(
+                         job: NEXT_AVAILABLE_RUNNER,
+                         parameters: COMMON_PARAMS + [
+                         booleanParam(name: 'IS_WEBRTC_INGESTION', value: true),
+                         booleanParam(name: 'USE_TURN', value: true),
+                         booleanParam(name: 'TRICKLE_ICE', value: true),
+                         booleanParam(name: 'USE_IOT', value: true),
+                         booleanParam(name: 'USE_MEDIA_STORAGE', value: true),
+                         string(name: 'STORAGE_STREAM_ARN', value: ""),
+                         string(name: 'DURATION_IN_SECONDS', value: LONG_RUNNING_DURATION_IN_SECONDS.toString()),
+                         string(name: 'MASTER_NODE_LABEL', value: "ec2-us-west-2"),
+                         string(name: 'VIEWER_NODE_LABEL', value: "ec2-us-west-2"),
+                         string(name: 'RUNNER_LABEL', value: "WebrtcIngestionLongRunningStaticOpenSSL"),
+                         string(name: 'SCENARIO_LABEL', value: "WebrtcIngestionLongRunning"),
+                         ],
+                         wait: false
+                         )
                     }
                 }
 
