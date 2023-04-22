@@ -203,7 +203,13 @@ STATUS Config::initWithEnvVars()
             storageStreamArn.value = "arn:aws:kinesisvideo:us-west-2:403080233248:stream/webrtc-canary-runner-1-WebrtcIngestionLongRunningStaticMbedTLS/1681748276351";
             DLOGV("storage stream arn: %s", storageStreamArn.value.c_str());
         }
-        else{
+        else if(channelName.value == "webrtc-canary-runner-0-WebrtcIngestionLongRunningOpenSSL"){
+            storageStreamArn.value = "arn:aws:kinesisvideo:us-west-2:403080233248:stream/webrtc-canary-runner-0-WebrtcIngestionLongRunningOpenSSL_thing/1682121320458";
+        }
+        else if(channelName.value == "webrtc-canary-runner-1-WebrtcIngestionLongRunningOpenSSL"){
+            storageStreamArn.value = "arn:aws:kinesisvideo:us-west-2:403080233248:stream/webrtc-canary-runner-1-WebrtcIngestionLongRunningOpenSSL_thing/1682121384808";
+        }
+        else {
             storageStreamArn.value = "arn:aws:kinesisvideo:us-west-2:403080233248:stream/test-stream-xyz-sdk-mac-local/1680642462543";
         }
 //        CHK_STATUS(mustenv(CANARY_STORAGE_STREAM_ARN_ENV_VAR, &storageStreamArn));
