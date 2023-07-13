@@ -86,6 +86,7 @@ CleanUp:
 
 STATUS run(Canary::PConfig pConfig)
 {
+    std::cout << "TEST: 1" << endl;
     STATUS retStatus = STATUS_SUCCESS;
     BOOL initialized = FALSE;
     TIMER_QUEUE_HANDLE timerQueueHandle = 0;
@@ -94,6 +95,8 @@ STATUS run(Canary::PConfig pConfig)
     CHK_STATUS(Canary::Cloudwatch::init(pConfig));
     CHK_STATUS(initKvsWebRtc());
     initialized = TRUE;
+
+    std::cout << "TEST: 2" << endl;
 
     SET_LOGGER_LOG_LEVEL(pConfig->logLevel.value);
 
@@ -169,6 +172,8 @@ CleanUp:
 
 VOID runPeer(Canary::PConfig pConfig, TIMER_QUEUE_HANDLE timerQueueHandle, STATUS* pRetStatus)
 {
+    std::cout << "TEST: 3" << endl;
+
     STATUS retStatus = STATUS_SUCCESS;
     UINT32 timeoutTimerId;
 
@@ -184,12 +189,19 @@ VOID runPeer(Canary::PConfig pConfig, TIMER_QUEUE_HANDLE timerQueueHandle, STATU
     CHK_STATUS(timerQueueAddTimer(timerQueueHandle, KVS_METRICS_INVOCATION_PERIOD, KVS_METRICS_INVOCATION_PERIOD,
                                   canaryKvsStats, (UINT64) &peer, &timeoutTimerId));
     CHK_STATUS(peer.init(pConfig, callbacks));
+    std::cout << "TEST: 4" << endl;
     CHK_STATUS(peer.connect());
+    std::cout << "TEST: 5" << endl;
 
     {
+            std::cout << "TEST: 6" << endl;
+
         // Since the goal of the canary is to test robustness of the SDK, there is not an immediate need
         // to send audio frames as well. It can always be added in if needed in the future
-        std::thread videoThread(sendCustomFrames, &peer, MEDIA_STREAM_TRACK_KIND_VIDEO, pConfig->bitRate.value, pConfig->frameRate.value);
+        
+        //std::thread videoThread(sendCustomFrames, &peer, MEDIA_STREAM_TRACK_KIND_VIDEO, pConfig->bitRate.value, pConfig->frameRate.value);
+        std::thread videoThread(sendLocalFrames, &peer, MEDIA_STREAM_TRACK_KIND_VIDEO, "../assets/h264SampleFrames/frame-%04d.h264", NUMBER_OF_H264_FRAME_FILES, SAMPLE_VIDEO_FRAME_DURATION);
+
         // All metrics tracking will happen on a time queue to simplify handling periodicity
         CHK_STATUS(timerQueueAddTimer(timerQueueHandle, METRICS_INVOCATION_PERIOD, METRICS_INVOCATION_PERIOD, canaryRtpOutboundStats, (UINT64) &peer,
                                       &timeoutTimerId));
@@ -209,6 +221,8 @@ CleanUp:
 
 STATUS onNewConnection(Canary::PPeer pPeer)
 {
+    std::cout << "TEST: A.1" << endl;
+
     STATUS retStatus = STATUS_SUCCESS;
     RtcMediaStreamTrack videoTrack, audioTrack;
 
