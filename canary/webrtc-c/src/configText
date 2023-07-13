@@ -1,0 +1,5 @@
+export CANARY_CHANNEL_NAME=nonStorageChannel
+export CANARY_IS_MASTER=TRUE
+
+export CANARY_CHANNEL_NAME=nonStorageChannel
+export CANARY_IS_MASTER=FALSE
