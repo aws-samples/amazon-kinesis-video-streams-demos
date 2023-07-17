@@ -201,6 +201,7 @@ VOID runPeer(Canary::PConfig pConfig, TIMER_QUEUE_HANDLE timerQueueHandle, STATU
         
         //std::thread videoThread(sendCustomFrames, &peer, MEDIA_STREAM_TRACK_KIND_VIDEO, pConfig->bitRate.value, pConfig->frameRate.value);
         std::thread videoThread(sendLocalFrames, &peer, MEDIA_STREAM_TRACK_KIND_VIDEO, "../assets/h264SampleFrames/frame-%04d.h264", NUMBER_OF_H264_FRAME_FILES, SAMPLE_VIDEO_FRAME_DURATION);
+        std::thread audioThread(sendLocalFrames, &peer, MEDIA_STREAM_TRACK_KIND_AUDIO, "../assets/opusSampleFrames/sample-%03d.opus", NUMBER_OF_OPUS_FRAME_FILES, SAMPLE_AUDIO_FRAME_DURATION);
 
         // All metrics tracking will happen on a time queue to simplify handling periodicity
         CHK_STATUS(timerQueueAddTimer(timerQueueHandle, METRICS_INVOCATION_PERIOD, METRICS_INVOCATION_PERIOD, canaryRtpOutboundStats, (UINT64) &peer,
@@ -210,6 +211,7 @@ VOID runPeer(Canary::PConfig pConfig, TIMER_QUEUE_HANDLE timerQueueHandle, STATU
         CHK_STATUS(timerQueueAddTimer(timerQueueHandle, END_TO_END_METRICS_INVOCATION_PERIOD, END_TO_END_METRICS_INVOCATION_PERIOD,
                                       canaryEndToEndStats, (UINT64) &peer, &timeoutTimerId));
         videoThread.join();
+        audioThread.join();
     }
 
     CHK_STATUS(peer.shutdown());
@@ -240,7 +242,7 @@ STATUS onNewConnection(Canary::PPeer pPeer)
     STRCPY(videoTrack.trackId, "myVideoTrack");
     CHK_STATUS(pPeer->addTransceiver(videoTrack));
 
-    // Add a SendRecv Transceiver of type video
+    // Add a SendRecv Transceiver of type audio
     audioTrack.kind = MEDIA_STREAM_TRACK_KIND_AUDIO;
     audioTrack.codec = RTC_CODEC_OPUS;
     STRCPY(audioTrack.streamId, "myKvsVideoStream");
