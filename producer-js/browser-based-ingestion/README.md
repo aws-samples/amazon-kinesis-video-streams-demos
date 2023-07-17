@@ -22,7 +22,7 @@ Currently available via Chrome, there four important tasks that this repository 
 4. Run the server with the following. This will open the webpage in your browser automatically
 ```
     brew install http-server
-    http-server -a localhost -p 8080 -o
+    http-server -a localhost -p 8080 -o /dist/index.html
 ```
 5. To view the stream, go to aws-samples.github.io/amazon-kinesis-video-streams-media-viewer/ and enter the your credentials and details of the endpoint and stream in use.
 
