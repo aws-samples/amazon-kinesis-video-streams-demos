@@ -53,7 +53,7 @@ class Peer {
     ~Peer();
     STATUS init(const Canary::PConfig, const Callbacks&);
     STATUS shutdown();
-    STATUS connect(BOOL);
+    STATUS connect(const BOOL);
     STATUS addTransceiver(RtcMediaStreamTrack&);
     STATUS addSupportedCodec(RTC_CODEC);
     STATUS writeFrame(PFrame, MEDIA_STREAM_TRACK_KIND);
