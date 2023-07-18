@@ -355,8 +355,6 @@ STATUS Peer::shutdown()
 
 STATUS Peer::connect(const BOOL useStorage)
 {
-    printf("TESTTT\n");
-
     auto connectPeerConnection = [this]() -> STATUS {
         STATUS retStatus = STATUS_SUCCESS;
         RtcSessionDescriptionInit offerSDPInit;
@@ -554,8 +552,6 @@ STATUS Peer::addTransceiver(RtcMediaStreamTrack& track)
     };
 
     auto handleVideoFrame = [](UINT64 customData, PFrame pFrame) -> VOID {
-        std::cout << "TEST: C.1" << endl;
-
         PPeer pPeer = (Canary::PPeer)(customData);
         std::unique_lock<std::recursive_mutex> lock(pPeer->mutex);
         PBYTE frameDataPtr = pFrame->frameData + ANNEX_B_NALU_SIZE;
@@ -632,7 +628,6 @@ STATUS Peer::writeFrame(PFrame pFrame, MEDIA_STREAM_TRACK_KIND kind)
         this->canaryOutgoingRTPMetricsContext.videoBytesGenerated += pFrame->size;
     }
     for (auto& transceiver : transceivers) {
-        //std::cout << "TEST: B.3" << endl;
         retStatus = ::writeFrame(transceiver, pFrame);
         CHK (retStatus == STATUS_SRTP_NOT_READY_YET || retStatus == STATUS_SUCCESS, retStatus);
 
