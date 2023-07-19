@@ -4,13 +4,9 @@ import com.amazonaws.util.BinaryUtils;
 import com.google.common.collect.ImmutableMap;
 import org.glassfish.tyrus.client.ClientManager;
 import org.glassfish.tyrus.client.ClientProperties;
-import org.glassfish.tyrus.client.SslEngineConfigurator;
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
-import javax.net.ssl.SSLContext;
-import javax.net.ssl.TrustManager;
-import javax.net.ssl.X509TrustManager;
 import javax.websocket.Endpoint;
 import javax.websocket.EndpointConfig;
 import javax.websocket.Session;
@@ -22,8 +18,6 @@ import java.nio.charset.StandardCharsets;
 import java.security.InvalidKeyException;
 import java.security.KeyManagementException;
 import java.security.NoSuchAlgorithmException;
-import java.security.cert.CertificateException;
-import java.security.cert.X509Certificate;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -41,8 +35,6 @@ import static org.apache.commons.lang3.StringUtils.EMPTY;
 import static org.apache.commons.lang3.StringUtils.isEmpty;
 import static org.apache.commons.lang3.StringUtils.isNotEmpty;
 
-
-@SuppressWarnings({"SpellCheckingInspection", "SameParameterValue"})
 public class AwsV4Signer {
 
     private static final String ALGORITHM_AWS4_HMAC_SHA_256 = "AWS4-HMAC-SHA256";
@@ -87,28 +79,7 @@ public class AwsV4Signer {
 
         /////////////////////////////////////////
 
-        final ClientManager client = ClientManager.createClient();
-        final SSLContext ctx = SSLContext.getInstance("TLS");
-        final TrustManager[] trustManagers = {new X509TrustManager() {
-            @Override
-            public X509Certificate[] getAcceptedIssuers() {
-                return new X509Certificate[0];
-            }
-
-            @Override
-            public void checkServerTrusted(X509Certificate[] chain, String authType) throws CertificateException {
-                // do not check anything
-            }
-
-            @Override
-            public void checkClientTrusted(X509Certificate[] chain, String authType) throws CertificateException {
-                // do not check anything
-            }
-        }};
-        ctx.init(null, trustManagers, null);
-        final SslEngineConfigurator sslEngineConfigurator = new SslEngineConfigurator(ctx);
-        sslEngineConfigurator.setHostVerificationEnabled(false);
-        client.getProperties().put(ClientProperties.SSL_ENGINE_CONFIGURATOR, sslEngineConfigurator);
+        final ClientManager client = new ClientManager();
         client.getProperties().put(ClientProperties.LOG_HTTP_UPGRADE, true);
 
         final URI signedUri = sign(uri, accessKey, secretKey, sessionToken, wssUri, region);
