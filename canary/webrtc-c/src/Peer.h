@@ -53,7 +53,7 @@ class Peer {
     ~Peer();
     STATUS init(const Canary::PConfig, const Callbacks&);
     STATUS shutdown();
-    STATUS connect(const BOOL);
+    STATUS connect();
     STATUS addTransceiver(RtcMediaStreamTrack&);
     STATUS addSupportedCodec(RTC_CODEC);
     STATUS writeFrame(PFrame, MEDIA_STREAM_TRACK_KIND);
@@ -83,6 +83,9 @@ class Peer {
     PRtcPeerConnection pPeerConnection;
     std::vector<PRtcRtpTransceiver> audioTransceivers;
     std::vector<PRtcRtpTransceiver> videoTransceivers;
+
+    BOOL useMediaStorage;
+
     BOOL isMaster;
     BOOL trickleIce;
     UINT64 offerReceiveTimestamp;

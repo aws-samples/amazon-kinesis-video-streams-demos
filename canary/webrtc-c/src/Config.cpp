@@ -223,6 +223,9 @@ STATUS Config::initWithEnvVars()
     CHK_STATUS(optenvUint64(CANARY_BIT_RATE_ENV_VAR, &bitRate, CANARY_DEFAULT_BITRATE));
     CHK_STATUS(optenvUint64(CANARY_FRAME_RATE_ENV_VAR, &frameRate, CANARY_DEFAULT_FRAMERATE));
 
+    // TODO: revert to FALSE, set to TRUE for testing
+    CHK_STATUS(optenvBool(CANARY_USE_STORAGE_ENV_VAR, &useMediaStorage, TRUE));
+
 CleanUp:
 
     return retStatus;
@@ -347,6 +350,8 @@ STATUS Config::initWithJSON(PCHAR filePath)
             jsonUint64(raw, tokens[++i], &logLevel64);
             logLevel.value = (UINT32) logLevel64.value;
             logLevel.initialized = TRUE;
+        } else if (compareJsonString((PCHAR) raw, &tokens[i], JSMN_STRING, (PCHAR) CANARY_USE_STORAGE_ENV_VAR)) {
+            jsonBool(raw, tokens[++i], &useMediaStorage);
         }
 
         // IoT credential provider related tokens
