@@ -63,16 +63,16 @@ public class AwsV4Signer {
         // URI to sign.
         // Connect as Viewer URL - GetSignalingChannelEndpoint + Query Parameters: Channel ARN as X-Amz-ChannelARN & Client Id as X-Amz-ClientId
         // For example: wss://v-a1b2c3d4.kinesisvideo.us-west-2.amazonaws.com?X-Amz-ChannelARN=arn:aws:kinesisvideo:us-west-2:123456789012:channel/demo-channel/1234567890123&X-Amz-ClientId=d7d1c6e2-9cb0-4d61-bea9-ecb3d3816557
-        final URI uri = new URI("");
+        final URI uri = new URI("wss://<Your GetSignalingChannelEndpoint response hostname>?X-Amz-ChannelARN=<YourChannelARN>&X-Amz-ClientId=<YourClientId>");
 
         // AWS Credentials. Session Token should be empty string if non-temporary credentials are used.
-        final String accessKey = "";
-        final String secretKey = "";
-        final String sessionToken = "";
+        final String accessKey = "YourAccessKey";
+        final String secretKey = "YourSecretKey";
+        final String sessionToken = "YourSessionToken";
 
         // Secure WebSocket method "wss" plus hostname obtained from GetSignalingChannelEndpoint
         // For example: wss://v-a1b2c3d4.kinesisvideo.us-west-2.amazonaws.com
-        final URI wssUri = new URI("");
+        final URI wssUri = new URI("wss://<Your GetSignalingChannelEndpoint Response hostname>");
 
         // AWS Region. For example, us-west-2
         final String region = "us-west-2";
