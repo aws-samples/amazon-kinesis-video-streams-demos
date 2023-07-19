@@ -1,7 +1,7 @@
 package org.amazonaws.kinesisvideo;
 
-import com.amazonaws.util.BinaryUtils;
 import com.google.common.collect.ImmutableMap;
+import org.apache.commons.lang3.StringUtils;
 import org.glassfish.tyrus.client.ClientManager;
 import org.glassfish.tyrus.client.ClientProperties;
 
@@ -111,7 +111,7 @@ public class AwsV4Signer {
         final String canonicalRequest = getCanonicalRequest(uri, canonicalQuerystring);
         final String stringToSign = signString(amzDate, createCredentialScope(region, datestamp), canonicalRequest);
         final byte[] signatureKey = getSignatureKey(secretKey, datestamp, region, SERVICE);
-        final String signature = BinaryUtils.toHex(hmacSha256(stringToSign, signatureKey));
+        final String signature = toHex(hmacSha256(stringToSign, signatureKey));
 
         final String signedCanonicalQueryString = canonicalQuerystring + "&" + X_AMZ_SIGNATURE + "=" + signature;
 
@@ -271,5 +271,24 @@ public class AwsV4Signer {
             }
         }
         return sdf;
+    }
+
+    private static final int HEX_LENGTH_8 = 8;
+    private static final int FF_LOCATION = 6;
+
+    private static String toHex(byte[] data) {
+        final StringBuilder sb = new StringBuilder(data.length * 2);
+        for (int i = 0; i < data.length; i++) {
+            String hex = Integer.toHexString(data[i]);
+            if (hex.length() == 1) {
+                // Append leading zero.
+                sb.append("0");
+            } else if (hex.length() == HEX_LENGTH_8) {
+                // Remove ff prefix from negative numbers.
+                hex = hex.substring(FF_LOCATION);
+            }
+            sb.append(hex);
+        }
+        return StringUtils.lowerCase(sb.toString());
     }
 }
