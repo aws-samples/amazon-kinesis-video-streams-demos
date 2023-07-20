@@ -28,7 +28,7 @@ In each of the samples, modify the variables in the `main()` method:
 Afterwards, run the `main()` method, and a signed URL will be generated and the
 sample application will also attempt to connect to the generated URL.
 
-## Using `wscat`:
+## Using `wscat`
 
 You can also use [`wscat`](https://www.npmjs.com/package/wscat) as your
 WebSocket client.
@@ -49,3 +49,20 @@ wscat -c "wss://v-a1b2c3d4.kinesisvideo.us-west-2.amazonaws.com/?X-Amz-Algorithm
 Connected (press CTRL+C to quit)
 > %     
 ```
+
+## Troubleshooting
+
+If you are experiencing a `400` error:
+* The URL is invalid. Check the following:
+* Ensure that the endpoint used matches the role you are connecting as. The `uri`/`wssUri` for your signaling channel is different depending on `role` specified when making the [GetSignalingChannelEndpoint](https://docs.aws.amazon.com/kinesisvideostreams/latest/dg/API_GetSignalingChannelEndpoint.html) API request.
+* If connecting as viewer, ensure that `X-Amz-ClientId` does not begin with `AWS_`.
+
+If you are experiencing a `403` error:
+* Something is wrong with signing. Try the following:
+* Double-check that the AWS Credentials used are not expired, or copy/pasted incorrectly.
+* Ensure that the `uri` and `wssUri` does not have any copy/paste errors.
+* Ensure that the correct region is passed in.
+
+If you are experiencing a `404` error:
+* Ensure that the Signaling Channel ARN specified as the `X-Amz-ChannelARN` query parameter in the `uri` is valid. 
+
