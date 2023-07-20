@@ -55,7 +55,7 @@ Connected (press CTRL+C to quit)
 If you are experiencing a `400` error:
 * The URL is invalid. Check the following:
 * Ensure that the endpoint used matches the role you are connecting as. The `uri`/`wssUri` for your signaling channel is different depending on `role` specified when making the [GetSignalingChannelEndpoint](https://docs.aws.amazon.com/kinesisvideostreams/latest/dg/API_GetSignalingChannelEndpoint.html) API request.
-* If connecting as viewer, ensure that `X-Amz-ClientId` does not begin with `AWS_`.
+* If [connecting as viewer](https://docs.aws.amazon.com/kinesisvideostreams-webrtc-dg/latest/devguide/kvswebrtc-websocket-apis-1.html), ensure that the value for the `X-Amz-ClientId` query parameter does not begin with `AWS_`.
 
 If you are experiencing a `403` error:
 * Something is wrong with signing. Try the following:
