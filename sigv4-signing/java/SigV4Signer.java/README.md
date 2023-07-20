@@ -60,6 +60,7 @@ If you are experiencing a `400` error:
 If you are experiencing a `403` error:
 * Something is wrong with signing. Try the following:
 * Double-check that the AWS Credentials used are not expired, or copy/pasted incorrectly.
+* Ensure that the system time is correct.
 * Ensure that the `uri` and `wssUri` does not have any copy/paste errors.
 * Ensure that the correct region is passed in.
 
