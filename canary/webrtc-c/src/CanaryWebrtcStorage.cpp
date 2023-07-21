@@ -19,10 +19,16 @@ VOID handleSignal(INT32 signal)
 VOID addCanaryMetadataToFrameData(PBYTE buffer, PFrame pFrame)
 {
     PBYTE pCurPtr = buffer + ANNEX_B_NALU_SIZE;
-    putUnalignedInt64BigEndian((PINT64) pCurPtr, pFrame->presentationTs);
+
+    putUnalignedInt64BigEndian((PINT64) pCurPtr, pFrame->presentationTs / HUNDREDS_OF_NANOS_IN_A_MILLISECOND);
     pCurPtr += SIZEOF(UINT64);
+
+    putUnalignedInt32BigEndian((PINT32) pCurPtr, pFrame->index);
+    pCurPtr += SIZEOF(UINT32);
+
     putUnalignedInt32BigEndian((PINT32) pCurPtr, pFrame->size);
     pCurPtr += SIZEOF(UINT32);
+
     putUnalignedInt32BigEndian((PINT32) pCurPtr, COMPUTE_CRC32(buffer, pFrame->size));
 }
 
