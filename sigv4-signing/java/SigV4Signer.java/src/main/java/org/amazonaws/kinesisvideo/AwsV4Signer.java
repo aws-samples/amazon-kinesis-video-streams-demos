@@ -61,21 +61,32 @@ public class AwsV4Signer {
         /////////////////////////////////////////
 
         // URI to sign.
-        // Connect as Viewer URL - GetSignalingChannelEndpoint + Query Parameters: Channel ARN as X-Amz-ChannelARN & Client Id as X-Amz-ClientId
-        // For example: wss://v-a1b2c3d4.kinesisvideo.us-west-2.amazonaws.com?X-Amz-ChannelARN=arn:aws:kinesisvideo:us-west-2:123456789012:channel/demo-channel/1234567890123&X-Amz-ClientId=d7d1c6e2-9cb0-4d61-bea9-ecb3d3816557
+        //
+        // Connect as Master URL - GetSignalingChannelEndpoint (master role) + Query Parameters: Channel ARN as X-Amz-ChannelARN
+        //   Ref: https://docs.aws.amazon.com/kinesisvideostreams-webrtc-dg/latest/devguide/kvswebrtc-websocket-apis-2.html
+        // Connect as Viewer URL - GetSignalingChannelEndpoint (viewer role) + Query Parameters: Channel ARN as X-Amz-ChannelARN & Client Id as X-Amz-ClientId
+        //   Ref: https://docs.aws.amazon.com/kinesisvideostreams-webrtc-dg/latest/devguide/kvswebrtc-websocket-apis-1.html
+        //
+        // Viewer URL example: wss://v-a1b2c3d4.kinesisvideo.us-west-2.amazonaws.com?X-Amz-ChannelARN=arn:aws:kinesisvideo:us-west-2:123456789012:channel/demo-channel/1234567890123&X-Amz-ClientId=d7d1c6e2-9cb0-4d61-bea9-ecb3d3816557
+        //
+        // **Note**: The Signaling Channel Endpoints are different, depending on the role (master/viewer) specified in GetSignalingChannelEndpoint API call.
+        //   Ref: https://docs.aws.amazon.com/kinesisvideostreams/latest/dg/API_SingleMasterChannelEndpointConfiguration.html#KinesisVideo-Type-SingleMasterChannelEndpointConfiguration-Role
         final URI uri = new URI("wss://<Your GetSignalingChannelEndpoint response hostname>?X-Amz-ChannelARN=<YourChannelARN>&X-Amz-ClientId=<YourClientId>");
+
+        // Secure WebSocket method "wss" plus hostname obtained from GetSignalingChannelEndpoint.
+        // Viewer URL example: wss://v-a1b2c3d4.kinesisvideo.us-west-2.amazonaws.com
+        //
+        // **Note**: The Signaling Channel Endpoints are different, depending on the role (master/viewer) specified in GetSignalingChannelEndpoint API call.
+        //   Ref: https://docs.aws.amazon.com/kinesisvideostreams/latest/dg/API_SingleMasterChannelEndpointConfiguration.html#KinesisVideo-Type-SingleMasterChannelEndpointConfiguration-Role
+        final URI wssUri = new URI("wss://<Your GetSignalingChannelEndpoint Response hostname>");
 
         // AWS Credentials. Session Token should be empty string if non-temporary credentials are used.
         final String accessKey = "YourAccessKey";
         final String secretKey = "YourSecretKey";
         final String sessionToken = "YourSessionToken";
 
-        // Secure WebSocket method "wss" plus hostname obtained from GetSignalingChannelEndpoint
-        // For example: wss://v-a1b2c3d4.kinesisvideo.us-west-2.amazonaws.com
-        final URI wssUri = new URI("wss://<Your GetSignalingChannelEndpoint Response hostname>");
-
         // AWS Region. For example, us-west-2
-        final String region = "us-west-2";
+        final String region = "YourChannelRegion";
 
         /////////////////////////////////////////
 
@@ -129,11 +140,18 @@ public class AwsV4Signer {
         return uriResult;
     }
 
-    private static Map<String, String> buildQueryParamsMap(URI uri, String accessKey, String sessionToken, String region, String amzDate, String datestamp) {
+    private static Map<String, String> buildQueryParamsMap(final URI uri, final String accessKey,
+                                                           final String sessionToken, final String region,
+                                                           final String amzDate, final String datestamp) {
         final ImmutableMap.Builder<String, String> queryParamsBuilder = ImmutableMap.<String, String>builder()
                 .put(X_AMZ_ALGORITHM, ALGORITHM_AWS4_HMAC_SHA_256)
                 .put(X_AMZ_CREDENTIAL, urlEncode(accessKey + "/" + createCredentialScope(region, datestamp)))
                 .put(X_AMZ_DATE, amzDate)
+
+                // The SigV4 signer has a maximum time limit of five minutes.
+                // Once a connection is established, peers exchange signaling messages,
+                // and the P2P connection is successful, the media P2P session
+                // can continue for longer period of time.
                 .put(X_AMZ_EXPIRES, "299")
                 .put(X_AMZ_SIGNED_HEADERS, SIGNED_HEADERS);
 
@@ -153,11 +171,11 @@ public class AwsV4Signer {
         return queryParamsBuilder.build();
     }
 
-    private static String createCredentialScope(String region, String datestamp) {
+    private static String createCredentialScope(final String region, final String datestamp) {
         return new StringJoiner("/").add(datestamp).add(region).add(SERVICE).add(AWS4_REQUEST_TYPE).toString();
     }
 
-    private static String getCanonicalRequest(URI uri, String canonicalQuerystring) {
+    private static String getCanonicalRequest(final URI uri, final String canonicalQuerystring) {
         final String payloadHash = sha256().hashString(EMPTY, UTF_8).toString();
         final String canonicalUri = getCanonicalUri(uri);
         final String canonicalHeaders = "host:" + uri.getHost() + NEW_LINE_DELIMITER;
@@ -172,11 +190,11 @@ public class AwsV4Signer {
         return canonicalRequest;
     }
 
-    private static String getCanonicalUri(URI uri) {
+    private static String getCanonicalUri(final URI uri) {
         return isEmpty(uri.getPath()) ? "/" : uri.getPath();
     }
 
-    private static String signString(String amzDate, String credentialScope, String canonicalRequest) {
+    private static String signString(final String amzDate, final String credentialScope, final String canonicalRequest) {
         final String stringToSign = new StringJoiner(NEW_LINE_DELIMITER).add(ALGORITHM_AWS4_HMAC_SHA_256)
                 .add(amzDate)
                 .add(credentialScope)
@@ -219,15 +237,15 @@ public class AwsV4Signer {
         return hmacSha256(AWS4_REQUEST_TYPE, kService);
     }
 
-    private static String getTimeStamp(long dateMilli) {
+    private static String getTimeStamp(final long dateMilli) {
         return format(TIME_PATTERN, new Date(dateMilli));
     }
 
-    private static String getDateStamp(long dateMilli) {
+    private static String getDateStamp(final long dateMilli) {
         return format(DATE_PATTERN, new Date(dateMilli));
     }
 
-    private static String getCanonicalizedQueryString(Map<String, String> queryParamsMap) {
+    private static String getCanonicalizedQueryString(final Map<String, String> queryParamsMap) {
         final List<String> queryKeys = new ArrayList<>(queryParamsMap.keySet());
         Collections.sort(queryKeys);
 
@@ -243,7 +261,7 @@ public class AwsV4Signer {
         return builder.toString();
     }
 
-    private static String format(String pattern, Date date) {
+    private static String format(final String pattern, final Date date) {
         return getSimpleDateFormat(pattern).get().format(date);
     }
 
@@ -276,7 +294,7 @@ public class AwsV4Signer {
     private static final int HEX_LENGTH_8 = 8;
     private static final int FF_LOCATION = 6;
 
-    private static String toHex(byte[] data) {
+    private static String toHex(final byte[] data) {
         final StringBuilder sb = new StringBuilder(data.length * 2);
         for (int i = 0; i < data.length; i++) {
             String hex = Integer.toHexString(data[i]);

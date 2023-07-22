@@ -45,10 +45,24 @@ func main() {
 	////////////////////////////////////////////
 	// ***Sample connection test:*** - fill in the variables:
 
-	// Connect as Viewer URL - GetSignalingChannelEndpoint + Query Parameters Channel ARN as X-Amz-ChannelARN + Client Id as X-Amz-ClientId
+	// URI to sign.
+	//
+	// Connect as Master URL - GetSignalingChannelEndpoint (master role) + Query Parameters: Channel ARN as X-Amz-ChannelARN
+	//   Ref: https://docs.aws.amazon.com/kinesisvideostreams-webrtc-dg/latest/devguide/kvswebrtc-websocket-apis-2.html
+	// Connect as Viewer URL - GetSignalingChannelEndpoint (viewer role) + Query Parameters: Channel ARN as X-Amz-ChannelARN & Client Id as X-Amz-ClientId
+	//   Ref: https://docs.aws.amazon.com/kinesisvideostreams-webrtc-dg/latest/devguide/kvswebrtc-websocket-apis-1.html
+	//
+	// Viewer URL example: wss://v-a1b2c3d4.kinesisvideo.us-west-2.amazonaws.com?X-Amz-ChannelARN=arn:aws:kinesisvideo:us-west-2:123456789012:channel/demo-channel/1234567890123&X-Amz-ClientId=d7d1c6e2-9cb0-4d61-bea9-ecb3d3816557
+	//
+	// **Note**: The Signaling Channel Endpoints are different, depending on the role (master/viewer) specified in GetSignalingChannelEndpoint API call.
+	//   Ref: https://docs.aws.amazon.com/kinesisvideostreams/latest/dg/API_SingleMasterChannelEndpointConfiguration.html#KinesisVideo-Type-SingleMasterChannelEndpointConfiguration-Role
 	uri, _ := url.Parse("wss://<Your GetSignalingEndpoint response hostname>?X-Amz-ChannelARN=<YourChannelARN>&X-Amz-ClientId=<YourClientId>")
 
-	// WebSocket Method WSS plus Hostname
+	// Secure WebSocket method "wss" plus hostname obtained from GetSignalingChannelEndpoint.
+	// Viewer URL example: wss://v-a1b2c3d4.kinesisvideo.us-west-2.amazonaws.com
+	//
+	// **Note**: The Signaling Channel Endpoints are different, depending on the role (master/viewer) specified in GetSignalingChannelEndpoint API call.
+	//   Ref: https://docs.aws.amazon.com/kinesisvideostreams/latest/dg/API_SingleMasterChannelEndpointConfiguration.html#KinesisVideo-Type-SingleMasterChannelEndpointConfiguration-Role
 	wssUri, _ := url.Parse("wss://<Your GetSignalingEndpoint Response hostname>")
 
 	// Test Credentials for sample connection verification. SessionToken can be empty string if using non-temporary credentials.
@@ -127,6 +141,10 @@ func buildQueryParamsMap(uri *url.URL, accessKey, sessionToken, region, amzDate,
 
 	xAmzCredential := urlEncode(accessKey + "/" + createCredentialScope(region, datestamp))
 
+	// The SigV4 signer has a maximum time limit of five minutes.
+	// Once a connection is established, peers exchange signaling messages,
+	// and the P2P connection is successful, the media P2P session
+	// can continue for longer period of time.
 	queryParamsMap := map[string]string{
 		X_AMZ_ALGORITHM:  ALGORITHM_AWS4_HMAC_SHA_256,
 		X_AMZ_CREDENTIAL: xAmzCredential,

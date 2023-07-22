@@ -67,3 +67,4 @@ If you are experiencing a `403` error:
 If you are experiencing a `404` error:
 * Ensure that the Signaling Channel ARN specified as the `X-Amz-ChannelARN` query parameter in the `uri` is valid. 
 
+Additionally, you can try checking the HTTP message body. There may be additional information returned in cases such as a 403.
