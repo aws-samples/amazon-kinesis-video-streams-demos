@@ -14,10 +14,10 @@ export CANARY_CHANNEL_NAME=nonIngestSample
 export AWS_KVS_LOG_LEVEL=1
 
 export CANARY_TRICKLE_ICE=TRUE
-# Need this to be set to true -> switched it to be default to true
-# - some devices do not support trickle ice
-# - both ends must agree to trickle ice
-# - ok to default to true
+Need this to be set to true -> switched it to be default to true
+- some devices do not support trickle ice
+- both ends must agree to trickle ice
+- ok to default to true
 
 
 
