@@ -19,16 +19,10 @@ VOID handleSignal(INT32 signal)
 VOID addCanaryMetadataToFrameData(PBYTE buffer, PFrame pFrame)
 {
     PBYTE pCurPtr = buffer + ANNEX_B_NALU_SIZE;
-
-    putUnalignedInt64BigEndian((PINT64) pCurPtr, pFrame->presentationTs / HUNDREDS_OF_NANOS_IN_A_MILLISECOND);
+    putUnalignedInt64BigEndian((PINT64) pCurPtr, pFrame->presentationTs);
     pCurPtr += SIZEOF(UINT64);
-
-    putUnalignedInt32BigEndian((PINT32) pCurPtr, pFrame->index);
-    pCurPtr += SIZEOF(UINT32);
-
     putUnalignedInt32BigEndian((PINT32) pCurPtr, pFrame->size);
     pCurPtr += SIZEOF(UINT32);
-
     putUnalignedInt32BigEndian((PINT32) pCurPtr, COMPUTE_CRC32(buffer, pFrame->size));
 }
 
@@ -258,7 +252,7 @@ VOID sendCustomFrames(Canary::PPeer pPeer, MEDIA_STREAM_TRACK_KIND kind, UINT64 
     PBYTE canaryFrameData = NULL;
     canaryFrameData = (PBYTE) MEMALLOC(actualFrameSize);
 
-    // We allocate a bigger buffer to accomodate the hex encoded string
+    // We allocate a bigger buffer to accommodate the hex encoded string
     frame.frameData = (PBYTE) MEMALLOC(frameSizeWithoutNalu * 2 + 1 + ANNEX_B_NALU_SIZE);
     frame.version = FRAME_CURRENT_VERSION;
     frame.presentationTs = GETTIME();
