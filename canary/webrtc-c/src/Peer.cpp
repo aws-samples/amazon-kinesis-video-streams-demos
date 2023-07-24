@@ -353,7 +353,7 @@ STATUS Peer::shutdown()
     return this->status;
 }
 
-STATUS Peer::connect(const BOOL useStorage)
+STATUS Peer::connect()
 {
     printf("TESTTT\n");
 
@@ -384,17 +384,15 @@ STATUS Peer::connect(const BOOL useStorage)
     STATUS retStatus = STATUS_SUCCESS;
     CHK_STATUS(signalingClientConnectSync(signalingClientHandle));
 
-
-    if(useStorage){
-        // Join storage session for media ingestion
-        std::cout << "[KVS Storage Master]invoking join storage session" << endl;
-        retStatus = signalingClientJoinSessionSync(signalingClientHandle);
-        if (retStatus != STATUS_SUCCESS) {
-            printf("[KVS Storage Master] signalingClientConnectSync(): operation returned status code: 0x%08x", retStatus);
-            goto CleanUp;
-        }
-        std::cout << "[KVS Storage Master] Signaling client connection to socket established" << endl;
+    // Join storage session for media ingestion
+    std::cout << "invoke join storage session" << endl;
+    retStatus = signalingClientJoinSessionSync(signalingClientHandle);
+    std::cout << "invoke join storage session" << endl;
+    if (retStatus != STATUS_SUCCESS) {
+        printf("[KVS Master] signalingClientConnectSync(): operation returned status code: 0x%08x", retStatus);
+        goto CleanUp;
     }
+    std::cout << "[KVS Master] Signaling client connection to socket established" << endl;
 
     if (!this->isMaster) {
         this->foundPeerId = TRUE;

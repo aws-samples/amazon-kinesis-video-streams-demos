@@ -6,6 +6,8 @@ VOID runPeer(Canary::PConfig, TIMER_QUEUE_HANDLE, STATUS*);
 VOID sendLocalFrames(Canary::PPeer, MEDIA_STREAM_TRACK_KIND, const std::string&, UINT64, UINT32);
 VOID sendCustomFrames(Canary::PPeer, MEDIA_STREAM_TRACK_KIND, UINT64, UINT64);
 STATUS canaryRtpOutboundStats(UINT32, UINT64, UINT64);
+STATUS canaryRtpInboundStats(UINT32, UINT64, UINT64);
+STATUS canaryEndToEndStats(UINT32, UINT64, UINT64);
 STATUS canaryKvsStats(UINT32, UINT64, UINT64);
 
 std::atomic<bool> terminated;
@@ -188,8 +190,7 @@ VOID runPeer(Canary::PConfig pConfig, TIMER_QUEUE_HANDLE timerQueueHandle, STATU
                                   canaryKvsStats, (UINT64) &peer, &timeoutTimerId));
     CHK_STATUS(peer.init(pConfig, callbacks));
     std::cout << "TEST: 4" << endl;
-    CHK_STATUS(peer.connect(true));
-
+    CHK_STATUS(peer.connect());
     std::cout << "TEST: 5" << endl;
 
     {
@@ -205,7 +206,10 @@ VOID runPeer(Canary::PConfig pConfig, TIMER_QUEUE_HANDLE timerQueueHandle, STATU
         // All metrics tracking will happen on a time queue to simplify handling periodicity
         CHK_STATUS(timerQueueAddTimer(timerQueueHandle, METRICS_INVOCATION_PERIOD, METRICS_INVOCATION_PERIOD, canaryRtpOutboundStats, (UINT64) &peer,
                                       &timeoutTimerId));
-
+        CHK_STATUS(timerQueueAddTimer(timerQueueHandle, METRICS_INVOCATION_PERIOD, METRICS_INVOCATION_PERIOD, canaryRtpInboundStats, (UINT64) &peer,
+                                      &timeoutTimerId));
+        CHK_STATUS(timerQueueAddTimer(timerQueueHandle, END_TO_END_METRICS_INVOCATION_PERIOD, END_TO_END_METRICS_INVOCATION_PERIOD,
+                                      canaryEndToEndStats, (UINT64) &peer, &timeoutTimerId));
         videoThread.join();
         audioThread.join();
     }
@@ -315,6 +319,36 @@ STATUS canaryRtpOutboundStats(UINT32 timerId, UINT64 currentTime, UINT64 customD
     if (!terminated.load()) {
         Canary::PPeer pPeer = (Canary::PPeer) customData;
         pPeer->publishStatsForCanary(RTC_STATS_TYPE_OUTBOUND_RTP);
+    } else {
+        retStatus = STATUS_TIMER_QUEUE_STOP_SCHEDULING;
+    }
+
+    return retStatus;
+}
+
+STATUS canaryRtpInboundStats(UINT32 timerId, UINT64 currentTime, UINT64 customData)
+{
+    UNUSED_PARAM(timerId);
+    UNUSED_PARAM(currentTime);
+    STATUS retStatus = STATUS_SUCCESS;
+    if (!terminated.load()) {
+        Canary::PPeer pPeer = (Canary::PPeer) customData;
+        pPeer->publishStatsForCanary(RTC_STATS_TYPE_INBOUND_RTP);
+    } else {
+        retStatus = STATUS_TIMER_QUEUE_STOP_SCHEDULING;
+    }
+
+    return retStatus;
+}
+
+STATUS canaryEndToEndStats(UINT32 timerId, UINT64 currentTime, UINT64 customData)
+{
+    UNUSED_PARAM(timerId);
+    UNUSED_PARAM(currentTime);
+    STATUS retStatus = STATUS_SUCCESS;
+    if (!terminated.load()) {
+        Canary::PPeer pPeer = (Canary::PPeer) customData;
+        pPeer->publishEndToEndMetrics();
     } else {
         retStatus = STATUS_TIMER_QUEUE_STOP_SCHEDULING;
     }
