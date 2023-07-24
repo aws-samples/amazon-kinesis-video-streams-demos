@@ -341,8 +341,6 @@ STATUS run(Canary::PConfig pConfig)
     masterChannelInfo.pCertPath = (PCHAR) DEFAULT_KVS_CACERT_PATH;
     masterChannelInfo.messageTtl = 0; // Default is 60 seconds
 
-    masterChannelInfo.useMediaStorage = TRUE;
-
     masterSignalingClientCallbacks.version = SIGNALING_CLIENT_CALLBACKS_CURRENT_VERSION;
     masterSignalingClientCallbacks.errorReportFn = signalingClientError;
     masterSignalingClientCallbacks.stateChangeFn = signalingClientStateChanged;
