@@ -164,7 +164,7 @@ STATUS Config::initWithEnvVars()
 
     /* This is ignored for master. Master can extract the info from offer. Viewer has to know if peer can trickle or
     * not ahead of time. */
-    CHK_STATUS(optenvBool(CANARY_TRICKLE_ICE_ENV_VAR, &trickleIce, FALSE));
+    CHK_STATUS(optenvBool(CANARY_TRICKLE_ICE_ENV_VAR, &trickleIce, TRUE));
     CHK_STATUS(optenvBool(CANARY_USE_TURN_ENV_VAR, &useTurn, TRUE));
     CHK_STATUS(optenvBool(CANARY_FORCE_TURN_ENV_VAR, &forceTurn, FALSE));
     CHK_STATUS(optenvBool(CANARY_USE_IOT_CREDENTIALS_ENV_VAR, &useIotCredentialProvider, FALSE));
@@ -222,6 +222,9 @@ STATUS Config::initWithEnvVars()
 
     CHK_STATUS(optenvUint64(CANARY_BIT_RATE_ENV_VAR, &bitRate, CANARY_DEFAULT_BITRATE));
     CHK_STATUS(optenvUint64(CANARY_FRAME_RATE_ENV_VAR, &frameRate, CANARY_DEFAULT_FRAMERATE));
+
+    // TODO: revert to FALSE, set to TRUE for testing
+    CHK_STATUS(optenvBool(CANARY_USE_STORAGE_ENV_VAR, &useMediaStorage, TRUE));
 
 CleanUp:
 
@@ -347,6 +350,8 @@ STATUS Config::initWithJSON(PCHAR filePath)
             jsonUint64(raw, tokens[++i], &logLevel64);
             logLevel.value = (UINT32) logLevel64.value;
             logLevel.initialized = TRUE;
+        } else if (compareJsonString((PCHAR) raw, &tokens[i], JSMN_STRING, (PCHAR) CANARY_USE_STORAGE_ENV_VAR)) {
+            jsonBool(raw, tokens[++i], &useMediaStorage);
         }
 
         // IoT credential provider related tokens

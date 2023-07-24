@@ -83,6 +83,9 @@ class Peer {
     PRtcPeerConnection pPeerConnection;
     std::vector<PRtcRtpTransceiver> audioTransceivers;
     std::vector<PRtcRtpTransceiver> videoTransceivers;
+
+    BOOL useMediaStorage;
+
     BOOL isMaster;
     BOOL trickleIce;
     UINT64 offerReceiveTimestamp;
