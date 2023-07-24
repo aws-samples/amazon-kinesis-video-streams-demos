@@ -144,7 +144,6 @@ STATUS Peer::initSignaling(const Canary::PConfig pConfig)
 
         return STATUS_SUCCESS;
     };
-    
     clientCallbacks.messageReceivedFn = [](UINT64 customData, PReceivedSignalingMessage pMsg) -> STATUS {
         STATUS retStatus = STATUS_SUCCESS;
         PPeer pPeer = (PPeer) customData;
@@ -353,8 +352,6 @@ STATUS Peer::shutdown()
 
 STATUS Peer::connect()
 {
-    printf("TESTTT\n");
-
     auto connectPeerConnection = [this]() -> STATUS {
         STATUS retStatus = STATUS_SUCCESS;
         RtcSessionDescriptionInit offerSDPInit;
@@ -381,16 +378,6 @@ STATUS Peer::connect()
 
     STATUS retStatus = STATUS_SUCCESS;
     CHK_STATUS(signalingClientConnectSync(signalingClientHandle));
-
-    // Join storage session for media ingestion
-    std::cout << "invoke join storage session" << endl;
-    retStatus = signalingClientJoinSessionSync(signalingClientHandle);
-    std::cout << "invoke join storage session" << endl;
-    if (retStatus != STATUS_SUCCESS) {
-        printf("[KVS Master] signalingClientConnectSync(): operation returned status code: 0x%08x", retStatus);
-        goto CleanUp;
-    }
-    std::cout << "[KVS Master] Signaling client connection to socket established" << endl;
 
     if (!this->isMaster) {
         this->foundPeerId = TRUE;
@@ -550,8 +537,6 @@ STATUS Peer::addTransceiver(RtcMediaStreamTrack& track)
     };
 
     auto handleVideoFrame = [](UINT64 customData, PFrame pFrame) -> VOID {
-        std::cout << "TEST: C.1" << endl;
-
         PPeer pPeer = (Canary::PPeer)(customData);
         std::unique_lock<std::recursive_mutex> lock(pPeer->mutex);
         PBYTE frameDataPtr = pFrame->frameData + ANNEX_B_NALU_SIZE;
@@ -628,7 +613,6 @@ STATUS Peer::writeFrame(PFrame pFrame, MEDIA_STREAM_TRACK_KIND kind)
         this->canaryOutgoingRTPMetricsContext.videoBytesGenerated += pFrame->size;
     }
     for (auto& transceiver : transceivers) {
-        //std::cout << "TEST: B.3" << endl;
         retStatus = ::writeFrame(transceiver, pFrame);
         CHK (retStatus == STATUS_SRTP_NOT_READY_YET || retStatus == STATUS_SUCCESS, retStatus);
 
