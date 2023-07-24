@@ -38,15 +38,12 @@ public class CanaryFrameProcessor implements FrameVisitor.FrameProcessor {
 
     @Override
     public void process(Frame frame, MkvTrackMetadata trackMetadata, Optional<FragmentMetadata> fragmentMetadata, Optional<FragmentMetadataVisitor.MkvTagProcessor> tagProcessor) throws FrameProcessException {
-        System.out.println("TEST");
-
         int frameTimeDelta = frame.getTimeCode();
         long fragmentStartTime = fragmentMetadata.get().getProducerSideTimestampMillis();
         byte[] data = new byte[frame.getFrameData().remaining()];
         int offset = 0;
         frame.getFrameData().get(data);
         byte[] timeData = new byte[Long.BYTES];
-
 
         System.arraycopy(data, offset, timeData, 0, timeData.length);
         offset += timeData.length;
