@@ -68,13 +68,6 @@ target_link_libraries(
   kvsWebrtcCanary)
 
 add_executable(
-  kvsWebrtcCanaryWebrtcStorage
-  src/CanaryWebrtcStorage.cpp)
-target_link_libraries(
-  kvsWebrtcCanaryWebrtcStorage
-  kvsWebrtcCanary)
-
-add_executable(
   kvsWebrtcCanarySignaling
   src/CanarySignaling.cpp)
 target_link_libraries(
