@@ -24,8 +24,6 @@ STATUS Peer::init(const Canary::PConfig pConfig, const Callbacks& callbacks)
 {
     STATUS retStatus = STATUS_SUCCESS;
 
-    this->useMediaStorage = pConfig->useMediaStorage.value;
-
     this->isMaster = pConfig->isMaster.value;
     this->trickleIce = pConfig->trickleIce.value;
     this->callbacks = callbacks;
@@ -98,7 +96,7 @@ STATUS Peer::initSignaling(const Canary::PConfig pConfig)
     channelInfo.pCertPath = (PCHAR) DEFAULT_KVS_CACERT_PATH;
     channelInfo.messageTtl = 0; // Default is 60 seconds
 
-    channelInfo.useMediaStorage = pConfig->useMediaStorage.value;
+    channelInfo.useMediaStorage = TRUE;
 
     this->clientInfo.signalingClientCreationMaxRetryAttempts = MAX_CALL_RETRY_COUNT;
 
@@ -355,7 +353,7 @@ STATUS Peer::shutdown()
     return this->status;
 }
 
-STATUS Peer::connect()
+STATUS Peer::connect(const BOOL useStorage)
 {
     auto connectPeerConnection = [this]() -> STATUS {
         STATUS retStatus = STATUS_SUCCESS;
@@ -385,7 +383,7 @@ STATUS Peer::connect()
     CHK_STATUS(signalingClientConnectSync(signalingClientHandle));
 
 
-    if(this->useMediaStorage){
+    if(useStorage){
         // Join storage session for media ingestion
         std::cout << "[KVS Storage Master]invoking join storage session" << endl;
         retStatus = signalingClientJoinSessionSync(signalingClientHandle);

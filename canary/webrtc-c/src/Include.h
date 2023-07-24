@@ -76,8 +76,6 @@
 #define CANARY_DEFAULT_CLIENT_ID      "DefaultClientId"
 #define CANARY_DEFAULT_LOG_GROUP_NAME "DefaultLogGroupName"
 
-#define CANARY_USE_STORAGE_ENV_VAR           "CANARY_USE_STORAGE"
-
 // Signaling Canary error definitions
 #define STATUS_SIGNALING_CANARY_BASE                    0x73000000
 #define STATUS_SIGNALING_CANARY_UNEXPECTED_MESSAGE      STATUS_SIGNALING_CANARY_BASE + 0x00000001
