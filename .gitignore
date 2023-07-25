@@ -20,3 +20,4 @@ canary/webrtc-c/.vscode/settings.json
 sigv4-signing/java/SigV4Signer.java/target/classes/org/amazonaws/kinesisvideo/AwsV4Signer.class
 sigv4-signing/java/SigV4Signer.java/target/classes/org/amazonaws/kinesisvideo/AwsV4Signer$1.class
 sigv4-signing/java/SigV4Signer.java/target/classes/org/amazonaws/kinesisvideo/AwsV4Signer$2.class
+canary/webrtc-c/src/configText
