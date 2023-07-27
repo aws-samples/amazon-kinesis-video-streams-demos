@@ -29,6 +29,12 @@ import java.text.SimpleDateFormat;
 // import com.amazonaws.services.kinesisvideo.model.ListFragmentsRequest;
 // import com.amazonaws.services.kinesisvideo.model.ListFragmentsResult;
 // import com.amazonaws.kinesisvideo.parser.examples.ListFragmentWorker;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+
 
 import lombok.extern.log4j.Log4j2;
 import lombok.extern.slf4j.Slf4j;
@@ -106,33 +112,17 @@ public class ProducerSdkCanaryConsumer {
 
         TimestampRange timestampRange = new TimestampRange();
         timestampRange.setStartTimestamp(new SimpleDateFormat("dd/MM/yyyy HH:mm:ss").parse("26/06/2023 17:49:38"));
-        timestampRange.setEndTimestamp(new SimpleDateFormat("dd/MM/yyyy HH:mm:ss").parse("26/07/2023 17:59:38")); 
+        timestampRange.setEndTimestamp(new SimpleDateFormat("dd/MM/yyyy HH:mm:ss").parse("26/07/2023 17:49:38")); 
         FragmentSelector fragmentSelector = new FragmentSelector();
             fragmentSelector.setFragmentSelectorType("SERVER_TIMESTAMP");
             fragmentSelector.setTimestampRange(timestampRange);
 
-        CanaryListFragmentWorker listFragmentWorker = new CanaryListFragmentWorker(streamName, credentialsProvider, dataEndpoint, Regions.fromName(region), fragmentSelector);
 
-        System.out.println("Here 1");
-        log.info("Here 1");
+        ExecutorService executorService = Executors.newFixedThreadPool(10);
+        Future listFragmentResult = executorService.submit(new CanaryListFragmentWorker(streamName, credentialsProvider, dataEndpoint, Regions.fromName(region), fragmentSelector));
+        System.out.println(listFragmentResult.get());
 
-
-        try{
-            List<String> callResult = listFragmentWorker.call();
-            System.out.println(callResult.size());
-
-            callResult = listFragmentWorker.call();
-            System.out.println(callResult.size());
-
-            callResult = listFragmentWorker.call();
-            System.out.println(callResult.size());
-        }
-        catch (Throwable t) {
-            log.error("Failure in ListFragmentWorker for streamName {} {}", streamName, t.toString());
-        }
-
-
-
+        // CanaryListFragmentWorker listFragmentWorker = new CanaryListFragmentWorker(streamName, credentialsProvider, dataEndpoint, Regions.fromName(region), fragmentSelector);
         // final GetDataEndpointRequest dataEndpointRequest = new GetDataEndpointRequest()
         //         .withAPIName(APIName.LIST_FRAGMENTS).withStreamName(streamName);
         // final String dataEndpoint = amazonKinesisVideo.getDataEndpoint(dataEndpointRequest).getDataEndpoint();
