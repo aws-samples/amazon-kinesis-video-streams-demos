@@ -3,7 +3,11 @@ package com.amazon.kinesis.video.canary.consumer;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Comparator;
 import java.util.concurrent.Callable;
+
+import org.jcodec.common.DictionaryCompressor.Int;
+
 import com.amazonaws.auth.AWSCredentialsProvider;
 import com.amazonaws.client.builder.AwsClientBuilder;
 import com.amazonaws.regions.Regions;
@@ -17,7 +21,6 @@ import java.text.MessageFormat;
 
 
 /* This worker retrieves all fragments within the specified TimestampRange from a specified Kinesis Video Stream and returns them in a list */
-
 @Slf4j
 public class CanaryListFragmentWorker implements Callable {
     private final FragmentSelector fragmentSelector;
@@ -57,8 +60,8 @@ public class CanaryListFragmentWorker implements Callable {
     }
 
     @Override
-    public List<String> call() {
-        List<String> fragmentNumbers = new ArrayList<>();
+    public List<CanaryFragment> call() {
+        List<CanaryFragment> fragments = new ArrayList<>();
         try {
             System.out.println(MessageFormat.format("Start ListFragment worker on stream {0}", streamName));
 
@@ -74,7 +77,7 @@ public class CanaryListFragmentWorker implements Callable {
                     result.getSdkResponseMetadata().getRequestId()));
 
             for (Fragment f: result.getFragments()) {
-                fragmentNumbers.add(f.getFragmentNumber());
+                fragments.add(new CanaryFragment(f));
             }
             String nextToken = result.getNextToken();
 
@@ -85,22 +88,25 @@ public class CanaryListFragmentWorker implements Callable {
                 result = amazonKinesisVideoArchivedMedia.listFragments(request);
 
                 for (Fragment f: result.getFragments()) {
-                    fragmentNumbers.add(f.getFragmentNumber());
+                    fragments.add(new CanaryFragment(f));
                 }
                 nextToken = result.getNextToken();
             }
-            Collections.sort(fragmentNumbers);
+            // Collections.sort(fragments);
+            // Collections.sort(fragments, Comparator.comparingInt(Integer.parseInt(Fragment::getFragmentNumber)));
+            fragments.sort(Comparator.comparing(CanaryFragment::getFragmentNumberInt));
 
-            for (String f: fragmentNumbers) {
-                System.out.println(MessageFormat.format("Retrieved fragment number {0} ", f));
+
+            for (CanaryFragment cf: fragments) {
+                System.out.println(MessageFormat.format("Retrieved fragment number {0} ", cf.fragment.getFragmentNumber()));
             }
         }
         catch (Throwable t) {
             System.out.println(MessageFormat.format("Failure in CanaryListFragmentWorker for streamName {0} {1}", streamName, t.toString()));
             throw t;
         } finally {
-            System.out.println(MessageFormat.format("Retrieved {0} Fragments and exiting CanaryListFragmentWorker for stream {1}", fragmentNumbers.size(), streamName));
-            return fragmentNumbers;
+            System.out.println(MessageFormat.format("Retrieved {0} Fragments and exiting CanaryListFragmentWorker for stream {1}", fragments.size(), streamName));
+            return fragments;
         }
     }
 }

@@ -111,8 +111,8 @@ public class ProducerSdkCanaryConsumer {
         final String dataEndpoint = amazonKinesisVideo.getDataEndpoint(dataEndpointRequest).getDataEndpoint();
 
         TimestampRange timestampRange = new TimestampRange();
-        timestampRange.setStartTimestamp(new SimpleDateFormat("dd/MM/yyyy HH:mm:ss").parse("26/06/2023 17:49:38"));
-        timestampRange.setEndTimestamp(new SimpleDateFormat("dd/MM/yyyy HH:mm:ss").parse("26/07/2023 17:49:38")); 
+        timestampRange.setStartTimestamp(new SimpleDateFormat("dd/MM/yyyy HH:mm:ss").parse("27/07/2023 17:50:38"));
+        timestampRange.setEndTimestamp(new SimpleDateFormat("dd/MM/yyyy HH:mm:ss").parse("27/07/2023 17:59:38")); 
         FragmentSelector fragmentSelector = new FragmentSelector();
             fragmentSelector.setFragmentSelectorType("SERVER_TIMESTAMP");
             fragmentSelector.setTimestampRange(timestampRange);
@@ -121,6 +121,11 @@ public class ProducerSdkCanaryConsumer {
         ExecutorService executorService = Executors.newFixedThreadPool(10);
         Future listFragmentResult = executorService.submit(new CanaryListFragmentWorker(streamName, credentialsProvider, dataEndpoint, Regions.fromName(region), fragmentSelector));
         System.out.println(listFragmentResult.get());
+
+
+
+
+
 
         // CanaryListFragmentWorker listFragmentWorker = new CanaryListFragmentWorker(streamName, credentialsProvider, dataEndpoint, Regions.fromName(region), fragmentSelector);
         // final GetDataEndpointRequest dataEndpointRequest = new GetDataEndpointRequest()

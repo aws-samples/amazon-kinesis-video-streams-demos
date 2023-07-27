@@ -25,3 +25,5 @@ canary/consumer-java/target/classes/com/amazon/kinesis/video/canary/consumer/Can
 canary/consumer-java/target/generated-sources/delombok/com/amazon/kinesis/video/canary/consumer/CanaryListFragmentWorker.java
 canary/consumer-java/log4j.xml
 canary/consumer-java/log/java_kvs.log
+canary/consumer-java/target/classes/com/amazon/kinesis/video/canary/consumer/CanaryFragment.class
+canary/consumer-java/target/generated-sources/delombok/com/amazon/kinesis/video/canary/consumer/CanaryFragment.java
