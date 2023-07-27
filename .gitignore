@@ -21,3 +21,7 @@ sigv4-signing/java/SigV4Signer.java/target/classes/org/amazonaws/kinesisvideo/Aw
 sigv4-signing/java/SigV4Signer.java/target/classes/org/amazonaws/kinesisvideo/AwsV4Signer$1.class
 sigv4-signing/java/SigV4Signer.java/target/classes/org/amazonaws/kinesisvideo/AwsV4Signer$2.class
 canary/webrtc-c/src/configText
+canary/consumer-java/target/classes/com/amazon/kinesis/video/canary/consumer/CanaryListFragmentWorker.class
+canary/consumer-java/target/generated-sources/delombok/com/amazon/kinesis/video/canary/consumer/CanaryListFragmentWorker.java
+canary/consumer-java/log4j.xml
+canary/consumer-java/log/java_kvs.log

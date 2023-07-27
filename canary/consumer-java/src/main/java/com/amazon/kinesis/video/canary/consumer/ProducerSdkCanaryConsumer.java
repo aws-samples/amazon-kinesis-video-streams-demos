@@ -16,13 +16,26 @@ import com.amazonaws.services.kinesisvideo.AmazonKinesisVideoClientBuilder;
 import com.amazonaws.services.kinesisvideo.model.StartSelector;
 import com.amazonaws.services.kinesisvideo.model.StartSelectorType;
 
+
 import com.amazonaws.services.kinesisvideo.model.APIName;
 import com.amazonaws.services.kinesisvideo.model.GetDataEndpointRequest;
+import com.amazonaws.services.kinesisvideo.AmazonKinesisVideoArchivedMedia;
+import com.amazonaws.client.builder.AwsClientBuilder;
+import com.amazonaws.auth.AWSCredentialsProvider;
+import com.amazonaws.services.kinesisvideo.model.TimestampRange;
+import com.amazonaws.services.kinesisvideo.model.FragmentSelector;
+import java.text.SimpleDateFormat;
+// import com.amazonaws.services.kinesisvideo.AmazonKinesisVideoArchivedMediaClient;
+// import com.amazonaws.services.kinesisvideo.model.ListFragmentsRequest;
+// import com.amazonaws.services.kinesisvideo.model.ListFragmentsResult;
+// import com.amazonaws.kinesisvideo.parser.examples.ListFragmentWorker;
 
+import lombok.extern.log4j.Log4j2;
 import lombok.extern.slf4j.Slf4j;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.List;
 import java.util.Optional;
 import java.util.Timer;
 import java.util.TimerTask;
@@ -86,9 +99,67 @@ public class ProducerSdkCanaryConsumer {
         timer.schedule(task, delay);
 
 
+
         final GetDataEndpointRequest dataEndpointRequest = new GetDataEndpointRequest()
-                .withAPIName(APIName.LIST_FRAGMENTS).withStreamName(streamName);
+            .withAPIName(APIName.LIST_FRAGMENTS).withStreamName(streamName);
         final String dataEndpoint = amazonKinesisVideo.getDataEndpoint(dataEndpointRequest).getDataEndpoint();
+
+        TimestampRange timestampRange = new TimestampRange();
+        timestampRange.setStartTimestamp(new SimpleDateFormat("dd/MM/yyyy HH:mm:ss").parse("26/06/2023 17:49:38"));
+        timestampRange.setEndTimestamp(new SimpleDateFormat("dd/MM/yyyy HH:mm:ss").parse("26/07/2023 17:59:38")); 
+        FragmentSelector fragmentSelector = new FragmentSelector();
+            fragmentSelector.setFragmentSelectorType("SERVER_TIMESTAMP");
+            fragmentSelector.setTimestampRange(timestampRange);
+
+        CanaryListFragmentWorker listFragmentWorker = new CanaryListFragmentWorker(streamName, credentialsProvider, dataEndpoint, Regions.fromName(region), fragmentSelector);
+
+        System.out.println("Here 1");
+        log.info("Here 1");
+
+
+        try{
+            List<String> callResult = listFragmentWorker.call();
+            System.out.println(callResult.size());
+
+            callResult = listFragmentWorker.call();
+            System.out.println(callResult.size());
+
+            callResult = listFragmentWorker.call();
+            System.out.println(callResult.size());
+        }
+        catch (Throwable t) {
+            log.error("Failure in ListFragmentWorker for streamName {} {}", streamName, t.toString());
+        }
+
+
+
+        // final GetDataEndpointRequest dataEndpointRequest = new GetDataEndpointRequest()
+        //         .withAPIName(APIName.LIST_FRAGMENTS).withStreamName(streamName);
+        // final String dataEndpoint = amazonKinesisVideo.getDataEndpoint(dataEndpointRequest).getDataEndpoint();
+
+        // System.out.println(dataEndpoint);
+        // System.out.println(region);
+
+        // final AmazonKinesisVideoArchivedMedia amazonKinesisVideoArchivedMedia = AmazonKinesisVideoArchivedMediaClient
+        // .builder()
+        // .withCredentials(credentialsProvider)
+        // .withEndpointConfiguration(new AwsClientBuilder.EndpointConfiguration(dataEndpoint, region))
+        // .build();
+
+        // System.out.println("Here 1");
+
+        // ListFragmentsRequest request = new ListFragmentsRequest()
+        //     .withStreamName(streamName);
+
+        // System.out.println("Here 2");
+
+        // ListFragmentsResult result = amazonKinesisVideoArchivedMedia.listFragments(request);
+        
+        // // System.out.println(result.getSdkResponseMetadata());
+
+        // System.out.println("Here 3");
+
+
 
         Timer intervalMetricsTimer = new Timer("IntervalMetricsTimer");
         TimerTask intervalMetricsTask = new TimerTask() {
@@ -97,6 +168,7 @@ public class ProducerSdkCanaryConsumer {
             }
         };
         intervalMetricsTimer.scheduleAtFixedRate(intervalMetricsTask, 0, 10000); // delay of 0 ms at an interval of 10,000 ms
+
 
 
         getMediaWorker.run();

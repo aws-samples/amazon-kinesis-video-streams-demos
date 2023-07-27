@@ -1,0 +1,106 @@
+package com.amazon.kinesis.video.canary.consumer;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.concurrent.Callable;
+import com.amazonaws.auth.AWSCredentialsProvider;
+import com.amazonaws.client.builder.AwsClientBuilder;
+import com.amazonaws.regions.Regions;
+import com.amazonaws.services.kinesisvideo.AmazonKinesisVideo;
+import com.amazonaws.services.kinesisvideo.AmazonKinesisVideoArchivedMedia;
+import com.amazonaws.services.kinesisvideo.AmazonKinesisVideoArchivedMediaClient;
+import com.amazonaws.services.kinesisvideo.model.*;
+import lombok.extern.slf4j.Slf4j;
+
+import java.text.MessageFormat;
+
+
+/* This worker retrieves all fragments within the specified TimestampRange from a specified Kinesis Video Stream and returns them in a list */
+
+@Slf4j
+public class CanaryListFragmentWorker implements Callable {
+    private final FragmentSelector fragmentSelector;
+    private final AmazonKinesisVideoArchivedMedia amazonKinesisVideoArchivedMedia;
+    private final long fragmentsPerRequest = 100;
+    private final Regions region;
+    private final AWSCredentialsProvider credentialsProvider;
+    protected final String streamName;
+
+    public CanaryListFragmentWorker(final String streamName,
+                              final AWSCredentialsProvider credentialsProvider, final String endPoint,
+                              final Regions region,
+                              final FragmentSelector fragmentSelector) {
+        this.region = region;
+        this.credentialsProvider = credentialsProvider;
+        this.streamName = streamName;
+        this.fragmentSelector = fragmentSelector;
+
+        amazonKinesisVideoArchivedMedia = AmazonKinesisVideoArchivedMediaClient
+                .builder()
+                .withCredentials(credentialsProvider)
+                .withEndpointConfiguration(new AwsClientBuilder.EndpointConfiguration(endPoint, region.getName()))
+                .build();
+    }
+
+    public static CanaryListFragmentWorker create(final String streamName,
+                                            final AWSCredentialsProvider credentialsProvider,
+                                            final Regions region,
+                                            final AmazonKinesisVideo amazonKinesisVideo,
+                                            final FragmentSelector fragmentSelector) {
+        final GetDataEndpointRequest request = new GetDataEndpointRequest()
+                .withAPIName(APIName.LIST_FRAGMENTS).withStreamName(streamName);
+        final String endpoint = amazonKinesisVideo.getDataEndpoint(request).getDataEndpoint();
+
+        return new CanaryListFragmentWorker(
+                streamName, credentialsProvider, endpoint, region, fragmentSelector);
+    }
+
+    @Override
+    public List<String> call() {
+        List<String> fragmentNumbers = new ArrayList<>();
+        try {
+            System.out.println(MessageFormat.format("Start ListFragment worker on stream {0}", streamName));
+
+            ListFragmentsRequest request = new ListFragmentsRequest()
+                    .withStreamName(streamName).withFragmentSelector(fragmentSelector).withMaxResults(fragmentsPerRequest);
+
+            ListFragmentsResult result = amazonKinesisVideoArchivedMedia.listFragments(request);
+
+
+            System.out.println(MessageFormat.format("List Fragments called on stream {0} response {1} request ID {2}",
+                    streamName,
+                    result.getSdkHttpMetadata().getHttpStatusCode(),
+                    result.getSdkResponseMetadata().getRequestId()));
+
+            for (Fragment f: result.getFragments()) {
+                fragmentNumbers.add(f.getFragmentNumber());
+            }
+            String nextToken = result.getNextToken();
+
+            /* If result is truncated, keep making requests until nextToken is empty */
+            while (nextToken != null) {
+                request = new ListFragmentsRequest()
+                        .withStreamName(streamName).withNextToken(nextToken);
+                result = amazonKinesisVideoArchivedMedia.listFragments(request);
+
+                for (Fragment f: result.getFragments()) {
+                    fragmentNumbers.add(f.getFragmentNumber());
+                }
+                nextToken = result.getNextToken();
+            }
+            Collections.sort(fragmentNumbers);
+
+            for (String f: fragmentNumbers) {
+                System.out.println(MessageFormat.format("Retrieved fragment number {0} ", f));
+            }
+        }
+        catch (Throwable t) {
+            System.out.println(MessageFormat.format("Failure in CanaryListFragmentWorker for streamName {0} {1}", streamName, t.toString()));
+            throw t;
+        } finally {
+            System.out.println(MessageFormat.format("Retrieved {0} Fragments and exiting CanaryListFragmentWorker for stream {1}", fragmentNumbers.size(), streamName));
+            return fragmentNumbers;
+        }
+    }
+}
