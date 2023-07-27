@@ -34,6 +34,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.lang.Exception;
 
 
 import lombok.extern.log4j.Log4j2;
@@ -49,8 +50,25 @@ import java.util.TimerTask;
 @Slf4j
 public class ProducerSdkCanaryConsumer {
 
-    private static void getIntervalMetrics(){
+    private static void getIntervalMetrics(String streamName, SystemPropertiesCredentialsProvider credentialsProvider, String dataEndpoint, String region){
         System.out.println("10 sec have passed...");
+
+        try{
+
+        TimestampRange timestampRange = new TimestampRange();
+        timestampRange.setStartTimestamp(new SimpleDateFormat("dd/MM/yyyy HH:mm:ss").parse("27/07/2023 17:50:38"));
+        timestampRange.setEndTimestamp(new SimpleDateFormat("dd/MM/yyyy HH:mm:ss").parse("27/07/2023 17:59:38")); 
+        FragmentSelector fragmentSelector = new FragmentSelector();
+            fragmentSelector.setFragmentSelectorType("SERVER_TIMESTAMP");
+            fragmentSelector.setTimestampRange(timestampRange);
+
+        ExecutorService executorService = Executors.newFixedThreadPool(10);
+        Future listFragmentResult = executorService.submit(new CanaryListFragmentWorker(streamName, credentialsProvider, dataEndpoint, Regions.fromName(region), fragmentSelector));
+        System.out.println(listFragmentResult.get());
+
+        } catch(Exception e){
+
+        }
         
     }
 
@@ -110,20 +128,6 @@ public class ProducerSdkCanaryConsumer {
             .withAPIName(APIName.LIST_FRAGMENTS).withStreamName(streamName);
         final String dataEndpoint = amazonKinesisVideo.getDataEndpoint(dataEndpointRequest).getDataEndpoint();
 
-        TimestampRange timestampRange = new TimestampRange();
-        timestampRange.setStartTimestamp(new SimpleDateFormat("dd/MM/yyyy HH:mm:ss").parse("27/07/2023 17:50:38"));
-        timestampRange.setEndTimestamp(new SimpleDateFormat("dd/MM/yyyy HH:mm:ss").parse("27/07/2023 17:59:38")); 
-        FragmentSelector fragmentSelector = new FragmentSelector();
-            fragmentSelector.setFragmentSelectorType("SERVER_TIMESTAMP");
-            fragmentSelector.setTimestampRange(timestampRange);
-
-
-        ExecutorService executorService = Executors.newFixedThreadPool(10);
-        Future listFragmentResult = executorService.submit(new CanaryListFragmentWorker(streamName, credentialsProvider, dataEndpoint, Regions.fromName(region), fragmentSelector));
-        System.out.println(listFragmentResult.get());
-
-
-
 
 
 
@@ -159,7 +163,7 @@ public class ProducerSdkCanaryConsumer {
         Timer intervalMetricsTimer = new Timer("IntervalMetricsTimer");
         TimerTask intervalMetricsTask = new TimerTask() {
             public void run() {
-                getIntervalMetrics();
+                getIntervalMetrics(streamName, credentialsProvider, dataEndpoint, region);
             }
         };
         intervalMetricsTimer.scheduleAtFixedRate(intervalMetricsTask, 0, 10000); // delay of 0 ms at an interval of 10,000 ms
