@@ -33,23 +33,6 @@ import static org.apache.commons.lang3.StringUtils.isNotEmpty;
 
 public class AwsV4Signer {
 
-    static final String ALGORITHM_AWS4_HMAC_SHA_256 = "AWS4-HMAC-SHA256";
-    static final String AWS4_REQUEST_TYPE = "aws4_request";
-    static final String SERVICE = "kinesisvideo";
-    static final String X_AMZ_ALGORITHM = "X-Amz-Algorithm";
-    static final String X_AMZ_CREDENTIAL = "X-Amz-Credential";
-    static final String X_AMZ_DATE = "X-Amz-Date";
-    static final String X_AMZ_EXPIRES = "X-Amz-Expires";
-    static final String X_AMZ_SECURITY_TOKEN = "X-Amz-Security-Token";
-    static final String X_AMZ_SIGNATURE = "X-Amz-Signature";
-    static final String X_AMZ_SIGNED_HEADERS = "X-Amz-SignedHeaders";
-    static final String NEW_LINE_DELIMITER = "\n";
-    static final String DATE_PATTERN = "yyyyMMdd";
-    static final String TIME_PATTERN = "yyyyMMdd'T'HHmmss'Z'";
-
-    static final String METHOD = "GET";
-    static final String SIGNED_HEADERS = "host";
-
     // SigV4 Signer sample reference for the Kinesis Video Streams WebRTC WebSocket connections
     // It will generate a sigv4 url given valid parameters, then connect to it using Tyrus WebSocket client
     public static void main(String[] args) {
@@ -144,11 +127,11 @@ public class AwsV4Signer {
         final String stringToSign = signString(amzDate, createCredentialScope(region, datestamp), canonicalRequest);
 
         // Step 3. Calculate the signature.
-        final byte[] signatureKey = getSignatureKey(secretKey, datestamp, region, SERVICE);
+        final byte[] signatureKey = getSignatureKey(secretKey, datestamp, region, AwsV4SignerConstants.SERVICE);
         final String signature = toHex(hmacSha256(stringToSign, signatureKey));
 
         // Step 4. Combine steps 1 and 3 to form the final URL.
-        final String signedCanonicalQueryString = canonicalQuerystring + "&" + X_AMZ_SIGNATURE + "=" + signature;
+        final String signedCanonicalQueryString = canonicalQuerystring + "&" + AwsV4SignerConstants.X_AMZ_SIGNATURE + "=" + signature;
 
         return URI.create(wssUri.getScheme() + "://" + wssUri.getHost() + "/?" + getCanonicalUri(uri).substring(1) + signedCanonicalQueryString);
     }
@@ -170,12 +153,12 @@ public class AwsV4Signer {
      * <p>
      * The query parameters that are included in this map are:
      * <ol>
-     *     <li>{@value #X_AMZ_ALGORITHM}</li>
-     *     <li>{@value #X_AMZ_CREDENTIAL}</li>
-     *     <li>{@value #X_AMZ_DATE}</li>
-     *     <li>{@value #X_AMZ_EXPIRES}</li>
-     *     <li>{@value #X_AMZ_SIGNED_HEADERS}</li>
-     *     <li>{@value #X_AMZ_SECURITY_TOKEN}, if the AWS Session Token is specified.</li>
+     *     <li>{@value AwsV4SignerConstants#X_AMZ_ALGORITHM}</li>
+     *     <li>{@value AwsV4SignerConstants#X_AMZ_CREDENTIAL}</li>
+     *     <li>{@value AwsV4SignerConstants#X_AMZ_DATE}</li>
+     *     <li>{@value AwsV4SignerConstants#X_AMZ_EXPIRES}</li>
+     *     <li>{@value AwsV4SignerConstants#X_AMZ_SIGNED_HEADERS}</li>
+     *     <li>{@value AwsV4SignerConstants#X_AMZ_SECURITY_TOKEN}, if the AWS Session Token is specified.</li>
      *     <li>And, the query parameters passed through {@code uri}.</li>
      * </ol>
      *
@@ -195,19 +178,19 @@ public class AwsV4Signer {
                                                    final String amzDate,
                                                    final String datestamp) {
         final ImmutableMap.Builder<String, String> queryParamsBuilder = ImmutableMap.<String, String>builder()
-                .put(X_AMZ_ALGORITHM, ALGORITHM_AWS4_HMAC_SHA_256)
-                .put(X_AMZ_CREDENTIAL, urlEncode(accessKey + "/" + createCredentialScope(region, datestamp)))
-                .put(X_AMZ_DATE, amzDate)
+                .put(AwsV4SignerConstants.X_AMZ_ALGORITHM, AwsV4SignerConstants.ALGORITHM_AWS4_HMAC_SHA_256)
+                .put(AwsV4SignerConstants.X_AMZ_CREDENTIAL, urlEncode(accessKey + "/" + createCredentialScope(region, datestamp)))
+                .put(AwsV4SignerConstants.X_AMZ_DATE, amzDate)
 
                 // The SigV4 signer has a maximum time limit of five minutes.
                 // Once a connection is established, peers exchange signaling messages,
                 // and the P2P connection is successful, the media P2P session
                 // can continue for longer period of time.
-                .put(X_AMZ_EXPIRES, "299")
-                .put(X_AMZ_SIGNED_HEADERS, SIGNED_HEADERS);
+                .put(AwsV4SignerConstants.X_AMZ_EXPIRES, "299")
+                .put(AwsV4SignerConstants.X_AMZ_SIGNED_HEADERS, AwsV4SignerConstants.SIGNED_HEADERS);
 
         if (isNotEmpty(sessionToken)) {
-            queryParamsBuilder.put(X_AMZ_SECURITY_TOKEN, urlEncode(sessionToken));
+            queryParamsBuilder.put(AwsV4SignerConstants.X_AMZ_SECURITY_TOKEN, urlEncode(sessionToken));
         }
 
         // Add the query parameters included in the uri.
@@ -257,8 +240,8 @@ public class AwsV4Signer {
         return new StringJoiner("/")
                 .add(datestamp)
                 .add(region)
-                .add(SERVICE)
-                .add(AWS4_REQUEST_TYPE)
+                .add(AwsV4SignerConstants.SERVICE)
+                .add(AwsV4SignerConstants.AWS4_REQUEST_TYPE)
                 .toString();
     }
 
@@ -278,7 +261,7 @@ public class AwsV4Signer {
      * <p>
      * The format of the <strong>canonical request</strong> are as follows:
      * <ol>
-     *     <li>{@code HTTP method + "\n"} - With presigned URL's, it's always {@value #METHOD}.</li>
+     *     <li>{@code HTTP method + "\n"} - With presigned URL's, it's always {@value AwsV4SignerConstants#METHOD}.</li>
      *     <li>{@code Canonical URI + "\n"} - Resource. In our case, it's always "/".</li>
      *     <li>{@code Canonical Query String + "\n"} - Sorted list of query parameters (and their values), excluding X-Amz-Signature. In our case: X-Amz-Algorithm, X-Amz-ChannelARN, X-Amz-ClientId (if viewer), X-Amz-Credential, X-Amz-Date, X-Amz-Expires.</li>
      *     <li>{@code Canonical Headers + "\n"} - In our case, we only have the required HTTP {@code host} header.</li>
@@ -297,14 +280,14 @@ public class AwsV4Signer {
     static String getCanonicalRequest(final URI uri, final String canonicalQuerystring) {
         final String payloadHash = sha256().hashString(EMPTY, UTF_8).toString();
         final String canonicalUri = getCanonicalUri(uri);
-        final String canonicalHeaders = "host:" + uri.getHost() + NEW_LINE_DELIMITER;
+        final String canonicalHeaders = "host:" + uri.getHost() + AwsV4SignerConstants.NEW_LINE_DELIMITER;
 
-        return new StringJoiner(NEW_LINE_DELIMITER)
-                .add(METHOD)
+        return new StringJoiner(AwsV4SignerConstants.NEW_LINE_DELIMITER)
+                .add(AwsV4SignerConstants.METHOD)
                 .add(canonicalUri)
                 .add(canonicalQuerystring)
                 .add(canonicalHeaders)
-                .add(SIGNED_HEADERS)
+                .add(AwsV4SignerConstants.SIGNED_HEADERS)
                 .add(payloadHash)
                 .toString();
     }
@@ -348,8 +331,8 @@ public class AwsV4Signer {
      * @see <a href="https://docs.aws.amazon.com/IAM/latest/UserGuide/create-signed-request.html#create-string-to-sign">String to sign</a>
      */
     static String signString(final String amzDate, final String credentialScope, final String canonicalRequest) {
-        return new StringJoiner(NEW_LINE_DELIMITER)
-                .add(ALGORITHM_AWS4_HMAC_SHA_256)
+        return new StringJoiner(AwsV4SignerConstants.NEW_LINE_DELIMITER)
+                .add(AwsV4SignerConstants.ALGORITHM_AWS4_HMAC_SHA_256)
                 .add(amzDate)
                 .add(credentialScope)
                 .add(sha256().hashString(canonicalRequest, UTF_8).toString())
@@ -406,7 +389,7 @@ public class AwsV4Signer {
         final byte[] kDate = hmacSha256(dateStamp, kSecret);
         final byte[] kRegion = hmacSha256(regionName, kDate);
         final byte[] kService = hmacSha256(serviceName, kRegion);
-        return hmacSha256(AWS4_REQUEST_TYPE, kService);
+        return hmacSha256(AwsV4SignerConstants.AWS4_REQUEST_TYPE, kService);
     }
 
     /**
@@ -423,7 +406,7 @@ public class AwsV4Signer {
      * @return The date string, formatted to the ISO 8601 standard.
      */
     static String getTimeStamp(final long dateMilli) {
-        return format(TIME_PATTERN, new Date(dateMilli));
+        return format(AwsV4SignerConstants.TIME_PATTERN, new Date(dateMilli));
     }
 
     /**
@@ -439,7 +422,7 @@ public class AwsV4Signer {
      * @return The date string, without the current time.
      */
     static String getDateStamp(final long dateMilli) {
-        return format(DATE_PATTERN, new Date(dateMilli));
+        return format(AwsV4SignerConstants.DATE_PATTERN, new Date(dateMilli));
     }
 
     private static String format(final String pattern, final Date date) {
