@@ -35,6 +35,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.lang.Exception;
+import java.util.Date;
 
 
 import lombok.extern.log4j.Log4j2;
@@ -54,18 +55,22 @@ public class ProducerSdkCanaryConsumer {
         System.out.println("10 sec have passed...");
 
         try{
+            TimestampRange timestampRange = new TimestampRange();
+            timestampRange.setStartTimestamp(new SimpleDateFormat("dd/MM/yyyy HH:mm:ss").parse("27/07/2023 17:50:38"));
+            timestampRange.setEndTimestamp(new SimpleDateFormat("dd/MM/yyyy HH:mm:ss").parse("27/07/2023 17:59:38")); 
+            FragmentSelector fragmentSelector = new FragmentSelector();
+                fragmentSelector.setFragmentSelectorType("SERVER_TIMESTAMP");
+                fragmentSelector.setTimestampRange(timestampRange);
 
-        TimestampRange timestampRange = new TimestampRange();
-        timestampRange.setStartTimestamp(new SimpleDateFormat("dd/MM/yyyy HH:mm:ss").parse("27/07/2023 17:50:38"));
-        timestampRange.setEndTimestamp(new SimpleDateFormat("dd/MM/yyyy HH:mm:ss").parse("27/07/2023 17:59:38")); 
-        FragmentSelector fragmentSelector = new FragmentSelector();
-            fragmentSelector.setFragmentSelectorType("SERVER_TIMESTAMP");
-            fragmentSelector.setTimestampRange(timestampRange);
+            ExecutorService executorService = Executors.newFixedThreadPool(10);
+            Future<List<CanaryFragment>> listFragmentResult = executorService.submit(new CanaryListFragmentWorker(streamName, credentialsProvider, dataEndpoint, Regions.fromName(region), fragmentSelector));
+            List<CanaryFragment> fragmentList = listFragmentResult.get();
+            System.out.println("Fragment number differences:");
 
-        ExecutorService executorService = Executors.newFixedThreadPool(10);
-        Future listFragmentResult = executorService.submit(new CanaryListFragmentWorker(streamName, credentialsProvider, dataEndpoint, Regions.fromName(region), fragmentSelector));
-        System.out.println(listFragmentResult.get());
-
+            for(int i = 1; i < fragmentList.size(); i++)
+            {
+                System.out.println(fragmentList.get(i).getFragmentNumberInt().subtract(fragmentList.get(i-1).getFragmentNumberInt()));
+            }
         } catch(Exception e){
 
         }
