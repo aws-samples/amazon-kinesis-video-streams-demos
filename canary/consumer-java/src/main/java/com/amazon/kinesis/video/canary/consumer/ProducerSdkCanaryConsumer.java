@@ -36,6 +36,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.lang.Exception;
 import java.util.Date;
+import java.text.DateFormat;
 
 
 import lombok.extern.log4j.Log4j2;
@@ -51,13 +52,14 @@ import java.util.TimerTask;
 @Slf4j
 public class ProducerSdkCanaryConsumer {
 
-    private static void getIntervalMetrics(String streamName, SystemPropertiesCredentialsProvider credentialsProvider, String dataEndpoint, String region){
+    private static void getIntervalMetrics(Date canaryStartTime, String streamName, SystemPropertiesCredentialsProvider credentialsProvider, String dataEndpoint, String region){
         System.out.println("10 sec have passed...");
 
         try{
             TimestampRange timestampRange = new TimestampRange();
-            timestampRange.setStartTimestamp(new SimpleDateFormat("dd/MM/yyyy HH:mm:ss").parse("27/07/2023 17:50:38"));
-            timestampRange.setEndTimestamp(new SimpleDateFormat("dd/MM/yyyy HH:mm:ss").parse("27/07/2023 17:59:38")); 
+            timestampRange.setStartTimestamp(canaryStartTime);
+            timestampRange.setEndTimestamp(new Date());
+
             FragmentSelector fragmentSelector = new FragmentSelector();
                 fragmentSelector.setFragmentSelectorType("SERVER_TIMESTAMP");
                 fragmentSelector.setTimestampRange(timestampRange);
@@ -65,8 +67,8 @@ public class ProducerSdkCanaryConsumer {
             ExecutorService executorService = Executors.newFixedThreadPool(10);
             Future<List<CanaryFragment>> listFragmentResult = executorService.submit(new CanaryListFragmentWorker(streamName, credentialsProvider, dataEndpoint, Regions.fromName(region), fragmentSelector));
             List<CanaryFragment> fragmentList = listFragmentResult.get();
-            System.out.println("Fragment number differences:");
 
+            System.out.println("Fragment number differences:");
             for(int i = 1; i < fragmentList.size(); i++)
             {
                 System.out.println(fragmentList.get(i).getFragmentNumberInt().subtract(fragmentList.get(i-1).getFragmentNumberInt()));
@@ -163,12 +165,12 @@ public class ProducerSdkCanaryConsumer {
 
         // System.out.println("Here 3");
 
-
+        Date canaryStartTime = new Date();
 
         Timer intervalMetricsTimer = new Timer("IntervalMetricsTimer");
         TimerTask intervalMetricsTask = new TimerTask() {
             public void run() {
-                getIntervalMetrics(streamName, credentialsProvider, dataEndpoint, region);
+                getIntervalMetrics(canaryStartTime, streamName, credentialsProvider, dataEndpoint, region);
             }
         };
         intervalMetricsTimer.scheduleAtFixedRate(intervalMetricsTask, 0, 10000); // delay of 0 ms at an interval of 10,000 ms
