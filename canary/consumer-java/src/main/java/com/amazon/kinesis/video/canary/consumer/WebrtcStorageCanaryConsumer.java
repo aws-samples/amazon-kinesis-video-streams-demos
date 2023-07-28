@@ -37,6 +37,8 @@ import java.util.concurrent.Future;
 import java.lang.Exception;
 import java.util.Date;
 import java.text.DateFormat;
+import java.text.MessageFormat;
+
 
 
 import lombok.extern.log4j.Log4j2;
@@ -52,10 +54,13 @@ import java.util.TimerTask;
 @Slf4j
 public class WebrtcStorageCanaryConsumer {
 
-    private static void getIntervalMetrics(Date canaryStartTime, String streamName, SystemPropertiesCredentialsProvider credentialsProvider, String dataEndpoint, String region){
-        System.out.println("12 sec have passed...");
+    private Integer fragmentListLength = 0;
 
+    private static void getIntervalMetrics(CanaryFragmentList fragmentList, Date canaryStartTime, String streamName, SystemPropertiesCredentialsProvider credentialsProvider, String dataEndpoint, String region){
+        System.out.println("12 sec have passed...");
         try{
+            System.out.println("TEST 1");
+
             TimestampRange timestampRange = new TimestampRange();
             timestampRange.setStartTimestamp(canaryStartTime);
             timestampRange.setEndTimestamp(new Date());
@@ -64,9 +69,19 @@ public class WebrtcStorageCanaryConsumer {
                 fragmentSelector.setFragmentSelectorType("SERVER_TIMESTAMP");
                 fragmentSelector.setTimestampRange(timestampRange);
 
+            Boolean newFragmentReceived = false;
+
             ExecutorService executorService = Executors.newFixedThreadPool(10);
             Future<List<CanaryFragment>> listFragmentResult = executorService.submit(new CanaryListFragmentWorker(streamName, credentialsProvider, dataEndpoint, Regions.fromName(region), fragmentSelector));
-            List<CanaryFragment> fragmentList = listFragmentResult.get();
+            List<CanaryFragment> newFragmentList = listFragmentResult.get();
+
+            if (newFragmentList.size() > fragmentList.getFragmentList().size())
+            {
+                newFragmentReceived = true;
+            }
+            System.out.println(MessageFormat.format("newFragmentReceived: {0}", newFragmentReceived));
+
+            fragmentList.setFragmentList(newFragmentList);
 
             // System.out.println("Fragment number differences:");
             // for(int i = 1; i < fragmentList.size(); i++)
@@ -74,7 +89,7 @@ public class WebrtcStorageCanaryConsumer {
             //     System.out.println(fragmentList.get(i).getFragmentNumberInt().subtract(fragmentList.get(i-1).getFragmentNumberInt()));
             // }
         } catch(Exception e){
-
+            System.out.println(e);
         } 
     }
 
@@ -166,10 +181,12 @@ public class WebrtcStorageCanaryConsumer {
 
         Date canaryStartTime = new Date();
 
+        CanaryFragmentList fragmentList = new CanaryFragmentList();
+
         Timer intervalMetricsTimer = new Timer("IntervalMetricsTimer");
         TimerTask intervalMetricsTask = new TimerTask() {
             public void run() {
-                getIntervalMetrics(canaryStartTime, streamName, credentialsProvider, dataEndpoint, region);
+                getIntervalMetrics(fragmentList, canaryStartTime, streamName, credentialsProvider, dataEndpoint, region);
             }
         };
         intervalMetricsTimer.scheduleAtFixedRate(intervalMetricsTask, 0, 12000); // delay of 0 ms at an interval of 10,000 ms
@@ -177,7 +194,7 @@ public class WebrtcStorageCanaryConsumer {
 
 
         getMediaWorker.run();
-        timer.cancel(); 
+        timer.cancel();
 
         // Using System.exit(0) to exit from application. 
         // The application does not exit on its own. Need to inspect what the issue

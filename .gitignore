@@ -33,3 +33,5 @@ canary/consumer-java/target/classes/com/amazon/kinesis/video/canary/consumer/Web
 canary/consumer-java/target/classes/com/amazon/kinesis/video/canary/consumer/WebrtcStorageCanaryConsumer$2.class
 canary/consumer-java/target/classes/com/amazon/kinesis/video/canary/consumer/WebrtcStorageCanaryConsumer$3.class
 canary/consumer-java/target/generated-sources/delombok/com/amazon/kinesis/video/canary/consumer/WebrtcStorageCanaryConsumer.java
+canary/consumer-java/target/classes/com/amazon/kinesis/video/canary/consumer/CanaryFragmentList.class
+canary/consumer-java/target/generated-sources/delombok/com/amazon/kinesis/video/canary/consumer/CanaryFragmentList.java
