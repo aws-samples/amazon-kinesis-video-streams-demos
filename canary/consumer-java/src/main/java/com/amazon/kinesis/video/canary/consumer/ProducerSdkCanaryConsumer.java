@@ -15,80 +15,24 @@ import com.amazonaws.services.kinesisvideo.AmazonKinesisVideo;
 import com.amazonaws.services.kinesisvideo.AmazonKinesisVideoClientBuilder;
 import com.amazonaws.services.kinesisvideo.model.StartSelector;
 import com.amazonaws.services.kinesisvideo.model.StartSelectorType;
-
-
-import com.amazonaws.services.kinesisvideo.model.APIName;
-import com.amazonaws.services.kinesisvideo.model.GetDataEndpointRequest;
-import com.amazonaws.services.kinesisvideo.AmazonKinesisVideoArchivedMedia;
-import com.amazonaws.client.builder.AwsClientBuilder;
-import com.amazonaws.auth.AWSCredentialsProvider;
-import com.amazonaws.services.kinesisvideo.model.TimestampRange;
-import com.amazonaws.services.kinesisvideo.model.FragmentSelector;
-import java.text.SimpleDateFormat;
-// import com.amazonaws.services.kinesisvideo.AmazonKinesisVideoArchivedMediaClient;
-// import com.amazonaws.services.kinesisvideo.model.ListFragmentsRequest;
-// import com.amazonaws.services.kinesisvideo.model.ListFragmentsResult;
-// import com.amazonaws.kinesisvideo.parser.examples.ListFragmentWorker;
-import java.util.concurrent.Callable;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
-import java.lang.Exception;
-import java.util.Date;
-import java.text.DateFormat;
-
-
-import lombok.extern.log4j.Log4j2;
 import lombok.extern.slf4j.Slf4j;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.util.List;
 import java.util.Optional;
 import java.util.Timer;
 import java.util.TimerTask;
 
 @Slf4j
 public class ProducerSdkCanaryConsumer {
-
-    private static void getIntervalMetrics(Date canaryStartTime, String streamName, SystemPropertiesCredentialsProvider credentialsProvider, String dataEndpoint, String region){
-        System.out.println("10 sec have passed...");
-
-        try{
-            TimestampRange timestampRange = new TimestampRange();
-            timestampRange.setStartTimestamp(canaryStartTime);
-            timestampRange.setEndTimestamp(new Date());
-
-            FragmentSelector fragmentSelector = new FragmentSelector();
-                fragmentSelector.setFragmentSelectorType("SERVER_TIMESTAMP");
-                fragmentSelector.setTimestampRange(timestampRange);
-
-            ExecutorService executorService = Executors.newFixedThreadPool(10);
-            Future<List<CanaryFragment>> listFragmentResult = executorService.submit(new CanaryListFragmentWorker(streamName, credentialsProvider, dataEndpoint, Regions.fromName(region), fragmentSelector));
-            List<CanaryFragment> fragmentList = listFragmentResult.get();
-
-            System.out.println("Fragment number differences:");
-            for(int i = 1; i < fragmentList.size(); i++)
-            {
-                System.out.println(fragmentList.get(i).getFragmentNumberInt().subtract(fragmentList.get(i-1).getFragmentNumberInt()));
-            }
-        } catch(Exception e){
-
-        }
-        
-    }
-
     public static void main(final String[] args) throws Exception {
         String streamNamePrefix = System.getenv("CANARY_STREAM_NAME");
         String canaryType = System.getenv("CANARY_TYPE");
         String canaryFragmentSizeStr = System.getenv("FRAGMENT_SIZE_IN_BYTES");
         String canaryLabel = System.getenv("CANARY_LABEL");
         String region = System.getenv("AWS_DEFAULT_REGION");
-
-        // TODO: Revert back to adding the Canary descriptions to stream name, removed for testing
-        final String streamName = streamNamePrefix;
-
+        final String streamName = String.format("%s-%s-%s", streamNamePrefix, canaryType,
+                    canaryLabel);
         Integer canaryRunTime = Integer.parseInt(System.getenv("CANARY_DURATION_IN_SECONDS"));
         log.info("Stream name {}", streamName);
 
@@ -120,62 +64,15 @@ public class ProducerSdkCanaryConsumer {
                 amazonKinesisVideo,
                 consumerFactory);
 
-        Timer timer = new Timer("Timer");
         TimerTask task = new TimerTask() {
             public void run() {
                 getMediaWorker.stop();
             }
         };
+        Timer timer = new Timer("Timer");
+        
         long delay = canaryRunTime * 1000;
         timer.schedule(task, delay);
-
-
-
-        final GetDataEndpointRequest dataEndpointRequest = new GetDataEndpointRequest()
-            .withAPIName(APIName.LIST_FRAGMENTS).withStreamName(streamName);
-        final String dataEndpoint = amazonKinesisVideo.getDataEndpoint(dataEndpointRequest).getDataEndpoint();
-
-
-
-
-        // CanaryListFragmentWorker listFragmentWorker = new CanaryListFragmentWorker(streamName, credentialsProvider, dataEndpoint, Regions.fromName(region), fragmentSelector);
-        // final GetDataEndpointRequest dataEndpointRequest = new GetDataEndpointRequest()
-        //         .withAPIName(APIName.LIST_FRAGMENTS).withStreamName(streamName);
-        // final String dataEndpoint = amazonKinesisVideo.getDataEndpoint(dataEndpointRequest).getDataEndpoint();
-
-        // System.out.println(dataEndpoint);
-        // System.out.println(region);
-
-        // final AmazonKinesisVideoArchivedMedia amazonKinesisVideoArchivedMedia = AmazonKinesisVideoArchivedMediaClient
-        // .builder()
-        // .withCredentials(credentialsProvider)
-        // .withEndpointConfiguration(new AwsClientBuilder.EndpointConfiguration(dataEndpoint, region))
-        // .build();
-
-        // System.out.println("Here 1");
-
-        // ListFragmentsRequest request = new ListFragmentsRequest()
-        //     .withStreamName(streamName);
-
-        // System.out.println("Here 2");
-
-        // ListFragmentsResult result = amazonKinesisVideoArchivedMedia.listFragments(request);
-        
-        // // System.out.println(result.getSdkResponseMetadata());
-
-        // System.out.println("Here 3");
-
-        Date canaryStartTime = new Date();
-
-        Timer intervalMetricsTimer = new Timer("IntervalMetricsTimer");
-        TimerTask intervalMetricsTask = new TimerTask() {
-            public void run() {
-                getIntervalMetrics(canaryStartTime, streamName, credentialsProvider, dataEndpoint, region);
-            }
-        };
-        intervalMetricsTimer.scheduleAtFixedRate(intervalMetricsTask, 0, 10000); // delay of 0 ms at an interval of 10,000 ms
-
-
 
         getMediaWorker.run();
         timer.cancel(); 

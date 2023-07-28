@@ -27,3 +27,9 @@ canary/consumer-java/log4j.xml
 canary/consumer-java/log/java_kvs.log
 canary/consumer-java/target/classes/com/amazon/kinesis/video/canary/consumer/CanaryFragment.class
 canary/consumer-java/target/generated-sources/delombok/com/amazon/kinesis/video/canary/consumer/CanaryFragment.java
+canary/consumer-java/target/classes/com/amazon/kinesis/video/canary/consumer/WebrtcStorageCanaryConsumer.class
+canary/consumer-java/target/classes/com/amazon/kinesis/video/canary/consumer/WebrtcStorageCanaryConsumer$1.class
+canary/consumer-java/target/classes/com/amazon/kinesis/video/canary/consumer/WebrtcStorageCanaryConsumer$1$1.class
+canary/consumer-java/target/classes/com/amazon/kinesis/video/canary/consumer/WebrtcStorageCanaryConsumer$2.class
+canary/consumer-java/target/classes/com/amazon/kinesis/video/canary/consumer/WebrtcStorageCanaryConsumer$3.class
+canary/consumer-java/target/generated-sources/delombok/com/amazon/kinesis/video/canary/consumer/WebrtcStorageCanaryConsumer.java
