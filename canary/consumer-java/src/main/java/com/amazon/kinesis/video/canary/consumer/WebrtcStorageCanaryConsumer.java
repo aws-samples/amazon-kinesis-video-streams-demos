@@ -38,6 +38,12 @@ import java.lang.Exception;
 import java.util.Date;
 import java.text.DateFormat;
 import java.text.MessageFormat;
+import com.amazonaws.services.cloudwatch.model.Dimension;
+import com.amazonaws.services.cloudwatch.model.MetricDatum;
+import com.amazonaws.services.cloudwatch.model.PutMetricDataRequest;
+import com.amazonaws.services.cloudwatch.model.StandardUnit;
+
+
 
 
 
@@ -50,6 +56,8 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Timer;
 import java.util.TimerTask;
+import java.util.ArrayList;
+
 
 @Slf4j
 public class WebrtcStorageCanaryConsumer {
@@ -59,8 +67,6 @@ public class WebrtcStorageCanaryConsumer {
     private static void getIntervalMetrics(CanaryFragmentList fragmentList, Date canaryStartTime, String streamName, SystemPropertiesCredentialsProvider credentialsProvider, String dataEndpoint, String region){
         System.out.println("12 sec have passed...");
         try{
-            System.out.println("TEST 1");
-
             TimestampRange timestampRange = new TimestampRange();
             timestampRange.setStartTimestamp(canaryStartTime);
             timestampRange.setEndTimestamp(new Date());
@@ -83,11 +89,28 @@ public class WebrtcStorageCanaryConsumer {
 
             fragmentList.setFragmentList(newFragmentList);
 
-            // System.out.println("Fragment number differences:");
-            // for(int i = 1; i < fragmentList.size(); i++)
-            // {
-            //     System.out.println(fragmentList.get(i).getFragmentNumberInt().subtract(fragmentList.get(i-1).getFragmentNumberInt()));
-            // }
+            final AmazonCloudWatchAsync cwClient = AmazonCloudWatchAsyncClientBuilder.standard()
+                .withRegion(region)
+                .withCredentials(credentialsProvider)
+                .build();
+
+            final Dimension dimensionPerStream = new Dimension()
+                .withName("ProducerSDKCanaryStreamName")
+                .withValue(streamName);
+            List<MetricDatum> datumList = new ArrayList<>();
+
+            MetricDatum datum = new MetricDatum()
+                .withMetricName("FragmentReceived")
+                .withUnit(StandardUnit.None)
+                .withValue(newFragmentReceived ? 1.0 : 0.0)
+                .withDimensions(dimensionPerStream);
+            datumList.add(datum);
+
+            PutMetricDataRequest request = new PutMetricDataRequest()
+                .withNamespace("KinesisVideoSDKCanary")
+                .withMetricData(datumList);
+            cwClient.putMetricDataAsync(request);
+
         } catch(Exception e){
             System.out.println(e);
         } 
