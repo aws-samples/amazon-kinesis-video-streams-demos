@@ -102,7 +102,7 @@ def buildPeer(isMaster, params) {
 }
 
 def buildStorageMasterPeer(params) {
-    def clientID = "Master"
+    def clientID = "StorageMaster"
     RUNNING_NODES_IN_BUILDING++
 
     // TODO: get the branch and version from orchestrator
@@ -154,6 +154,88 @@ def buildStorageMasterPeer(params) {
             ./kvsWebrtcCanaryWebrtcStorage"""
     }
 }
+
+def buildStorageConsumerPeer(params) {
+    def clientID = "StorageConsumer"
+
+    def consumerEnvs = [        
+        'JAVA_HOME': "/opt/jdk-13.0.1",
+        'M2_HOME': "/opt/apache-maven-3.6.3"
+    ].collect({k,v -> "${k}=${v}" })
+
+    // TODO: get the branch and version from orchestrator
+    if (params.FIRST_ITERATION) {
+        deleteDir()
+    }
+
+    def consumerStartUpDelay = 45
+    echo "NODE_NAME = ${env.NODE_NAME}"
+    checkout([
+        scm: [
+            $class: 'GitSCM', 
+            branches: [[name: params.GIT_HASH]],
+            userRemoteConfigs: [[url: params.GIT_URL]]
+        ]
+    ])
+
+    RUNNING_NODES++
+    echo "Number of running nodes: ${RUNNING_NODES}"
+
+    sleep consumerStartUpDelay
+    withEnv(consumerEnvs) {
+        sh '''
+            PATH="$JAVA_HOME/bin:$PATH"
+            export PATH="$M2_HOME/bin:$PATH"
+            cd $WORKSPACE/canary/consumer-java
+            make -j4
+        '''
+    }
+
+    RUNNING_NODES--
+    echo "Number of running nodes after build: ${RUNNING_NODES}"
+    waitUntil {
+        RUNNING_NODES == 0
+    }
+    
+    echo "Done waiting in NODE_NAME = ${env.NODE_NAME}"
+
+    def scripts_dir = "$WORKSPACE/canary/producer-c"
+    def endpoint = "${scripts_dir}/iot-credential-provider.txt"
+    def core_cert_file = "${scripts_dir}/p${env.NODE_NAME}_certificate.pem"
+    def private_key_file = "${scripts_dir}/p${env.NODE_NAME}_private.key"
+    def role_alias = "p${env.NODE_NAME}_role_alias"
+    def thing_name = "p${env.NODE_NAME}_thing"
+
+    def envs = [
+        'JAVA_HOME': "/opt/jdk-13.0.1",
+        'M2_HOME': "/opt/apache-maven-3.6.3",
+        'AWS_KVS_LOG_LEVEL': params.AWS_KVS_LOG_LEVEL,
+
+        'CANARY_STREAM_NAME': "aTestStream",
+
+        'CANARY_LABEL': params.RUNNER_LABEL,
+        'CANARY_TYPE': "Realtime",
+        'FRAGMENT_SIZE_IN_BYTES' : "1048576", // TODO: eliminate this for all consumers? not used in the apps
+        'CANARY_DURATION_IN_SECONDS': params.DURATION_IN_SECONDS,
+        'AWS_DEFAULT_REGION': params.AWS_DEFAULT_REGION,
+        'CANARY_RUN_SCENARIO': params.SCENARIO_LABEL,
+        'TRACK_TYPE': params.TRACK_TYPE,
+        'CANARY_USE_IOT_PROVIDER': params.USE_IOT,
+        'AWS_IOT_CORE_CREDENTIAL_ENDPOINT': "${endpoint}",
+        'AWS_IOT_CORE_CERT': "${core_cert_file}",
+        'AWS_IOT_CORE_PRIVATE_KEY': "${private_key_file}",
+        'AWS_IOT_CORE_ROLE_ALIAS': "${role_alias}",
+        'AWS_IOT_CORE_THING_NAME': "${thing_name}"
+    ].collect({k,v -> "${k}=${v}" })
+
+    withRunnerWrapper(envs) {
+        sh '''
+            cd $WORKSPACE/canary/consumer-java
+            java -classpath target/aws-kinesisvideo-producer-sdk-canary-consumer-1.0-SNAPSHOT.jar:$(cat tmp_jar) -Daws.accessKeyId=${AWS_ACCESS_KEY_ID} -Daws.secretKey=${AWS_SECRET_ACCESS_KEY} com.amazon.kinesis.video.canary.consumer.WebrtcStorageCanaryConsumer
+        '''
+    }
+}
+
 
 def buildSignaling(params) {
 
@@ -226,50 +308,79 @@ pipeline {
         stage('Build and Run Webrtc Canary') {
             failFast true
             when {
-                equals expected: false, actual: params.IS_SIGNALING
+                allOf {
+                    equals expected: false, actual: params.IS_SIGNALING
+                    equals expected: false, actual: params.IS_STORAGE
+                }
             }
 
             parallel {
-                stage('MasterStorage') {
+                stage('Master') {
+                    steps {
+                        script {
+                            buildPeer(true, params)
+                        }
+                    }
+                }
+                stage('Viewer') {
+                    agent {
+                        label params.VIEWER_NODE_LABEL
+                    }
+
+                    steps {
+                        script {
+                            buildPeer(false, params)
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Build and Run Signaling Canary') {
+            failFast true
+            when {
+                allOf {
+                    equals expected: true, actual: params.IS_SIGNALING
+                    equals expected: false, actual: params.IS_STORAGE
+                }
+            }
+
+            steps {
+                script {
+                    buildSignaling(params)
+                }
+            }
+        }
+
+        stage('Build and Run Webrtc Storage Master and Consumer Canaries') {
+            failFast true
+            when {
+                allOf {
+                    equals expected: false, actual: params.IS_SIGNALING
+                    equals expected: true, actual: params.IS_STORAGE
+                }
+            }
+            parallel {
+                stage('StorageMaster') {
                     steps {
                         script {
                             buildStorageMasterPeer(params)
                         }
                     }
                 }
-                // stage('Master') {
-                //     steps {
-                //         script {
-                //             buildPeer(true, params)
-                //         }
-                //     }
-                // }
-                // stage('Viewer') {
-                //     agent {
-                //         label params.VIEWER_NODE_LABEL
-                //     }
-
-                //     steps {
-                //         script {
-                //             buildPeer(false, params)
-                //         }
-                //     }
-                // }
+                stage('StorageConsumer') {
+                    steps {
+                        script {
+                            buildStorageConsumerPeer(params)
+                        }
+                    }
+                }
             }
         }
 
-        // stage('Build and Run Signaling Canary') {
-        //     failFast true
-        //     when {
-        //         equals expected: true, actual: params.IS_SIGNALING
-        //     }
 
-        //     steps {
-        //         script {
-        //             buildSignaling(params)
-        //         }
-        //     }
-        // }
+
+
 
         // In case of failures, we should add some delays so that we don't get into a tight loop of retrying
         stage('Throttling Retry') {

@@ -213,6 +213,8 @@ pipeline {
                         build(
                             job: NEXT_AVAILABLE_RUNNER,
                             parameters: COMMON_PARAMS + [
+                                booleanParam(name: 'IS_SIGNALING', value: false),
+                                booleanParam(name: 'IS_STORAGE', value: true),
                                 booleanParam(name: 'USE_TURN', value: true),
                                 booleanParam(name: 'TRICKLE_ICE', value: true),
                                 booleanParam(name: 'USE_IOT', value: false),
@@ -220,6 +222,7 @@ pipeline {
                                 string(name: 'MASTER_NODE_LABEL', value: "ec2-us-west-2"),
                                 string(name: 'RUNNER_LABEL', value: "WebrtcStorageLongRunningOpenSSL"),
                                 string(name: 'SCENARIO_LABEL', value: "WebrtcStorageLongRunning"),
+                                string(name: 'AWS_DEFAULT_REGION', value: "us-west-2"),
                             ],
                             wait: false
                         )
