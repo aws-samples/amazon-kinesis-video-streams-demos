@@ -133,7 +133,9 @@ def buildStorageMasterPeer(params) {
       'CANARY_USE_IOT_PROVIDER': params.USE_IOT,
       'CANARY_LOG_GROUP_NAME': params.LOG_GROUP_NAME,
       'CANARY_LOG_STREAM_NAME': "${params.RUNNER_LABEL}-${clientID}-${START_TIMESTAMP}",
-      'CANARY_CHANNEL_NAME': "${env.JOB_NAME}-${params.RUNNER_LABEL}",
+
+      'CANARY_CHANNEL_NAME': "aTestChannel",
+      
       'CANARY_LABEL': params.SCENARIO_LABEL,
       'CANARY_CLIENT_ID': clientID,
       'CANARY_IS_MASTER': true,
