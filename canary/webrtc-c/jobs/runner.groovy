@@ -136,7 +136,7 @@ def buildStorageMasterPeer(params) {
       'CANARY_CHANNEL_NAME': "${env.JOB_NAME}-${params.RUNNER_LABEL}",
       'CANARY_LABEL': params.SCENARIO_LABEL,
       'CANARY_CLIENT_ID': clientID,
-      'CANARY_IS_MASTER': isMaster,
+      'CANARY_IS_MASTER': true,
       'CANARY_DURATION_IN_SECONDS': params.DURATION_IN_SECONDS,
       'AWS_IOT_CORE_CREDENTIAL_ENDPOINT': "${endpoint}",
       'AWS_IOT_CORE_CERT': "${core_cert_file}",
@@ -148,7 +148,7 @@ def buildStorageMasterPeer(params) {
     withRunnerWrapper(envs) {
         sh """
             cd ./canary/webrtc-c/build &&
-            ${isMaster ? "" : "sleep 10 &&"}
+            ${"sleep 10 &&"}
             ./kvsWebrtcCanaryWebrtcStorage"""
     }
 }
