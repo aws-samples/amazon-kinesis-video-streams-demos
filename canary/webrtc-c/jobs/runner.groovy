@@ -178,8 +178,8 @@ def buildStorageConsumerPeer(params) {
         ]
     ])
 
-    RUNNING_NODES++
-    echo "Number of running nodes: ${RUNNING_NODES}"
+    RUNNING_NODES_IN_BUILDING++
+    echo "Number of running nodes: ${RUNNING_NODES_IN_BUILDING}"
 
     sleep consumerStartUpDelay
     withEnv(consumerEnvs) {
@@ -191,10 +191,10 @@ def buildStorageConsumerPeer(params) {
         '''
     }
 
-    RUNNING_NODES--
-    echo "Number of running nodes after build: ${RUNNING_NODES}"
+    RUNNING_NODES_IN_BUILDING--
+    echo "Number of running nodes after build: ${RUNNING_NODES_IN_BUILDING}"
     waitUntil {
-        RUNNING_NODES == 0
+        RUNNING_NODES_IN_BUILDING == 0
     }
     
     echo "Done waiting in NODE_NAME = ${env.NODE_NAME}"
