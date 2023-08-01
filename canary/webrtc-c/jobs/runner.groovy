@@ -215,11 +215,11 @@ def buildStorageConsumerPeer(params) {
 
         'CANARY_LABEL': params.RUNNER_LABEL,
         'CANARY_TYPE': "Realtime",
-        'FRAGMENT_SIZE_IN_BYTES' : "1048576", // TODO: eliminate this for all consumers? not used in the apps
+        'FRAGMENT_SIZE_IN_BYTES' : "1048576", // TODO: eliminate this from the consumer apps? not used in the apps
         'CANARY_DURATION_IN_SECONDS': params.DURATION_IN_SECONDS,
         'AWS_DEFAULT_REGION': params.AWS_DEFAULT_REGION,
         'CANARY_RUN_SCENARIO': params.SCENARIO_LABEL,
-        'TRACK_TYPE': params.TRACK_TYPE,
+        'TRACK_TYPE': "SingleTrack",
         'CANARY_USE_IOT_PROVIDER': params.USE_IOT,
         'AWS_IOT_CORE_CREDENTIAL_ENDPOINT': "${endpoint}",
         'AWS_IOT_CORE_CERT': "${core_cert_file}",
