@@ -170,13 +170,6 @@ def buildStorageConsumerPeer(params) {
 
     def consumerStartUpDelay = 45
     echo "NODE_NAME = ${env.NODE_NAME}"
-    checkout([
-        scm: [
-            $class: 'GitSCM', 
-            branches: [[name: params.GIT_HASH]],
-            userRemoteConfigs: [[url: params.GIT_URL]]
-        ]
-    ])
 
     RUNNING_NODES_IN_BUILDING++
     echo "Number of running nodes: ${RUNNING_NODES_IN_BUILDING}"
