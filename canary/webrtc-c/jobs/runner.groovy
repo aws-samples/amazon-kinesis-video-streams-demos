@@ -281,6 +281,7 @@ pipeline {
         booleanParam(name: 'USE_MBEDTLS', defaultValue: false)
         string(name: 'LOG_GROUP_NAME')
         string(name: 'MASTER_NODE_LABEL')
+        string(name: 'CONSUMER_NODE_LABEL')
         string(name: 'VIEWER_NODE_LABEL')
         string(name: 'RUNNER_LABEL')
         string(name: 'SCENARIO_LABEL')
@@ -362,6 +363,9 @@ pipeline {
                     }
                 }
                 stage('StorageConsumer') {
+                     agent {
+                        label params.CONSUMER_NODE_LABEL
+                    }
                     steps {
                         script {
                             buildStorageConsumerPeer(params)
@@ -400,6 +404,7 @@ pipeline {
                       booleanParam(name: 'USE_MBEDTLS', value: params.USE_MBEDTLS),
                       string(name: 'LOG_GROUP_NAME', value: params.LOG_GROUP_NAME),
                       string(name: 'MASTER_NODE_LABEL', value: params.MASTER_NODE_LABEL),
+                      string(name: 'CONSUMER_NODE_LABEL', value: params.CONSUMER_NODE_LABEL),
                       string(name: 'VIEWER_NODE_LABEL', value: params.VIEWER_NODE_LABEL),
                       string(name: 'RUNNER_LABEL', value: params.RUNNER_LABEL),
                       string(name: 'SCENARIO_LABEL', value: params.SCENARIO_LABEL),

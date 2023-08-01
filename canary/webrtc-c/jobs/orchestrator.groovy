@@ -220,6 +220,7 @@ pipeline {
                                 booleanParam(name: 'USE_IOT', value: false),
                                 string(name: 'DURATION_IN_SECONDS', value: LONG_RUNNING_DURATION_IN_SECONDS.toString()),
                                 string(name: 'MASTER_NODE_LABEL', value: "ec2-us-west-2"),
+                                string(name: 'CONSUMER_NODE_LABEL', value: "ec2-us-west-2-consumer"),
                                 string(name: 'RUNNER_LABEL', value: "WebrtcStorageLongRunningOpenSSL"),
                                 string(name: 'SCENARIO_LABEL', value: "WebrtcStorageLongRunning"),
                                 string(name: 'AWS_DEFAULT_REGION', value: "us-west-2"),
