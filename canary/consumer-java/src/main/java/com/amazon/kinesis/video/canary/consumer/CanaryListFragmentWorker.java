@@ -94,7 +94,7 @@ public class CanaryListFragmentWorker implements Callable {
             fragments.sort(Comparator.comparing(CanaryFragment::getFragmentNumberInt));
 
             for (CanaryFragment cf : fragments) {
-                System.out.println(MessageFormat.format("Retrieved fragment number {0} ", cf.fragment.getFragmentNumber()));
+                System.out.println(MessageFormat.format("Retrieved fragment number {0} ", cf.getFragment().getFragmentNumber()));
             }
         }
         catch (Throwable t) {
