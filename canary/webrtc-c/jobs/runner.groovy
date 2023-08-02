@@ -185,7 +185,6 @@ def buildStorageConsumerPeer(params) {
     RUNNING_NODES_IN_BUILDING++
     echo "Number of running nodes: ${RUNNING_NODES_IN_BUILDING}"
 
-    def thing_prefix = "${env.JOB_NAME}-${params.RUNNER_LABEL}"
     sleep consumerStartUpDelay
     withEnv(consumerEnvs) {
         sh '''
