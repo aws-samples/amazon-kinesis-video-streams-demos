@@ -134,7 +134,7 @@ def buildStorageMasterPeer(params) {
       'CANARY_LOG_GROUP_NAME': params.LOG_GROUP_NAME,
       'CANARY_LOG_STREAM_NAME': "${params.RUNNER_LABEL}-${clientID}-${START_TIMESTAMP}",
 
-      'CANARY_CHANNEL_NAME': "aTestChannel",
+      'CANARY_CHANNEL_NAME': "aTestChannel", //  TODO: replace hardcoded name with descriptive, labeled name
       
       'CANARY_LABEL': params.SCENARIO_LABEL,
       'CANARY_CLIENT_ID': clientID,
@@ -167,6 +167,9 @@ def buildStorageConsumerPeer(params) {
     if (params.FIRST_ITERATION) {
         deleteDir()
     }
+
+    def thing_prefix = "${env.JOB_NAME}-${params.RUNNER_LABEL}"
+    buildProject(params.USE_MBEDTLS, thing_prefix)
 
     def consumerStartUpDelay = 45
     echo "NODE_NAME = ${env.NODE_NAME}"
@@ -213,7 +216,7 @@ def buildStorageConsumerPeer(params) {
         'M2_HOME': "/opt/apache-maven-3.6.3",
         'AWS_KVS_LOG_LEVEL': params.AWS_KVS_LOG_LEVEL,
 
-        'CANARY_STREAM_NAME': "aTestStream",
+        'CANARY_STREAM_NAME': "aTestStream", //  TODO: replace hardcoded name with descriptive, labeled name
 
         'CANARY_LABEL': params.RUNNER_LABEL,
         'CANARY_TYPE': "Realtime",
@@ -237,7 +240,6 @@ def buildStorageConsumerPeer(params) {
         '''
     }
 }
-
 
 def buildSignaling(params) {
 
@@ -317,13 +319,13 @@ pipeline {
                 }
             }
             parallel {
-                // stage('StorageMaster') {
-                //     steps {
-                //         script {
-                //             buildStorageMasterPeer(params)
-                //         }
-                //     }
-                // }
+                stage('StorageMaster') {
+                    steps {
+                        script {
+                            buildStorageMasterPeer(params)
+                        }
+                    }
+                }
                 stage('StorageConsumer') {
                      agent {
                         label params.CONSUMER_NODE_LABEL
