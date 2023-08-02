@@ -7,9 +7,7 @@ import com.amazonaws.services.kinesisvideo.model.Fragment;
 
 public class CanaryFragment{
     private Integer fragmentNumberInt;
-
-
-    public Fragment fragment;
+    private Fragment fragment;
 
     public BigInteger getFragmentNumberInt() {
         return new BigInteger(fragment.getFragmentNumber());
