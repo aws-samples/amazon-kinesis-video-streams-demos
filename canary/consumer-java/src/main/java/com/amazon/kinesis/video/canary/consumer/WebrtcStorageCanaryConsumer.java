@@ -140,30 +140,12 @@ public class WebrtcStorageCanaryConsumer {
             }
         };
 
-        // TODO: remove this call, but keep timer going
-        ContinuousGetMediaWorker getMediaWorker = ContinuousGetMediaWorker.create(Regions.fromName(region),
-                credentialsProvider, streamName, new StartSelector().withStartSelectorType(StartSelectorType.NOW),
-                amazonKinesisVideo,
-                consumerFactory);
-
-        Timer timer = new Timer("Timer");
-        TimerTask task = new TimerTask() {
-            public void run() {
-                getMediaWorker.stop();
-            }
-        };
-        long delay = canaryRunTime * 1000;
-        timer.schedule(task, delay);
-
-
-
         final GetDataEndpointRequest dataEndpointRequest = new GetDataEndpointRequest()
             .withAPIName(APIName.LIST_FRAGMENTS).withStreamName(streamName);
         final String dataEndpoint = amazonKinesisVideo.getDataEndpoint(dataEndpointRequest).getDataEndpoint();
 
-        Date canaryStartTime = new Date();
-
         CanaryFragmentList fragmentList = new CanaryFragmentList();
+        Date canaryStartTime = new Date();
 
         Timer intervalMetricsTimer = new Timer("IntervalMetricsTimer");
         TimerTask intervalMetricsTask = new TimerTask() {
@@ -171,10 +153,11 @@ public class WebrtcStorageCanaryConsumer {
                 getIntervalMetrics(fragmentList, canaryStartTime, streamName, credentialsProvider, dataEndpoint, region);
             }
         };
+        
         intervalMetricsTimer.scheduleAtFixedRate(intervalMetricsTask, 0, 12000); // delay of 0 ms at an interval of 12,000 ms
-
-        getMediaWorker.run();
-        timer.cancel();
+        
+        long delay = canaryRunTime * 1000;
+        Thread.sleep(delay);
 
         // Using System.exit(0) to exit from application. 
         // The application does not exit on its own. Need to inspect what the issue
