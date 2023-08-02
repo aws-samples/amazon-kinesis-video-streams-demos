@@ -338,8 +338,6 @@ pipeline {
             }
         }
 
-
-
         // In case of failures, we should add some delays so that we don't get into a tight loop of retrying
         stage('Throttling Retry') {
             when {
@@ -359,6 +357,7 @@ pipeline {
                     parameters: [
                       string(name: 'AWS_KVS_LOG_LEVEL', value: params.AWS_KVS_LOG_LEVEL),
                       booleanParam(name: 'IS_SIGNALING', value: params.IS_SIGNALING),
+                      booleanParam(name: 'IS_STORAGE', value: params.IS_STORAGE),
                       booleanParam(name: 'USE_TURN', value: params.USE_TURN),
                       booleanParam(name: 'USE_IOT', value: params.USE_IOT),
                       booleanParam(name: 'TRICKLE_ICE', value: params.TRICKLE_ICE),
