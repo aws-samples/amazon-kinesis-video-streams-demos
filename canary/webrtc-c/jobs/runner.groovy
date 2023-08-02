@@ -187,7 +187,7 @@ def buildStorageConsumerPeer(params) {
         sh '''
             PATH="$JAVA_HOME/bin:$PATH"
             export PATH="$M2_HOME/bin:$PATH"
-            cd $WORKSPACE/canary/consumer-java
+            cd ./canary/consumer-java
             make -j4
         '''
     }
@@ -200,12 +200,12 @@ def buildStorageConsumerPeer(params) {
     
     echo "Done waiting in NODE_NAME = ${env.NODE_NAME}"
 
-    def scripts_dir = "$WORKSPACE/canary/producer-c"
+    def scripts_dir = "$WORKSPACE/canary/webrtc-c/scripts"
     def endpoint = "${scripts_dir}/iot-credential-provider.txt"
-    def core_cert_file = "${scripts_dir}/p${env.NODE_NAME}_certificate.pem"
-    def private_key_file = "${scripts_dir}/p${env.NODE_NAME}_private.key"
-    def role_alias = "p${env.NODE_NAME}_role_alias"
-    def thing_name = "p${env.NODE_NAME}_thing"
+    def core_cert_file = "${scripts_dir}/${thing_prefix}_certificate.pem"
+    def private_key_file = "${scripts_dir}/${thing_prefix}_private.key"
+    def role_alias = "${thing_prefix}_role_alias"
+    def thing_name = "${thing_prefix}_thing"
 
     def envs = [
         'JAVA_HOME': "/opt/jdk-13.0.1",
