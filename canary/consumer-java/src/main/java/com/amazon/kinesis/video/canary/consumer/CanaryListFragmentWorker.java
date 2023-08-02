@@ -5,9 +5,9 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Comparator;
 import java.util.concurrent.Callable;
+import java.text.MessageFormat;
 
 import org.jcodec.common.DictionaryCompressor.Int;
-
 import com.amazonaws.auth.AWSCredentialsProvider;
 import com.amazonaws.client.builder.AwsClientBuilder;
 import com.amazonaws.regions.Regions;
@@ -16,8 +16,6 @@ import com.amazonaws.services.kinesisvideo.AmazonKinesisVideoArchivedMedia;
 import com.amazonaws.services.kinesisvideo.AmazonKinesisVideoArchivedMediaClient;
 import com.amazonaws.services.kinesisvideo.model.*;
 import lombok.extern.slf4j.Slf4j;
-
-import java.text.MessageFormat;
 
 
 /* This worker retrieves all fragments within the specified TimestampRange from a specified Kinesis Video Stream and returns them in a list */
