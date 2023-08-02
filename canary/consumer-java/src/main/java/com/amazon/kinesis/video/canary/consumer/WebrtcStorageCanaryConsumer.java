@@ -51,8 +51,6 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 public class WebrtcStorageCanaryConsumer {
 
-    private Integer fragmentListLength = 0;
-
     private static void getIntervalMetrics(CanaryFragmentList fragmentList, Date canaryStartTime, String streamName, SystemPropertiesCredentialsProvider credentialsProvider, String dataEndpoint, String region){
         System.out.println("12 sec have passed...");
         try{
@@ -112,7 +110,7 @@ public class WebrtcStorageCanaryConsumer {
         String canaryLabel = System.getenv("CANARY_LABEL");
         String region = System.getenv("AWS_DEFAULT_REGION");
 
-        // TODO: Revert back to adding the Canary descriptions to stream name, removed for testing
+        // TODO: Revert back to adding the Canary labels to stream name, removed for testing
         final String streamName = streamNamePrefix;
 
         Integer canaryRunTime = Integer.parseInt(System.getenv("CANARY_DURATION_IN_SECONDS"));
@@ -141,6 +139,8 @@ public class WebrtcStorageCanaryConsumer {
                 };
             }
         };
+
+        // TODO: remove this call, but keep timer going
         ContinuousGetMediaWorker getMediaWorker = ContinuousGetMediaWorker.create(Regions.fromName(region),
                 credentialsProvider, streamName, new StartSelector().withStartSelectorType(StartSelectorType.NOW),
                 amazonKinesisVideo,
@@ -161,36 +161,6 @@ public class WebrtcStorageCanaryConsumer {
             .withAPIName(APIName.LIST_FRAGMENTS).withStreamName(streamName);
         final String dataEndpoint = amazonKinesisVideo.getDataEndpoint(dataEndpointRequest).getDataEndpoint();
 
-
-
-
-        // CanaryListFragmentWorker listFragmentWorker = new CanaryListFragmentWorker(streamName, credentialsProvider, dataEndpoint, Regions.fromName(region), fragmentSelector);
-        // final GetDataEndpointRequest dataEndpointRequest = new GetDataEndpointRequest()
-        //         .withAPIName(APIName.LIST_FRAGMENTS).withStreamName(streamName);
-        // final String dataEndpoint = amazonKinesisVideo.getDataEndpoint(dataEndpointRequest).getDataEndpoint();
-
-        // System.out.println(dataEndpoint);
-        // System.out.println(region);
-
-        // final AmazonKinesisVideoArchivedMedia amazonKinesisVideoArchivedMedia = AmazonKinesisVideoArchivedMediaClient
-        // .builder()
-        // .withCredentials(credentialsProvider)
-        // .withEndpointConfiguration(new AwsClientBuilder.EndpointConfiguration(dataEndpoint, region))
-        // .build();
-
-        // System.out.println("Here 1");
-
-        // ListFragmentsRequest request = new ListFragmentsRequest()
-        //     .withStreamName(streamName);
-
-        // System.out.println("Here 2");
-
-        // ListFragmentsResult result = amazonKinesisVideoArchivedMedia.listFragments(request);
-        
-        // // System.out.println(result.getSdkResponseMetadata());
-
-        // System.out.println("Here 3");
-
         Date canaryStartTime = new Date();
 
         CanaryFragmentList fragmentList = new CanaryFragmentList();
@@ -202,8 +172,6 @@ public class WebrtcStorageCanaryConsumer {
             }
         };
         intervalMetricsTimer.scheduleAtFixedRate(intervalMetricsTask, 0, 12000); // delay of 0 ms at an interval of 10,000 ms
-
-
 
         getMediaWorker.run();
         timer.cancel();
