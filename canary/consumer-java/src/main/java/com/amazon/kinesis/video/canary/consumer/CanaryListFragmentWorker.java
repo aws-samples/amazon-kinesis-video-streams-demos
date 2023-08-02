@@ -90,10 +90,8 @@ public class CanaryListFragmentWorker implements Callable {
                 }
                 nextToken = result.getNextToken();
             }
-            // Collections.sort(fragments);
-            // Collections.sort(fragments, Comparator.comparingInt(Integer.parseInt(Fragment::getFragmentNumber)));
+           
             fragments.sort(Comparator.comparing(CanaryFragment::getFragmentNumberInt));
-
 
             for (CanaryFragment cf : fragments) {
                 System.out.println(MessageFormat.format("Retrieved fragment number {0} ", cf.fragment.getFragmentNumber()));
