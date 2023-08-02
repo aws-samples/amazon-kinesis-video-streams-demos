@@ -324,7 +324,6 @@ pipeline {
                 //         }
                 //     }
                 // }
-
                 stage('StorageConsumer') {
                      agent {
                         label params.CONSUMER_NODE_LABEL
