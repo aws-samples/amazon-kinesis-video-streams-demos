@@ -18,6 +18,12 @@ import com.amazonaws.services.kinesisvideo.model.*;
 import lombok.extern.slf4j.Slf4j;
 
 
+/*
+    This is a modified version of the ListFragmentWorker example found here:
+    https://github.com/aws/amazon-kinesis-video-streams-parser-library/blob/0056da083402a96cffcdfd8bca9433dd25eb7470/src/main/java/com/amazonaws/kinesisvideo/parser/examples/ListFragmentWorker.java#L7
+ */
+
+
 /* This worker retrieves all fragments within the specified TimestampRange from a specified Kinesis Video Stream and returns them in a list */
 @Slf4j
 public class CanaryListFragmentWorker implements Callable {

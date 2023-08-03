@@ -51,6 +51,7 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 public class WebrtcStorageCanaryConsumer {
 
+    // TODO: Take out sending metrics functionality and make into a sendMetrics function
     private static void getIntervalMetrics(CanaryFragmentList fragmentList, Date canaryStartTime, String streamName, SystemPropertiesCredentialsProvider credentialsProvider, String dataEndpoint, String region){
         System.out.println("12 sec have passed...");
         try{

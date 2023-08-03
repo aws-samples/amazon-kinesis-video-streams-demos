@@ -4,6 +4,10 @@ import java.util.List;
 import java.util.ArrayList;
 
 
+/*
+    CanaryFragmentList allows for intervalMetricsTask calls to access the same data by passing a CanaryFragmentList object.
+ */
+
 public class CanaryFragmentList {
 
     private List<CanaryFragment> fragmentList = new ArrayList<>();
