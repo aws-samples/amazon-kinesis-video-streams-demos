@@ -15,31 +15,6 @@ VOID handleSignal(INT32 signal)
     terminated = TRUE;
 }
 
-// add frame pts, original frame size, CRC to beginning of buffer after Annex-B format NALu
-VOID addCanaryMetadataToFrameData(PBYTE buffer, PFrame pFrame)
-{
-    PBYTE pCurPtr = buffer + ANNEX_B_NALU_SIZE;
-    putUnalignedInt64BigEndian((PINT64) pCurPtr, pFrame->presentationTs);
-    pCurPtr += SIZEOF(UINT64);
-    putUnalignedInt32BigEndian((PINT32) pCurPtr, pFrame->size);
-    pCurPtr += SIZEOF(UINT32);
-    putUnalignedInt32BigEndian((PINT32) pCurPtr, COMPUTE_CRC32(buffer, pFrame->size));
-}
-
-// Frame Data format: NALu (4 bytes) + Header (PTS, Size (including header), CRC (frame data) + Randomly generated frameBits
-
-// TODO: Support dynamic random frame sizes to bring it closer to real time scenarios
-VOID createCanaryFrameData(PBYTE buffer, PFrame pFrame)
-{
-    UINT32 i;
-    // For decoding purposes, the first 4 bytes need to be a NALu
-    putUnalignedInt32BigEndian((PINT32) buffer, 0x00000001);
-    for (i = ANNEX_B_NALU_SIZE + CANARY_METADATA_SIZE; i < pFrame->size; i++) {
-        buffer[i] = RAND();
-    }
-    addCanaryMetadataToFrameData(buffer, pFrame);
-}
-
 INT32 main(INT32 argc, CHAR* argv[])
 {
 #ifndef _WIN32
@@ -236,63 +211,6 @@ STATUS onNewConnection(Canary::PPeer pPeer)
 CleanUp:
 
     return retStatus;
-}
-
-VOID sendCustomFrames(Canary::PPeer pPeer, MEDIA_STREAM_TRACK_KIND kind, UINT64 dataRate, UINT64 frameRate)
-{
-    STATUS retStatus = STATUS_SUCCESS;
-    Frame frame;
-    UINT32 hexStrLen = 0;
-    UINT32 actualFrameSize = 0;
-    UINT32 frameSizeWithoutNalu = 0;
-    // This is the actual frame size that includes the metadata and the actual frame data
-    actualFrameSize = CANARY_METADATA_SIZE + ((dataRate / 8) / frameRate);
-    frameSizeWithoutNalu = actualFrameSize - ANNEX_B_NALU_SIZE;
-
-    PBYTE canaryFrameData = NULL;
-    canaryFrameData = (PBYTE) MEMALLOC(actualFrameSize);
-
-    // We allocate a bigger buffer to accommodate the hex encoded string
-    frame.frameData = (PBYTE) MEMALLOC(frameSizeWithoutNalu * 2 + 1 + ANNEX_B_NALU_SIZE);
-    frame.version = FRAME_CURRENT_VERSION;
-    frame.presentationTs = GETTIME();
-
-    while (!terminated.load()) {
-        frame.size = actualFrameSize;
-        createCanaryFrameData(canaryFrameData, &frame);
-
-        // Hex encode the data (without the ANNEX-B NALu) to ensure parts of random frame data is not skipped if they
-        // are the same as the ANNEX-B NALu
-        CHK_STATUS(hexEncode(frame.frameData + ANNEX_B_NALU_SIZE, frameSizeWithoutNalu, NULL, &hexStrLen));
-
-        // This re-alloc is done in case the estimated size does not match the actual requirement.
-        // We do not want to constantly malloc within a loop. Hence, we re-allocate only if required
-        // Either ways, the realloc should not happen
-        if (hexStrLen != (frameSizeWithoutNalu * 2 + 1)) {
-            DLOGW("Re allocating...this should not happen...something might be wrong");
-            frame.frameData = (PBYTE) REALLOC(frame.frameData, hexStrLen + ANNEX_B_NALU_SIZE);
-            CHK_ERR(frame.frameData != NULL, STATUS_NOT_ENOUGH_MEMORY, "Failed to realloc media buffer");
-        }
-        CHK_STATUS(hexEncode(canaryFrameData + ANNEX_B_NALU_SIZE, frameSizeWithoutNalu, (PCHAR)(frame.frameData + ANNEX_B_NALU_SIZE), &hexStrLen));
-        MEMCPY(frame.frameData, canaryFrameData, ANNEX_B_NALU_SIZE);
-
-        // We must update the size to reflect the original data with hex encoded data
-        frame.size = hexStrLen + ANNEX_B_NALU_SIZE;
-        pPeer->writeFrame(&frame, kind);
-        THREAD_SLEEP(HUNDREDS_OF_NANOS_IN_A_SECOND / frameRate);
-        frame.presentationTs = GETTIME();
-    }
-CleanUp:
-
-    SAFE_MEMFREE(frame.frameData);
-    SAFE_MEMFREE(canaryFrameData);
-
-    auto threadKind = kind == MEDIA_STREAM_TRACK_KIND_VIDEO ? "video" : "audio";
-    if (STATUS_FAILED(retStatus)) {
-        DLOGE("%s thread exited with 0x%08x", threadKind, retStatus);
-    } else {
-        DLOGI("%s thread exited successfully", threadKind);
-    }
 }
 
 STATUS canaryRtpOutboundStats(UINT32 timerId, UINT64 currentTime, UINT64 customData)
