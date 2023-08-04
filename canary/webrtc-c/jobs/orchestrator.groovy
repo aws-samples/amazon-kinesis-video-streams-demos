@@ -3,7 +3,7 @@ import jenkins.model.*
 RUNNER_JOB_NAME_PREFIX = "webrtc-canary-runner"
 PERIODIC_DURATION_IN_SECONDS = 30
 LONG_RUNNING_DURATION_IN_SECONDS = 0
-CONSUMER_LONG_RUNNING_DURATION_IN_SECONDS = 7200
+STORAGE_LONG_RUNNING_DURATION_IN_SECONDS = 3600
 MIN_RETRY_DELAY_IN_SECONDS = 60
 COLD_STARTUP_DELAY_IN_SECONDS = 60 * 60
 GIT_URL = 'https://github.com/aws-samples/amazon-kinesis-video-streams-demos.git'
@@ -219,7 +219,7 @@ pipeline {
                                 booleanParam(name: 'USE_TURN', value: true),
                                 booleanParam(name: 'TRICKLE_ICE', value: true),
                                 booleanParam(name: 'USE_IOT', value: false),
-                                string(name: 'DURATION_IN_SECONDS', value: CONSUMER_LONG_RUNNING_DURATION_IN_SECONDS.toString()),
+                                string(name: 'DURATION_IN_SECONDS', value: STORAGE_LONG_RUNNING_DURATION_IN_SECONDS.toString()),
                                 string(name: 'MASTER_NODE_LABEL', value: "ec2-us-west-2"),
                                 string(name: 'CONSUMER_NODE_LABEL', value: "ec2-us-west-2-consumer"),
                                 string(name: 'RUNNER_LABEL', value: "WebrtcStorageLongRunningOpenSSL"),
