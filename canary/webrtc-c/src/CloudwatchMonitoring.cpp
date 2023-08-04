@@ -18,7 +18,7 @@ STATUS CloudwatchMonitoring::init(BOOL isStorage)
         this->labelDimension.SetName("StorageWebRTCSDKCanaryLabel");
     } else
     {
-        this->labelDimension.SetName("StorageWebRTCSDKCanaryLabel");
+        this->labelDimension.SetName("WebRTCSDKCanaryLabel");
     }
 
     this->labelDimension.SetValue(pConfig->label.value);
