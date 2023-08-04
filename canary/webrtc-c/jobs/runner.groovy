@@ -179,7 +179,6 @@ def buildStorageConsumerPeer(params) {
         deleteDir()
     }
 
-    def consumerStartUpDelay = 45
     echo "NODE_NAME = ${env.NODE_NAME}"
 
     def thing_prefix = "${env.JOB_NAME}-${params.RUNNER_LABEL}"
@@ -187,7 +186,7 @@ def buildStorageConsumerPeer(params) {
     RUNNING_NODES_IN_BUILDING++
     echo "Number of running nodes: ${RUNNING_NODES_IN_BUILDING}"
 
-    buildConsumerProject(params.USE_MBEDTLS, thing_prefix)
+    buildConsumerProject(thing_prefix)
 
     RUNNING_NODES_IN_BUILDING--
     echo "Number of running nodes after build: ${RUNNING_NODES_IN_BUILDING}"
@@ -227,6 +226,7 @@ def buildStorageConsumerPeer(params) {
         'AWS_IOT_CORE_THING_NAME': "${thing_name}"
     ].collect({k,v -> "${k}=${v}" })
 
+    def consumerStartUpDelay = 45
     sleep consumerStartUpDelay
 
     withRunnerWrapper(envs) {
