@@ -320,13 +320,13 @@ pipeline {
                 }
             }
             parallel {
-                stage('StorageMaster') {
-                    steps {
-                        script {
-                            // buildStorageMasterPeer(params)
-                        }
-                    }
-                }
+                // stage('StorageMaster') {
+                //     steps {
+                //         script {
+                //             buildStorageMasterPeer(params)
+                //         }
+                //     }
+                // }
                 stage('StorageConsumer') {
                      agent {
                         label params.CONSUMER_NODE_LABEL
