@@ -217,7 +217,12 @@ def buildStorageConsumerPeer(params) {
         'M2_HOME': "/opt/apache-maven-3.6.3",
         'AWS_KVS_LOG_LEVEL': params.AWS_KVS_LOG_LEVEL,
 
+
         'CANARY_STREAM_NAME': "aTestStream", //  TODO: replace hardcoded name with descriptive, labeled name
+
+        'CANARY_STORAGE_SIZE_IN_BYTES': "134217728"
+        'CANARY_BUFFER_DURATION_IN_SECONDS': "120"
+
 
         'CANARY_LABEL': params.RUNNER_LABEL,
         'CANARY_TYPE': "Realtime",
@@ -227,11 +232,6 @@ def buildStorageConsumerPeer(params) {
         'CANARY_RUN_SCENARIO': params.SCENARIO_LABEL,
         'TRACK_TYPE': "SingleTrack",
         'CANARY_USE_IOT_PROVIDER': params.USE_IOT,
-        'AWS_IOT_CORE_CREDENTIAL_ENDPOINT': "${endpoint}",
-        'AWS_IOT_CORE_CERT': "${core_cert_file}",
-        'AWS_IOT_CORE_PRIVATE_KEY': "${private_key_file}",
-        'AWS_IOT_CORE_ROLE_ALIAS': "${role_alias}",
-        'AWS_IOT_CORE_THING_NAME': "${thing_name}"
     ].collect({k,v -> "${k}=${v}" })
 
     withRunnerWrapper(envs) {
