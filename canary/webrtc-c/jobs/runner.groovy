@@ -12,7 +12,18 @@ CREDENTIALS = [
     ]
 ]
 
-def buildProject(useMbedTLS, thing_prefix) {
+def buildConsumerProject(thing_prefix) {
+    checkout([$class: 'GitSCM', branches: [[name: params.GIT_HASH ]],
+              userRemoteConfigs: [[url: params.GIT_URL]]])
+
+    sh '''
+        PATH="$JAVA_HOME/bin:$PATH"
+        export PATH="$M2_HOME/bin:$PATH"
+        cd ./canary/consumer-java
+        make -j4'''
+}
+
+def buildWebRTCProject(useMbedTLS, thing_prefix) {
     checkout([$class: 'GitSCM', branches: [[name: params.GIT_HASH ]],
               userRemoteConfigs: [[url: params.GIT_URL]]])
 
@@ -59,7 +70,7 @@ def buildPeer(isMaster, params) {
     }
 
     def thing_prefix = "${env.JOB_NAME}-${params.RUNNER_LABEL}"
-    buildProject(params.USE_MBEDTLS, thing_prefix)
+    buildWebRTCProject(params.USE_MBEDTLS, thing_prefix)
 
     RUNNING_NODES_IN_BUILDING--
     
@@ -111,7 +122,7 @@ def buildStorageMasterPeer(params) {
     }
 
     def thing_prefix = "${env.JOB_NAME}-${params.RUNNER_LABEL}"
-    buildProject(params.USE_MBEDTLS, thing_prefix)
+    buildWebRTCProject(params.USE_MBEDTLS, thing_prefix)
 
     RUNNING_NODES_IN_BUILDING--
     
@@ -168,35 +179,21 @@ def buildStorageConsumerPeer(params) {
         deleteDir()
     }
 
-    def thing_prefix = "${env.JOB_NAME}-${params.RUNNER_LABEL}"
-    buildProject(params.USE_MBEDTLS, thing_prefix)
-
     def consumerStartUpDelay = 45
     echo "NODE_NAME = ${env.NODE_NAME}"
 
-    checkout([
-        scm: [
-            $class: 'GitSCM', 
-            branches: [[name: params.GIT_HASH]],
-            userRemoteConfigs: [[url: params.GIT_URL]]
-        ]
-    ])
+    def thing_prefix = "${env.JOB_NAME}-${params.RUNNER_LABEL}"
 
     RUNNING_NODES_IN_BUILDING++
     echo "Number of running nodes: ${RUNNING_NODES_IN_BUILDING}"
 
     sleep consumerStartUpDelay
-    withEnv(consumerEnvs) {
-        sh '''
-            PATH="$JAVA_HOME/bin:$PATH"
-            export PATH="$M2_HOME/bin:$PATH"
-            cd ./canary/consumer-java
-            make -j4
-        '''
-    }
+
+    buildConsumerProject(params.USE_MBEDTLS, thing_prefix)
 
     RUNNING_NODES_IN_BUILDING--
     echo "Number of running nodes after build: ${RUNNING_NODES_IN_BUILDING}"
+
     waitUntil {
         RUNNING_NODES_IN_BUILDING == 0
     }
@@ -247,7 +244,7 @@ def buildSignaling(params) {
         deleteDir()
     }
     def thing_prefix = "${env.JOB_NAME}-${params.RUNNER_LABEL}"
-    buildProject(params.USE_MBEDTLS, thing_prefix)
+    buildWebRTCProject(params.USE_MBEDTLS, thing_prefix)
 
     def scripts_dir = "$WORKSPACE/canary/webrtc-c/scripts"
     def endpoint = "${scripts_dir}/iot-credential-provider.txt"
