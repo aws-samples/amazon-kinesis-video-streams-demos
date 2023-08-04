@@ -220,8 +220,8 @@ def buildStorageConsumerPeer(params) {
 
         'CANARY_STREAM_NAME': "aTestStream", //  TODO: replace hardcoded name with descriptive, labeled name
 
-        'CANARY_STORAGE_SIZE_IN_BYTES': "134217728"
-        'CANARY_BUFFER_DURATION_IN_SECONDS': "120"
+        'CANARY_STORAGE_SIZE_IN_BYTES': "134217728",
+        'CANARY_BUFFER_DURATION_IN_SECONDS': "120",
 
 
         'CANARY_LABEL': params.RUNNER_LABEL,
