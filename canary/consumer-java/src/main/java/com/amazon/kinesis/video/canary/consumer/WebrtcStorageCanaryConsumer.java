@@ -155,6 +155,7 @@ public class WebrtcStorageCanaryConsumer {
             }
         };
         
+        // TODO: change this to 16 s becuase media server can have fragments up to 15 s long
         intervalMetricsTimer.scheduleAtFixedRate(intervalMetricsTask, 0, 12000); // delay of 0 ms at an interval of 12,000 ms
         
         long delay = canaryRunTime * 1000;
