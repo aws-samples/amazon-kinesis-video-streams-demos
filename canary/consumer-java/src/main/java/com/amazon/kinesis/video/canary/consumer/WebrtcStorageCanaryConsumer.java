@@ -149,8 +149,9 @@ public class WebrtcStorageCanaryConsumer {
                 getIntervalMetrics(fragmentList, canaryStartTime, streamName, canaryLabel, credentialsProvider, dataEndpoint, region);
             }
         };
-        
-        intervalMetricsTimer.scheduleAtFixedRate(intervalMetricsTask, 0, 16000); // delay of 0 ms at an interval of 16,000 ms
+
+        long intervalDelay = 16000;
+        intervalMetricsTimer.scheduleAtFixedRate(intervalMetricsTask, intervalDelay, intervalDelay); // delay of intervalDelay ms at an interval of intervalDelay ms
         
         long delay = canaryRunTime * 1000;
         Thread.sleep(delay);
