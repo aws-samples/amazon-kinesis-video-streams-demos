@@ -52,7 +52,7 @@ import lombok.extern.slf4j.Slf4j;
 public class WebrtcStorageCanaryConsumer {
 
     // TODO: Take out sending metrics functionality and make into a sendMetrics function
-    private static void getIntervalMetrics(CanaryFragmentList fragmentList, Date canaryStartTime, String streamName, SystemPropertiesCredentialsProvider credentialsProvider, String dataEndpoint, String region){
+    private static void getIntervalMetrics(CanaryFragmentList fragmentList, Date canaryStartTime, String streamName, String canaryLabel, SystemPropertiesCredentialsProvider credentialsProvider, String dataEndpoint, String region){
         System.out.println("12 sec have passed...");
         try{
             TimestampRange timestampRange = new TimestampRange();
@@ -83,16 +83,25 @@ public class WebrtcStorageCanaryConsumer {
                 .build();
 
             final Dimension dimensionPerStream = new Dimension()
-                .withName("ProducerSDKCanaryStreamName")
+                .withName("StorageWebrtcCanaryStreamName")
                 .withValue(streamName);
+            final Dimension aggregatedDimension = new Dimension()
+                .withName("ProducerSDKCanaryType")
+                .withValue(canaryLabel);
             List<MetricDatum> datumList = new ArrayList<>();
-
+            
             MetricDatum datum = new MetricDatum()
                 .withMetricName("FragmentReceived")
                 .withUnit(StandardUnit.None)
                 .withValue(newFragmentReceived ? 1.0 : 0.0)
                 .withDimensions(dimensionPerStream);
             datumList.add(datum);
+            MetricDatum aggDatum = new MetricDatum()
+                .withMetricName("FragmentReceived")
+                .withUnit(StandardUnit.None)
+                .withValue(newFragmentReceived ? 1.0 : 0.0)
+                .withDimensions(aggregatedDimension);
+            datumList.add(aggDatum);
 
             PutMetricDataRequest request = new PutMetricDataRequest()
                 .withNamespace("KinesisVideoSDKCanary")
@@ -127,20 +136,6 @@ public class WebrtcStorageCanaryConsumer {
                 .withCredentials(credentialsProvider)
                 .build();
 
-        GetMediaResponseStreamConsumerFactory consumerFactory = new GetMediaResponseStreamConsumerFactory() {
-            @Override
-            public GetMediaResponseStreamConsumer createConsumer() throws IOException {
-                return new GetMediaResponseStreamConsumer() {
-                    @Override
-                    public void process(InputStream inputStream, FragmentMetadataCallback fragmentMetadataCallback) throws MkvElementVisitException, IOException {
-                        processWithFragmentEndCallbacks(inputStream, fragmentMetadataCallback,
-                                FrameVisitor.create(new CanaryFrameProcessor(amazonCloudWatch, streamName, canaryLabel),
-                                        Optional.of(new FragmentMetadataVisitor.BasicMkvTagProcessor())));
-                    }
-                };
-            }
-        };
-
         final GetDataEndpointRequest dataEndpointRequest = new GetDataEndpointRequest()
             .withAPIName(APIName.LIST_FRAGMENTS).withStreamName(streamName);
         final String dataEndpoint = amazonKinesisVideo.getDataEndpoint(dataEndpointRequest).getDataEndpoint();
@@ -151,7 +146,7 @@ public class WebrtcStorageCanaryConsumer {
         Timer intervalMetricsTimer = new Timer("IntervalMetricsTimer");
         TimerTask intervalMetricsTask = new TimerTask() {
             public void run() {
-                getIntervalMetrics(fragmentList, canaryStartTime, streamName, credentialsProvider, dataEndpoint, region);
+                getIntervalMetrics(fragmentList, canaryStartTime, streamName, canaryLabel, credentialsProvider, dataEndpoint, region);
             }
         };
         
