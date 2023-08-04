@@ -6,15 +6,23 @@ CloudwatchMonitoring::CloudwatchMonitoring(PConfig pConfig, ClientConfiguration*
 {
 }
 
-STATUS CloudwatchMonitoring::init()
+STATUS CloudwatchMonitoring::init(BOOL isStorage)
 {
     STATUS retStatus = STATUS_SUCCESS;
 
     this->channelDimension.SetName("WebRTCSDKCanaryChannelName");
     this->channelDimension.SetValue(pConfig->channelName.value);
 
-    this->labelDimension.SetName("WebRTCSDKCanaryLabel");
+    if (isStorage)
+    {
+        this->labelDimension.SetName("StorageWebRTCSDKCanaryLabel");
+    } else
+    {
+        this->labelDimension.SetName("StorageWebRTCSDKCanaryLabel");
+    }
+
     this->labelDimension.SetValue(pConfig->label.value);
+
 
     return retStatus;
 }

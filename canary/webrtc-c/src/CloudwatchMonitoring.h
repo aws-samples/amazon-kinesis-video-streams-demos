@@ -5,7 +5,7 @@ namespace Canary {
 class CloudwatchMonitoring {
   public:
     CloudwatchMonitoring(Canary::PConfig, ClientConfiguration*);
-    STATUS init();
+    STATUS init(BOOL isStorage);
     VOID deinit();
     VOID push(const MetricDatum&);
     VOID pushExitStatus(STATUS);
