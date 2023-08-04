@@ -83,10 +83,10 @@ public class WebrtcStorageCanaryConsumer {
                 .build();
 
             final Dimension dimensionPerStream = new Dimension()
-                .withName("StorageWebrtcCanaryStreamName")
+                .withName("StorageWebRTCSDKCanaryStreamName")
                 .withValue(streamName);
             final Dimension aggregatedDimension = new Dimension()
-                .withName("ProducerSDKCanaryType")
+                .withName("StorageWebRTCSDKCanaryLabel")
                 .withValue(canaryLabel);
             List<MetricDatum> datumList = new ArrayList<>();
             
