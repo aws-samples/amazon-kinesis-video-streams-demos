@@ -187,8 +187,6 @@ def buildStorageConsumerPeer(params) {
     RUNNING_NODES_IN_BUILDING++
     echo "Number of running nodes: ${RUNNING_NODES_IN_BUILDING}"
 
-    sleep consumerStartUpDelay
-
     buildConsumerProject(params.USE_MBEDTLS, thing_prefix)
 
     RUNNING_NODES_IN_BUILDING--
@@ -228,6 +226,8 @@ def buildStorageConsumerPeer(params) {
         'AWS_IOT_CORE_ROLE_ALIAS': "${role_alias}",
         'AWS_IOT_CORE_THING_NAME': "${thing_name}"
     ].collect({k,v -> "${k}=${v}" })
+
+    sleep consumerStartUpDelay
 
     withRunnerWrapper(envs) {
         sh '''
