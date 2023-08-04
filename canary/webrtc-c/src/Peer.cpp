@@ -288,12 +288,12 @@ STATUS Peer::initPeerConnection()
 
         switch (newState) {
             case RTC_PEER_CONNECTION_STATE_CONNECTING:
-                pPeer->iceHolePunchingStartTime = GETTIME();
                 break;
             case RTC_PEER_CONNECTION_STATE_CONNECTED: {
-                auto duration = (GETTIME() - pPeer->iceHolePunchingStartTime) / HUNDREDS_OF_NANOS_IN_A_MILLISECOND;
-                DLOGI("ICE hole punching took %lu ms", duration);
-                Canary::Cloudwatch::getInstance().monitoring.pushICEHolePunchingDelay(duration, Aws::CloudWatch::Model::StandardUnit::Milliseconds);
+                peerConnectionGetMetrics(pPeer->pPeerConnection, &pPeer->peerConnectionMetrics);
+                Canary::Cloudwatch::getInstance().monitoring.pushPeerConnectionMetrics(&pPeer->peerConnectionMetrics);
+                iceAgentGetMetrics(pPeer->pPeerConnection, &pPeer->iceMetrics);
+                Canary::Cloudwatch::getInstance().monitoring.pushKvsIceAgentMetrics(&pPeer->iceMetrics);
                 break;
             }
             case RTC_PEER_CONNECTION_STATE_FAILED:
