@@ -205,6 +205,8 @@ def buildStorageConsumerPeer(params) {
     
     echo "Done waiting in NODE_NAME = ${env.NODE_NAME}"
 
+    def thing_prefix = "${env.JOB_NAME}-${params.RUNNER_LABEL}"
+
     def scripts_dir = "$WORKSPACE/canary/webrtc-c/scripts"
     def endpoint = "${scripts_dir}/iot-credential-provider.txt"
     def core_cert_file = "${scripts_dir}/${thing_prefix}_certificate.pem"
