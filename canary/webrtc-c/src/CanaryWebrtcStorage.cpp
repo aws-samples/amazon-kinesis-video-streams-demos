@@ -84,44 +84,7 @@ STATUS run(Canary::PConfig pConfig)
                                       &timeoutTimerId));
     }
 
-    if (!pConfig->runBothPeers.value) {
-        runPeer(pConfig, timerQueueHandle, &retStatus);
-    } else {
-        // Modify config to differentiate master and viewer
-        UINT64 timestamp = GETTIME() / HUNDREDS_OF_NANOS_IN_A_SECOND;
-        STATUS masterRetStatus;
-        std::stringstream ss;
-
-        Canary::Config masterConfig = *pConfig;
-        masterConfig.isMaster.value = TRUE;
-
-        ss << pConfig->clientId.value << "Master";
-        masterConfig.clientId.value = ss.str();
-        ss.str("");
-
-        ss << pConfig->channelName.value << "-master-" << timestamp;
-        masterConfig.logStreamName.value = ss.str();
-        ss.str("");
-
-        Canary::Config viewerConfig = *pConfig;
-        viewerConfig.isMaster.value = FALSE;
-
-        ss << pConfig->clientId.value << "Viewer";
-        viewerConfig.clientId.value = ss.str();
-        ss.str("");
-
-        ss << pConfig->channelName.value << "-viewer-" << timestamp;
-        viewerConfig.logStreamName.value = ss.str();
-        ss.str("");
-
-        std::thread masterThread(runPeer, &masterConfig, timerQueueHandle, &masterRetStatus);
-        THREAD_SLEEP(CANARY_DEFAULT_VIEWER_INIT_DELAY);
-
-        runPeer(&viewerConfig, timerQueueHandle, &retStatus);
-        masterThread.join();
-
-        retStatus = STATUS_FAILED(retStatus) ? retStatus : masterRetStatus;
-    }
+    runPeer(pConfig, timerQueueHandle, &retStatus);
 
 CleanUp:
 
@@ -159,11 +122,7 @@ VOID runPeer(Canary::PConfig pConfig, TIMER_QUEUE_HANDLE timerQueueHandle, STATU
     CHK_STATUS(peer.init(pConfig, callbacks));
     CHK_STATUS(peer.connect());
 
-    {
-        // Since the goal of the canary is to test robustness of the SDK, there is not an immediate need
-        // to send audio frames as well. It can always be added in if needed in the future
-        
-        //std::thread videoThread(sendCustomFrames, &peer, MEDIA_STREAM_TRACK_KIND_VIDEO, pConfig->bitRate.value, pConfig->frameRate.value);
+    {   
         std::thread videoThread(sendLocalFrames, &peer, MEDIA_STREAM_TRACK_KIND_VIDEO, "../assets/h264SampleFrames/frame-%04d.h264", NUMBER_OF_H264_FRAME_FILES, SAMPLE_VIDEO_FRAME_DURATION);
         std::thread audioThread(sendLocalFrames, &peer, MEDIA_STREAM_TRACK_KIND_AUDIO, "../assets/opusSampleFrames/sample-%03d.opus", NUMBER_OF_OPUS_FRAME_FILES, SAMPLE_AUDIO_FRAME_DURATION);
 
