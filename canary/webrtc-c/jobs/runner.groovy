@@ -358,7 +358,9 @@ pipeline {
                 // TODO: Maybe there's a better way to write this instead of duplicating it
                 build(
                     job: env.JOB_NAME,
+
                     parameters: [
+                      string(name: 'AWS_DEFAULT_REGION', value: params.AWS_DEFAULT_REGION),
                       string(name: 'AWS_KVS_LOG_LEVEL', value: params.AWS_KVS_LOG_LEVEL),
                       booleanParam(name: 'IS_SIGNALING', value: params.IS_SIGNALING),
                       booleanParam(name: 'IS_STORAGE', value: params.IS_STORAGE),

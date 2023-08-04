@@ -6,6 +6,7 @@ CloudwatchMonitoring::CloudwatchMonitoring(PConfig pConfig, ClientConfiguration*
 {
 }
 
+// TODO: remove this parameter and add as a propagated member
 STATUS CloudwatchMonitoring::init(BOOL isStorage)
 {
     STATUS retStatus = STATUS_SUCCESS;
