@@ -323,7 +323,7 @@ pipeline {
                 stage('StorageMaster') {
                     steps {
                         script {
-                            buildStorageMasterPeer(params)
+                            // buildStorageMasterPeer(params)
                         }
                     }
                 }
