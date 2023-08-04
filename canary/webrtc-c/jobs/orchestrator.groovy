@@ -222,7 +222,7 @@ pipeline {
                                 string(name: 'DURATION_IN_SECONDS', value: STORAGE_LONG_RUNNING_DURATION_IN_SECONDS.toString()),
                                 string(name: 'MASTER_NODE_LABEL', value: "ec2-us-west-2"),
                                 string(name: 'CONSUMER_NODE_LABEL', value: "ec2-us-west-2-consumer"),
-                                string(name: 'RUNNER_LABEL', value: "WebrtcStorageLongRunningOpenSSL"),
+                                string(name: 'RUNNER_LABEL', value: "WebrtcLongRunning"),
                                 string(name: 'SCENARIO_LABEL', value: "WebrtcLongRunning"),
                                 string(name: 'AWS_DEFAULT_REGION', value: "us-west-2"),
                             ],
