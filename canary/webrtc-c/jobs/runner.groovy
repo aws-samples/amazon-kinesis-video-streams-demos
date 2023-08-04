@@ -12,15 +12,22 @@ CREDENTIALS = [
     ]
 ]
 
-def buildConsumerProject(thing_prefix) {
+def buildConsumerProject() {
     checkout([$class: 'GitSCM', branches: [[name: params.GIT_HASH ]],
               userRemoteConfigs: [[url: params.GIT_URL]]])
+              
+    def consumerEnvs = [        
+        'JAVA_HOME': "/opt/jdk-13.0.1",
+        'M2_HOME': "/opt/apache-maven-3.6.3"
+    ].collect({k,v -> "${k}=${v}" })
 
-    sh '''
-        PATH="$JAVA_HOME/bin:$PATH"
-        export PATH="$M2_HOME/bin:$PATH"
-        cd ./canary/consumer-java
-        make -j4'''
+    withEnv(envs) {
+        sh '''
+            PATH="$JAVA_HOME/bin:$PATH"
+            export PATH="$M2_HOME/bin:$PATH"
+            cd ./canary/consumer-java
+            make -j4'''
+    }
 }
 
 def buildWebRTCProject(useMbedTLS, thing_prefix) {
@@ -181,12 +188,13 @@ def buildStorageConsumerPeer(params) {
 
     echo "NODE_NAME = ${env.NODE_NAME}"
 
-    def thing_prefix = "${env.JOB_NAME}-${params.RUNNER_LABEL}"
-
     RUNNING_NODES_IN_BUILDING++
     echo "Number of running nodes: ${RUNNING_NODES_IN_BUILDING}"
+        
+    def consumerStartUpDelay = 45
+    sleep consumerStartUpDelay
 
-    buildConsumerProject(thing_prefix)
+    buildConsumerProject()
 
     RUNNING_NODES_IN_BUILDING--
     echo "Number of running nodes after build: ${RUNNING_NODES_IN_BUILDING}"
@@ -225,9 +233,6 @@ def buildStorageConsumerPeer(params) {
         'AWS_IOT_CORE_ROLE_ALIAS': "${role_alias}",
         'AWS_IOT_CORE_THING_NAME': "${thing_name}"
     ].collect({k,v -> "${k}=${v}" })
-
-    def consumerStartUpDelay = 45
-    sleep consumerStartUpDelay
 
     withRunnerWrapper(envs) {
         sh '''
