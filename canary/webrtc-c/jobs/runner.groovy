@@ -152,8 +152,8 @@ def buildStorageMasterPeer(params) {
       'CANARY_LOG_GROUP_NAME': params.LOG_GROUP_NAME,
       'CANARY_LOG_STREAM_NAME': "${params.RUNNER_LABEL}-${clientID}-${START_TIMESTAMP}",
 
-      // 'CANARY_CHANNEL_NAME': "aTestChannel", //  TODO: replace hardcoded name with descriptive, labeled name
-      'CANARY_CHANNEL_NAME': "${env.JOB_NAME}-${params.RUNNER_LABEL}",
+      'CANARY_CHANNEL_NAME': "aTestChannel", //  TODO: replace hardcoded name with descriptive, labeled name
+      // 'CANARY_CHANNEL_NAME': "${env.JOB_NAME}-${params.RUNNER_LABEL}",
 
       'CANARY_LABEL': params.SCENARIO_LABEL,
       'CANARY_CLIENT_ID': clientID,
@@ -221,8 +221,8 @@ def buildStorageConsumerPeer(params) {
         'AWS_KVS_LOG_LEVEL': params.AWS_KVS_LOG_LEVEL,
 
 
-        // 'CANARY_STREAM_NAME': "aTestStream", //  TODO: replace hardcoded name with descriptive, labeled name
-        'CANARY_STREAM_NAME': "${env.JOB_NAME}-${params.RUNNER_LABEL}",
+        'CANARY_STREAM_NAME': "aTestStream", //  TODO: replace hardcoded name with descriptive, labeled name
+        // 'CANARY_STREAM_NAME': "${env.JOB_NAME}-${params.RUNNER_LABEL}",
 
         'CANARY_STORAGE_SIZE_IN_BYTES': "134217728",
         'CANARY_BUFFER_DURATION_IN_SECONDS': "120",
