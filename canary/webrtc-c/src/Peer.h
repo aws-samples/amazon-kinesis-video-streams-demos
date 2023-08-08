@@ -85,6 +85,7 @@ class Peer {
     std::vector<PRtcRtpTransceiver> videoTransceivers;
     BOOL isMaster;
     BOOL trickleIce;
+    BOOL isProfilingMode;
     UINT64 offerReceiveTimestamp;
     BOOL firstFrame;
     BOOL useIotCredentialProvider;
@@ -97,6 +98,7 @@ class Peer {
     RtcStats canaryMetrics;
     PeerConnectionMetrics peerConnectionMetrics;
     KvsIceAgentMetrics iceMetrics;
+    SignalingClientMetrics signalingClientMetrics;
     OutgoingRTPMetricsContext canaryOutgoingRTPMetricsContext;
     IncomingRTPMetricsContext canaryIncomingRTPMetricsContext;
     EndToEndMetricsContext endToEndMetricsContext;

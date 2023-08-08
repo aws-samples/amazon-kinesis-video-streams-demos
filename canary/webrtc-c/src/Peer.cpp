@@ -48,8 +48,14 @@ STATUS Peer::init(const Canary::PConfig pConfig, const Callbacks& callbacks)
                                                   &pAwsCredentialProvider));
     }
     else {
-        CHK_STATUS(createStaticCredentialProvider((PCHAR) pConfig->accessKey.value.c_str(), 0, (PCHAR) pConfig->secretKey.value.c_str(), 0,
-                                                  (PCHAR) pConfig->sessionToken.value.c_str(), 0, MAX_UINT64, &pAwsCredentialProvider));
+        if(IS_EMPTY_STRING(pConfig->sessionToken.value.c_str())) {
+            CHK_STATUS(createStaticCredentialProvider((PCHAR) pConfig->accessKey.value.c_str(), 0, (PCHAR) pConfig->secretKey.value.c_str(), 0,
+                                                      NULL, 0, MAX_UINT64, &pAwsCredentialProvider));
+        } else {
+            CHK_STATUS(createStaticCredentialProvider((PCHAR) pConfig->accessKey.value.c_str(), 0, (PCHAR) pConfig->secretKey.value.c_str(), 0,
+                                                      (PCHAR) pConfig->sessionToken.value.c_str(), 0, MAX_UINT64, &pAwsCredentialProvider));
+        }
+
     }
 
     CHK_STATUS(initSignaling(pConfig));
@@ -219,7 +225,7 @@ STATUS Peer::initRtcConfiguration(const Canary::PConfig pConfig)
 
     // Set the  STUN server
     if (pConfig->endpoint.value.empty()) {
-        SNPRINTF(pConfiguration->iceServers[0].urls, MAX_ICE_CONFIG_URI_LEN, KINESIS_VIDEO_STUN_URL, pConfig->region.value.c_str());
+        SNPRINTF(pConfiguration->iceServers[0].urls, MAX_ICE_CONFIG_URI_LEN, KINESIS_VIDEO_STUN_URL, pConfig->region.value.c_str(), KINESIS_VIDEO_STUN_URL_POSTFIX);
     } else {
         SNPRINTF(pConfiguration->iceServers[0].urls, MAX_ICE_CONFIG_URI_LEN, "stun:stun.%s:443", pConfig->endpoint.value.c_str());
     }
@@ -288,12 +294,23 @@ STATUS Peer::initPeerConnection()
 
         switch (newState) {
             case RTC_PEER_CONNECTION_STATE_CONNECTING:
+                if(!pPeer->isProfilingMode) {
+                    pPeer->iceHolePunchingStartTime = GETTIME();
+                }
+
                 break;
             case RTC_PEER_CONNECTION_STATE_CONNECTED: {
-                peerConnectionGetMetrics(pPeer->pPeerConnection, &pPeer->peerConnectionMetrics);
-                Canary::Cloudwatch::getInstance().monitoring.pushPeerConnectionMetrics(&pPeer->peerConnectionMetrics);
-                iceAgentGetMetrics(pPeer->pPeerConnection, &pPeer->iceMetrics);
-                Canary::Cloudwatch::getInstance().monitoring.pushKvsIceAgentMetrics(&pPeer->iceMetrics);
+                if(pPeer->isProfilingMode) {
+                    peerConnectionGetMetrics(pPeer->pPeerConnection, &pPeer->peerConnectionMetrics);
+                    Canary::Cloudwatch::getInstance().monitoring.pushPeerConnectionMetrics(&pPeer->peerConnectionMetrics);
+                    iceAgentGetMetrics(pPeer->pPeerConnection, &pPeer->iceMetrics);
+                    Canary::Cloudwatch::getInstance().monitoring.pushKvsIceAgentMetrics(&pPeer->iceMetrics);
+                }
+                else {
+                    auto duration = (GETTIME() - pPeer->iceHolePunchingStartTime) / HUNDREDS_OF_NANOS_IN_A_MILLISECOND;
+                    DLOGI("ICE hole punching took %lu ms", duration);
+                    Canary::Cloudwatch::getInstance().monitoring.pushICEHolePunchingDelay(duration, Aws::CloudWatch::Model::StandardUnit::Milliseconds);
+                }
                 break;
             }
             case RTC_PEER_CONNECTION_STATE_FAILED:
@@ -465,6 +482,10 @@ STATUS Peer::handleSignalingMsg(PReceivedSignalingMessage pMsg)
         CHK_STATUS(serializeSessionDescriptionInit(&answerSDPInit, msg.payload, &buffLen));
 
         CHK_STATUS(this->send(&msg));
+        if(this->isProfilingMode) {
+            signalingClientGetMetrics(this->signalingClientHandle, &this->signalingClientMetrics);
+            Canary::Cloudwatch::getInstance().monitoring.pushSignalingClientMetrics(&this->signalingClientMetrics);
+        }
 
     CleanUp:
 

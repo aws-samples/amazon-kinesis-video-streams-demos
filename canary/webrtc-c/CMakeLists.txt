@@ -14,13 +14,13 @@ set(BUILD_SAMPLE OFF CACHE BOOL "Disable sample building for WebRTC library" FOR
 FetchContent_Declare(
   webrtc
   GIT_REPOSITORY https://github.com/awslabs/amazon-kinesis-video-streams-webrtc-sdk-c
-  GIT_TAG        863a1a47eb8858702f3ec444032957e2332cc693
+  GIT_TAG        update-producer-dep
 )
 
 FetchContent_Declare(
   cloudwatch
   GIT_REPOSITORY https://github.com/aws/aws-sdk-cpp
-  GIT_TAG        1.11.92
+  GIT_TAG        1.9.67
 )
 
 FetchContent_GetProperties(webrtc)
