@@ -90,15 +90,17 @@ STATUS run(Canary::PConfig pConfig)
     BOOL initialized = FALSE;
     TIMER_QUEUE_HANDLE timerQueueHandle = 0;
     UINT32 timeoutTimerId;
-
+    printf("Start\n");
     CHK_STATUS(Canary::Cloudwatch::init(pConfig));
+    printf("Next 1\n");
     CHK_STATUS(initKvsWebRtc());
+    printf("Next 2\n");
     initialized = TRUE;
 
     SET_LOGGER_LOG_LEVEL(pConfig->logLevel.value);
-
+    printf("Logger level set\n");
     CHK_STATUS(timerQueueCreate(&timerQueueHandle));
-
+    printf("Timer queue set\n");
     if (pConfig->duration.value != 0) {
         auto terminate = [](UINT32 timerId, UINT64 currentTime, UINT64 customData) -> STATUS {
             UNUSED_PARAM(timerId);
@@ -180,10 +182,14 @@ VOID runPeer(Canary::PConfig pConfig, TIMER_QUEUE_HANDLE timerQueueHandle, STATU
 
     CHK(pConfig != NULL, STATUS_NULL_ARG);
 
+    printf("Here -1\n");
     pConfig->print();
+    printf("Here 0\n");
     CHK_STATUS(timerQueueAddTimer(timerQueueHandle, KVS_METRICS_INVOCATION_PERIOD, KVS_METRICS_INVOCATION_PERIOD,
                                   canaryKvsStats, (UINT64) &peer, &timeoutTimerId));
+    printf("Here 1\n");
     CHK_STATUS(peer.init(pConfig, callbacks));
+    printf("Here 2\n");
     CHK_STATUS(peer.connect());
 
     {
