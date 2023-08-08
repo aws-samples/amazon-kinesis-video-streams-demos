@@ -53,7 +53,6 @@ public class WebrtcStorageCanaryConsumer {
 
     // TODO: Take out sending metrics functionality and make into a sendMetrics function
     private static void getIntervalMetrics(CanaryFragmentList fragmentList, Date canaryStartTime, String streamName, String canaryLabel, SystemPropertiesCredentialsProvider credentialsProvider, String dataEndpoint, String region){
-        System.out.println("12 sec have passed...");
         try{
             TimestampRange timestampRange = new TimestampRange();
             timestampRange.setStartTimestamp(canaryStartTime);
@@ -151,7 +150,7 @@ public class WebrtcStorageCanaryConsumer {
         };
 
         long intervalDelay = 16000;
-        intervalMetricsTimer.scheduleAtFixedRate(intervalMetricsTask, intervalDelay * 2, intervalDelay); // initial delay of 2 * intervalDelay ms at an interval of intervalDelay ms
+        intervalMetricsTimer.scheduleAtFixedRate(intervalMetricsTask, 45000, intervalDelay); // initial delay of 45 s at an interval of intervalDelay ms
         
         long delay = canaryRunTime * 1000;
         Thread.sleep(delay);
