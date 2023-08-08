@@ -183,7 +183,9 @@ VOID runPeer(Canary::PConfig pConfig, TIMER_QUEUE_HANDLE timerQueueHandle, STATU
     pConfig->print();
     CHK_STATUS(timerQueueAddTimer(timerQueueHandle, KVS_METRICS_INVOCATION_PERIOD, KVS_METRICS_INVOCATION_PERIOD,
                                   canaryKvsStats, (UINT64) &peer, &timeoutTimerId));
+    DLOGI("Timer initialized");
     CHK_STATUS(peer.init(pConfig, callbacks));
+    DLOGI("Peer initialized");
     CHK_STATUS(peer.connect());
 
     {

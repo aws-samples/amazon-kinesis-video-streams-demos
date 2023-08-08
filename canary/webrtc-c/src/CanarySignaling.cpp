@@ -310,8 +310,15 @@ STATUS run(Canary::PConfig pConfig)
                                                   &pCredentialProvider));
     }
     else {
-        CHK_STATUS(createStaticCredentialProvider((PCHAR) pConfig->accessKey.value.c_str(), 0, (PCHAR) pConfig->secretKey.value.c_str(), 0,
-                                                  (PCHAR) pConfig->sessionToken.value.c_str(), 0, MAX_UINT64, &pCredentialProvider));
+        if(IS_EMPTY_STRING(pConfig->sessionToken.value.c_str())) {
+            CHK_STATUS(createStaticCredentialProvider((PCHAR) pConfig->accessKey.value.c_str(), 0, (PCHAR) pConfig->secretKey.value.c_str(), 0,
+                                                      NULL, 0, MAX_UINT64, &pCredentialProvider));
+
+        } else {
+            CHK_STATUS(createStaticCredentialProvider((PCHAR) pConfig->accessKey.value.c_str(), 0, (PCHAR) pConfig->secretKey.value.c_str(), 0,
+                                                      (PCHAR) pConfig->sessionToken.value.c_str(), 0, MAX_UINT64, &pCredentialProvider));
+
+        }
     }
 
     // Generate a random channel name if not specified in the config.
