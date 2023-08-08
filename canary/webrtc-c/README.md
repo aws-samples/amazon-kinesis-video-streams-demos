@@ -3,11 +3,11 @@
 ## Build
 
 ### Download
-To download run the following command:
+To download, run the following command:
 
 `git clone https://github.com/aws-samples/amazon-kinesis-video-streams-demos.git`
 
-You will also need to install `pkg-config` and `CMake` and a build enviroment
+You will also need to install `pkg-config` and `CMake` and a build environment
 
 ### Configure
 Create a build directory in the newly checked out repository, and execute CMake from it.
@@ -15,7 +15,7 @@ Create a build directory in the newly checked out repository, and execute CMake 
 `mkdir -p amazon-kinesis-video-streams-demos/canary/webrtc-c/build; cd amazon-kinesis-video-streams-demos/canary/webrtc-c/build; cmake .. `
 
 ### Build
-To build the library and the provided samples run make in the build directory you executed CMake.
+To build the library and the provided samples, run make in the build directory you executed CMake.
 
 `make`
 
@@ -116,7 +116,7 @@ TODO
 
 #### Seeding
 
-Seeding is a meta job that its sole job is to bootstrap other jobs, orchestrator and runners. 
+Seeding is a meta job whose sole job is to bootstrap other jobs, orchestrators, and runners. 
 When there's a new change to the seed or the other jobs that were created from the seed, the change will automatically propagate to the other jobs. 
 
 The concept is very similar to [AWS CloudFormation](https://aws.amazon.com/cloudformation/)
@@ -126,7 +126,7 @@ The concept is very similar to [AWS CloudFormation](https://aws.amazon.com/cloud
 
 #### Orchestration
 
-Orchestration is a process of permuting a set of the canary configuration and delegate the works to the runner. The permutation can be ranging from streaming duration, bitrate, device types, regions, etc.
+Orchestration is a process of permuting a set of the canary configuration and delegate the works to the runner. The permutation can range from streaming duration, bitrate, device types, regions, etc.
 
 ![orchestration](./docs/orchestration.png)
 
