@@ -150,7 +150,7 @@ public class WebrtcStorageCanaryConsumer {
         };
 
         long intervalDelay = 16000;
-        intervalMetricsTimer.scheduleAtFixedRate(intervalMetricsTask, 45000, intervalDelay); // initial delay of 45 s at an interval of intervalDelay ms
+        intervalMetricsTimer.scheduleAtFixedRate(intervalMetricsTask, 60000, intervalDelay); // initial delay of 60 s at an interval of intervalDelay ms
         
         long delay = canaryRunTime * 1000;
         Thread.sleep(delay);
