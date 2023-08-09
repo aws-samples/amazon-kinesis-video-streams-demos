@@ -388,7 +388,7 @@ STATUS Peer::connect()
         DLOGI("[KVS Storage Master]invoking join storage session");
         retStatus = signalingClientJoinSessionSync(signalingClientHandle);
         if (retStatus != STATUS_SUCCESS) {
-            DLOGI("[KVS Storage Master] signalingClientConnectSync(): operation returned status code: 0x%08x", retStatus);
+            DLOGE("[KVS Storage Master] signalingClientConnectSync(): operation returned status code: 0x%08x", retStatus);
             goto CleanUp;
         }
         DLOGI("[KVS Storage Master] Signaling client connection to socket established");
