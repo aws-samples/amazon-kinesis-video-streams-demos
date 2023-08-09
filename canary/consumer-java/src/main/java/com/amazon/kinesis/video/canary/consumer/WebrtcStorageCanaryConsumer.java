@@ -30,7 +30,6 @@ import lombok.extern.log4j.Log4j2;
 @Log4j2
 public class WebrtcStorageCanaryConsumer {
 
-    // TODO: Take out sending metrics functionality and make into a sendMetrics function
     private static void calculateFragmentContinuityMetric(CanaryFragmentList fragmentList, Date canaryStartTime, String streamName, String canaryLabel, SystemPropertiesCredentialsProvider credentialsProvider, String dataEndpoint, String region){
         try{
             TimestampRange timestampRange = new TimestampRange();
@@ -101,14 +100,12 @@ public class WebrtcStorageCanaryConsumer {
     }
 
     public static void main(final String[] args) throws Exception {
-        final String streamNamePrefix = System.getenv("CANARY_STREAM_NAME");
+        final String streamName = System.getenv("CANARY_STREAM_NAME");
         final String canaryType = System.getenv("CANARY_TYPE");
         final String canaryFragmentSizeStr = System.getenv("FRAGMENT_SIZE_IN_BYTES");
         final String canaryLabel = System.getenv("CANARY_LABEL");
         final String region = System.getenv("AWS_DEFAULT_REGION");
 
-        // TODO: Revert back to adding the Canary labels to stream name, removed for testing
-        final String streamName = streamNamePrefix;
 
         final Integer canaryRunTime = Integer.parseInt(System.getenv("CANARY_DURATION_IN_SECONDS"));
         log.info("Stream name {}", streamName);

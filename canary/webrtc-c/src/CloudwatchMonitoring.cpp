@@ -7,7 +7,6 @@ CloudwatchMonitoring::CloudwatchMonitoring(PConfig pConfig, ClientConfiguration*
     pConfig->useMediaStorage ? this->isStorage = true : this->isStorage = false;
 }
 
-// TODO: remove this parameter and add as a propagated member
 STATUS CloudwatchMonitoring::init()
 {
     STATUS retStatus = STATUS_SUCCESS;
