@@ -385,13 +385,13 @@ STATUS Peer::connect()
 
     if(this->useMediaStorage){
         // Join storage session for media ingestion
-        std::cout << "[KVS Storage Master]invoking join storage session" << endl;
+        DLOGI("[KVS Storage Master]invoking join storage session");
         retStatus = signalingClientJoinSessionSync(signalingClientHandle);
         if (retStatus != STATUS_SUCCESS) {
-            printf("[KVS Storage Master] signalingClientConnectSync(): operation returned status code: 0x%08x", retStatus);
+            DLOGI("[KVS Storage Master] signalingClientConnectSync(): operation returned status code: 0x%08x", retStatus);
             goto CleanUp;
         }
-        std::cout << "[KVS Storage Master] Signaling client connection to socket established" << endl;
+        DLOGI("[KVS Storage Master] Signaling client connection to socket established");
     }
 
     if (!this->isMaster) {
