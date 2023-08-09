@@ -31,7 +31,7 @@ import lombok.extern.log4j.Log4j2;
 public class WebrtcStorageCanaryConsumer {
 
     // TODO: Take out sending metrics functionality and make into a sendMetrics function
-    private static void getIntervalMetrics(CanaryFragmentList fragmentList, Date canaryStartTime, String streamName, String canaryLabel, SystemPropertiesCredentialsProvider credentialsProvider, String dataEndpoint, String region){
+    private static void calculateFragmentContinuityMetric(CanaryFragmentList fragmentList, Date canaryStartTime, String streamName, String canaryLabel, SystemPropertiesCredentialsProvider credentialsProvider, String dataEndpoint, String region){
         try{
             TimestampRange timestampRange = new TimestampRange();
             timestampRange.setStartTimestamp(canaryStartTime);
@@ -55,6 +55,15 @@ public class WebrtcStorageCanaryConsumer {
 
             fragmentList.setFragmentList(newFragmentList);
 
+            sendFragmentContinuityMetric(newFragmentReceived, streamName, canaryLabel, credentialsProvider, region);
+
+        } catch(Exception e){
+            log.error(e);
+        } 
+    }
+
+    private static void sendFragmentContinuityMetric(Boolean newFragmentReceived, String streamName, String canaryLabel, SystemPropertiesCredentialsProvider credentialsProvider, String region){
+        try{
             final AmazonCloudWatchAsync cwClient = AmazonCloudWatchAsyncClientBuilder.standard()
                 .withRegion(region)
                 .withCredentials(credentialsProvider)
@@ -125,7 +134,7 @@ public class WebrtcStorageCanaryConsumer {
         TimerTask intervalMetricsTask = new TimerTask() {
             @Override
             public void run() {
-                getIntervalMetrics(fragmentList, canaryStartTime, streamName, canaryLabel, credentialsProvider, dataEndpoint, region);
+                calculateFragmentContinuityMetric(fragmentList, canaryStartTime, streamName, canaryLabel, credentialsProvider, dataEndpoint, region);
             }
         };
 
