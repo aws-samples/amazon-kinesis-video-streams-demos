@@ -67,7 +67,7 @@ public class CanaryListFragmentWorker implements Callable {
     public List<CanaryFragment> call() {
         List<CanaryFragment> fragments = new ArrayList<>();
         try {
-            System.out.println(MessageFormat.format("Start ListFragment worker on stream {0}", streamName));
+            log.info(MessageFormat.format("Start ListFragment worker on stream {0}", streamName));
 
             ListFragmentsRequest request = new ListFragmentsRequest()
                     .withStreamName(streamName).withFragmentSelector(fragmentSelector).withMaxResults(fragmentsPerRequest);
