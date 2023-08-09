@@ -45,10 +45,8 @@ import com.amazonaws.services.cloudwatch.model.MetricDatum;
 import com.amazonaws.services.cloudwatch.model.PutMetricDataRequest;
 import com.amazonaws.services.cloudwatch.model.StandardUnit;
 import lombok.extern.log4j.Log4j2;
-import lombok.extern.slf4j.Slf4j;
 
-
-@Slf4j
+@Log4j2
 public class WebrtcStorageCanaryConsumer {
 
     // TODO: Take out sending metrics functionality and make into a sendMetrics function
@@ -72,7 +70,7 @@ public class WebrtcStorageCanaryConsumer {
             {
                 newFragmentReceived = true;
             }
-            System.out.println(MessageFormat.format("newFragmentReceived: {0}", newFragmentReceived));
+            log.info(MessageFormat.format("newFragmentReceived: {0}", newFragmentReceived));
 
             fragmentList.setFragmentList(newFragmentList);
 
@@ -108,7 +106,7 @@ public class WebrtcStorageCanaryConsumer {
             cwClient.putMetricDataAsync(request);
 
         } catch(Exception e){
-            System.out.println(e);
+            log.error(e);
         } 
     }
 

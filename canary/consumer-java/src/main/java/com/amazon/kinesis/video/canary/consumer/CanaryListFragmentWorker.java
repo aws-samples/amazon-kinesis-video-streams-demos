@@ -75,7 +75,7 @@ public class CanaryListFragmentWorker implements Callable {
             ListFragmentsResult result = amazonKinesisVideoArchivedMedia.listFragments(request);
 
 
-            System.out.println(MessageFormat.format("List Fragments called on stream {0} response {1} request ID {2}",
+            log.info(MessageFormat.format("List Fragments called on stream {0} response {1} request ID {2}",
                     streamName,
                     result.getSdkHttpMetadata().getHttpStatusCode(),
                     result.getSdkResponseMetadata().getRequestId()));
@@ -100,14 +100,14 @@ public class CanaryListFragmentWorker implements Callable {
             fragments.sort(Comparator.comparing(CanaryFragment::getFragmentNumberInt));
 
             for (CanaryFragment cf : fragments) {
-                System.out.println(MessageFormat.format("Retrieved fragment number {0} ", cf.getFragment().getFragmentNumber()));
+                log.info(MessageFormat.format("Retrieved fragment number {0} ", cf.getFragment().getFragmentNumber()));
             }
         }
         catch (Exception e) {
-            System.out.println(MessageFormat.format("Failure in CanaryListFragmentWorker for streamName {0} {1}", streamName, e.toString()));
+            log.error(MessageFormat.format("Failure in CanaryListFragmentWorker for streamName {0} {1}", streamName, e.toString()));
             throw e;
         } finally {
-            System.out.println(MessageFormat.format("Retrieved {0} Fragments and exiting CanaryListFragmentWorker for stream {1}", fragments.size(), streamName));
+            log.info(MessageFormat.format("Retrieved {0} Fragments and exiting CanaryListFragmentWorker for stream {1}", fragments.size(), streamName));
             return fragments;
         }
     }
