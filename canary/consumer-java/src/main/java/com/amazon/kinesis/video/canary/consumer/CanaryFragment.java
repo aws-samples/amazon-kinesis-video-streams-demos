@@ -14,6 +14,7 @@ import com.amazonaws.services.kinesisvideo.model.Fragment;
 public class CanaryFragment{
     private Integer fragmentNumberInt;
     private Fragment fragment;
+    
 
     public CanaryFragment(Fragment fragment) {
         this.fragment = fragment;

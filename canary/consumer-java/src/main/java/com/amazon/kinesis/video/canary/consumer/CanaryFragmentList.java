@@ -12,6 +12,7 @@ public class CanaryFragmentList {
 
     private List<CanaryFragment> fragmentList = new ArrayList<>();
 
+    
     public CanaryFragmentList() {}
 
     public void setFragmentList(List<CanaryFragment> fragmentList)

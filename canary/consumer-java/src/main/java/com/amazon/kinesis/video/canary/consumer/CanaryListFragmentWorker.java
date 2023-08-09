@@ -103,9 +103,9 @@ public class CanaryListFragmentWorker implements Callable {
                 System.out.println(MessageFormat.format("Retrieved fragment number {0} ", cf.getFragment().getFragmentNumber()));
             }
         }
-        catch (Throwable t) {
-            System.out.println(MessageFormat.format("Failure in CanaryListFragmentWorker for streamName {0} {1}", streamName, t.toString()));
-            throw t;
+        catch (Exception e) {
+            System.out.println(MessageFormat.format("Failure in CanaryListFragmentWorker for streamName {0} {1}", streamName, e.toString()));
+            throw e;
         } finally {
             System.out.println(MessageFormat.format("Retrieved {0} Fragments and exiting CanaryListFragmentWorker for stream {1}", fragments.size(), streamName));
             return fragments;

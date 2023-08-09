@@ -113,16 +113,16 @@ public class WebrtcStorageCanaryConsumer {
     }
 
     public static void main(final String[] args) throws Exception {
-        String streamNamePrefix = System.getenv("CANARY_STREAM_NAME");
-        String canaryType = System.getenv("CANARY_TYPE");
-        String canaryFragmentSizeStr = System.getenv("FRAGMENT_SIZE_IN_BYTES");
-        String canaryLabel = System.getenv("CANARY_LABEL");
-        String region = System.getenv("AWS_DEFAULT_REGION");
+        final String streamNamePrefix = System.getenv("CANARY_STREAM_NAME");
+        final String canaryType = System.getenv("CANARY_TYPE");
+        final String canaryFragmentSizeStr = System.getenv("FRAGMENT_SIZE_IN_BYTES");
+        final String canaryLabel = System.getenv("CANARY_LABEL");
+        final String region = System.getenv("AWS_DEFAULT_REGION");
 
         // TODO: Revert back to adding the Canary labels to stream name, removed for testing
         final String streamName = streamNamePrefix;
 
-        Integer canaryRunTime = Integer.parseInt(System.getenv("CANARY_DURATION_IN_SECONDS"));
+        final Integer canaryRunTime = Integer.parseInt(System.getenv("CANARY_DURATION_IN_SECONDS"));
         log.info("Stream name {}", streamName);
 
         final SystemPropertiesCredentialsProvider credentialsProvider = new SystemPropertiesCredentialsProvider();
@@ -140,19 +140,20 @@ public class WebrtcStorageCanaryConsumer {
         final String dataEndpoint = amazonKinesisVideo.getDataEndpoint(dataEndpointRequest).getDataEndpoint();
 
         CanaryFragmentList fragmentList = new CanaryFragmentList();
-        Date canaryStartTime = new Date();
+        final Date canaryStartTime = new Date();
 
         Timer intervalMetricsTimer = new Timer("IntervalMetricsTimer");
         TimerTask intervalMetricsTask = new TimerTask() {
+            @Override
             public void run() {
                 getIntervalMetrics(fragmentList, canaryStartTime, streamName, canaryLabel, credentialsProvider, dataEndpoint, region);
             }
         };
 
-        long intervalDelay = 16000;
+        final long intervalDelay = 16000;
         intervalMetricsTimer.scheduleAtFixedRate(intervalMetricsTask, 60000, intervalDelay); // initial delay of 60 s at an interval of intervalDelay ms
         
-        long delay = canaryRunTime * 1000;
+        final long delay = canaryRunTime * 1000;
         Thread.sleep(delay);
 
         // Using System.exit(0) to exit from application. 
