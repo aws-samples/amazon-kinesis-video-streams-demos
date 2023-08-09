@@ -29,6 +29,7 @@ INT32 main(INT32 argc, CHAR* argv[])
     CHK_STATUS([&]() -> STATUS {
         STATUS retStatus = STATUS_SUCCESS;
         auto config = Canary::Config();
+        config.useMediaStorage = true;
 
         Aws::SDKOptions options;
         Aws::InitAPI(options);

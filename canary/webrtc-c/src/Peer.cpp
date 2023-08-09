@@ -25,7 +25,7 @@ STATUS Peer::init(const Canary::PConfig pConfig, const Callbacks& callbacks)
     STATUS retStatus = STATUS_SUCCESS;
 
     this->isMaster = pConfig->isMaster.value;
-    this->useMediaStorage = pConfig->useMediaStorage.value;
+    this->useMediaStorage = pConfig->useMediaStorage;
     this->trickleIce = pConfig->trickleIce.value;
     this->callbacks = callbacks;
     this->canaryOutgoingRTPMetricsContext.prevTs = GETTIME();
@@ -97,7 +97,7 @@ STATUS Peer::initSignaling(const Canary::PConfig pConfig)
     channelInfo.pCertPath = (PCHAR) DEFAULT_KVS_CACERT_PATH;
     channelInfo.messageTtl = 0; // Default is 60 seconds
 
-    channelInfo.useMediaStorage = pConfig->useMediaStorage.value;
+    channelInfo.useMediaStorage = pConfig->useMediaStorage;
 
     this->clientInfo.signalingClientCreationMaxRetryAttempts = MAX_CALL_RETRY_COUNT;
 

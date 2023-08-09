@@ -4,8 +4,7 @@ namespace Canary {
 
 CloudwatchMonitoring::CloudwatchMonitoring(PConfig pConfig, ClientConfiguration* pClientConfig) : pConfig(pConfig), client(*pClientConfig)
 {
-    pConfig->useMediaStorage.value ? this->isStorage = true : this->isStorage = false;
-    std::cout << "USING MEDIA STORAGE" << endl;
+    pConfig->useMediaStorage ? this->isStorage = true : this->isStorage = false;
 }
 
 // TODO: remove this parameter and add as a propagated member

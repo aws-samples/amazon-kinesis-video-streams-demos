@@ -223,8 +223,6 @@ STATUS Config::initWithEnvVars()
     CHK_STATUS(optenvUint64(CANARY_BIT_RATE_ENV_VAR, &bitRate, CANARY_DEFAULT_BITRATE));
     CHK_STATUS(optenvUint64(CANARY_FRAME_RATE_ENV_VAR, &frameRate, CANARY_DEFAULT_FRAMERATE));
 
-    CHK_STATUS(optenvBool(CANARY_USE_STORAGE_ENV_VAR, &useMediaStorage, FALSE));
-
 CleanUp:
 
     return retStatus;
@@ -251,7 +249,7 @@ VOID Config::print()
           "\tCredential type : %s\n"
           "\n",
           this->endpoint.value.c_str(), this->region.value.c_str(), this->label.value.c_str(), this->channelName.value.c_str(),
-          this->clientId.value.c_str(), this->isMaster.value ? "Master" : "Viewer", this->useMediaStorage.value ? "True" : "False",
+          this->clientId.value.c_str(), this->isMaster.value ? "Master" : "Viewer", this->useMediaStorage ? "True" : "False",
           this->trickleIce.value ? "True" : "False", this->useTurn.value ? "True" : "False", this->logLevel.value,
           this->logGroupName.value.c_str(), this->logStreamName.value.c_str(), this->duration.value / HUNDREDS_OF_NANOS_IN_A_SECOND,
           this->iterationDuration.value / HUNDREDS_OF_NANOS_IN_A_SECOND, this->runBothPeers.value ? "True" : "False",
@@ -351,8 +349,6 @@ STATUS Config::initWithJSON(PCHAR filePath)
             jsonUint64(raw, tokens[++i], &logLevel64);
             logLevel.value = (UINT32) logLevel64.value;
             logLevel.initialized = TRUE;
-        } else if (compareJsonString((PCHAR) raw, &tokens[i], JSMN_STRING, (PCHAR) CANARY_USE_STORAGE_ENV_VAR)) {
-            jsonBool(raw, tokens[++i], &useMediaStorage);
         }
 
         // IoT credential provider related tokens
