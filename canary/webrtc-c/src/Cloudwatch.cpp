@@ -28,7 +28,7 @@ STATUS Cloudwatch::init(Canary::PConfig pConfig)
         globalCustomLogPrintFn = logger;
     }
 
-    CHK_STATUS(instance.monitoring.init(pConfig->useMediaStorage.value));
+    CHK_STATUS(instance.monitoring.init());
 
 CleanUp:
 

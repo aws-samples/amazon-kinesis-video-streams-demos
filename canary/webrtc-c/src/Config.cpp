@@ -223,8 +223,7 @@ STATUS Config::initWithEnvVars()
     CHK_STATUS(optenvUint64(CANARY_BIT_RATE_ENV_VAR, &bitRate, CANARY_DEFAULT_BITRATE));
     CHK_STATUS(optenvUint64(CANARY_FRAME_RATE_ENV_VAR, &frameRate, CANARY_DEFAULT_FRAMERATE));
 
-    // TODO: revert to FALSE, set to TRUE for testing
-    CHK_STATUS(optenvBool(CANARY_USE_STORAGE_ENV_VAR, &useMediaStorage, TRUE));
+    CHK_STATUS(optenvBool(CANARY_USE_STORAGE_ENV_VAR, &useMediaStorage, FALSE));
 
 CleanUp:
 
@@ -240,6 +239,7 @@ VOID Config::print()
           "\tChannel Name    : %s\n"
           "\tClient ID       : %s\n"
           "\tRole            : %s\n"
+          "\tStorage         : %s\n"
           "\tTrickle ICE     : %s\n"
           "\tUse TURN        : %s\n"
           "\tLog Level       : %u\n"
@@ -251,10 +251,11 @@ VOID Config::print()
           "\tCredential type : %s\n"
           "\n",
           this->endpoint.value.c_str(), this->region.value.c_str(), this->label.value.c_str(), this->channelName.value.c_str(),
-          this->clientId.value.c_str(), this->isMaster.value ? "Master" : "Viewer", this->trickleIce.value ? "True" : "False",
-          this->useTurn.value ? "True" : "False", this->logLevel.value, this->logGroupName.value.c_str(), this->logStreamName.value.c_str(),
-          this->duration.value / HUNDREDS_OF_NANOS_IN_A_SECOND, this->iterationDuration.value / HUNDREDS_OF_NANOS_IN_A_SECOND,
-          this->runBothPeers.value ? "True" : "False", this->useIotCredentialProvider.value ? "IoT" : "Static");
+          this->clientId.value.c_str(), this->isMaster.value ? "Master" : "Viewer", this->useMediaStorage.value ? "True" : "False",
+          this->trickleIce.value ? "True" : "False", this->useTurn.value ? "True" : "False", this->logLevel.value,
+          this->logGroupName.value.c_str(), this->logStreamName.value.c_str(), this->duration.value / HUNDREDS_OF_NANOS_IN_A_SECOND,
+          this->iterationDuration.value / HUNDREDS_OF_NANOS_IN_A_SECOND, this->runBothPeers.value ? "True" : "False",
+          this->useIotCredentialProvider.value ? "IoT" : "Static");
     if(this->useIotCredentialProvider.value) {
         DLOGD("\tIoT endpoint : %s\n"
               "\tIoT cert filename : %s\n"

@@ -24,9 +24,8 @@ STATUS Peer::init(const Canary::PConfig pConfig, const Callbacks& callbacks)
 {
     STATUS retStatus = STATUS_SUCCESS;
 
-    this->useMediaStorage = pConfig->useMediaStorage.value;
-
     this->isMaster = pConfig->isMaster.value;
+    this->useMediaStorage = pConfig->useMediaStorage.value;
     this->trickleIce = pConfig->trickleIce.value;
     this->callbacks = callbacks;
     this->canaryOutgoingRTPMetricsContext.prevTs = GETTIME();

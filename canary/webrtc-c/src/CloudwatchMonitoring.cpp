@@ -4,17 +4,19 @@ namespace Canary {
 
 CloudwatchMonitoring::CloudwatchMonitoring(PConfig pConfig, ClientConfiguration* pClientConfig) : pConfig(pConfig), client(*pClientConfig)
 {
+    pConfig->useMediaStorage.value ? this->isStorage = true : this->isStorage = false;
+    std::cout << "USING MEDIA STORAGE" << endl;
 }
 
 // TODO: remove this parameter and add as a propagated member
-STATUS CloudwatchMonitoring::init(BOOL isStorage)
+STATUS CloudwatchMonitoring::init()
 {
     STATUS retStatus = STATUS_SUCCESS;
 
     this->channelDimension.SetName("WebRTCSDKCanaryChannelName");
     this->channelDimension.SetValue(pConfig->channelName.value);
 
-    if (isStorage)
+    if (this->isStorage)
     {
         this->labelDimension.SetName("StorageWebRTCSDKCanaryLabel");
     } else

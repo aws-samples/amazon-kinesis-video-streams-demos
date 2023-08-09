@@ -84,9 +84,8 @@ class Peer {
     std::vector<PRtcRtpTransceiver> audioTransceivers;
     std::vector<PRtcRtpTransceiver> videoTransceivers;
 
-    BOOL useMediaStorage;
-
     BOOL isMaster;
+    BOOL useMediaStorage;
     BOOL trickleIce;
     UINT64 offerReceiveTimestamp;
     BOOL firstFrame;

@@ -10,3 +10,4 @@ sigv4-signing/java/SigV4Signer.java/target/classes/org/amazonaws/kinesisvideo/Aw
 canary/consumer-java/log4j.xml
 canary/consumer-java/log/java_kvs.log
 canary/consumer-java/target/*
+canary/.vscode
