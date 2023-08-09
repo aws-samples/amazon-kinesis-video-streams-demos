@@ -27,6 +27,7 @@ STATUS Peer::init(const Canary::PConfig pConfig, const Callbacks& callbacks)
     this->isMaster = pConfig->isMaster.value;
     this->trickleIce = pConfig->trickleIce.value;
     this->callbacks = callbacks;
+    this->isProfilingMode = pConfig->isProfilingMode.value;
     this->canaryOutgoingRTPMetricsContext.prevTs = GETTIME();
     this->canaryOutgoingRTPMetricsContext.prevFramesDiscardedOnSend = 0;
     this->canaryOutgoingRTPMetricsContext.prevNackCount = 0;
@@ -300,13 +301,7 @@ STATUS Peer::initPeerConnection()
 
                 break;
             case RTC_PEER_CONNECTION_STATE_CONNECTED: {
-                if(pPeer->isProfilingMode) {
-                    peerConnectionGetMetrics(pPeer->pPeerConnection, &pPeer->peerConnectionMetrics);
-                    Canary::Cloudwatch::getInstance().monitoring.pushPeerConnectionMetrics(&pPeer->peerConnectionMetrics);
-                    iceAgentGetMetrics(pPeer->pPeerConnection, &pPeer->iceMetrics);
-                    Canary::Cloudwatch::getInstance().monitoring.pushKvsIceAgentMetrics(&pPeer->iceMetrics);
-                }
-                else {
+                if(!pPeer->isProfilingMode) {
                     auto duration = (GETTIME() - pPeer->iceHolePunchingStartTime) / HUNDREDS_OF_NANOS_IN_A_MILLISECOND;
                     DLOGI("ICE hole punching took %lu ms", duration);
                     Canary::Cloudwatch::getInstance().monitoring.pushICEHolePunchingDelay(duration, Aws::CloudWatch::Model::StandardUnit::Milliseconds);
@@ -482,10 +477,6 @@ STATUS Peer::handleSignalingMsg(PReceivedSignalingMessage pMsg)
         CHK_STATUS(serializeSessionDescriptionInit(&answerSDPInit, msg.payload, &buffLen));
 
         CHK_STATUS(this->send(&msg));
-        if(this->isProfilingMode) {
-            signalingClientGetMetrics(this->signalingClientHandle, &this->signalingClientMetrics);
-            Canary::Cloudwatch::getInstance().monitoring.pushSignalingClientMetrics(&this->signalingClientMetrics);
-        }
 
     CleanUp:
 
@@ -615,6 +606,23 @@ STATUS Peer::addSupportedCodec(RTC_CODEC codec)
 
 CleanUp:
 
+    return retStatus;
+}
+
+STATUS Peer::sendProfilingMetrics()
+{
+    STATUS retStatus = STATUS_SUCCESS;
+
+    CHK(!this->firstFrame, STATUS_WAITING_ON_FIRST_FRAME);
+
+    // We want to batch send all the metrics once the first frame is sent out.
+    signalingClientGetMetrics(this->signalingClientHandle, &this->signalingClientMetrics);
+    Canary::Cloudwatch::getInstance().monitoring.pushSignalingClientMetrics(&this->signalingClientMetrics);
+    peerConnectionGetMetrics(this->pPeerConnection, &this->peerConnectionMetrics);
+    Canary::Cloudwatch::getInstance().monitoring.pushPeerConnectionMetrics(&this->peerConnectionMetrics);
+    iceAgentGetMetrics(this->pPeerConnection, &this->iceMetrics);
+    Canary::Cloudwatch::getInstance().monitoring.pushKvsIceAgentMetrics(&this->iceMetrics);
+CleanUp:
     return retStatus;
 }
 

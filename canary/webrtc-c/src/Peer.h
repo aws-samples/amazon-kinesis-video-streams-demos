@@ -57,6 +57,7 @@ class Peer {
     STATUS addTransceiver(RtcMediaStreamTrack&);
     STATUS addSupportedCodec(RTC_CODEC);
     STATUS writeFrame(PFrame, MEDIA_STREAM_TRACK_KIND);
+    STATUS sendProfilingMetrics();
 
     // WebRTC Stats
     STATUS publishStatsForCanary(RTC_STATS_TYPE);

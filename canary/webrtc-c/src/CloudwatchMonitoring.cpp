@@ -321,7 +321,7 @@ VOID CloudwatchMonitoring::pushSignalingClientMetrics(PSignalingClientMetrics pS
     describeDatum.SetUnit(Aws::CloudWatch::Model::StandardUnit::Milliseconds);
     this->push(describeDatum);
 
-    createDatum.SetMetricName("CreatCallTime");
+    createDatum.SetMetricName("CreateCallTime");
     createDatum.SetValue(pSignalingClientMetrics->signalingClientStats.createCallTime);
     createDatum.SetUnit(Aws::CloudWatch::Model::StandardUnit::Milliseconds);
     this->push(createDatum);

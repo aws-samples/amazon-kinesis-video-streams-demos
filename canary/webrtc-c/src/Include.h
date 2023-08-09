@@ -87,6 +87,7 @@
 
 #define STATUS_WEBRTC_CANARY_BASE                       0x74000000
 #define STATUS_WEBRTC_EMPTY_IOT_CRED_FILE               STATUS_WEBRTC_CANARY_BASE + 0x00000001
+#define STATUS_WAITING_ON_FIRST_FRAME                   STATUS_WEBRTC_CANARY_BASE + 0x00000002
 
 #define CANARY_VIDEO_FRAMES_PATH (PCHAR) "./assets/h264SampleFrames/frame-%04d.h264"
 #define CANARY_AUDIO_FRAMES_PATH (PCHAR) "./assets/opusSampleFrames/sample-%03d.opus"
