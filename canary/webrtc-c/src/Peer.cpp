@@ -27,6 +27,7 @@ STATUS Peer::init(const Canary::PConfig pConfig, const Callbacks& callbacks)
     this->isMaster = pConfig->isMaster.value;
     this->trickleIce = pConfig->trickleIce.value;
     this->callbacks = callbacks;
+    this->isProfilingMode = pConfig->isProfilingMode.value;
     this->canaryOutgoingRTPMetricsContext.prevTs = GETTIME();
     this->canaryOutgoingRTPMetricsContext.prevFramesDiscardedOnSend = 0;
     this->canaryOutgoingRTPMetricsContext.prevNackCount = 0;
@@ -48,8 +49,14 @@ STATUS Peer::init(const Canary::PConfig pConfig, const Callbacks& callbacks)
                                                   &pAwsCredentialProvider));
     }
     else {
-        CHK_STATUS(createStaticCredentialProvider((PCHAR) pConfig->accessKey.value.c_str(), 0, (PCHAR) pConfig->secretKey.value.c_str(), 0,
-                                                  (PCHAR) pConfig->sessionToken.value.c_str(), 0, MAX_UINT64, &pAwsCredentialProvider));
+        if(IS_EMPTY_STRING(pConfig->sessionToken.value.c_str())) {
+            CHK_STATUS(createStaticCredentialProvider((PCHAR) pConfig->accessKey.value.c_str(), 0, (PCHAR) pConfig->secretKey.value.c_str(), 0,
+                                                      NULL, 0, MAX_UINT64, &pAwsCredentialProvider));
+        } else {
+            CHK_STATUS(createStaticCredentialProvider((PCHAR) pConfig->accessKey.value.c_str(), 0, (PCHAR) pConfig->secretKey.value.c_str(), 0,
+                                                      (PCHAR) pConfig->sessionToken.value.c_str(), 0, MAX_UINT64, &pAwsCredentialProvider));
+        }
+
     }
 
     CHK_STATUS(initSignaling(pConfig));
@@ -219,7 +226,7 @@ STATUS Peer::initRtcConfiguration(const Canary::PConfig pConfig)
 
     // Set the  STUN server
     if (pConfig->endpoint.value.empty()) {
-        SNPRINTF(pConfiguration->iceServers[0].urls, MAX_ICE_CONFIG_URI_LEN, KINESIS_VIDEO_STUN_URL, pConfig->region.value.c_str());
+        SNPRINTF(pConfiguration->iceServers[0].urls, MAX_ICE_CONFIG_URI_LEN, KINESIS_VIDEO_STUN_URL, pConfig->region.value.c_str(), KINESIS_VIDEO_STUN_URL_POSTFIX);
     } else {
         SNPRINTF(pConfiguration->iceServers[0].urls, MAX_ICE_CONFIG_URI_LEN, "stun:stun.%s:443", pConfig->endpoint.value.c_str());
     }
@@ -288,12 +295,17 @@ STATUS Peer::initPeerConnection()
 
         switch (newState) {
             case RTC_PEER_CONNECTION_STATE_CONNECTING:
-                pPeer->iceHolePunchingStartTime = GETTIME();
+                if(!pPeer->isProfilingMode) {
+                    pPeer->iceHolePunchingStartTime = GETTIME();
+                }
+
                 break;
             case RTC_PEER_CONNECTION_STATE_CONNECTED: {
-                auto duration = (GETTIME() - pPeer->iceHolePunchingStartTime) / HUNDREDS_OF_NANOS_IN_A_MILLISECOND;
-                DLOGI("ICE hole punching took %lu ms", duration);
-                Canary::Cloudwatch::getInstance().monitoring.pushICEHolePunchingDelay(duration, Aws::CloudWatch::Model::StandardUnit::Milliseconds);
+                if(!pPeer->isProfilingMode) {
+                    auto duration = (GETTIME() - pPeer->iceHolePunchingStartTime) / HUNDREDS_OF_NANOS_IN_A_MILLISECOND;
+                    DLOGI("ICE hole punching took %lu ms", duration);
+                    Canary::Cloudwatch::getInstance().monitoring.pushICEHolePunchingDelay(duration, Aws::CloudWatch::Model::StandardUnit::Milliseconds);
+                }
                 break;
             }
             case RTC_PEER_CONNECTION_STATE_FAILED:
@@ -594,6 +606,23 @@ STATUS Peer::addSupportedCodec(RTC_CODEC codec)
 
 CleanUp:
 
+    return retStatus;
+}
+
+STATUS Peer::sendProfilingMetrics()
+{
+    STATUS retStatus = STATUS_SUCCESS;
+
+    CHK(!this->firstFrame, STATUS_WAITING_ON_FIRST_FRAME);
+
+    // We want to batch send all the metrics once the first frame is sent out.
+    signalingClientGetMetrics(this->signalingClientHandle, &this->signalingClientMetrics);
+    Canary::Cloudwatch::getInstance().monitoring.pushSignalingClientMetrics(&this->signalingClientMetrics);
+    peerConnectionGetMetrics(this->pPeerConnection, &this->peerConnectionMetrics);
+    Canary::Cloudwatch::getInstance().monitoring.pushPeerConnectionMetrics(&this->peerConnectionMetrics);
+    iceAgentGetMetrics(this->pPeerConnection, &this->iceMetrics);
+    Canary::Cloudwatch::getInstance().monitoring.pushKvsIceAgentMetrics(&this->iceMetrics);
+CleanUp:
     return retStatus;
 }
 
