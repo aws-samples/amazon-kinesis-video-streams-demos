@@ -186,8 +186,8 @@ def buildStorageEndpoint(isConsumer, params) {
       'CANARY_USE_TURN': params.USE_TURN,
       'CANARY_TRICKLE_ICE': params.TRICKLE_ICE,
       'CANARY_LOG_GROUP_NAME': params.LOG_GROUP_NAME,
-      'CANARY_LOG_STREAM_NAME': "${params.RUNNER_LABEL}-${clientID}-${START_TIMESTAMP}",
-      'CANARY_CLIENT_ID': clientID,
+      'CANARY_LOG_STREAM_NAME': "${params.RUNNER_LABEL}-StorageMaster-${START_TIMESTAMP}",
+      'CANARY_CLIENT_ID': "Master",
       'CANARY_IS_MASTER': true,
       'CANARY_CHANNEL_NAME': "${env.JOB_NAME}-${params.RUNNER_LABEL}"
     ]
