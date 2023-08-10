@@ -1,14 +1,15 @@
 import jenkins.model.*
 
 RUNNER_JOB_NAME_PREFIX = "webrtc-canary-runner"
-PERIODIC_DURATION_IN_SECONDS = 300
+PERIODIC_DURATION_IN_SECONDS = 30
 LONG_RUNNING_DURATION_IN_SECONDS = 0
+DURATION_IN_SECONDS_5_MIN = 300 // 5 min
 DURATION_IN_SECONDS_65_MIN = 3900 // 65 min
 DURATION_IN_SECONDS_45_MIN = 2700 // 45 min
 MIN_RETRY_DELAY_IN_SECONDS = 60
 COLD_STARTUP_DELAY_IN_SECONDS = 60 * 60
 GIT_URL = 'https://github.com/aws-samples/amazon-kinesis-video-streams-demos.git'
-GIT_HASH = 'webrtc-c-mediaserver-canary'
+GIT_HASH = 'webrtc-c-mediaserver-canary' // TODO: Revert to 'master'
 COMMON_PARAMS = [
     string(name: 'AWS_KVS_LOG_LEVEL', value: "2"),
     string(name: 'MIN_RETRY_DELAY_IN_SECONDS', value: MIN_RETRY_DELAY_IN_SECONDS.toString()),
@@ -256,7 +257,7 @@ pipeline {
                                 booleanParam(name: 'USE_TURN', value: true),
                                 booleanParam(name: 'TRICKLE_ICE', value: true),
                                 booleanParam(name: 'USE_IOT', value: false),
-                                string(name: 'DURATION_IN_SECONDS', value: PERIODIC_DURATION_IN_SECONDS.toString()),
+                                string(name: 'DURATION_IN_SECONDS', value: DURATION_IN_SECONDS_5_MIN.toString()),
                                 string(name: 'MASTER_NODE_LABEL', value: "ec2-us-west-2"),
                                 string(name: 'CONSUMER_NODE_LABEL', value: "ec2-us-west-2-consumer"),
                                 string(name: 'RUNNER_LABEL', value: "Webrtc30sec"),

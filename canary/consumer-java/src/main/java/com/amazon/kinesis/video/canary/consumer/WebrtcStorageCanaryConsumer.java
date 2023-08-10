@@ -101,8 +101,6 @@ public class WebrtcStorageCanaryConsumer {
 
     public static void main(final String[] args) throws Exception {
         final String streamName = System.getenv("CANARY_STREAM_NAME");
-        final String canaryType = System.getenv("CANARY_TYPE");
-        final String canaryFragmentSizeStr = System.getenv("FRAGMENT_SIZE_IN_BYTES");
         final String canaryLabel = System.getenv("CANARY_LABEL");
         final String region = System.getenv("AWS_DEFAULT_REGION");
 
