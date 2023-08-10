@@ -122,6 +122,8 @@ pipeline {
                         build(
                             job: NEXT_AVAILABLE_RUNNER,
                             parameters: COMMON_PARAMS + [
+                                booleanParam(name: 'IS_SIGNALING', value: false),
+                                booleanParam(name: 'IS_STORAGE', value: false),
                                 booleanParam(name: 'USE_TURN', value: true),
                                 booleanParam(name: 'TRICKLE_ICE', value: true),
                                 booleanParam(name: 'USE_IOT', value: true),
@@ -137,6 +139,8 @@ pipeline {
                         build(
                             job: NEXT_AVAILABLE_RUNNER,
                             parameters: COMMON_PARAMS + [
+                                booleanParam(name: 'IS_SIGNALING', value: false),
+                                booleanParam(name: 'IS_STORAGE', value: false),
                                 booleanParam(name: 'USE_TURN', value: true),
                                 booleanParam(name: 'TRICKLE_ICE', value: true),
                                 booleanParam(name: 'USE_IOT', value: true),
@@ -152,6 +156,8 @@ pipeline {
                         build(
                             job: NEXT_AVAILABLE_RUNNER,
                             parameters: COMMON_PARAMS + [
+                                booleanParam(name: 'IS_SIGNALING', value: false),
+                                booleanParam(name: 'IS_STORAGE', value: false),
                                 booleanParam(name: 'USE_TURN', value: true),
                                 booleanParam(name: 'TRICKLE_ICE', value: true),
                                 booleanParam(name: 'USE_IOT', value: false),
@@ -168,6 +174,8 @@ pipeline {
                         build(
                             job: NEXT_AVAILABLE_RUNNER,
                             parameters: COMMON_PARAMS + [
+                                booleanParam(name: 'IS_SIGNALING', value: false),
+                                booleanParam(name: 'IS_STORAGE', value: false),
                                 booleanParam(name: 'USE_TURN', value: true),
                                 booleanParam(name: 'TRICKLE_ICE', value: true),
                                 booleanParam(name: 'USE_IOT', value: false),
@@ -185,6 +193,7 @@ pipeline {
                             job: NEXT_AVAILABLE_RUNNER,
                             parameters: COMMON_PARAMS + [
                                 booleanParam(name: 'IS_SIGNALING', value: true),
+                                booleanParam(name: 'IS_STORAGE', value: false),
                                 booleanParam(name: 'USE_IOT', value: false),
                                 string(name: 'DURATION_IN_SECONDS', value: PERIODIC_DURATION_IN_SECONDS.toString()),
                                 string(name: 'MASTER_NODE_LABEL', value: "ec2-us-west-2"),
@@ -201,6 +210,7 @@ pipeline {
                             job: NEXT_AVAILABLE_RUNNER,
                             parameters: COMMON_PARAMS + [
                                 booleanParam(name: 'IS_SIGNALING', value: true),
+                                booleanParam(name: 'IS_STORAGE', value: false),
                                 booleanParam(name: 'USE_IOT', value: true),
                                 string(name: 'DURATION_IN_SECONDS', value: LONG_RUNNING_DURATION_IN_SECONDS.toString()),
                                 string(name: 'MASTER_NODE_LABEL', value: "ec2-us-west-2"),
