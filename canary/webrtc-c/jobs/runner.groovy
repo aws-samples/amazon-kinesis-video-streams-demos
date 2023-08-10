@@ -12,6 +12,47 @@ CREDENTIALS = [
     ]
 ]
 
+def buildWebRTCProject(useMbedTLS, thing_prefix) {
+    checkout([$class: 'GitSCM', branches: [[name: params.GIT_HASH ]],
+              userRemoteConfigs: [[url: params.GIT_URL]]])
+
+    def configureCmd = "cmake .. -DCMAKE_INSTALL_PREFIX=\"\$PWD\""
+    if (useMbedTLS) {
+      configureCmd += " -DUSE_OPENSSL=OFF -DUSE_MBEDTLS=ON"
+    }     
+
+    sh """
+        cd ./canary/webrtc-c/scripts &&
+        chmod a+x cert_setup.sh &&
+        ./cert_setup.sh ${thing_prefix} &&
+        cd .. &&
+        mkdir -p build && 
+        cd build && 
+        ${configureCmd} && 
+        make"""
+}
+
+def buildConsumerProject() {
+    def consumerStartUpDelay = 45
+    sleep consumerStartUpDelay
+
+    checkout([$class: 'GitSCM', branches: [[name: params.GIT_HASH ]],
+              userRemoteConfigs: [[url: params.GIT_URL]]])
+              
+    def consumerEnvs = [        
+        'JAVA_HOME': "/opt/jdk-13.0.1",
+        'M2_HOME': "/opt/apache-maven-3.6.3"
+    ].collect({k,v -> "${k}=${v}" })
+
+    withEnv(consumerEnvs) {
+        sh '''
+            PATH="$JAVA_HOME/bin:$PATH"
+            export PATH="$M2_HOME/bin:$PATH"
+            cd ./canary/consumer-java
+            make -j4'''
+    }
+}
+
 def withRunnerWrapper(envs, fn) {
     withEnv(envs) {
         withCredentials(CREDENTIALS) {
@@ -119,48 +160,7 @@ def buildSignaling(params) {
     }
 }
 
-def buildStorageConsumer() {
-    def consumerStartUpDelay = 45
-    sleep consumerStartUpDelay
-
-    checkout([$class: 'GitSCM', branches: [[name: params.GIT_HASH ]],
-              userRemoteConfigs: [[url: params.GIT_URL]]])
-              
-    def consumerEnvs = [        
-        'JAVA_HOME': "/opt/jdk-13.0.1",
-        'M2_HOME': "/opt/apache-maven-3.6.3"
-    ].collect({k,v -> "${k}=${v}" })
-
-    withEnv(consumerEnvs) {
-        sh '''
-            PATH="$JAVA_HOME/bin:$PATH"
-            export PATH="$M2_HOME/bin:$PATH"
-            cd ./canary/consumer-java
-            make -j4'''
-    }
-}
-
-def buildStorageMaster(useMbedTLS, thing_prefix) {
-    checkout([$class: 'GitSCM', branches: [[name: params.GIT_HASH ]],
-              userRemoteConfigs: [[url: params.GIT_URL]]])
-
-    def configureCmd = "cmake .. -DCMAKE_INSTALL_PREFIX=\"\$PWD\""
-    if (useMbedTLS) {
-      configureCmd += " -DUSE_OPENSSL=OFF -DUSE_MBEDTLS=ON"
-    }     
-
-    sh """
-        cd ./canary/webrtc-c/scripts &&
-        chmod a+x cert_setup.sh &&
-        ./cert_setup.sh ${thing_prefix} &&
-        cd .. &&
-        mkdir -p build && 
-        cd build && 
-        ${configureCmd} && 
-        make"""
-}
-
-def buildStorageProject(isConsumer, params) {
+def buildStorageEndpoint(isConsumer, params) {
     def scripts_dir = !isConsumer ? "$WORKSPACE/canary/webrtc-c/scripts" :
         "$WORKSPACE/canary/webrtc-c/scripts"
     def thing_prefix = "${env.JOB_NAME}-${params.RUNNER_LABEL}"
@@ -204,11 +204,10 @@ def buildStorageProject(isConsumer, params) {
         deleteDir()
     }
     if (!isConsumer){
-        buildStorageMaster(params.USE_MBEDTLS, thing_prefix)
+        buildWebRTCProject(params.USE_MBEDTLS, thing_prefix)
     } else {
-        buildStorageConsumer()
+        buildConsumerProject()
     }
-    buildWebRTCProject(params.USE_MBEDTLS, thing_prefix)
     RUNNING_NODES_IN_BUILDING--
     
     waitUntil {
@@ -321,7 +320,7 @@ pipeline {
                 stage('StorageMaster') {
                     steps {
                         script {
-                            buildStoragePeer(params)
+                            buildStorageEndpoint(false, params)
                         }
                     }
                 }
@@ -331,7 +330,7 @@ pipeline {
                     }
                     steps {
                         script {
-                            buildStoragePeer(params)
+                            buildStorageEndpoint(true, params)
                         }
                     }
                 }
