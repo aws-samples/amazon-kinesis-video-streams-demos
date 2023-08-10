@@ -70,13 +70,12 @@
 #define IOT_CORE_PRIVATE_KEY_ENV_VAR         "AWS_IOT_CORE_PRIVATE_KEY"
 #define IOT_CORE_ROLE_ALIAS_ENV_VAR          "AWS_IOT_CORE_ROLE_ALIAS"
 #define IOT_CORE_THING_NAME_ENV_VAR          "AWS_IOT_CORE_THING_NAME"
+#define CANARY_USE_STORAGE_ENV_VAR           "CANARY_USE_STORAGE"
 
 #define CANARY_DEFAULT_LABEL          "ScaryTestLabel"
 #define CANARY_DEFAULT_CHANNEL_NAME   "ScaryTestStream"
 #define CANARY_DEFAULT_CLIENT_ID      "DefaultClientId"
 #define CANARY_DEFAULT_LOG_GROUP_NAME "DefaultLogGroupName"
-
-#define CANARY_USE_STORAGE_ENV_VAR           "CANARY_USE_STORAGE"
 
 // Signaling Canary error definitions
 #define STATUS_SIGNALING_CANARY_BASE                    0x73000000
