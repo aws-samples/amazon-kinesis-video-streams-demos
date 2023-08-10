@@ -260,7 +260,7 @@ pipeline {
                                 string(name: 'DURATION_IN_SECONDS', value: DURATION_IN_SECONDS_5_MIN.toString()),
                                 string(name: 'MASTER_NODE_LABEL', value: "ec2-us-west-2"),
                                 string(name: 'CONSUMER_NODE_LABEL', value: "ec2-us-west-2-consumer"),
-                                string(name: 'RUNNER_LABEL', value: "Webrtc30sec"),
+                                string(name: 'RUNNER_LABEL', value: "Webrtc5min"),
                                 string(name: 'SCENARIO_LABEL', value: "WebrtcPeriodic"),
                                 string(name: 'AWS_DEFAULT_REGION', value: "us-west-2"),
                             ],
