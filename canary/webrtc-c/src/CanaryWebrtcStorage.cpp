@@ -4,7 +4,6 @@ STATUS onNewConnection(Canary::PPeer);
 STATUS run(Canary::PConfig);
 VOID runPeer(Canary::PConfig, TIMER_QUEUE_HANDLE, STATUS*);
 VOID sendLocalFrames(Canary::PPeer, MEDIA_STREAM_TRACK_KIND, const std::string&, UINT64, UINT32);
-VOID sendCustomFrames(Canary::PPeer, MEDIA_STREAM_TRACK_KIND, UINT64, UINT64);
 STATUS canaryRtpOutboundStats(UINT32, UINT64, UINT64);
 STATUS canaryKvsStats(UINT32, UINT64, UINT64);
 
