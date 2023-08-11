@@ -15,7 +15,7 @@ import com.amazonaws.services.kinesisvideo.AmazonKinesisVideo;
 import com.amazonaws.services.kinesisvideo.AmazonKinesisVideoArchivedMedia;
 import com.amazonaws.services.kinesisvideo.AmazonKinesisVideoArchivedMediaClient;
 import com.amazonaws.services.kinesisvideo.model.*;
-import lombok.extern.slf4j.Slf4j;
+import lombok.extern.log4j.Log4j2;
 
 
 /*
@@ -25,7 +25,7 @@ import lombok.extern.slf4j.Slf4j;
 
 
 /* This worker retrieves all fragments within the specified TimestampRange from a specified Kinesis Video Stream and returns them in a list */
-@Slf4j
+@Log4j2
 public class CanaryListFragmentWorker implements Callable {
     private final FragmentSelector fragmentSelector;
     private final AmazonKinesisVideoArchivedMedia amazonKinesisVideoArchivedMedia;
@@ -67,7 +67,7 @@ public class CanaryListFragmentWorker implements Callable {
     public List<CanaryFragment> call() {
         List<CanaryFragment> fragments = new ArrayList<>();
         try {
-            log.info(MessageFormat.format("Start ListFragment worker on stream {0}", streamName));
+            log.info("Start CanaryListFragment worker on stream {}", streamName);
 
             ListFragmentsRequest request = new ListFragmentsRequest()
                     .withStreamName(streamName).withFragmentSelector(fragmentSelector).withMaxResults(fragmentsPerRequest);
@@ -75,10 +75,10 @@ public class CanaryListFragmentWorker implements Callable {
             ListFragmentsResult result = amazonKinesisVideoArchivedMedia.listFragments(request);
 
 
-            log.info(MessageFormat.format("List Fragments called on stream {0} response {1} request ID {2}",
+            log.info("List Fragments called on stream {} response {} request ID {}",
                     streamName,
                     result.getSdkHttpMetadata().getHttpStatusCode(),
-                    result.getSdkResponseMetadata().getRequestId()));
+                    result.getSdkResponseMetadata().getRequestId());
 
             for (Fragment f: result.getFragments()) {
                 fragments.add(new CanaryFragment(f));
@@ -100,14 +100,14 @@ public class CanaryListFragmentWorker implements Callable {
             fragments.sort(Comparator.comparing(CanaryFragment::getFragmentNumberInt));
 
             for (CanaryFragment cf : fragments) {
-                log.info(MessageFormat.format("Retrieved fragment number {0} ", cf.getFragment().getFragmentNumber()));
+                log.info("Retrieved fragment number {} ", cf.getFragment().getFragmentNumber());
             }
         }
         catch (Exception e) {
-            log.error(MessageFormat.format("Failure in CanaryListFragmentWorker for streamName {0} {1}", streamName, e.toString()));
+            log.error("Failure in CanaryListFragmentWorker for streamName {} {}", streamName, e.toString());
             throw e;
         } finally {
-            log.info(MessageFormat.format("Retrieved {0} Fragments and exiting CanaryListFragmentWorker for stream {1}", fragments.size(), streamName));
+            log.info("Retrieved {} Fragments and exiting CanaryListFragmentWorker for stream {}", fragments.size(), streamName);
             return fragments;
         }
     }

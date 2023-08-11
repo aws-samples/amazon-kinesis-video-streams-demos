@@ -27,7 +27,6 @@ import lombok.extern.log4j.Log4j2;
 
 @Log4j2
 public class WebrtcStorageCanaryConsumer {
-
     private static void calculateFragmentContinuityMetric(CanaryFragmentList fragmentList, Date canaryStartTime, String streamName, String canaryLabel, SystemPropertiesCredentialsProvider credentialsProvider, String dataEndpoint, String region){
         try{
             TimestampRange timestampRange = new TimestampRange();
@@ -51,7 +50,7 @@ public class WebrtcStorageCanaryConsumer {
             {
                 newFragmentReceived = true;
             }
-            log.info(MessageFormat.format("newFragmentReceived: {0}", newFragmentReceived));
+            log.info("New fragment received: {}", newFragmentReceived);
 
             fragmentList.setFragmentList(newFragmentList);
 
@@ -104,10 +103,9 @@ public class WebrtcStorageCanaryConsumer {
         final String streamName = System.getenv("CANARY_STREAM_NAME");
         final String canaryLabel = System.getenv("CANARY_LABEL");
         final String region = System.getenv("AWS_DEFAULT_REGION");
-
-
         final Integer canaryRunTime = Integer.parseInt(System.getenv("CANARY_DURATION_IN_SECONDS"));
-        log.info("Stream name {}", streamName);
+        
+        log.info("Stream name: {}", streamName);
 
         final SystemPropertiesCredentialsProvider credentialsProvider = new SystemPropertiesCredentialsProvider();
         final AmazonKinesisVideo amazonKinesisVideo = AmazonKinesisVideoClientBuilder.standard()
