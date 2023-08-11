@@ -1,0 +1,390 @@
+Parameters:
+  ProfilingId:
+    Type: String
+  DashboardNameStr:
+    Type: String
+    AllowedPattern: "[a-zA-Z0-9-_]*"
+Resources:
+  ProfilingDashboard:
+    Type: AWS::CloudWatch::Dashboard
+    Properties:
+      DashboardName: !Ref DashboardNameStr
+      DashboardBody: !Sub |
+        {
+          "widgets": [
+            {
+              "type": "metric",
+              "x": 0,
+              "y": 0,
+              "width": 6,
+              "height": 6,
+              "properties": {
+                "metrics": [
+                  [ "KinesisVideoSDKCanary", "GetTokenTime", "WebRTCSDKCanaryLabel", "${ProfilingId}", { "region": "${AWS::Region}" } ]
+                ],
+                "view": "timeSeries",
+                "region": "${AWS::Region}",
+                "title": "GetTokenTime",
+                "period": 300,
+                "stat": "Average"
+              }
+            },
+            {
+              "type": "metric",
+              "x": 18,
+              "y": 6,
+              "width": 6,
+              "height": 6,
+              "properties": {
+                "metrics": [
+                  [ "KinesisVideoSDKCanary", "ConnectCallTime", "WebRTCSDKCanaryLabel", "${ProfilingId}", { "region": "${AWS::Region}" } ]
+                ],
+                "view": "timeSeries",
+                "region": "${AWS::Region}",
+                "title": "ConnectCallTime",
+                "period": 300,
+                "stat": "Average"
+              }
+            },
+            {
+              "type": "metric",
+              "x": 18,
+              "y": 18,
+              "width": 6,
+              "height": 6,
+              "properties": {
+                "metrics": [
+                  [ "KinesisVideoSDKCanary", "OfferToAnswerTime", "WebRTCSDKCanaryLabel", "${ProfilingId}", { "region": "${AWS::Region}" } ]
+                ],
+                "view": "timeSeries",
+                "region": "${AWS::Region}",
+                "title": "OfferToAnswerTime",
+                "period": 300,
+                "stat": "Average"
+              }
+            },
+            {
+              "type": "metric",
+              "x": 0,
+              "y": 6,
+              "width": 6,
+              "height": 6,
+              "properties": {
+                "metrics": [
+                  [ "KinesisVideoSDKCanary", "GetEndpointCallTime", "WebRTCSDKCanaryLabel", "${ProfilingId}", { "region": "${AWS::Region}" } ]
+                ],
+                "view": "timeSeries",
+                "region": "${AWS::Region}",
+                "title": "GetEndpointCallTime",
+                "period": 300,
+                "stat": "Average"
+              }
+            },
+            {
+              "type": "metric",
+              "x": 12,
+              "y": 0,
+              "width": 6,
+              "height": 6,
+              "properties": {
+                "metrics": [
+                  [ "KinesisVideoSDKCanary", "DescribeCallTime", "WebRTCSDKCanaryLabel", "${ProfilingId}", { "region": "${AWS::Region}" } ]
+                ],
+                "view": "timeSeries",
+                "region": "${AWS::Region}",
+                "title": "DescribeCallTime",
+                "period": 300,
+                "stat": "Average"
+              }
+            },
+            {
+              "type": "metric",
+              "x": 0,
+              "y": 12,
+              "width": 6,
+              "height": 6,
+              "properties": {
+                "metrics": [
+                  [ "KinesisVideoSDKCanary", "ConnectClientTotalTime", "WebRTCSDKCanaryLabel", "${ProfilingId}", { "region": "${AWS::Region}" } ]
+                ],
+                "view": "timeSeries",
+                "region": "${AWS::Region}",
+                "title": "ConnectClientTotalTime",
+                "period": 300,
+                "stat": "Average"
+              }
+            },
+            {
+              "type": "metric",
+              "x": 6,
+              "y": 6,
+              "width": 6,
+              "height": 6,
+              "properties": {
+                "metrics": [
+                  [ "KinesisVideoSDKCanary", "GetIceConfigCallTime", "WebRTCSDKCanaryLabel", "${ProfilingId}", { "region": "${AWS::Region}" } ]
+                ],
+                "view": "timeSeries",
+                "region": "${AWS::Region}",
+                "title": "GetIceConfigCallTime",
+                "period": 300,
+                "stat": "Average"
+              }
+            },
+            {
+              "type": "metric",
+              "x": 12,
+              "y": 6,
+              "width": 6,
+              "height": 6,
+              "properties": {
+                "metrics": [
+                  [ "KinesisVideoSDKCanary", "FetchClientTotalTime", "WebRTCSDKCanaryLabel", "${ProfilingId}", { "region": "${AWS::Region}" } ]
+                ],
+                "view": "timeSeries",
+                "region": "${AWS::Region}",
+                "title": "FetchClientTotalTime",
+                "period": 300,
+                "stat": "Average"
+              }
+            },
+            {
+              "type": "metric",
+              "x": 0,
+              "y": 18,
+              "width": 6,
+              "height": 6,
+              "properties": {
+                "metrics": [
+                  [ "KinesisVideoSDKCanary", "CreateCallTime", "WebRTCSDKCanaryLabel", "${ProfilingId}", { "region": "${AWS::Region}" } ]
+                ],
+                "view": "timeSeries",
+                "region": "${AWS::Region}",
+                "title": "CreateCallTime",
+                "period": 300,
+                "stat": "Average"
+              }
+            },
+            {
+              "type": "metric",
+              "x": 6,
+              "y": 0,
+              "width": 6,
+              "height": 6,
+              "properties": {
+                "metrics": [
+                  [ "KinesisVideoSDKCanary", "CreateClientTotalTime", "WebRTCSDKCanaryLabel", "${ProfilingId}", { "region": "${AWS::Region}" } ]
+                ],
+                "view": "timeSeries",
+                "region": "${AWS::Region}",
+                "title": "CreateClientTotalTime",
+                "period": 300,
+                "stat": "Average"
+              }
+            },
+            {
+              "type": "metric",
+              "x": 12,
+              "y": 12,
+              "width": 6,
+              "height": 6,
+              "properties": {
+                "metrics": [
+                  [ "KinesisVideoSDKCanary", "LocalCandidateGatheringTime", "WebRTCSDKCanaryLabel", "${ProfilingId}", { "region": "${AWS::Region}" } ]
+                ],
+                "view": "timeSeries",
+                "region": "${AWS::Region}",
+                "title": "LocalCandidateGatheringTime",
+                "period": 300,
+                "stat": "Average"
+              }
+            },
+            {
+              "type": "metric",
+              "x": 6,
+              "y": 24,
+              "width": 6,
+              "height": 6,
+              "properties": {
+                "metrics": [
+                  [ "KinesisVideoSDKCanary", "IceCandidatePairNominationTime", "WebRTCSDKCanaryLabel", "${ProfilingId}", { "region": "${AWS::Region}" } ]
+                ],
+                "view": "timeSeries",
+                "region": "${AWS::Region}",
+                "title": "IceCandidatePairNominationTime",
+                "period": 300,
+                "stat": "Average"
+              }
+            },
+            {
+              "type": "metric",
+              "x": 12,
+              "y": 18,
+              "width": 6,
+              "height": 6,
+              "properties": {
+                "metrics": [
+                  [ "KinesisVideoSDKCanary", "IceServerResolutionTime", "WebRTCSDKCanaryLabel", "${ProfilingId}", { "region": "${AWS::Region}" } ]
+                ],
+                "view": "timeSeries",
+                "region": "${AWS::Region}",
+                "title": "IceServerResolutionTime",
+                "period": 300,
+                "stat": "Average"
+              }
+            },
+            {
+              "type": "metric",
+              "x": 18,
+              "y": 18,
+              "width": 6,
+              "height": 6,
+              "properties": {
+                "metrics": [
+                  [ "KinesisVideoSDKCanary", "IcecandidateGatheringTime", "WebRTCSDKCanaryLabel", "${ProfilingId}", { "region": "${AWS::Region}" } ]
+                ],
+                "view": "timeSeries",
+                "region": "${AWS::Region}",
+                "title": "IcecandidateGatheringTime",
+                "period": 300,
+                "stat": "Average"
+              }
+            },
+            {
+              "type": "metric",
+              "x": 12,
+              "y": 24,
+              "width": 6,
+              "height": 6,
+              "properties": {
+                "metrics": [
+                  [ "KinesisVideoSDKCanary", "ICEHolePunchingDelay", "WebRTCSDKCanaryLabel", "${ProfilingId}", { "region": "${AWS::Region}" } ]
+                ],
+                "view": "timeSeries",
+                "region": "${AWS::Region}",
+                "title": "ICEHolePunchingDelay",
+                "period": 300,
+                "stat": "Average"
+              }
+            },
+            {
+              "type": "metric",
+              "x": 6,
+              "y": 18,
+              "width": 6,
+              "height": 6,
+              "properties": {
+                "metrics": [
+                  [ "KinesisVideoSDKCanary", "RelayCandidateSetUpTime", "WebRTCSDKCanaryLabel", "${ProfilingId}", { "region": "${AWS::Region}" } ]
+                ],
+                "view": "timeSeries",
+                "region": "${AWS::Region}",
+                "title": "RelayCandidateSetUpTime",
+                "period": 300,
+                "stat": "Average"
+              }
+            },
+            {
+              "type": "metric",
+              "x": 0,
+              "y": 18,
+              "width": 6,
+              "height": 6,
+              "properties": {
+                "metrics": [
+                  [ "KinesisVideoSDKCanary", "SrflxCandidateSetUpTime", "WebRTCSDKCanaryLabel", "${ProfilingId}", { "region": "${AWS::Region}" } ]
+                ],
+                "view": "timeSeries",
+                "region": "${AWS::Region}",
+                "title": "SrflxCandidateSetUpTime",
+                "period": 300,
+                "stat": "Average"
+              }
+            },
+            {
+              "type": "metric",
+              "x": 18,
+              "y": 12,
+              "width": 6,
+              "height": 6,
+              "properties": {
+                "metrics": [
+                  [ "KinesisVideoSDKCanary", "HostCandidateSetUpTime", "WebRTCSDKCanaryLabel", "${ProfilingId}", { "region": "${AWS::Region}" } ]
+                ],
+                "view": "timeSeries",
+                "region": "${AWS::Region}",
+                "title": "HostCandidateSetUpTime",
+                "period": 300,
+                "stat": "Average"
+              }
+            },
+            {
+              "type": "metric",
+              "x": 18,
+              "y": 24,
+              "width": 6,
+              "height": 6,
+              "properties": {
+                "metrics": [
+                  [ "KinesisVideoSDKCanary", "IceAgentSetUpTime", "WebRTCSDKCanaryLabel", "${ProfilingId}", { "region": "${AWS::Region}" } ]
+                ],
+                "view": "timeSeries",
+                "region": "${AWS::Region}",
+                "title": "IceAgentSetUpTime",
+                "period": 300,
+                "stat": "Average"
+              }
+            },
+            {
+              "type": "metric",
+              "x": 0,
+              "y": 30,
+              "width": 6,
+              "height": 6,
+              "properties": {
+                "metrics": [
+                  [ "KinesisVideoSDKCanary", "DtlsSetupTime", "WebRTCSDKCanaryLabel", "${ProfilingId}", { "region": "${AWS::Region}" } ]
+                ],
+                "view": "timeSeries",
+                "region": "${AWS::Region}",
+                "title": "DtlsSetupTime",
+                "period": 300,
+                "stat": "Average"
+              }
+            },
+            {
+              "type": "metric",
+              "x": 6,
+              "y": 12,
+              "width": 6,
+              "height": 6,
+              "properties": {
+                "metrics": [
+                  [ "KinesisVideoSDKCanary", "PcCreationTime", "WebRTCSDKCanaryLabel", "${ProfilingId}", { "region": "${AWS::Region}" } ]
+                ],
+                "view": "timeSeries",
+                "region": "${AWS::Region}",
+                "title": "PcCreationTime",
+                "period": 300,
+                "stat": "Average"
+              }
+            },
+            {
+              "type": "metric",
+              "x": 6,
+              "y": 30,
+              "width": 6,
+              "height": 6,
+              "properties": {
+                "metrics": [
+                  [ "KinesisVideoSDKCanary", "TimeToFirstFrame", "WebRTCSDKCanaryLabel", "${ProfilingId}", { "region": "${AWS::Region}" } ]
+                ],
+                "view": "timeSeries",
+                "region": "${AWS::Region}",
+                "title": "TimeToFirstFrame",
+                "period": 300,
+                "stat": "Average"
+              }
+            }
+          ]
+        }
