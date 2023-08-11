@@ -1,8 +1,6 @@
 package com.amazon.kinesis.video.canary.consumer;
 
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
+import java.util.concurrent.FutureTask;
 import java.lang.Exception;
 import java.util.Date;
 import java.text.MessageFormat;
@@ -42,9 +40,12 @@ public class WebrtcStorageCanaryConsumer {
 
             Boolean newFragmentReceived = false;
 
-            ExecutorService executorService = Executors.newFixedThreadPool(10);
-            Future<List<CanaryFragment>> listFragmentResult = executorService.submit(new CanaryListFragmentWorker(streamName, credentialsProvider, dataEndpoint, Regions.fromName(region), fragmentSelector));
-            List<CanaryFragment> newFragmentList = listFragmentResult.get();
+            final FutureTask<List<CanaryFragment>> futureTask = new FutureTask<>(
+                new CanaryListFragmentWorker(streamName, credentialsProvider, dataEndpoint, Regions.fromName(region), fragmentSelector)
+            );
+            Thread thread = new Thread(futureTask);
+            thread.start();
+            List<CanaryFragment> newFragmentList = futureTask.get();
 
             if (newFragmentList.size() > fragmentList.getFragmentList().size())
             {
