@@ -616,7 +616,17 @@ STATUS Peer::sendProfilingMetrics()
     CHK(!this->firstFrame, STATUS_WAITING_ON_FIRST_FRAME);
 
     // We want to batch send all the metrics once the first frame is sent out.
+    signalingClientMetrics.version = SIGNALING_CLIENT_METRICS_CURRENT_VERSION;
     signalingClientGetMetrics(this->signalingClientHandle, &this->signalingClientMetrics);
+    DLOGP("[Signaling Get token] %" PRIu64 " ms", this->signalingClientMetrics.signalingClientStats.getTokenCallTime);
+    DLOGP("[Signaling Describe] %" PRIu64 " ms", this->signalingClientMetrics.signalingClientStats.describeCallTime);
+    DLOGP("[Signaling Create Channel] %" PRIu64 " ms", this->signalingClientMetrics.signalingClientStats.createCallTime);
+    DLOGP("[Signaling Get endpoint] %" PRIu64 " ms", this->signalingClientMetrics.signalingClientStats.getEndpointCallTime);
+    DLOGP("[Signaling Get ICE config] %" PRIu64 " ms", this->signalingClientMetrics.signalingClientStats.getIceConfigCallTime);
+    DLOGP("[Signaling Connect] %" PRIu64 " ms", this->signalingClientMetrics.signalingClientStats.connectCallTime);
+    DLOGP("[Signaling create client] %" PRIu64 " ms", this->signalingClientMetrics.signalingClientStats.createClientTime);
+    DLOGP("[Signaling fetch client] %" PRIu64 " ms", this->signalingClientMetrics.signalingClientStats.fetchClientTime);
+    DLOGP("[Signaling connect client] %" PRIu64 " ms", this->signalingClientMetrics.signalingClientStats.connectClientTime);
     Canary::Cloudwatch::getInstance().monitoring.pushSignalingClientMetrics(&this->signalingClientMetrics);
     peerConnectionGetMetrics(this->pPeerConnection, &this->peerConnectionMetrics);
     Canary::Cloudwatch::getInstance().monitoring.pushPeerConnectionMetrics(&this->peerConnectionMetrics);
