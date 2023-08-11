@@ -234,6 +234,129 @@ VOID CloudwatchMonitoring::pushOutboundRtpStats(Canary::POutgoingRTPMetricsConte
     this->push(retransmissionPercentDatum);
 }
 
+VOID CloudwatchMonitoring::pushPeerConnectionMetrics(PPeerConnectionMetrics pPeerConnectionMetrics)
+{
+    MetricDatum pcCreationDatum, dtlsSetupDatum, iceHolePunchingDatum;
+
+    pcCreationDatum.SetMetricName("PcCreationTime");
+    pcCreationDatum.SetValue(pPeerConnectionMetrics->peerConnectionStats.peerConnectionCreationTime);
+    pcCreationDatum.SetUnit(Aws::CloudWatch::Model::StandardUnit::Milliseconds);
+    this->push(pcCreationDatum);
+
+    dtlsSetupDatum.SetMetricName("DtlsSetupTime");
+    dtlsSetupDatum.SetValue(pPeerConnectionMetrics->peerConnectionStats.dtlsSessionSetupTime);
+    dtlsSetupDatum.SetUnit(Aws::CloudWatch::Model::StandardUnit::Milliseconds);
+    this->push(dtlsSetupDatum);
+
+    iceHolePunchingDatum.SetMetricName("ICEHolePunchingDelay");
+    iceHolePunchingDatum.SetValue(pPeerConnectionMetrics->peerConnectionStats.iceHolePunchingTime);
+    iceHolePunchingDatum.SetUnit(Aws::CloudWatch::Model::StandardUnit::Milliseconds);
+    this->push(iceHolePunchingDatum);
+}
+
+VOID CloudwatchMonitoring::pushKvsIceAgentMetrics(PKvsIceAgentMetrics pKvsIceAgentMetrics)
+{
+    MetricDatum localCandidateGatheringDatum, hostCandidateSetupDatum, srflxCandidateSetUpDatum,
+                iceAgentSetupDatum, relayCandidateSetUpDatum, iceServerParseDatum,
+                iceCandidatePairNominationDatum, iceCandidateGatheringDatum;
+
+    localCandidateGatheringDatum.SetMetricName("LocalCandidateGatheringTime");
+    localCandidateGatheringDatum.SetValue(pKvsIceAgentMetrics->kvsIceAgentStats.localCandidateGatheringTime);
+    localCandidateGatheringDatum.SetUnit(Aws::CloudWatch::Model::StandardUnit::Milliseconds);
+    this->push(localCandidateGatheringDatum);
+
+    hostCandidateSetupDatum.SetMetricName("HostCandidateSetUpTime");
+    hostCandidateSetupDatum.SetValue(pKvsIceAgentMetrics->kvsIceAgentStats.hostCandidateSetUpTime);
+    hostCandidateSetupDatum.SetUnit(Aws::CloudWatch::Model::StandardUnit::Milliseconds);
+    this->push(hostCandidateSetupDatum);
+
+    srflxCandidateSetUpDatum.SetMetricName("SrflxCandidateSetUpTime");
+    srflxCandidateSetUpDatum.SetValue(pKvsIceAgentMetrics->kvsIceAgentStats.srflxCandidateSetUpTime);
+    srflxCandidateSetUpDatum.SetUnit(Aws::CloudWatch::Model::StandardUnit::Milliseconds);
+    this->push(srflxCandidateSetUpDatum);
+
+    relayCandidateSetUpDatum.SetMetricName("RelayCandidateSetUpTime");
+    relayCandidateSetUpDatum.SetValue(pKvsIceAgentMetrics->kvsIceAgentStats.relayCandidateSetUpTime);
+    relayCandidateSetUpDatum.SetUnit(Aws::CloudWatch::Model::StandardUnit::Milliseconds);
+    this->push(relayCandidateSetUpDatum);
+
+    iceServerParseDatum.SetMetricName("IceServerResolutionTime");
+    iceServerParseDatum.SetValue(pKvsIceAgentMetrics->kvsIceAgentStats.iceServerParsingTime);
+    iceServerParseDatum.SetUnit(Aws::CloudWatch::Model::StandardUnit::Milliseconds);
+    this->push(iceServerParseDatum);
+
+    iceCandidatePairNominationDatum.SetMetricName("IceCandidatePairNominationTime");
+    iceCandidatePairNominationDatum.SetValue(pKvsIceAgentMetrics->kvsIceAgentStats.iceCandidatePairNominationTime);
+    iceCandidatePairNominationDatum.SetUnit(Aws::CloudWatch::Model::StandardUnit::Milliseconds);
+    this->push(iceCandidatePairNominationDatum);
+
+    iceCandidateGatheringDatum.SetMetricName("IcecandidateGatheringTime");
+    iceCandidateGatheringDatum.SetValue(pKvsIceAgentMetrics->kvsIceAgentStats.candidateGatheringTime);
+    iceCandidateGatheringDatum.SetUnit(Aws::CloudWatch::Model::StandardUnit::Milliseconds);
+    this->push(iceCandidateGatheringDatum);
+
+    iceAgentSetupDatum.SetMetricName("IceAgentSetUpTime");
+    iceAgentSetupDatum.SetValue(pKvsIceAgentMetrics->kvsIceAgentStats.iceAgentSetUpTime);
+    iceAgentSetupDatum.SetUnit(Aws::CloudWatch::Model::StandardUnit::Milliseconds);
+    this->push(iceAgentSetupDatum);
+}
+
+VOID CloudwatchMonitoring::pushSignalingClientMetrics(PSignalingClientMetrics pSignalingClientMetrics)
+{
+    MetricDatum offerToAnswerDatum, getTokenDatum, describeDatum, createDatum, endpointDatum,
+                iceConfigDatum, connectDatum ,createClientDatum, fetchDatum, connectClientDatum;
+
+    offerToAnswerDatum.SetMetricName("OfferToAnswerTime");
+    offerToAnswerDatum.SetValue(pSignalingClientMetrics->signalingClientStats.offerToAnswerTime);
+    offerToAnswerDatum.SetUnit(Aws::CloudWatch::Model::StandardUnit::Milliseconds);
+    this->push(offerToAnswerDatum);
+
+    getTokenDatum.SetMetricName("GetTokenTime");
+    getTokenDatum.SetValue(pSignalingClientMetrics->signalingClientStats.getTokenCallTime);
+    getTokenDatum.SetUnit(Aws::CloudWatch::Model::StandardUnit::Milliseconds);
+    this->push(getTokenDatum);
+
+    describeDatum.SetMetricName("DescribeCallTime");
+    describeDatum.SetValue(pSignalingClientMetrics->signalingClientStats.describeCallTime);
+    describeDatum.SetUnit(Aws::CloudWatch::Model::StandardUnit::Milliseconds);
+    this->push(describeDatum);
+
+    createDatum.SetMetricName("CreateCallTime");
+    createDatum.SetValue(pSignalingClientMetrics->signalingClientStats.createCallTime);
+    createDatum.SetUnit(Aws::CloudWatch::Model::StandardUnit::Milliseconds);
+    this->push(createDatum);
+
+    endpointDatum.SetMetricName("GetEndpointCallTime");
+    endpointDatum.SetValue(pSignalingClientMetrics->signalingClientStats.getEndpointCallTime);
+    endpointDatum.SetUnit(Aws::CloudWatch::Model::StandardUnit::Milliseconds);
+    this->push(endpointDatum);
+
+    iceConfigDatum.SetMetricName("GetIceConfigCallTime");
+    iceConfigDatum.SetValue(pSignalingClientMetrics->signalingClientStats.getIceConfigCallTime);
+    iceConfigDatum.SetUnit(Aws::CloudWatch::Model::StandardUnit::Milliseconds);
+    this->push(iceConfigDatum);
+
+    connectDatum.SetMetricName("ConnectCallTime");
+    connectDatum.SetValue(pSignalingClientMetrics->signalingClientStats.connectCallTime);
+    connectDatum.SetUnit(Aws::CloudWatch::Model::StandardUnit::Milliseconds);
+    this->push(connectDatum);
+
+    createClientDatum.SetMetricName("CreateClientTotalTime");
+    createClientDatum.SetValue(pSignalingClientMetrics->signalingClientStats.createClientTime);
+    createClientDatum.SetUnit(Aws::CloudWatch::Model::StandardUnit::Milliseconds);
+    this->push(createClientDatum);
+
+    fetchDatum.SetMetricName("FetchClientTotalTime");
+    fetchDatum.SetValue(pSignalingClientMetrics->signalingClientStats.fetchClientTime);
+    fetchDatum.SetUnit(Aws::CloudWatch::Model::StandardUnit::Milliseconds);
+    this->push(fetchDatum);
+
+    connectClientDatum.SetMetricName("ConnectClientTotalTime");
+    connectClientDatum.SetValue(pSignalingClientMetrics->signalingClientStats.connectClientTime);
+    connectClientDatum.SetUnit(Aws::CloudWatch::Model::StandardUnit::Milliseconds);
+    this->push(connectClientDatum);
+}
+
 VOID CloudwatchMonitoring::pushInboundRtpStats(Canary::PIncomingRTPMetricsContext pIncomingRtpStats)
 {
     MetricDatum incomingBitrateDatum, incomingPacketRate, incomingFrameDropRateDatum;
