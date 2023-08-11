@@ -27,27 +27,26 @@ import lombok.extern.log4j.Log4j2;
 
 @Log4j2
 public class WebrtcStorageCanaryConsumer {
-    private static void calculateFragmentContinuityMetric(CanaryFragmentList fragmentList, Date canaryStartTime, String streamName, String canaryLabel, SystemPropertiesCredentialsProvider credentialsProvider, String dataEndpoint, String region){
-        try{
+    private static void calculateFragmentContinuityMetric(CanaryFragmentList fragmentList, Date canaryStartTime, String streamName, String canaryLabel, SystemPropertiesCredentialsProvider credentialsProvider, String dataEndpoint, String region) {
+        try {
             TimestampRange timestampRange = new TimestampRange();
             timestampRange.setStartTimestamp(canaryStartTime);
             timestampRange.setEndTimestamp(new Date());
 
             FragmentSelector fragmentSelector = new FragmentSelector();
-                fragmentSelector.setFragmentSelectorType("SERVER_TIMESTAMP");
-                fragmentSelector.setTimestampRange(timestampRange);
+            fragmentSelector.setFragmentSelectorType("SERVER_TIMESTAMP");
+            fragmentSelector.setTimestampRange(timestampRange);
 
             Boolean newFragmentReceived = false;
 
             final FutureTask<List<CanaryFragment>> futureTask = new FutureTask<>(
-                new CanaryListFragmentWorker(streamName, credentialsProvider, dataEndpoint, Regions.fromName(region), fragmentSelector)
+                    new CanaryListFragmentWorker(streamName, credentialsProvider, dataEndpoint, Regions.fromName(region), fragmentSelector)
             );
             Thread thread = new Thread(futureTask);
             thread.start();
             List<CanaryFragment> newFragmentList = futureTask.get();
 
-            if (newFragmentList.size() > fragmentList.getFragmentList().size())
-            {
+            if (newFragmentList.size() > fragmentList.getFragmentList().size()) {
                 newFragmentReceived = true;
             }
             log.info("New fragment received: {}", newFragmentReceived);
@@ -56,47 +55,47 @@ public class WebrtcStorageCanaryConsumer {
 
             sendFragmentContinuityMetric(newFragmentReceived, streamName, canaryLabel, credentialsProvider, region);
 
-        } catch(Exception e){
+        } catch (Exception e) {
             log.error(e);
-        } 
+        }
     }
 
-    private static void sendFragmentContinuityMetric(Boolean newFragmentReceived, String streamName, String canaryLabel, SystemPropertiesCredentialsProvider credentialsProvider, String region){
-        try{
+    private static void sendFragmentContinuityMetric(Boolean newFragmentReceived, String streamName, String canaryLabel, SystemPropertiesCredentialsProvider credentialsProvider, String region) {
+        try {
             final AmazonCloudWatchAsync cwClient = AmazonCloudWatchAsyncClientBuilder.standard()
-                .withRegion(region)
-                .withCredentials(credentialsProvider)
-                .build();
+                    .withRegion(region)
+                    .withCredentials(credentialsProvider)
+                    .build();
 
             final Dimension dimensionPerStream = new Dimension()
-                .withName("StorageWebRTCSDKCanaryStreamName")
-                .withValue(streamName);
+                    .withName("StorageWebRTCSDKCanaryStreamName")
+                    .withValue(streamName);
             final Dimension aggregatedDimension = new Dimension()
-                .withName("StorageWebRTCSDKCanaryLabel")
-                .withValue(canaryLabel);
+                    .withName("StorageWebRTCSDKCanaryLabel")
+                    .withValue(canaryLabel);
             List<MetricDatum> datumList = new ArrayList<>();
-            
+
             MetricDatum datum = new MetricDatum()
-                .withMetricName("FragmentReceived")
-                .withUnit(StandardUnit.None)
-                .withValue(newFragmentReceived ? 1.0 : 0.0)
-                .withDimensions(dimensionPerStream);
+                    .withMetricName("FragmentReceived")
+                    .withUnit(StandardUnit.None)
+                    .withValue(newFragmentReceived ? 1.0 : 0.0)
+                    .withDimensions(dimensionPerStream);
             datumList.add(datum);
             MetricDatum aggDatum = new MetricDatum()
-                .withMetricName("FragmentReceived")
-                .withUnit(StandardUnit.None)
-                .withValue(newFragmentReceived ? 1.0 : 0.0)
-                .withDimensions(aggregatedDimension);
+                    .withMetricName("FragmentReceived")
+                    .withUnit(StandardUnit.None)
+                    .withValue(newFragmentReceived ? 1.0 : 0.0)
+                    .withDimensions(aggregatedDimension);
             datumList.add(aggDatum);
 
             PutMetricDataRequest request = new PutMetricDataRequest()
-                .withNamespace("KinesisVideoSDKCanary")
-                .withMetricData(datumList);
+                    .withNamespace("KinesisVideoSDKCanary")
+                    .withMetricData(datumList);
             cwClient.putMetricDataAsync(request);
 
-        } catch(Exception e){
+        } catch (Exception e) {
             log.error(e);
-        } 
+        }
     }
 
     public static void main(final String[] args) throws Exception {
@@ -104,7 +103,7 @@ public class WebrtcStorageCanaryConsumer {
         final String canaryLabel = System.getenv("CANARY_LABEL");
         final String region = System.getenv("AWS_DEFAULT_REGION");
         final Integer canaryRunTime = Integer.parseInt(System.getenv("CANARY_DURATION_IN_SECONDS"));
-        
+
         log.info("Stream name: {}", streamName);
 
         final SystemPropertiesCredentialsProvider credentialsProvider = new SystemPropertiesCredentialsProvider();
@@ -118,7 +117,7 @@ public class WebrtcStorageCanaryConsumer {
                 .build();
 
         final GetDataEndpointRequest dataEndpointRequest = new GetDataEndpointRequest()
-            .withAPIName(APIName.LIST_FRAGMENTS).withStreamName(streamName);
+                .withAPIName(APIName.LIST_FRAGMENTS).withStreamName(streamName);
         final String dataEndpoint = amazonKinesisVideo.getDataEndpoint(dataEndpointRequest).getDataEndpoint();
 
         CanaryFragmentList fragmentList = new CanaryFragmentList();
@@ -134,7 +133,7 @@ public class WebrtcStorageCanaryConsumer {
 
         final long intervalDelay = 16000;
         intervalMetricsTimer.scheduleAtFixedRate(intervalMetricsTask, 60000, intervalDelay); // initial delay of 60 s at an interval of intervalDelay ms
-        
+
         final long delay = canaryRunTime * 1000;
         Thread.sleep(delay);
 

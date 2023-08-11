@@ -12,16 +12,15 @@ public class CanaryFragmentList {
 
     private List<CanaryFragment> fragmentList = new ArrayList<>();
 
-    
-    public CanaryFragmentList() {}
 
-    public void setFragmentList(List<CanaryFragment> fragmentList)
-    {
+    public CanaryFragmentList() {
+    }
+
+    public void setFragmentList(List<CanaryFragment> fragmentList) {
         this.fragmentList = fragmentList;
     }
 
-    public List<CanaryFragment> getFragmentList()
-    {
+    public List<CanaryFragment> getFragmentList() {
         return fragmentList;
     }
 

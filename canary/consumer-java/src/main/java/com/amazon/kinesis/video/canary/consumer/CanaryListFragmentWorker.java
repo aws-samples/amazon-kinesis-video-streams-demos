@@ -35,9 +35,9 @@ public class CanaryListFragmentWorker implements Callable {
     protected final String streamName;
 
     public CanaryListFragmentWorker(final String streamName,
-                              final AWSCredentialsProvider credentialsProvider, final String endPoint,
-                              final Regions region,
-                              final FragmentSelector fragmentSelector) {
+                                    final AWSCredentialsProvider credentialsProvider, final String endPoint,
+                                    final Regions region,
+                                    final FragmentSelector fragmentSelector) {
         this.region = region;
         this.credentialsProvider = credentialsProvider;
         this.streamName = streamName;
@@ -51,10 +51,10 @@ public class CanaryListFragmentWorker implements Callable {
     }
 
     public static CanaryListFragmentWorker create(final String streamName,
-                                            final AWSCredentialsProvider credentialsProvider,
-                                            final Regions region,
-                                            final AmazonKinesisVideo amazonKinesisVideo,
-                                            final FragmentSelector fragmentSelector) {
+                                                  final AWSCredentialsProvider credentialsProvider,
+                                                  final Regions region,
+                                                  final AmazonKinesisVideo amazonKinesisVideo,
+                                                  final FragmentSelector fragmentSelector) {
         final GetDataEndpointRequest request = new GetDataEndpointRequest()
                 .withAPIName(APIName.LIST_FRAGMENTS).withStreamName(streamName);
         final String endpoint = amazonKinesisVideo.getDataEndpoint(request).getDataEndpoint();
@@ -80,7 +80,7 @@ public class CanaryListFragmentWorker implements Callable {
                     result.getSdkHttpMetadata().getHttpStatusCode(),
                     result.getSdkResponseMetadata().getRequestId());
 
-            for (Fragment f: result.getFragments()) {
+            for (Fragment f : result.getFragments()) {
                 fragments.add(new CanaryFragment(f));
             }
             String nextToken = result.getNextToken();
@@ -91,19 +91,18 @@ public class CanaryListFragmentWorker implements Callable {
                         .withStreamName(streamName).withNextToken(nextToken);
                 result = amazonKinesisVideoArchivedMedia.listFragments(request);
 
-                for (Fragment f: result.getFragments()) {
+                for (Fragment f : result.getFragments()) {
                     fragments.add(new CanaryFragment(f));
                 }
                 nextToken = result.getNextToken();
             }
-           
+
             fragments.sort(Comparator.comparing(CanaryFragment::getFragmentNumberInt));
 
             for (CanaryFragment cf : fragments) {
                 log.info("Retrieved fragment number {} ", cf.getFragment().getFragmentNumber());
             }
-        }
-        catch (Exception e) {
+        } catch (Exception e) {
             log.error("Failure in CanaryListFragmentWorker for streamName {} {}", streamName, e.toString());
             throw e;
         } finally {
