@@ -14,7 +14,7 @@ set(BUILD_SAMPLE OFF CACHE BOOL "Disable sample building for WebRTC library" FOR
 FetchContent_Declare(
   webrtc
   GIT_REPOSITORY https://github.com/awslabs/amazon-kinesis-video-streams-webrtc-sdk-c
-  GIT_TAG        c11a97fbc741d489ac83dfd42fe0aaa16c74114e
+  GIT_TAG        fa4004d1ab7ccdee23e75cd11ba80eecae2405b0
 )
 
 FetchContent_Declare(
@@ -66,6 +66,13 @@ add_executable(
   src/CanaryWebrtc.cpp)
 target_link_libraries(
   kvsWebrtcCanaryWebrtc
+  kvsWebrtcCanary)
+
+add_executable(
+  kvsWebrtcCanaryWebrtcStorage
+  src/CanaryWebrtcStorage.cpp)
+target_link_libraries(
+  kvsWebrtcCanaryWebrtcStorage
   kvsWebrtcCanary)
 
 add_executable(

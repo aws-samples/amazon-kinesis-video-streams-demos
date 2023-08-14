@@ -25,6 +25,7 @@ STATUS Peer::init(const Canary::PConfig pConfig, const Callbacks& callbacks)
     STATUS retStatus = STATUS_SUCCESS;
 
     this->isMaster = pConfig->isMaster.value;
+    this->useMediaStorage = pConfig->useMediaStorage;
     this->trickleIce = pConfig->trickleIce.value;
     this->callbacks = callbacks;
     this->isProfilingMode = pConfig->isProfilingMode.value;
@@ -102,6 +103,8 @@ STATUS Peer::initSignaling(const Canary::PConfig pConfig)
     channelInfo.reconnect = TRUE;
     channelInfo.pCertPath = (PCHAR) DEFAULT_KVS_CACERT_PATH;
     channelInfo.messageTtl = 0; // Default is 60 seconds
+
+    channelInfo.useMediaStorage = pConfig->useMediaStorage;
 
     this->clientInfo.signalingClientCreationMaxRetryAttempts = MAX_CALL_RETRY_COUNT;
 
@@ -390,6 +393,17 @@ STATUS Peer::connect()
 
     STATUS retStatus = STATUS_SUCCESS;
     CHK_STATUS(signalingClientConnectSync(signalingClientHandle));
+
+    if(this->useMediaStorage){
+        // Join storage session for media ingestion
+        DLOGI("[KVS Storage Master]invoking join storage session");
+        retStatus = signalingClientJoinSessionSync(signalingClientHandle);
+        if (retStatus != STATUS_SUCCESS) {
+            DLOGE("[KVS Storage Master] signalingClientConnectSync(): operation returned status code: 0x%08x", retStatus);
+            goto CleanUp;
+        }
+        DLOGI("[KVS Storage Master] Signaling client connection to socket established");
+    }
 
     if (!this->isMaster) {
         this->foundPeerId = TRUE;

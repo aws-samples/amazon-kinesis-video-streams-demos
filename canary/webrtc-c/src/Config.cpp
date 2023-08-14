@@ -164,7 +164,7 @@ STATUS Config::initWithEnvVars()
 
     /* This is ignored for master. Master can extract the info from offer. Viewer has to know if peer can trickle or
     * not ahead of time. */
-    CHK_STATUS(optenvBool(CANARY_TRICKLE_ICE_ENV_VAR, &trickleIce, FALSE));
+    CHK_STATUS(optenvBool(CANARY_TRICKLE_ICE_ENV_VAR, &trickleIce, TRUE));
     CHK_STATUS(optenvBool(CANARY_USE_TURN_ENV_VAR, &useTurn, TRUE));
     CHK_STATUS(optenvBool(CANARY_FORCE_TURN_ENV_VAR, &forceTurn, FALSE));
     CHK_STATUS(optenvBool(CANARY_USE_IOT_CREDENTIALS_ENV_VAR, &useIotCredentialProvider, FALSE));
@@ -238,6 +238,7 @@ VOID Config::print()
           "\tChannel Name    : %s\n"
           "\tClient ID       : %s\n"
           "\tRole            : %s\n"
+          "\tStorage         : %s\n"
           "\tTrickle ICE     : %s\n"
           "\tUse TURN        : %s\n"
           "\tLog Level       : %u\n"
@@ -249,10 +250,11 @@ VOID Config::print()
           "\tCredential type : %s\n"
           "\n",
           this->endpoint.value.c_str(), this->region.value.c_str(), this->label.value.c_str(), this->channelName.value.c_str(),
-          this->clientId.value.c_str(), this->isMaster.value ? "Master" : "Viewer", this->trickleIce.value ? "True" : "False",
-          this->useTurn.value ? "True" : "False", this->logLevel.value, this->logGroupName.value.c_str(), this->logStreamName.value.c_str(),
-          this->duration.value / HUNDREDS_OF_NANOS_IN_A_SECOND, this->iterationDuration.value / HUNDREDS_OF_NANOS_IN_A_SECOND,
-          this->runBothPeers.value ? "True" : "False", this->useIotCredentialProvider.value ? "IoT" : "Static");
+          this->clientId.value.c_str(), this->isMaster.value ? "Master" : "Viewer", this->useMediaStorage ? "True" : "False",
+          this->trickleIce.value ? "True" : "False", this->useTurn.value ? "True" : "False", this->logLevel.value,
+          this->logGroupName.value.c_str(), this->logStreamName.value.c_str(), this->duration.value / HUNDREDS_OF_NANOS_IN_A_SECOND,
+          this->iterationDuration.value / HUNDREDS_OF_NANOS_IN_A_SECOND, this->runBothPeers.value ? "True" : "False",
+          this->useIotCredentialProvider.value ? "IoT" : "Static");
     if(this->useIotCredentialProvider.value) {
         DLOGD("\tIoT endpoint : %s\n"
               "\tIoT cert filename : %s\n"

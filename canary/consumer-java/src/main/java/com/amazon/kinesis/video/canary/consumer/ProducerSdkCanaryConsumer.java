@@ -83,4 +83,3 @@ public class ProducerSdkCanaryConsumer {
         System.exit(0);
     }
 }
-

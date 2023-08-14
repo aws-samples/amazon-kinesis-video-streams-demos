@@ -4,6 +4,7 @@ namespace Canary {
 
 CloudwatchMonitoring::CloudwatchMonitoring(PConfig pConfig, ClientConfiguration* pClientConfig) : pConfig(pConfig), client(*pClientConfig)
 {
+    pConfig->useMediaStorage ? this->isStorage = true : this->isStorage = false;
 }
 
 STATUS CloudwatchMonitoring::init()
@@ -13,8 +14,16 @@ STATUS CloudwatchMonitoring::init()
     this->channelDimension.SetName("WebRTCSDKCanaryChannelName");
     this->channelDimension.SetValue(pConfig->channelName.value);
 
-    this->labelDimension.SetName("WebRTCSDKCanaryLabel");
+    if (this->isStorage)
+    {
+        this->labelDimension.SetName("StorageWebRTCSDKCanaryLabel");
+    } else
+    {
+        this->labelDimension.SetName("WebRTCSDKCanaryLabel");
+    }
+
     this->labelDimension.SetValue(pConfig->label.value);
+
 
     return retStatus;
 }

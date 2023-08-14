@@ -29,6 +29,7 @@ class CloudwatchMonitoring {
     PConfig pConfig;
     CloudWatchClient client;
     std::atomic<UINT64> pendingMetrics;
+    BOOL isStorage;
 };
 
 } // namespace Canary

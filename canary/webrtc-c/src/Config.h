@@ -25,6 +25,7 @@ class Config {
     Value<BOOL> forceTurn;
     Value<BOOL> useIotCredentialProvider;
     Value<BOOL> isProfilingMode;
+    BOOL useMediaStorage;
 
     // credentials
     Value<std::string> accessKey;
