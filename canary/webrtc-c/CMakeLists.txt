@@ -15,7 +15,7 @@ FetchContent_Declare(
   webrtc
   GIT_REPOSITORY https://github.com/awslabs/amazon-kinesis-video-streams-webrtc-sdk-c
   GIT_TAG        fa4004d1ab7ccdee23e75cd11ba80eecae2405b0
-
+)
 
 FetchContent_Declare(
   cloudwatch
