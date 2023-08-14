@@ -24,6 +24,7 @@ class Config {
     Value<BOOL> useTurn;
     Value<BOOL> forceTurn;
     Value<BOOL> useIotCredentialProvider;
+    Value<BOOL> isProfilingMode;
     BOOL useMediaStorage;
 
     // credentials

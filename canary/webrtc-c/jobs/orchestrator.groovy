@@ -2,6 +2,7 @@ import jenkins.model.*
 
 RUNNER_JOB_NAME_PREFIX = "webrtc-canary-runner"
 PERIODIC_DURATION_IN_SECONDS = 30
+PERIODIC_PROFILING_DURATION_IN_SECONDS = 90
 LONG_RUNNING_DURATION_IN_SECONDS = 0
 DURATION_IN_SECONDS_5_MIN = 300 // 5 min
 DURATION_IN_SECONDS_65_MIN = 3900 // 65 min
@@ -277,6 +278,24 @@ pipeline {
                             ],
                             wait: false
                         )
+
+                        build(
+                            job: NEXT_AVAILABLE_RUNNER,
+                            parameters: COMMON_PARAMS + [
+                                booleanParam(name: 'USE_TURN', value: true),
+                                booleanParam(name: 'TRICKLE_ICE', value: true),
+                                booleanParam(name: 'USE_IOT', value: false),
+                                booleanParam(name: 'USE_MBEDTLS', value: false),
+                                booleanParam(name: 'IS_PROFILING', value: true),
+                                string(name: 'DURATION_IN_SECONDS', value: PERIODIC_PROFILING_DURATION_IN_SECONDS.toString()),
+                                string(name: 'MASTER_NODE_LABEL', value: "ec2-profiling"),
+                                string(name: 'VIEWER_NODE_LABEL', value: "ec2-profiling"),
+                                string(name: 'RUNNER_LABEL', value: "WebrtcPeriodicProfiling"),
+                                string(name: 'SCENARIO_LABEL', value: "WebrtcProfiling"),
+                            ],
+                            wait: false
+                        )
+
                     }
                 }
 

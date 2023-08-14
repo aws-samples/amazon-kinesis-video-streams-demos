@@ -9,12 +9,13 @@ include(FetchContent)
 set(CUSTOM_MEMORY_MANAGEMENT OFF CACHE BOOL "Tell AWS SDK to not use custom memory management" FORCE)
 set(ENABLE_TESTING OFF CACHE BOOL "Disable building tests for AWS SDK" FORCE)
 set(BUILD_ONLY "monitoring;logs" CACHE STRING "Tell AWS SDK to only build monitoring and logs" FORCE)
+set(BUILD_SAMPLE OFF CACHE BOOL "Disable sample building for WebRTC library" FORCE)
 
 FetchContent_Declare(
   webrtc
   GIT_REPOSITORY https://github.com/awslabs/amazon-kinesis-video-streams-webrtc-sdk-c
   GIT_TAG        fa4004d1ab7ccdee23e75cd11ba80eecae2405b0
-)
+
 
 FetchContent_Declare(
   cloudwatch

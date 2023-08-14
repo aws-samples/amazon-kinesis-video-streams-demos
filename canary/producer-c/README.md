@@ -17,36 +17,36 @@ Note 2: Currently, this demo is tested on Linux and MacOS.
 4. `make`
 
 ## Build
-To download run the following command:
+To download, run the following command:
 
 `git clone https://github.com/aws-samples/amazon-kinesis-video-streams-demos.git`
 
 Configure
-Create a build directory in the newly checked out repository, and execute CMake from it.
+Create a build directory in the newly checked out repository and execute CMake from it.
 
 1. `mkdir -p amazon-kinesis-video-streams-demos/canary/producer-c/build` 
 2. `cd amazon-kinesis-video-streams-demos/canary/producer-c/build`
 3. `cmake ..`
 
-The file installs the C Producer SDK libraries, PIC libraries for you and CPP SDK components for you.
+The file installs the C Producer SDK libraries, PIC libraries, and CPP SDK components for you.
 
-NOTE: This project requires setting up of AWS SDK CPP Libraries. The specific components being used are:
+NOTE: This project requires the setting up of AWS SDK CPP Libraries. The specific components being used are:
 1. `events`
 2. `monitoring`
 3. `logs`
 
 ## Running the application
 
-The demo comprises of a simple sample that uses custom constructed frames to capture certain metrics and performance parameters of the C Producer SDK and PIC. To run the sample:
+The demo comprises of a simple sample that uses custom-constructed frames to capture certain metrics and performance parameters of the C Producer SDK and PIC. To run the sample:
 
 `./kvsProducerSampleCloudwatch <path-to-config-file>`, or
 `./kvsProducerSampleCloudwatch`	
 
-Note that if config file is provided and environment variables are exported, JSON file is used to configure the canary app
+Note that if a config file is provided and environment variables are exported, a JSON file is used to configure the canary app
 
 The application uses a JSON file or environment variables to parse some parameters that can be controlled by the application. It is necessary to provide the absolute path to the JSON file to run the application. A sample config file is provided [here](https://github.com/aws-samples/amazon-kinesis-video-streams-demos/tree/master/canary/producer-c). If using environment variables, take a look at the [sample shell script](https://github.com/aws-samples/amazon-kinesis-video-streams-demos/tree/master/canary/producer-c).
 
-On running the application, the metrics are geenrated and posted in the `KinesisVideoSDKCanary` namespace with stream name format:  `<stream-name-prefix>-<Realtime/Offline>-<canary-type>`, where `canary-type` is signifies the type of run of the application, for example, `periodic`, `longrun`, etc.
+On running the application, the metrics are generated and posted in the `KinesisVideoSDKCanary` namespace with stream name format:  `<stream-name-prefix>-<Realtime/Offline>-<canary-type>`, where `canary-type` signifies the type of run of the application, for example, `periodic`, `longrun`, etc.
 
 ## Metrics being collected currently
 
@@ -95,7 +95,7 @@ Required Script Signature Approvals:
 
 #### Seeding
 
-Seeding is a meta job that its sole job is to bootstrap other jobs, orchestrator and runners. 
+Seeding is a meta job whose sole job is to bootstrap other jobs, orchestrator and runners. 
 When there's a new change to the seed or the other jobs that were created from the seed, the change will automatically propagate to the other jobs. 
 
 The concept is very similar to [AWS CloudFormation](https://aws.amazon.com/cloudformation/)
@@ -105,7 +105,7 @@ Seed script can be found [here](https://github.com/aws-samples/amazon-kinesis-vi
 
 #### Orchestration
 
-Orchestration is a process of permuting a set of the canary configuration and delegate the works to the runner. The permutation can be ranging from streaming duration, bitrate, device types, regions, etc.
+Orchestration is a process of permuting a set of the canary configurations and delegating the works to the runner. The permutation can be ranging from streaming duration, bitrate, device types, regions, etc.
 
 ![orchestrator](./docs/orchestrator.png)
 
