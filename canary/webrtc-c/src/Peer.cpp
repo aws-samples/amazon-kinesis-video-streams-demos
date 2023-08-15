@@ -49,13 +49,13 @@ STATUS Peer::init(const Canary::PConfig pConfig, const Callbacks& callbacks)
                                                   &pAwsCredentialProvider));
     }
     else {
-        if(IS_EMPTY_STRING(pConfig->sessionToken.value.c_str())) {
-            CHK_STATUS(createStaticCredentialProvider((PCHAR) pConfig->accessKey.value.c_str(), 0, (PCHAR) pConfig->secretKey.value.c_str(), 0,
-                                                      NULL, 0, MAX_UINT64, &pAwsCredentialProvider));
-        } else {
+//        if(IS_EMPTY_STRING(pConfig->sessionToken.value.c_str())) {
+//            CHK_STATUS(createStaticCredentialProvider((PCHAR) pConfig->accessKey.value.c_str(), 0, (PCHAR) pConfig->secretKey.value.c_str(), 0,
+//                                                      NULL, 0, MAX_UINT64, &pAwsCredentialProvider));
+//        } else {
             CHK_STATUS(createStaticCredentialProvider((PCHAR) pConfig->accessKey.value.c_str(), 0, (PCHAR) pConfig->secretKey.value.c_str(), 0,
                                                       (PCHAR) pConfig->sessionToken.value.c_str(), 0, MAX_UINT64, &pAwsCredentialProvider));
-        }
+//        }
 
     }
 
@@ -226,7 +226,7 @@ STATUS Peer::initRtcConfiguration(const Canary::PConfig pConfig)
 
     // Set the  STUN server
     if (pConfig->endpoint.value.empty()) {
-        SNPRINTF(pConfiguration->iceServers[0].urls, MAX_ICE_CONFIG_URI_LEN, KINESIS_VIDEO_STUN_URL, pConfig->region.value.c_str(), KINESIS_VIDEO_STUN_URL_POSTFIX);
+        SNPRINTF(pConfiguration->iceServers[0].urls, MAX_ICE_CONFIG_URI_LEN, KINESIS_VIDEO_STUN_URL, pConfig->region.value.c_str());
     } else {
         SNPRINTF(pConfiguration->iceServers[0].urls, MAX_ICE_CONFIG_URI_LEN, "stun:stun.%s:443", pConfig->endpoint.value.c_str());
     }
