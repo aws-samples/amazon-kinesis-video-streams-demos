@@ -219,10 +219,10 @@ VOID runPeer(Canary::PConfig pConfig, TIMER_QUEUE_HANDLE timerQueueHandle, STATU
                                       &timeoutTimerId));
         CHK_STATUS(timerQueueAddTimer(timerQueueHandle, END_TO_END_METRICS_INVOCATION_PERIOD, END_TO_END_METRICS_INVOCATION_PERIOD,
                                       canaryEndToEndStats, (UINT64) &peer, &timeoutTimerId));
-        if(pConfig->isProfilingMode.value && pConfig->isMaster.value) {
-            std::thread pushProfilingThread(sendProfilingMetrics, &peer);
-            pushProfilingThread.join();
-        }
+//        if(pConfig->isProfilingMode.value && pConfig->isMaster.value) {
+//            std::thread pushProfilingThread(sendProfilingMetrics, &peer);
+//            pushProfilingThread.join();
+//        }
         videoThread.join();
     }
 

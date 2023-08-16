@@ -234,6 +234,7 @@ VOID CloudwatchMonitoring::pushOutboundRtpStats(Canary::POutgoingRTPMetricsConte
     this->push(retransmissionPercentDatum);
 }
 
+/*
 VOID CloudwatchMonitoring::pushPeerConnectionMetrics(PPeerConnectionMetrics pPeerConnectionMetrics)
 {
     MetricDatum pcCreationDatum, dtlsSetupDatum, iceHolePunchingDatum;
@@ -356,6 +357,7 @@ VOID CloudwatchMonitoring::pushSignalingClientMetrics(PSignalingClientMetrics pS
     connectClientDatum.SetUnit(Aws::CloudWatch::Model::StandardUnit::Milliseconds);
     this->push(connectClientDatum);
 }
+*/
 
 VOID CloudwatchMonitoring::pushInboundRtpStats(Canary::PIncomingRTPMetricsContext pIncomingRtpStats)
 {
