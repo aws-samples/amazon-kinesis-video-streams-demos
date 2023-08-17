@@ -53,6 +53,7 @@ INT32 main(INT32 argc, CHAR* argv[])
     initializeEndianness();
     SET_INSTRUMENTED_ALLOCATORS();
     SRAND(time(0));
+    printf("Starting with main\n");
     // Make sure that all destructors have been called first before resetting the instrumented allocators
     CHK_STATUS([&]() -> STATUS {
         STATUS retStatus = STATUS_SUCCESS;
@@ -62,6 +63,7 @@ INT32 main(INT32 argc, CHAR* argv[])
         Aws::InitAPI(options);
 
         CHK_STATUS(config.init(argc, argv));
+        printf("Initialized config\n");
         CHK_STATUS(run(&config));
 
     CleanUp:
@@ -99,7 +101,7 @@ STATUS run(Canary::PConfig pConfig)
     SET_LOGGER_LOG_LEVEL(pConfig->logLevel.value);
 
     CHK_STATUS(timerQueueCreate(&timerQueueHandle));
-
+    DLOGI("Starting the run");
     if (pConfig->duration.value != 0) {
         auto terminate = [](UINT32 timerId, UINT64 currentTime, UINT64 customData) -> STATUS {
             UNUSED_PARAM(timerId);
@@ -113,6 +115,7 @@ STATUS run(Canary::PConfig pConfig)
     }
 
     if (!pConfig->runBothPeers.value) {
+        DLOGI("Running a peer");
         runPeer(pConfig, timerQueueHandle, &retStatus);
     } else {
         // Modify config to differentiate master and viewer
@@ -201,7 +204,7 @@ VOID runPeer(Canary::PConfig pConfig, TIMER_QUEUE_HANDLE timerQueueHandle, STATU
     Canary::Peer peer;
 
     CHK(pConfig != NULL, STATUS_NULL_ARG);
-
+    DLOGI("Before printing");
     pConfig->print();
     CHK_STATUS(timerQueueAddTimer(timerQueueHandle, KVS_METRICS_INVOCATION_PERIOD, KVS_METRICS_INVOCATION_PERIOD,
                                   canaryKvsStats, (UINT64) &peer, &timeoutTimerId));

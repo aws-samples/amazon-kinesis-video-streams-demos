@@ -26,9 +26,9 @@ def buildProject(useMbedTLS, thing_prefix) {
         chmod a+x cert_setup.sh &&
         ./cert_setup.sh ${thing_prefix} &&
         cd .. &&
-        mkdir -p build && 
-        cd build && 
-        ${configureCmd} && 
+        mkdir -p build &&
+        cd build &&
+        ${configureCmd} &&
         make"""
 }
 
@@ -236,6 +236,7 @@ pipeline {
                       booleanParam(name: 'USE_IOT', value: params.USE_IOT),
                       booleanParam(name: 'IS_PROFILING', value: params.IS_PROFILING),
                       booleanParam(name: 'TRICKLE_ICE', value: params.TRICKLE_ICE),
+                      booleanParam(name: 'USE_OPENSSL', value: params.USE_OPENSSL),
                       booleanParam(name: 'USE_MBEDTLS', value: params.USE_MBEDTLS),
                       string(name: 'LOG_GROUP_NAME', value: params.LOG_GROUP_NAME),
                       string(name: 'MASTER_NODE_LABEL', value: params.MASTER_NODE_LABEL),
