@@ -357,6 +357,7 @@ STATUS run(Canary::PConfig pConfig)
     masterClientInfo.loggingLevel = pConfig->logLevel.value;
     STRCPY(masterClientInfo.clientId, SIGNALING_CANARY_MASTER_CLIENT_ID);
 
+    DLOGD("Creating signaling client sync");
     // Create the master signaling client
     CHK_STATUS(createSignalingClientSync(&masterClientInfo, &masterChannelInfo, &masterSignalingClientCallbacks, pCredentialProvider,
                                          &masterSignalingClientHandle));
