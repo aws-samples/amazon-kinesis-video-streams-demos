@@ -174,7 +174,7 @@ STATUS Peer::initSignaling(const Canary::PConfig pConfig)
 
         return retStatus;
     };
-
+    DLOGI("Creating signaling client sync for peer connection");
     CHK_STATUS(createSignalingClientSync(&this->clientInfo, &channelInfo, &clientCallbacks, pAwsCredentialProvider, &signalingClientHandle));
     CHK_STATUS(signalingClientFetchSync(signalingClientHandle));
 
