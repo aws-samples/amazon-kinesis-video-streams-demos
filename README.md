@@ -15,7 +15,6 @@ This repository contains a list of use cases with sample codes or high level des
 * [WebRTC JS](https://github.com/awslabs/amazon-kinesis-video-streams-webrtc-sdk-js)
 * Canary
   * [Producer C](/canary/producer-c)
-  * [Producer CPP](/canary/producer-cpp)
   * [Consumer Java](/canary/consumer-java)
   * [Webrtc C](/canary/webrtc-c)
 * GStreamer

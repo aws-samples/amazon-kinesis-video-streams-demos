@@ -17,7 +17,7 @@ CREDENTIALS = [
 
 def buildProducer() {
   sh  """
-    cd ./canary/producer-c &&
+    cd ./canary/producer-c && 
     chmod a+x cert_setup.sh &&
     ./cert_setup.sh ${NODE_NAME} &&
     mkdir -p build &&

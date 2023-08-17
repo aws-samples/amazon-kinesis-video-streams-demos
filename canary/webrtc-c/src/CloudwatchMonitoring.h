@@ -18,9 +18,6 @@ class CloudwatchMonitoring {
     VOID pushOutboundRtpStats(Canary::POutgoingRTPMetricsContext);
     VOID pushInboundRtpStats(Canary::PIncomingRTPMetricsContext);
     VOID pushEndToEndMetrics(Canary::EndToEndMetricsContext);
-    VOID pushPeerConnectionMetrics(PPeerConnectionMetrics);
-    VOID pushKvsIceAgentMetrics(PKvsIceAgentMetrics);
-    VOID pushSignalingClientMetrics(PSignalingClientMetrics);
     VOID pushRetryCount(UINT32);
 
   private:

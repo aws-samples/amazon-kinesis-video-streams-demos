@@ -1,60 +1,59 @@
-cmake_minimum_required(VERSION 3.11)
+cmake_minimum_required(VERSION 3.10.2)
+set(CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/CMake;${CMAKE_MODULE_PATH}")
 
+if(APPLE AND NOT DEFINED ENV{MACOSX_DEPLOYMENT_TARGET} AND NOT DEFINED ENV{SDKROOT})
+  set(CMAKE_OSX_DEPLOYMENT_TARGET ${CMAKE_SYSTEM_VERSION})
+endif()
+
+include(Utilities)
 project(KinesisVideoProducerCloudwatch LANGUAGES C CXX)
-include(FetchContent)
 
-set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_MACOSX_RPATH TRUE)
+get_filename_component(ROOT "${CMAKE_CURRENT_SOURCE_DIR}" ABSOLUTE)
 
-# AWS SDK options
-set(CUSTOM_MEMORY_MANAGEMENT OFF CACHE BOOL "Tell AWS SDK to not use custom memory management" FORCE)
-set(ENABLE_TESTING OFF CACHE BOOL "Disable building tests for AWS SDK" FORCE)
-set(BUILD_ONLY "monitoring;logs" CACHE STRING "Tell AWS SDK to only build monitoring and logs" FORCE)
-set(BUILD_COMMON_CURL ON CACHE BOOL "Curl" FORCE)
+message(STATUS "Kinesis Video Producer path is ${KINESIS_VIDEO_PRODUCER_C_SRC}")
 
-FetchContent_Declare(
-        producerc
-        GIT_REPOSITORY https://github.com/awslabs/amazon-kinesis-video-streams-producer-c.git
-        GIT_TAG        611b9b9efb1fe3a404b94f493d877e6bc1a8b8e7
-)
-
-FetchContent_Declare(
-        cloudwatch
-        GIT_REPOSITORY https://github.com/aws/aws-sdk-cpp
-        GIT_TAG        1.11.92
-)
-
-FetchContent_GetProperties(webrtc)
-if(NOT producerc_POPULATED)
-  FetchContent_Populate(producerc)
-  add_subdirectory(${producerc_SOURCE_DIR} ${producerc_BINARY_DIR} EXCLUDE_FROM_ALL)
+if (NOT OPEN_SRC_INSTALL_PREFIX)
+  set(OPEN_SRC_INSTALL_PREFIX ${CMAKE_CURRENT_SOURCE_DIR}/open-source)
+  set(ENV{PKG_CONFIG_PATH}
+        "$ENV{PKG_CONFIG_PATH}:${OPEN_SRC_INSTALL_PREFIX}/lib/pkgconfig")
+  set(CMAKE_PREFIX_PATH ${CMAKE_PREFIX_PATH} ${OPEN_SRC_INSTALL_PREFIX})
 endif()
 
-FetchContent_GetProperties(cloudwatch)
-if(NOT cloudwatch_POPULATED)
-  FetchContent_Populate(cloudwatch)
-  add_subdirectory(${cloudwatch_SOURCE_DIR} ${cloudwatch_BINARY_DIR} EXCLUDE_FROM_ALL)
+if(NOT EXISTS ${OPEN_SRC_INSTALL_PREFIX})
+  file(MAKE_DIRECTORY ${OPEN_SRC_INSTALL_PREFIX})
 endif()
 
-file(GLOB PIC_HEADERS "${pic_project_SOURCE_DIR}/src/*/include")
-include_directories(${cloudwatch_SOURCE_DIR}/aws-cpp-sdk-core/include)
-include_directories(${cloudwatch_SOURCE_DIR}/aws-cpp-sdk-monitoring/include)
-include_directories(${cloudwatch_SOURCE_DIR}/aws-cpp-sdk-logs/include)
-include_directories(${producerc_SOURCE_DIR}/src/include)
-include_directories(${producerc_SOURCE_DIR}/open-source/include)
-include_directories("${PIC_HEADERS}")
+message(STATUS "Begin building dependencies.")
 
-link_directories(${producerc_SOURCE_DIR}/open-source/lib)
-add_executable(
-        kvsProducerSampleCloudwatch
-        canary/KvsProducerSampleCloudwatch.cpp
-        canary/CanaryStreamUtils.cpp
-        canary/CanaryLogsUtils.cpp
-        canary/CanaryUtils.h)
-target_link_libraries(
-        kvsProducerSampleCloudwatch
-        cproducer
-        kvspicUtils
-        aws-cpp-sdk-core
-        aws-cpp-sdk-monitoring
-        aws-cpp-sdk-logs)
+build_dependency(kvsProducerC)
+build_dependency(cppsdk)
 
+message(STATUS "Finished building dependencies.")
+
+############# find dependent libraries ############
+
+find_package(Threads)
+find_package(PkgConfig REQUIRED)
+find_package(AWSSDK REQUIRED COMPONENTS monitoring logs)
+
+if (WIN32)
+  find_library(LIBKVSPIC_LIBRARIES kvspic REQUIRED)
+  find_library(LIBKVSPRODUCERC cproducer REQUIRED)
+else()
+  pkg_check_modules(LIBKVSPIC REQUIRED libkvspic)
+  pkg_check_modules(LIBKVSPRODUCERC REQUIRED libcproducer)
+endif()
+
+set(OPEN_SRC_INCLUDE_DIRS ${LIBKVSPIC_INCLUDE_DIRS})
+link_directories(${LIBKVSPIC_LIBRARY_DIRS})
+
+include_directories(${OPEN_SRC_INCLUDE_DIRS})
+
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
+add_executable(kvsProducerSampleCloudwatch
+            ${CMAKE_CURRENT_SOURCE_DIR}/canary/KvsProducerSampleCloudwatch.cpp
+            ${CMAKE_CURRENT_SOURCE_DIR}/canary/CanaryStreamUtils.cpp
+            ${CMAKE_CURRENT_SOURCE_DIR}/canary/CanaryLogsUtils.cpp)
+
+target_link_libraries(kvsProducerSampleCloudwatch cproducer kvspicUtils ${AWSSDK_LINK_LIBRARIES})

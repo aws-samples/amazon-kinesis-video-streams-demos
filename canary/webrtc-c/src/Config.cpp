@@ -168,7 +168,6 @@ STATUS Config::initWithEnvVars()
     CHK_STATUS(optenvBool(CANARY_USE_TURN_ENV_VAR, &useTurn, TRUE));
     CHK_STATUS(optenvBool(CANARY_FORCE_TURN_ENV_VAR, &forceTurn, FALSE));
     CHK_STATUS(optenvBool(CANARY_USE_IOT_CREDENTIALS_ENV_VAR, &useIotCredentialProvider, FALSE));
-    CHK_STATUS(optenvBool(CANARY_RUN_IN_PROFILING_MODE_ENV_VAR, &isProfilingMode, FALSE));
 
     CHK_STATUS(optenv(CACERT_PATH_ENV_VAR, &caCertPath, KVS_CA_CERT_PATH));
 

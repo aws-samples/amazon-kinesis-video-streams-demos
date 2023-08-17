@@ -57,7 +57,6 @@ class Peer {
     STATUS addTransceiver(RtcMediaStreamTrack&);
     STATUS addSupportedCodec(RTC_CODEC);
     STATUS writeFrame(PFrame, MEDIA_STREAM_TRACK_KIND);
-    STATUS sendProfilingMetrics();
 
     // WebRTC Stats
     STATUS publishStatsForCanary(RTC_STATS_TYPE);
@@ -89,7 +88,6 @@ class Peer {
     BOOL useMediaStorage;
     
     BOOL trickleIce;
-    BOOL isProfilingMode;
     UINT64 offerReceiveTimestamp;
     BOOL firstFrame;
     BOOL useIotCredentialProvider;
@@ -100,9 +98,6 @@ class Peer {
     UINT64 signalingStartTime;
     UINT64 iceHolePunchingStartTime;
     RtcStats canaryMetrics;
-    PeerConnectionMetrics peerConnectionMetrics;
-    KvsIceAgentMetrics iceMetrics;
-    SignalingClientMetrics signalingClientMetrics;
     OutgoingRTPMetricsContext canaryOutgoingRTPMetricsContext;
     IncomingRTPMetricsContext canaryIncomingRTPMetricsContext;
     EndToEndMetricsContext endToEndMetricsContext;

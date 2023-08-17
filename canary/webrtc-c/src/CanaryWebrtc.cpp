@@ -5,7 +5,6 @@ STATUS run(Canary::PConfig);
 VOID runPeer(Canary::PConfig, TIMER_QUEUE_HANDLE, STATUS*);
 VOID sendLocalFrames(Canary::PPeer, MEDIA_STREAM_TRACK_KIND, const std::string&, UINT64, UINT32);
 VOID sendCustomFrames(Canary::PPeer, MEDIA_STREAM_TRACK_KIND, UINT64, UINT64);
-VOID sendProfilingMetrics(Canary::PPeer);
 STATUS canaryRtpOutboundStats(UINT32, UINT64, UINT64);
 STATUS canaryRtpInboundStats(UINT32, UINT64, UINT64);
 STATUS canaryEndToEndStats(UINT32, UINT64, UINT64);
@@ -168,27 +167,6 @@ CleanUp:
     return retStatus;
 }
 
-// This is not a time sensitive thread. It is ok if pushing the metrics gets delayed by 100 ms because of the
-// thread sleep
-VOID sendProfilingMetrics(Canary::PPeer pPeer)
-{
-    STATUS retStatus = STATUS_SUCCESS;
-    BOOL done = FALSE;
-    while (!terminated.load()) {
-        retStatus = pPeer->sendProfilingMetrics();
-        if (retStatus == STATUS_WAITING_ON_FIRST_FRAME) {
-            THREAD_SLEEP(HUNDREDS_OF_NANOS_IN_A_MILLISECOND * 100); // to prevent busy waiting
-        } else if (retStatus == STATUS_SUCCESS) {
-            DLOGI("First frame sent out, pushed profiling metrics");
-            done = TRUE;
-            break;
-        }
-    }
-    if(!done) {
-        DLOGE("First frame never got sent out...no profiling metrics pushed to cloudwatch..error code: 0x%08x", retStatus);
-    }
-}
-
 VOID runPeer(Canary::PConfig pConfig, TIMER_QUEUE_HANDLE timerQueueHandle, STATUS* pRetStatus)
 {
     STATUS retStatus = STATUS_SUCCESS;
@@ -219,10 +197,6 @@ VOID runPeer(Canary::PConfig pConfig, TIMER_QUEUE_HANDLE timerQueueHandle, STATU
                                       &timeoutTimerId));
         CHK_STATUS(timerQueueAddTimer(timerQueueHandle, END_TO_END_METRICS_INVOCATION_PERIOD, END_TO_END_METRICS_INVOCATION_PERIOD,
                                       canaryEndToEndStats, (UINT64) &peer, &timeoutTimerId));
-        if(pConfig->isProfilingMode.value && pConfig->isMaster.value) {
-            std::thread pushProfilingThread(sendProfilingMetrics, &peer);
-            pushProfilingThread.join();
-        }
         videoThread.join();
     }
 
@@ -304,7 +278,7 @@ VOID sendCustomFrames(Canary::PPeer pPeer, MEDIA_STREAM_TRACK_KIND kind, UINT64 
 
         // We must update the size to reflect the original data with hex encoded data
         frame.size = hexStrLen + ANNEX_B_NALU_SIZE;
-         pPeer->writeFrame(&frame, kind);
+        pPeer->writeFrame(&frame, kind);
         THREAD_SLEEP(HUNDREDS_OF_NANOS_IN_A_SECOND / frameRate);
         frame.presentationTs = GETTIME();
     }
