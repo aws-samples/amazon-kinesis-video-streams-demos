@@ -10,6 +10,17 @@ set(CUSTOM_MEMORY_MANAGEMENT OFF CACHE BOOL "Tell AWS SDK to not use custom memo
 set(ENABLE_TESTING OFF CACHE BOOL "Disable building tests for AWS SDK" FORCE)
 set(BUILD_ONLY "monitoring;logs" CACHE STRING "Tell AWS SDK to only build monitoring and logs" FORCE)
 
+# set(CMAKE_PREFIX_PATH "/home/ubuntu/amazon-kinesis-video-streams-demos/canary/webrtc-c/build/_deps/webrtc-src/open-source/lib")
+
+if (NOT OPEN_SRC_INSTALL_PREFIX)
+  set(OPEN_SRC_INSTALL_PREFIX ${CMAKE_CURRENT_SOURCE_DIR}/build/_deps)
+  set(CMAKE_PREFIX_PATH ${CMAKE_PREFIX_PATH} ${OPEN_SRC_INSTALL_PREFIX})
+endif()
+
+if(NOT EXISTS ${OPEN_SRC_INSTALL_PREFIX})
+  file(MAKE_DIRECTORY ${OPEN_SRC_INSTALL_PREFIX})
+endif()
+
 FetchContent_Declare(
   webrtc
   GIT_REPOSITORY https://github.com/awslabs/amazon-kinesis-video-streams-webrtc-sdk-c
@@ -19,7 +30,7 @@ FetchContent_Declare(
 FetchContent_Declare(
   cloudwatch
   GIT_REPOSITORY https://github.com/aws/aws-sdk-cpp
-  GIT_TAG        1.9.67
+  GIT_TAG        1.10.9
 )
 
 FetchContent_GetProperties(webrtc)
@@ -41,9 +52,14 @@ add_definitions(-DCMAKE_DETECTED_CACERT_PATH)
 include_directories(${cloudwatch_SOURCE_DIR}/aws-cpp-sdk-core/include)
 include_directories(${cloudwatch_SOURCE_DIR}/aws-cpp-sdk-monitoring/include)
 include_directories(${cloudwatch_SOURCE_DIR}/aws-cpp-sdk-logs/include)
+
 include_directories(${webrtc_SOURCE_DIR}/src/include)
 include_directories(${webrtc_SOURCE_DIR}/open-source/include)
 link_directories(${webrtc_SOURCE_DIR}/open-source/lib)
+
+link_directories(${CMAKE_CURRENT_SOURCE_DIR}/build/_deps/lib)
+
+
 add_library(
   kvsWebrtcCanary
   src/Config.cpp
@@ -58,7 +74,8 @@ target_link_libraries(
   kvspicUtils
   aws-cpp-sdk-core
   aws-cpp-sdk-monitoring
-  aws-cpp-sdk-logs)
+  aws-cpp-sdk-logs
+  )
 
 add_executable(
   kvsWebrtcCanaryWebrtc
