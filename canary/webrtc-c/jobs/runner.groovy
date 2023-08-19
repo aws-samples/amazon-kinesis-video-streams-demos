@@ -165,6 +165,14 @@ pipeline {
     }
 
     stages {
+        stage('Set build description') {
+            steps {
+                script {
+                    currentBuild.displayName = "${params.RUNNER_LABEL} [#${BUILD_NUMBER}]"
+                    currentBuild.description = "Executed on: ${NODE_NAME}\n"
+                }
+            }
+        }
         stage('Preparation') {
             steps {
               echo params.toString()
