@@ -260,6 +260,7 @@ pipeline {
                             wait: false
                         )
 
+                        // TODO: disable consumer for periodic runs?
                         build(
                             job: NEXT_AVAILABLE_RUNNER,
                             parameters: COMMON_PARAMS + [
