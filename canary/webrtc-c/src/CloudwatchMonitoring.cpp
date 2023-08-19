@@ -11,6 +11,7 @@ STATUS CloudwatchMonitoring::init()
 {
     STATUS retStatus = STATUS_SUCCESS;
 
+    // TODO: would it be cleaner to call it Storage...Name if isStorage like I added for the Label?
     this->channelDimension.SetName("WebRTCSDKCanaryChannelName");
     this->channelDimension.SetValue(pConfig->channelName.value);
 
