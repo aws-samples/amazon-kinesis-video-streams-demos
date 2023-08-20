@@ -18,7 +18,7 @@ def buildProject(useMbedTLS, thing_prefix) {
 
     def configureCmd = "cmake .. -DCMAKE_BUILD_TYPE=Debug -DCMAKE_C_FLAGS_DEBUG=\"-g -O0\" -DCMAKE_CXX_FLAGS_DEBUG=\"-g -O0\" -DCMAKE_INSTALL_PREFIX=\"\$PWD\""
     if (useMbedTLS) {
-      configureCmd += " -DKVS_USE_OPENSSL=OFF -DKVS_USE_MBEDTLS=ON"
+      configureCmd += " -DUSE_OPENSSL=OFF -DUSE_MBEDTLS=ON"
     }     
 
     sh """
