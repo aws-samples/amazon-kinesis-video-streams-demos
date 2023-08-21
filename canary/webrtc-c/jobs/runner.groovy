@@ -33,6 +33,7 @@ def buildWebRTCProject(useMbedTLS, thing_prefix) {
 }
 
 def buildConsumerProject() {
+    // TODO: should probably remove this - not needed for webrtc consumer
     def consumerStartUpDelay = 45
     sleep consumerStartUpDelay
 
@@ -219,7 +220,6 @@ def buildStorageEndpoint(isConsumer, params) {
         withRunnerWrapper(envs) {
             sh """
                 cd ./canary/webrtc-c/build &&
-                ${"sleep 10 &&"}
                 ./kvsWebrtcCanaryWebrtcStorage"""
         }
     } else {
