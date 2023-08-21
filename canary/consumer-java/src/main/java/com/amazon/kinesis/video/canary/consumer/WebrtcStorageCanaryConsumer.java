@@ -31,6 +31,7 @@ import lombok.extern.log4j.Log4j2;
 public class WebrtcStorageCanaryConsumer {
     private static void calculateFragmentContinuityMetric(CanaryFragmentList fragmentList, Date canaryStartTime, String streamName, String canaryLabel, SystemPropertiesCredentialsProvider credentialsProvider, String dataEndpoint, String region) {
         try {
+            // TODO: eliminate this duplicated code, other metric function does this too.
             TimestampRange timestampRange = new TimestampRange();
             timestampRange.setStartTimestamp(canaryStartTime);
             timestampRange.setEndTimestamp(new Date());
@@ -99,6 +100,7 @@ public class WebrtcStorageCanaryConsumer {
 
     private static void publishMetricToCW(String metricName, double value, StandardUnit cwUnit, String streamName, String canaryLabel, SystemPropertiesCredentialsProvider credentialsProvider, String region) {
         try {
+            System.out.println("Publishing a metric");
             final AmazonCloudWatchAsync cwClient = AmazonCloudWatchAsyncClientBuilder.standard()
                     .withRegion(region)
                     .withCredentials(credentialsProvider)
@@ -141,7 +143,6 @@ public class WebrtcStorageCanaryConsumer {
         final String streamName = System.getenv("CANARY_STREAM_NAME");
         final String canaryLabel = System.getenv("CANARY_LABEL");
         final String region = System.getenv("AWS_DEFAULT_REGION");
-        final String canaryScenario = System.getenv("CANARY_RUN_SCENARIO");
         final Integer canaryRunTime = Integer.parseInt(System.getenv("CANARY_DURATION_IN_SECONDS"));
 
         log.info("Stream name: {}", streamName);
@@ -165,8 +166,9 @@ public class WebrtcStorageCanaryConsumer {
         CanaryFragmentList fragmentList = new CanaryFragmentList();
         Timer intervalMetricsTimer = new Timer("IntervalMetricsTimer");
 
-        switch (canaryScenario){
-            case "FragmentContinuity": {
+        switch (canaryLabel){
+            case "WebrtcLongRunning": {
+                System.out.println("FragmentContinuity Case");
                 TimerTask intervalMetricsTask = new TimerTask() {
                     @Override
                     public void run() {
@@ -177,7 +179,8 @@ public class WebrtcStorageCanaryConsumer {
                 intervalMetricsTimer.scheduleAtFixedRate(intervalMetricsTask, 60000, intervalDelay); // initial delay of 60 s at an interval of intervalDelay ms
                 break;
             }
-            case "TimeToFirstFragment": {
+            case "WebrtcPeriodic": {
+                System.out.println("TimeToFirstFragment Case");
                 TimerTask intervalMetricsTask = new TimerTask() {
                     @Override
                     public void run() {
@@ -189,7 +192,8 @@ public class WebrtcStorageCanaryConsumer {
                 break;
             }
             default:
-                log.info("Env var CANARY_RUN_SCENARIO: {} must be set to either Continuous or Intermittent", canaryScenario);
+                log.info("Env var CANARY_LABEL: {} must be set to either WebrtcLongRunning or WebrtcPeriodic", canaryLabel);
+                System.out.println("Default Case");
                 break;
         }
 
