@@ -55,14 +55,49 @@ public class WebrtcStorageCanaryConsumer {
 
             fragmentList.setFragmentList(newFragmentList);
 
-            sendFragmentContinuityMetric(newFragmentReceived, streamName, canaryLabel, credentialsProvider, region);
+            publishMetricToCW("FragmentReceived", newFragmentReceived ? 1.0 : 0.0, StandardUnit.None, streamName, canaryLabel, credentialsProvider, region);
 
         } catch (Exception e) {
             log.error(e);
         }
     }
 
-    private static void sendFragmentContinuityMetric(Boolean newFragmentReceived, String streamName, String canaryLabel, SystemPropertiesCredentialsProvider credentialsProvider, String region) {
+    private static void calculateTimeToFirstFragment(Timer intervalMetricsTimer, Date canaryStartTime, String streamName, String canaryLabel, SystemPropertiesCredentialsProvider credentialsProvider, String dataEndpoint, String region) {
+        try {
+            Boolean fragmentReceived = false;
+            double timeToFirstFragment = Double.MAX_VALUE;
+        
+            // Time range for listFragments request
+            TimestampRange timestampRange = new TimestampRange();
+            timestampRange.setStartTimestamp(canaryStartTime);
+            timestampRange.setEndTimestamp(new Date());
+
+            // Configures listFragments request
+            FragmentSelector fragmentSelector = new FragmentSelector();
+            fragmentSelector.setFragmentSelectorType("SERVER_TIMESTAMP");
+            fragmentSelector.setTimestampRange(timestampRange);
+
+            final FutureTask<List<CanaryFragment>> futureTask = new FutureTask<>(
+                new CanaryListFragmentWorker(streamName, credentialsProvider, dataEndpoint, Regions.fromName(region), fragmentSelector)
+            );
+            Thread thread = new Thread(futureTask);
+            thread.start();
+            List<CanaryFragment> fragmentList = futureTask.get();
+
+            if (fragmentList.size() > 0) {
+                timeToFirstFragment = new Date().getTime() - canaryStartTime.getTime();
+                fragmentReceived = true;
+                publishMetricToCW("TimeToFirstFragment", timeToFirstFragment, StandardUnit.Milliseconds, streamName, canaryLabel, credentialsProvider, region);
+                intervalMetricsTimer.cancel();
+            }
+
+        } catch (Exception e) {
+            log.error(e);
+        }
+                
+    }
+
+    private static void publishMetricToCW(String metricName, double value, StandardUnit cwUnit, String streamName, String canaryLabel, SystemPropertiesCredentialsProvider credentialsProvider, String region) {
         try {
             final AmazonCloudWatchAsync cwClient = AmazonCloudWatchAsyncClientBuilder.standard()
                     .withRegion(region)
@@ -78,15 +113,15 @@ public class WebrtcStorageCanaryConsumer {
             List<MetricDatum> datumList = new ArrayList<>();
 
             MetricDatum datum = new MetricDatum()
-                    .withMetricName("FragmentReceived")
-                    .withUnit(StandardUnit.None)
-                    .withValue(newFragmentReceived ? 1.0 : 0.0)
+                    .withMetricName(metricName)
+                    .withUnit(cwUnit)
+                    .withValue(value)
                     .withDimensions(dimensionPerStream);
             datumList.add(datum);
             MetricDatum aggDatum = new MetricDatum()
-                    .withMetricName("FragmentReceived")
-                    .withUnit(StandardUnit.None)
-                    .withValue(newFragmentReceived ? 1.0 : 0.0)
+                    .withMetricName(metricName)
+                    .withUnit(cwUnit)
+                    .withValue(value)
                     .withDimensions(aggregatedDimension);
             datumList.add(aggDatum);
 
@@ -94,26 +129,20 @@ public class WebrtcStorageCanaryConsumer {
                     .withNamespace("KinesisVideoSDKCanary")
                     .withMetricData(datumList);
             cwClient.putMetricDataAsync(request);
-
+            System.out.println("Publishing metric: ");
+            System.out.println(value);
         } catch (Exception e) {
+            System.out.println(e);
             log.error(e);
         }
-    }
-
-    private static void calculateTimeToFirstFragment() {
-        
     }
 
     public static void main(final String[] args) throws Exception {
         final String streamName = System.getenv("CANARY_STREAM_NAME");
         final String canaryLabel = System.getenv("CANARY_LABEL");
         final String region = System.getenv("AWS_DEFAULT_REGION");
+        final String canaryScenario = System.getenv("CANARY_RUN_SCENARIO");
         final Integer canaryRunTime = Integer.parseInt(System.getenv("CANARY_DURATION_IN_SECONDS"));
-
-        final String metricType = System.getenv("CANARY_METRIC_TYPE");
-
-        // FragmentContinuity
-        // TimeToFirstFragment
 
         log.info("Stream name: {}", streamName);
 
@@ -133,10 +162,11 @@ public class WebrtcStorageCanaryConsumer {
 
         final Date canaryStartTime = new Date();
 
-        switch (metricType){
+        CanaryFragmentList fragmentList = new CanaryFragmentList();
+        Timer intervalMetricsTimer = new Timer("IntervalMetricsTimer");
+
+        switch (canaryScenario){
             case "FragmentContinuity": {
-                CanaryFragmentList fragmentList = new CanaryFragmentList();
-                Timer intervalMetricsTimer = new Timer("IntervalMetricsTimer");
                 TimerTask intervalMetricsTask = new TimerTask() {
                     @Override
                     public void run() {
@@ -148,77 +178,24 @@ public class WebrtcStorageCanaryConsumer {
                 break;
             }
             case "TimeToFirstFragment": {
-                Boolean newFragmentReceived = false;
-                double timeToFirstFragment = Double.MAX_VALUE;
-                while(!newFragmentReceived)
-                {
-                    TimestampRange timestampRange = new TimestampRange();
-                    timestampRange.setStartTimestamp(canaryStartTime);
-                    timestampRange.setEndTimestamp(new Date());
-
-                    FragmentSelector fragmentSelector = new FragmentSelector();
-                    fragmentSelector.setFragmentSelectorType("SERVER_TIMESTAMP");
-                    fragmentSelector.setTimestampRange(timestampRange);
-
-                    final FutureTask<List<CanaryFragment>> futureTask = new FutureTask<>(
-                        new CanaryListFragmentWorker(streamName, credentialsProvider, dataEndpoint, Regions.fromName(region), fragmentSelector)
-                    );
-                    Thread thread = new Thread(futureTask);
-                    thread.start();
-                    List<CanaryFragment> fragmentList = futureTask.get();
-
-                    if (fragmentList.size() > 0) {
-                        timeToFirstFragment = new Date().getTime() - canaryStartTime.getTime();
-                        newFragmentReceived = true;
+                TimerTask intervalMetricsTask = new TimerTask() {
+                    @Override
+                    public void run() {
+                        calculateTimeToFirstFragment(intervalMetricsTimer, canaryStartTime, streamName, canaryLabel, credentialsProvider, dataEndpoint, region);
                     }
-                    log.info("New fragment received: {}", newFragmentReceived);
-                }
-                try {
-                    final AmazonCloudWatchAsync cwClient = AmazonCloudWatchAsyncClientBuilder.standard()
-                            .withRegion(region)
-                            .withCredentials(credentialsProvider)
-                            .build();
-
-                    final Dimension dimensionPerStream = new Dimension()
-                            .withName("StorageWebRTCSDKCanaryStreamName")
-                            .withValue(streamName);
-                    final Dimension aggregatedDimension = new Dimension()
-                            .withName("StorageWebRTCSDKCanaryLabel")
-                            .withValue(canaryLabel);
-                    List<MetricDatum> datumList = new ArrayList<>();
-
-                    MetricDatum datum = new MetricDatum()
-                            .withMetricName("TimeToFirstFragment")
-                            .withUnit(StandardUnit.Milliseconds)
-                            .withValue(timeToFirstFragment)
-                            .withDimensions(dimensionPerStream);
-                    datumList.add(datum);
-                    MetricDatum aggDatum = new MetricDatum()
-                            .withMetricName("TimeToFirstFragment")
-                            .withUnit(StandardUnit.Milliseconds)
-                            .withValue(timeToFirstFragment)
-                            .withDimensions(aggregatedDimension);
-                    datumList.add(aggDatum);
-
-                    PutMetricDataRequest request = new PutMetricDataRequest()
-                            .withNamespace("KinesisVideoSDKCanary")
-                            .withMetricData(datumList);
-                    cwClient.putMetricDataAsync(request);
-                    System.out.println("Publishing metric: ");
-                    System.out.println(timeToFirstFragment);
-                    //Thread.sleep(3000);
-
-                } catch (Exception e) {
-                    System.out.println(e);
-                    log.error(e);
-                }
+                };
+                final long intervalDelay = 1;
+                intervalMetricsTimer.scheduleAtFixedRate(intervalMetricsTask, 0, intervalDelay); // initial delay of 0 ms at an interval of 1 ms
                 break;
             }
             default:
-                log.info("Env var CANARY_METRIC_TYPE: {} must be set to either FragmentContinuity or TimeToFirstFragment", metricType);
+                log.info("Env var CANARY_RUN_SCENARIO: {} must be set to either Continuous or Intermittent", canaryScenario);
                 break;
         }
 
+        // TODO: Make this comment more clear or remove:
+        // Run this sleep for both FragmentReceived and TimeToFirstFrame metric cases to ensure
+        // connection can be made to media-server for periodic runs
         Thread.sleep(canaryRunTime * 1000);
 
         // Using System.exit(0) to exit from application. 
