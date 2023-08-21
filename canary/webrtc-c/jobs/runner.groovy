@@ -13,11 +13,13 @@ CREDENTIALS = [
 ]
 
 def buildProject(useMbedTLS, thing_prefix) {
+    echo 'Flag set to ' + useMbedTLS
     checkout([$class: 'GitSCM', branches: [[name: params.GIT_HASH ]],
               userRemoteConfigs: [[url: params.GIT_URL]]])
 
     def configureCmd = "cmake .. -DCMAKE_BUILD_TYPE=Debug -DCMAKE_C_FLAGS_DEBUG=\"-g -O0\" -DCMAKE_CXX_FLAGS_DEBUG=\"-g -O0\" -DCMAKE_INSTALL_PREFIX=\"\$PWD\""
     if (useMbedTLS) {
+      echo 'Using mbedtls'
       configureCmd += " -DUSE_OPENSSL=OFF -DUSE_MBEDTLS=ON"
     }     
 
