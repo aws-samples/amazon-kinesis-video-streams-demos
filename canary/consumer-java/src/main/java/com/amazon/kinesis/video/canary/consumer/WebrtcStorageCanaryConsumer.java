@@ -156,8 +156,7 @@ public class WebrtcStorageCanaryConsumer {
     }
 
     public static void main(final String[] args) throws Exception {
-        //final String streamName = System.getenv("CANARY_STREAM_NAME");
-        final String streamName = "stream";
+        final String streamName = System.getenv("CANARY_STREAM_NAME");
 
 
         final String canaryLabel = System.getenv("CANARY_LABEL");
@@ -186,7 +185,7 @@ public class WebrtcStorageCanaryConsumer {
         Timer intervalMetricsTimer = new Timer("IntervalMetricsTimer");
 
 
-        
+
         // Code for sharing:
             // final AmazonKinesisVideoMedia videoMedia;
 
