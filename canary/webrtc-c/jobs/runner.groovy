@@ -113,10 +113,16 @@ def buildPeer(isMaster, params) {
 def buildSignaling(params) {
 
     // TODO: get the branch and version from orchestrator
+    // TODO: get the branch and version from orchestrator
     if (params.FIRST_ITERATION) {
-        if()
-        deleteDir()
+        if(params.CACHED_WORKSPACE_ID == "${env.WORKSPACE}") {
+            echo "Same workspace: " + params.CACHED_WORKSPACE_ID
+            echo "New one: ${env.WORKSPACE}"
+        } else {
+            deleteDir()
+        }
     }
+
     def thing_prefix = "${env.JOB_NAME}-${params.RUNNER_LABEL}"
     buildProject(params.USE_MBEDTLS, thing_prefix)
 
@@ -220,7 +226,7 @@ pipeline {
             post {
                 always {
                     script {
-                        cachedWorkspaceId = ${env.WORKSPACE}"
+                        cachedWorkspaceId = ${env.WORKSPACE}
                         echo "Cached workspace id post job: ${cachedWorkspaceId}"
                     }
                 }
@@ -236,6 +242,14 @@ pipeline {
             steps {
                 script {
                     buildSignaling(params)
+                }
+            }
+            post {
+                always {
+                    script {
+                        cachedWorkspaceId = ${env.WORKSPACE}
+                        echo "Cached workspace id post job: ${cachedWorkspaceId}"
+                    }
                 }
             }
         }
