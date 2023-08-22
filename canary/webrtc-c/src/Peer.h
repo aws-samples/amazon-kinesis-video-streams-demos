@@ -97,9 +97,9 @@ class Peer {
     UINT64 signalingStartTime;
     UINT64 iceHolePunchingStartTime;
     RtcStats canaryMetrics;
-//    PeerConnectionMetrics peerConnectionMetrics;
-//    KvsIceAgentMetrics iceMetrics;
-//    SignalingClientMetrics signalingClientMetrics;
+    PeerConnectionMetrics peerConnectionMetrics;
+    KvsIceAgentMetrics iceMetrics;
+    SignalingClientMetrics signalingClientMetrics;
     OutgoingRTPMetricsContext canaryOutgoingRTPMetricsContext;
     IncomingRTPMetricsContext canaryIncomingRTPMetricsContext;
     EndToEndMetricsContext endToEndMetricsContext;

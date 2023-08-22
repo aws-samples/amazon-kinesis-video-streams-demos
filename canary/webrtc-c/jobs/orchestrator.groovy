@@ -123,7 +123,7 @@ pipeline {
                                 booleanParam(name: 'USE_TURN', value: true),
                                 booleanParam(name: 'TRICKLE_ICE', value: true),
                                 booleanParam(name: 'USE_IOT', value: true),
-                                booleanParam(name: 'USE_OPENSSL', value: true),
+                                booleanParam(name: 'USE_MBEDTLS', value: false),
                                 string(name: 'DURATION_IN_SECONDS', value: PERIODIC_DURATION_IN_SECONDS.toString()),
                                 string(name: 'MASTER_NODE_LABEL', value: "ec2-us-west-2"),
                                 string(name: 'VIEWER_NODE_LABEL', value: "ec2-us-west-2"),
@@ -139,7 +139,7 @@ pipeline {
                                 booleanParam(name: 'USE_TURN', value: true),
                                 booleanParam(name: 'TRICKLE_ICE', value: true),
                                 booleanParam(name: 'USE_IOT', value: true),
-                                booleanParam(name: 'USE_OPENSSL', value: true),
+                                booleanParam(name: 'USE_MBEDTLS', value: false),
                                 string(name: 'DURATION_IN_SECONDS', value: LONG_RUNNING_DURATION_IN_SECONDS.toString()),
                                 string(name: 'MASTER_NODE_LABEL', value: "ec2-us-west-2"),
                                 string(name: 'VIEWER_NODE_LABEL', value: "ec2-us-west-2"),
@@ -155,7 +155,6 @@ pipeline {
                                 booleanParam(name: 'USE_TURN', value: true),
                                 booleanParam(name: 'TRICKLE_ICE', value: true),
                                 booleanParam(name: 'USE_IOT', value: false),
-                                booleanParam(name: 'USE_OPENSSL', value: false),
                                 booleanParam(name: 'USE_MBEDTLS', value: true),
                                 string(name: 'DURATION_IN_SECONDS', value: PERIODIC_DURATION_IN_SECONDS.toString()),
                                 string(name: 'MASTER_NODE_LABEL', value: "ec2-us-west-2"),
@@ -172,7 +171,6 @@ pipeline {
                                 booleanParam(name: 'USE_TURN', value: true),
                                 booleanParam(name: 'TRICKLE_ICE', value: true),
                                 booleanParam(name: 'USE_IOT', value: false),
-                                booleanParam(name: 'USE_OPENSSL', value: false),
                                 booleanParam(name: 'USE_MBEDTLS', value: true),
                                 string(name: 'DURATION_IN_SECONDS', value: LONG_RUNNING_DURATION_IN_SECONDS.toString()),
                                 string(name: 'MASTER_NODE_LABEL', value: "ec2-us-west-2"),
@@ -189,7 +187,6 @@ pipeline {
                                 booleanParam(name: 'IS_SIGNALING', value: true),
                                 booleanParam(name: 'USE_IOT', value: false),
                                 booleanParam(name: 'USE_MBEDTLS', value: false),
-                                booleanParam(name: 'USE_OPENSSL', value: true),
                                 string(name: 'DURATION_IN_SECONDS', value: PERIODIC_DURATION_IN_SECONDS.toString()),
                                 string(name: 'MASTER_NODE_LABEL', value: "ec2-us-west-2"),
                                 // TODO: should not need viewer node label for signaling. If not set, Jenkins pipeline will crash
@@ -206,6 +203,7 @@ pipeline {
                             parameters: COMMON_PARAMS + [
                                 booleanParam(name: 'IS_SIGNALING', value: true),
                                 booleanParam(name: 'USE_IOT', value: true),
+                                booleanParam(name: 'USE_MBEDTLS', value: false),
                                 string(name: 'DURATION_IN_SECONDS', value: LONG_RUNNING_DURATION_IN_SECONDS.toString()),
                                 string(name: 'MASTER_NODE_LABEL', value: "ec2-us-west-2"),
                                 // TODO: should not need viewer node label for signaling. If not set, Jenkins pipeline will crash
@@ -217,22 +215,22 @@ pipeline {
                             wait: false
                         )
 
-//                         build(
-//                             job: NEXT_AVAILABLE_RUNNER,
-//                             parameters: COMMON_PARAMS + [
-//                                 booleanParam(name: 'USE_TURN', value: true),
-//                                 booleanParam(name: 'TRICKLE_ICE', value: true),
-//                                 booleanParam(name: 'USE_IOT', value: false),
-//                                 booleanParam(name: 'USE_MBEDTLS', value: false),
-//                                 booleanParam(name: 'IS_PROFILING', value: true),
-//                                 string(name: 'DURATION_IN_SECONDS', value: PERIODIC_PROFILING_DURATION_IN_SECONDS.toString()),
-//                                 string(name: 'MASTER_NODE_LABEL', value: "ec2-profiling"),
-//                                 string(name: 'VIEWER_NODE_LABEL', value: "ec2-profiling"),
-//                                 string(name: 'RUNNER_LABEL', value: "WebrtcPeriodicProfiling"),
-//                                 string(name: 'SCENARIO_LABEL', value: "WebrtcProfiling"),
-//                             ],
-//                             wait: false
-//                         )
+                        build(
+                            job: NEXT_AVAILABLE_RUNNER,
+                            parameters: COMMON_PARAMS + [
+                                booleanParam(name: 'USE_TURN', value: true),
+                                booleanParam(name: 'TRICKLE_ICE', value: true),
+                                booleanParam(name: 'USE_IOT', value: false),
+                                booleanParam(name: 'USE_MBEDTLS', value: false),
+                                booleanParam(name: 'IS_PROFILING', value: true),
+                                string(name: 'DURATION_IN_SECONDS', value: PERIODIC_PROFILING_DURATION_IN_SECONDS.toString()),
+                                string(name: 'MASTER_NODE_LABEL', value: "ec2-profiling"),
+                                string(name: 'VIEWER_NODE_LABEL', value: "ec2-profiling"),
+                                string(name: 'RUNNER_LABEL', value: "WebrtcPeriodicProfiling"),
+                                string(name: 'SCENARIO_LABEL', value: "WebrtcProfiling"),
+                            ],
+                            wait: false
+                        )
 
                     }
                 }

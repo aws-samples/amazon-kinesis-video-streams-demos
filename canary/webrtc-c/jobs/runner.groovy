@@ -3,6 +3,7 @@ import org.jenkinsci.plugins.workflow.steps.FlowInterruptedException
 START_TIMESTAMP = new Date().getTime()
 RUNNING_NODES_IN_BUILDING = 0
 HAS_ERROR = false
+CACHED_WORKSPACE_ID = ""
 CREDENTIALS = [
     [
         $class: 'AmazonWebServicesCredentialsBinding', 
@@ -17,7 +18,7 @@ def buildProject(useMbedTLS, thing_prefix) {
     checkout([$class: 'GitSCM', branches: [[name: params.GIT_HASH ]],
               userRemoteConfigs: [[url: params.GIT_URL]]])
 
-    def configureCmd = "cmake .. -DCMAKE_BUILD_TYPE=Debug -DCMAKE_C_FLAGS_DEBUG=\"-g -O0\" -DCMAKE_CXX_FLAGS_DEBUG=\"-g -O0\" -DCMAKE_INSTALL_PREFIX=\"\$PWD\""
+    def configureCmd = "cmake .. -DCMAKE_BUILD_TYPE=Debug -DCMAKE_CXX_FLAGS_DEBUG=\"-g -O0\" -DCMAKE_INSTALL_PREFIX=\"\$PWD\""
     if (useMbedTLS) {
       echo 'Using mbedtls'
       configureCmd += " -DUSE_OPENSSL=OFF -DUSE_MBEDTLS=ON"
@@ -54,6 +55,8 @@ def withRunnerWrapper(envs, fn) {
 def buildPeer(isMaster, params) {
     def clientID = isMaster ? "Master" : "Viewer"
     RUNNING_NODES_IN_BUILDING++
+    CACHED_WORKSPACE_ID = "$WORKSPACE"
+    echo $CACHED_WORKSPACE_ID
 
     // TODO: get the branch and version from orchestrator
     if (params.FIRST_ITERATION) {
@@ -246,7 +249,6 @@ pipeline {
                       booleanParam(name: 'USE_IOT', value: params.USE_IOT),
                       booleanParam(name: 'IS_PROFILING', value: params.IS_PROFILING),
                       booleanParam(name: 'TRICKLE_ICE', value: params.TRICKLE_ICE),
-                      booleanParam(name: 'USE_OPENSSL', value: params.USE_OPENSSL),
                       booleanParam(name: 'USE_MBEDTLS', value: params.USE_MBEDTLS),
                       string(name: 'LOG_GROUP_NAME', value: params.LOG_GROUP_NAME),
                       string(name: 'MASTER_NODE_LABEL', value: params.MASTER_NODE_LABEL),
