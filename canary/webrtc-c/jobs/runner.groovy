@@ -160,7 +160,7 @@ pipeline {
         label params.MASTER_NODE_LABEL
     }
 
-    def cachedWorkspaceId = $env.WORKSPACE
+    def cachedWorkspaceId = "${env.WORKSPACE}"
 
     parameters {
         choice(name: 'AWS_KVS_LOG_LEVEL', choices: ["1", "2", "3", "4", "5"])
@@ -226,7 +226,7 @@ pipeline {
             post {
                 always {
                     script {
-                        cachedWorkspaceId = ${env.WORKSPACE}
+                        cachedWorkspaceId = "${env.WORKSPACE}"
                         echo "Cached workspace id post job: ${cachedWorkspaceId}"
                     }
                 }
@@ -247,7 +247,7 @@ pipeline {
             post {
                 always {
                     script {
-                        cachedWorkspaceId = ${env.WORKSPACE}
+                        cachedWorkspaceId = "${env.WORKSPACE}"
                         echo "Cached workspace id post job: ${cachedWorkspaceId}"
                     }
                 }
