@@ -160,7 +160,7 @@ pipeline {
         label params.MASTER_NODE_LABEL
     }
 
-    def cachedWorkspaceId = ""
+    def cachedWorkspaceId = $env.WORKSPACE
 
     parameters {
         choice(name: 'AWS_KVS_LOG_LEVEL', choices: ["1", "2", "3", "4", "5"])
