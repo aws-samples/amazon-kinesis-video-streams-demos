@@ -156,7 +156,10 @@ public class WebrtcStorageCanaryConsumer {
     }
 
     public static void main(final String[] args) throws Exception {
-        final String streamName = System.getenv("CANARY_STREAM_NAME");
+        //final String streamName = System.getenv("CANARY_STREAM_NAME");
+        final String streamName = "stream";
+
+
         final String canaryLabel = System.getenv("CANARY_LABEL");
         final String region = System.getenv("AWS_DEFAULT_REGION");
         final Integer canaryRunTime = Integer.parseInt(System.getenv("CANARY_DURATION_IN_SECONDS"));
@@ -182,51 +185,78 @@ public class WebrtcStorageCanaryConsumer {
         CanaryFragmentList fragmentList = new CanaryFragmentList();
         Timer intervalMetricsTimer = new Timer("IntervalMetricsTimer");
 
-        try {
-            getMediaTimeToFirstFragment();
-            final AmazonKinesisVideoMedia videoMedia;
 
-            AmazonKinesisVideoMediaClientBuilder builder = AmazonKinesisVideoMediaClientBuilder.standard().withEndpointConfiguration(new AwsClientBuilder.EndpointConfiguration(dataEndpoint, region)).withCredentials(credentialsProvider);
-            videoMedia = builder.build();
+        
+        // Code for sharing:
+            // final AmazonKinesisVideoMedia videoMedia;
 
-            GetMediaResult getMediaResult = null;
+            // AmazonKinesisVideoMediaClientBuilder builder = AmazonKinesisVideoMediaClientBuilder.standard()
+            //         .withEndpointConfiguration(new AwsClientBuilder.EndpointConfiguration(dataEndpoint, region))
+            //         .withCredentials(credentialsProvider);
+            // videoMedia = builder.build();
             
-            StartSelector selectorToUse = new StartSelector().withStartSelectorType(StartSelectorType.NOW);
-            getMediaResult = videoMedia.getMedia(new GetMediaRequest().withStreamName(streamName).withStartSelector(selectorToUse));
-        } catch (Exception e) {
-            System.out.println(e);
-        }
+            // StartSelector startSelector = new StartSelector().withStartSelectorType(StartSelectorType.NOW);
 
-        // switch (canaryLabel){
-        //     case "WebrtcLongRunning": {
-        //         System.out.println("FragmentContinuity Case");
-        //         TimerTask intervalMetricsTask = new TimerTask() {
-        //             @Override
-        //             public void run() {
-        //                 calculateFragmentContinuityMetric(fragmentList, canaryStartTime, streamName, canaryLabel, credentialsProvider, dataEndpoint, region);
-        //             }
-        //         };
-        //         final long intervalDelay = 16000;
-        //         intervalMetricsTimer.scheduleAtFixedRate(intervalMetricsTask, 60000, intervalDelay); // initial delay of 60 s at an interval of intervalDelay ms
-        //         break;
-        //     }
-        //     case "WebrtcPeriodic": {
-        //         System.out.println("TimeToFirstFragment Case");
-        //         TimerTask intervalMetricsTask = new TimerTask() {
-        //             @Override
-        //             public void run() {
-        //                 calculateTimeToFirstFragment(intervalMetricsTimer, canaryStartTime, streamName, canaryLabel, credentialsProvider, dataEndpoint, region);
-        //             }
-        //         };
-        //         final long intervalDelay = 1;
-        //         intervalMetricsTimer.scheduleAtFixedRate(intervalMetricsTask, 0, intervalDelay); // initial delay of 0 ms at an interval of 1 ms
-        //         break;
-        //     }
-        //     default:
-        //         log.info("Env var CANARY_LABEL: {} must be set to either WebrtcLongRunning or WebrtcPeriodic", canaryLabel);
-        //         System.out.println("Default Case");
-        //         break;
+            // GetMediaResult result = videoMedia.getMedia(new GetMediaRequest()
+            //         .withStreamName(streamName)
+            //         .withStartSelector(startSelector));
+
+
+
+        // try {
+        //     // getMediaTimeToFirstFragment();
+        //     final AmazonKinesisVideoMedia videoMedia;
+
+        //     AmazonKinesisVideoMediaClientBuilder builder = AmazonKinesisVideoMediaClientBuilder.standard().withEndpointConfiguration(new AwsClientBuilder.EndpointConfiguration(dataEndpoint, region)).withCredentials(credentialsProvider);
+        //     videoMedia = builder.build();
+
+        //     GetMediaResult getMediaResult = null;
+            
+        //     StartSelector startSelector = new StartSelector().withStartSelectorType(StartSelectorType.NOW);
+        //     //getMediaResult = videoMedia.getMedia(new GetMediaRequest().withStreamName(streamName).withStartSelector(startSelector));
+        
+        //     System.out.println(MessageFormat.format("Start GetMedia worker on stream {0}", streamName));
+        //     GetMediaResult result = videoMedia.getMedia(new GetMediaRequest().withStreamName(streamName).withStartSelector(startSelector));
+        //     //System.out.println(MessageFormat.format("GetMedia called on stream {0} response {1} requestId {2}", streamName, result.getSdkHttpMetadata().getHttpStatusCode(), result.getSdkResponseMetadata().getRequestId()));
+        //     System.out.println("here");
+        // } catch (Exception e) {
+        //     System.out.println(e);
         // }
+
+
+        
+
+
+        switch (canaryLabel){
+            case "WebrtcLongRunning": {
+                System.out.println("FragmentContinuity Case");
+                TimerTask intervalMetricsTask = new TimerTask() {
+                    @Override
+                    public void run() {
+                        calculateFragmentContinuityMetric(fragmentList, canaryStartTime, streamName, canaryLabel, credentialsProvider, dataEndpoint, region);
+                    }
+                };
+                final long intervalDelay = 16000;
+                intervalMetricsTimer.scheduleAtFixedRate(intervalMetricsTask, 60000, intervalDelay); // initial delay of 60 s at an interval of intervalDelay ms
+                break;
+            }
+            case "WebrtcPeriodic": {
+                System.out.println("TimeToFirstFragment Case");
+                TimerTask intervalMetricsTask = new TimerTask() {
+                    @Override
+                    public void run() {
+                        calculateTimeToFirstFragment(intervalMetricsTimer, canaryStartTime, streamName, canaryLabel, credentialsProvider, dataEndpoint, region);
+                    }
+                };
+                final long intervalDelay = 1;
+                intervalMetricsTimer.scheduleAtFixedRate(intervalMetricsTask, 0, intervalDelay); // initial delay of 0 ms at an interval of 1 ms
+                break;
+            }
+            default:
+                log.info("Env var CANARY_LABEL: {} must be set to either WebrtcLongRunning or WebrtcPeriodic", canaryLabel);
+                System.out.println("Default Case");
+                break;
+        }
 
         // TODO: Make this comment more clear or remove:
         // Run this sleep for both FragmentReceived and TimeToFirstFrame metric cases to ensure
