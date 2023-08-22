@@ -55,12 +55,15 @@ def withRunnerWrapper(envs, fn) {
 def buildPeer(isMaster, params) {
     def clientID = isMaster ? "Master" : "Viewer"
     RUNNING_NODES_IN_BUILDING++
-    CACHED_WORKSPACE_ID = "$WORKSPACE"
-    echo $CACHED_WORKSPACE_ID
 
     // TODO: get the branch and version from orchestrator
     if (params.FIRST_ITERATION) {
-        deleteDir()
+        if(params.CACHED_WORKSPACE_ID == "${env.WORKSPACE}") {
+            echo "Same workspace: " + params.CACHED_WORKSPACE_ID
+            echo "New one: ${env.WORKSPACE}"
+        } else {
+            deleteDir()
+        }
     }
 
     def thing_prefix = "${env.JOB_NAME}-${params.RUNNER_LABEL}"
@@ -111,6 +114,7 @@ def buildSignaling(params) {
 
     // TODO: get the branch and version from orchestrator
     if (params.FIRST_ITERATION) {
+        if()
         deleteDir()
     }
     def thing_prefix = "${env.JOB_NAME}-${params.RUNNER_LABEL}"
@@ -149,6 +153,8 @@ pipeline {
     agent {
         label params.MASTER_NODE_LABEL
     }
+
+    def cachedWorkspaceId = ""
 
     parameters {
         choice(name: 'AWS_KVS_LOG_LEVEL', choices: ["1", "2", "3", "4", "5"])
@@ -211,6 +217,14 @@ pipeline {
                     }
                 }
             }
+            post {
+                always {
+                    script {
+                        cachedWorkspaceId = ${env.WORKSPACE}"
+                        echo "Cached workspace id post job: ${cachedWorkspaceId}"
+                    }
+                }
+            }
         }
 
         stage('Build and Run Signaling Canary') {
@@ -259,6 +273,7 @@ pipeline {
                       string(name: 'MIN_RETRY_DELAY_IN_SECONDS', value: params.MIN_RETRY_DELAY_IN_SECONDS),
                       string(name: 'GIT_URL', value: params.GIT_URL),
                       string(name: 'GIT_HASH', value: params.GIT_HASH),
+                      string(name: 'CACHED_WORKSPACE_ID', value: "$cachedWorkspaceId"),
                       booleanParam(name: 'FIRST_ITERATION', value: true)
                     ],
                     wait: false
