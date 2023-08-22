@@ -3,7 +3,6 @@ import org.jenkinsci.plugins.workflow.steps.FlowInterruptedException
 START_TIMESTAMP = new Date().getTime()
 RUNNING_NODES_IN_BUILDING = 0
 HAS_ERROR = false
-CACHED_WORKSPACE_ID = ""
 CREDENTIALS = [
     [
         $class: 'AmazonWebServicesCredentialsBinding', 
@@ -58,12 +57,7 @@ def buildPeer(isMaster, params) {
 
     // TODO: get the branch and version from orchestrator
     if (params.FIRST_ITERATION) {
-        if(params.CACHED_WORKSPACE_ID == "${env.WORKSPACE}") {
-            echo "Same workspace: " + params.CACHED_WORKSPACE_ID
-            echo "New one: ${env.WORKSPACE}"
-        } else {
-            deleteDir()
-        }
+        deleteDir()
     }
 
     def thing_prefix = "${env.JOB_NAME}-${params.RUNNER_LABEL}"
@@ -160,8 +154,6 @@ pipeline {
         label params.MASTER_NODE_LABEL
     }
 
-    def cachedWorkspaceId = "${env.WORKSPACE}"
-
     parameters {
         choice(name: 'AWS_KVS_LOG_LEVEL', choices: ["1", "2", "3", "4", "5"])
         booleanParam(name: 'IS_SIGNALING')
@@ -223,14 +215,6 @@ pipeline {
                     }
                 }
             }
-            post {
-                always {
-                    script {
-                        cachedWorkspaceId = "${env.WORKSPACE}"
-                        echo "Cached workspace id post job: ${cachedWorkspaceId}"
-                    }
-                }
-            }
         }
 
         stage('Build and Run Signaling Canary') {
@@ -247,8 +231,8 @@ pipeline {
             post {
                 always {
                     script {
-                        cachedWorkspaceId = "${env.WORKSPACE}"
-                        echo "Cached workspace id post job: ${cachedWorkspaceId}"
+                        CACHED_WORKSPACE_ID = "${env.WORKSPACE}"
+                        echo "Cached workspace id post job: ${CACHED_WORKSPACE_ID}"
                     }
                 }
             }
@@ -287,7 +271,6 @@ pipeline {
                       string(name: 'MIN_RETRY_DELAY_IN_SECONDS', value: params.MIN_RETRY_DELAY_IN_SECONDS),
                       string(name: 'GIT_URL', value: params.GIT_URL),
                       string(name: 'GIT_HASH', value: params.GIT_HASH),
-                      string(name: 'CACHED_WORKSPACE_ID', value: "$cachedWorkspaceId"),
                       booleanParam(name: 'FIRST_ITERATION', value: true)
                     ],
                     wait: false
