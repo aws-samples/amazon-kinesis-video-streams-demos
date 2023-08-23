@@ -8,6 +8,8 @@ import java.util.List;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.ArrayList;
+import java.io.InputStream;
+
 
 import com.amazonaws.auth.SystemPropertiesCredentialsProvider;
 import com.amazonaws.regions.Regions;
@@ -77,7 +79,6 @@ public class WebrtcStorageCanaryConsumer {
 
     private static void calculateTimeToFirstFragment(Timer intervalMetricsTimer, Date canaryStartTime, String streamName, String canaryLabel, SystemPropertiesCredentialsProvider credentialsProvider, String dataEndpoint, String region) {
         try {
-            Boolean fragmentReceived = false;
             double timeToFirstFragment = Double.MAX_VALUE;
         
             // TODO: make the below two blocks of code into a 
@@ -102,7 +103,6 @@ public class WebrtcStorageCanaryConsumer {
 
             if (fragmentList.size() > 0) {
                 timeToFirstFragment = new Date().getTime() - canaryStartTime.getTime();
-                fragmentReceived = true;
                 publishMetricToCW("TimeToFirstFragment", timeToFirstFragment, StandardUnit.Milliseconds, streamName, canaryLabel, credentialsProvider, region);
                 intervalMetricsTimer.cancel();
             }
@@ -113,7 +113,39 @@ public class WebrtcStorageCanaryConsumer {
                 
     }
 
-    private static void getMediaTimeToFirstFragment() {
+    private static void getMediaTimeToFirstFragment(AmazonKinesisVideo amazonKinesisVideo, Timer intervalMetricsTimer, Date canaryStartTime, String streamName, String canaryLabel, SystemPropertiesCredentialsProvider credentialsProvider, String dataEndpoint, String region) {
+        try {
+            double timeToFirstFragment = Double.MAX_VALUE;
+
+            final GetDataEndpointRequest dataEndpointRequestGetMedia = new GetDataEndpointRequest()
+                .withAPIName(APIName.GET_MEDIA).withStreamName(streamName);
+            final String dataEndpointGetMedia = amazonKinesisVideo.getDataEndpoint(dataEndpointRequestGetMedia).getDataEndpoint();
+
+            final AmazonKinesisVideoMedia videoMedia;
+            AmazonKinesisVideoMediaClientBuilder builder = AmazonKinesisVideoMediaClientBuilder.standard().withEndpointConfiguration(new AwsClientBuilder.EndpointConfiguration(dataEndpointGetMedia, region)).withCredentials(credentialsProvider);
+            videoMedia = builder.build();
+            
+            StartSelector startSelector = new StartSelector().withStartSelectorType(StartSelectorType.NOW);
+            
+            int counter = 0;
+
+            System.out.println(MessageFormat.format("Start GetMedia worker on stream {0}", streamName));
+            GetMediaResult result = videoMedia.getMedia(new GetMediaRequest().withStreamName(streamName).withStartSelector(startSelector));
+            System.out.println(MessageFormat.format("GetMedia called on stream {0} response {1} requestId {2}", streamName, result.getSdkHttpMetadata().getHttpStatusCode(), result.getSdkResponseMetadata().getRequestId()));
+            
+            InputStream payload = result.getPayload();
+
+            long currentTime = new Date().getTime();
+
+            if (payload.read() != -1) {
+                timeToFirstFragment = currentTime - canaryStartTime.getTime();
+                publishMetricToCW("TimeToFirstFragment", timeToFirstFragment, StandardUnit.Milliseconds, streamName, canaryLabel, credentialsProvider, region);
+                intervalMetricsTimer.cancel();
+            }
+    
+        } catch (Exception e) {
+            System.out.println(e);
+        }
         
     }
 
@@ -184,6 +216,8 @@ public class WebrtcStorageCanaryConsumer {
 
         final Date canaryStartTime = new Date();
 
+
+        // TODO: put all things within switch case block that aren't shared
         CanaryFragmentList fragmentList = new CanaryFragmentList();
         Timer intervalMetricsTimer = new Timer("IntervalMetricsTimer");
 
@@ -206,28 +240,36 @@ public class WebrtcStorageCanaryConsumer {
 
 
         // try {
+        //     final GetDataEndpointRequest dataEndpointRequestGetMedia = new GetDataEndpointRequest()
+        //         .withAPIName(APIName.GET_MEDIA).withStreamName(streamName);
+        //     final String dataEndpointGetMedia = amazonKinesisVideo.getDataEndpoint(dataEndpointRequestGetMedia).getDataEndpoint();
+
         //     // getMediaTimeToFirstFragment();
         //     final AmazonKinesisVideoMedia videoMedia;
 
-        //     AmazonKinesisVideoMediaClientBuilder builder = AmazonKinesisVideoMediaClientBuilder.standard().withEndpointConfiguration(new AwsClientBuilder.EndpointConfiguration(dataEndpoint, region)).withCredentials(credentialsProvider);
+        //     AmazonKinesisVideoMediaClientBuilder builder = AmazonKinesisVideoMediaClientBuilder.standard().withEndpointConfiguration(new AwsClientBuilder.EndpointConfiguration(dataEndpointGetMedia, region)).withCredentials(credentialsProvider);
         //     videoMedia = builder.build();
-
-        //     GetMediaResult getMediaResult = null;
             
         //     StartSelector startSelector = new StartSelector().withStartSelectorType(StartSelectorType.NOW);
-        //     //getMediaResult = videoMedia.getMedia(new GetMediaRequest().withStreamName(streamName).withStartSelector(startSelector));
         
         //     System.out.println(MessageFormat.format("Start GetMedia worker on stream {0}", streamName));
         //     GetMediaResult result = videoMedia.getMedia(new GetMediaRequest().withStreamName(streamName).withStartSelector(startSelector));
-        //     //System.out.println(MessageFormat.format("GetMedia called on stream {0} response {1} requestId {2}", streamName, result.getSdkHttpMetadata().getHttpStatusCode(), result.getSdkResponseMetadata().getRequestId()));
+        //     System.out.println(MessageFormat.format("GetMedia called on stream {0} response {1} requestId {2}", streamName, result.getSdkHttpMetadata().getHttpStatusCode(), result.getSdkResponseMetadata().getRequestId()));
         //     System.out.println("here");
+        //     InputStream payload = result.getPayload();
+
+        //     System.out.println("AVAILABLE:");
+        //     System.out.println(payload.available());
+                        
+        //     System.out.println(payload.read(new byte[1]));
+    
+        //     System.out.println(result.getContentType());
         // } catch (Exception e) {
         //     System.out.println(e);
         // }
 
 
         
-
 
         switch (canaryLabel){
             case "WebrtcLongRunning": {
@@ -247,10 +289,12 @@ public class WebrtcStorageCanaryConsumer {
                 TimerTask intervalMetricsTask = new TimerTask() {
                     @Override
                     public void run() {
-                        calculateTimeToFirstFragment(intervalMetricsTimer, canaryStartTime, streamName, canaryLabel, credentialsProvider, dataEndpoint, region);
+                        // TODO: make endpoint all cases within funciton rather than passing amazonKinesisVideo
+                        getMediaTimeToFirstFragment(amazonKinesisVideo, intervalMetricsTimer, canaryStartTime, streamName, canaryLabel, credentialsProvider, dataEndpoint, region);
+                        //calculateTimeToFirstFragment(intervalMetricsTimer, canaryStartTime, streamName, canaryLabel, credentialsProvider, dataEndpoint, region);
                     }
                 };
-                final long intervalDelay = 1;
+                final long intervalDelay = 300;
                 intervalMetricsTimer.scheduleAtFixedRate(intervalMetricsTask, 0, intervalDelay); // initial delay of 0 ms at an interval of 1 ms
                 break;
             }
