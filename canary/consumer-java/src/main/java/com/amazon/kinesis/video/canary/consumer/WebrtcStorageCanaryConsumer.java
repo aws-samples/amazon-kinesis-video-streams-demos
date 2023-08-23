@@ -80,6 +80,9 @@ public class WebrtcStorageCanaryConsumer {
             Boolean fragmentReceived = false;
             double timeToFirstFragment = Double.MAX_VALUE;
         
+            // TODO: make the below two blocks of code into a 
+            // getFragmentSelector() function, reuse in the other metric
+
             // Time range for listFragments request
             TimestampRange timestampRange = new TimestampRange();
             timestampRange.setStartTimestamp(canaryStartTime);
