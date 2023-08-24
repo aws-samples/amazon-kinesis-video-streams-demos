@@ -330,8 +330,8 @@ public class WebrtcStorageCanaryConsumer {
                     public void run() {
                         // TODO: make endpoint all cases within funciton rather than passing amazonKinesisVideo
                         //getMediaTimeToFirstFragment(amazonKinesisVideo, intervalMetricsTimer, canaryStartTime, streamName, canaryLabel, credentialsProvider, dataEndpoint, region);
-                        calculateTimeToFirstFragment(intervalMetricsTimer, canaryStartTime, streamName, canaryLabel, credentialsProvider, dataEndpoint, region);
-                        //modifiedCalculateTimeToFirstFragment(intervalMetricsTimer, canaryStartTime, streamName, canaryLabel, credentialsProvider, dataEndpoint, region);
+                        //calculateTimeToFirstFragment(intervalMetricsTimer, canaryStartTime, streamName, canaryLabel, credentialsProvider, dataEndpoint, region);
+                        modifiedCalculateTimeToFirstFragment(intervalMetricsTimer, canaryStartTime, streamName, canaryLabel, credentialsProvider, dataEndpoint, region);
                     }
                 };
                 final long intervalDelay = 300;
