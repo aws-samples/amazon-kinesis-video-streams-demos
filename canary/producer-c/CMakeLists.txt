@@ -14,7 +14,7 @@ set(BUILD_COMMON_CURL ON CACHE BOOL "Curl" FORCE)
 FetchContent_Declare(
         producerc
         GIT_REPOSITORY https://github.com/awslabs/amazon-kinesis-video-streams-producer-c.git
-        GIT_TAG        611b9b9efb1fe3a404b94f493d877e6bc1a8b8e7
+        GIT_TAG        ab3b6331594dfbd0a59686dfb8dc4938bc86da1a
 )
 
 FetchContent_Declare(
