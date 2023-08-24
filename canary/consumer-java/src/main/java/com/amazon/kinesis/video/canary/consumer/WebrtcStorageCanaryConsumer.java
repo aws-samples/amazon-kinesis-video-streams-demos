@@ -94,6 +94,8 @@ public class WebrtcStorageCanaryConsumer {
             fragmentSelector.setFragmentSelectorType("SERVER_TIMESTAMP");
             fragmentSelector.setTimestampRange(timestampRange);
 
+            long currentTime = new Date().getTime();
+
             final FutureTask<List<CanaryFragment>> futureTask = new FutureTask<>(
                 new CanaryListFragmentWorker(streamName, credentialsProvider, dataEndpoint, Regions.fromName(region), fragmentSelector)
             );
@@ -102,7 +104,44 @@ public class WebrtcStorageCanaryConsumer {
             List<CanaryFragment> fragmentList = futureTask.get();
 
             if (fragmentList.size() > 0) {
-                timeToFirstFragment = new Date().getTime() - canaryStartTime.getTime();
+                timeToFirstFragment = currentTime - canaryStartTime.getTime();
+                publishMetricToCW("TimeToFirstFragment", timeToFirstFragment, StandardUnit.Milliseconds, streamName, canaryLabel, credentialsProvider, region);
+                intervalMetricsTimer.cancel();
+            }
+
+        } catch (Exception e) {
+            log.error(e);
+        }
+                
+    }
+
+    private static void modifiedCalculateTimeToFirstFragment(Timer intervalMetricsTimer, Date canaryStartTime, String streamName, String canaryLabel, SystemPropertiesCredentialsProvider credentialsProvider, String dataEndpoint, String region) {
+        try {
+            double timeToFirstFragment = Double.MAX_VALUE;
+        
+            // TODO: make the below two blocks of code into a 
+            //      getFragmentSelector() function, reuse in the other metric
+
+            // Time range for listFragments request
+            TimestampRange timestampRange = new TimestampRange();
+            timestampRange.setStartTimestamp(canaryStartTime);
+            timestampRange.setEndTimestamp(new Date());
+
+            // Configures listFragments request
+            FragmentSelector fragmentSelector = new FragmentSelector();
+            fragmentSelector.setFragmentSelectorType("SERVER_TIMESTAMP");
+            fragmentSelector.setTimestampRange(timestampRange);
+
+            final FutureTask<List<CanaryFragment>> futureTask = new FutureTask<>(
+                new CanaryListFragmentWorker(streamName, credentialsProvider, dataEndpoint, Regions.fromName(region), fragmentSelector)
+            );
+            Thread thread = new Thread(futureTask);
+            thread.start();
+            List<CanaryFragment> fragmentList = futureTask.get();
+
+            if (fragmentList.size() > 0) {
+                Date ingestedAt = fragmentList.get(0).getFragment().getServerTimestamp();
+                timeToFirstFragment = ingestedAt.getTime() - canaryStartTime.getTime();
                 publishMetricToCW("TimeToFirstFragment", timeToFirstFragment, StandardUnit.Milliseconds, streamName, canaryLabel, credentialsProvider, region);
                 intervalMetricsTimer.cancel();
             }
@@ -290,8 +329,9 @@ public class WebrtcStorageCanaryConsumer {
                     @Override
                     public void run() {
                         // TODO: make endpoint all cases within funciton rather than passing amazonKinesisVideo
-                        getMediaTimeToFirstFragment(amazonKinesisVideo, intervalMetricsTimer, canaryStartTime, streamName, canaryLabel, credentialsProvider, dataEndpoint, region);
-                        //calculateTimeToFirstFragment(intervalMetricsTimer, canaryStartTime, streamName, canaryLabel, credentialsProvider, dataEndpoint, region);
+                        //getMediaTimeToFirstFragment(amazonKinesisVideo, intervalMetricsTimer, canaryStartTime, streamName, canaryLabel, credentialsProvider, dataEndpoint, region);
+                        calculateTimeToFirstFragment(intervalMetricsTimer, canaryStartTime, streamName, canaryLabel, credentialsProvider, dataEndpoint, region);
+                        //modifiedCalculateTimeToFirstFragment(intervalMetricsTimer, canaryStartTime, streamName, canaryLabel, credentialsProvider, dataEndpoint, region);
                     }
                 };
                 final long intervalDelay = 300;
