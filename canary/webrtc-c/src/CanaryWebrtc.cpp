@@ -99,7 +99,6 @@ STATUS run(Canary::PConfig pConfig)
     SET_LOGGER_LOG_LEVEL(pConfig->logLevel.value);
 
     CHK_STATUS(timerQueueCreate(&timerQueueHandle));
-
     if (pConfig->duration.value != 0) {
         auto terminate = [](UINT32 timerId, UINT64 currentTime, UINT64 customData) -> STATUS {
             UNUSED_PARAM(timerId);
@@ -201,7 +200,6 @@ VOID runPeer(Canary::PConfig pConfig, TIMER_QUEUE_HANDLE timerQueueHandle, STATU
     Canary::Peer peer;
 
     CHK(pConfig != NULL, STATUS_NULL_ARG);
-
     pConfig->print();
     CHK_STATUS(timerQueueAddTimer(timerQueueHandle, KVS_METRICS_INVOCATION_PERIOD, KVS_METRICS_INVOCATION_PERIOD,
                                   canaryKvsStats, (UINT64) &peer, &timeoutTimerId));

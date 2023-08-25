@@ -13,11 +13,13 @@ CREDENTIALS = [
 ]
 
 def buildProject(useMbedTLS, thing_prefix) {
+    echo 'Flag set to ' + useMbedTLS
     checkout([$class: 'GitSCM', branches: [[name: params.GIT_HASH ]],
               userRemoteConfigs: [[url: params.GIT_URL]]])
 
-    def configureCmd = "cmake .. -DCMAKE_INSTALL_PREFIX=\"\$PWD\""
+    def configureCmd = "cmake .. -DCMAKE_BUILD_TYPE=Debug -DCMAKE_CXX_FLAGS_DEBUG=\"-g -O0\" -DCMAKE_INSTALL_PREFIX=\"\$PWD\""
     if (useMbedTLS) {
+      echo 'Using mbedtls'
       configureCmd += " -DUSE_OPENSSL=OFF -DUSE_MBEDTLS=ON"
     }     
 
@@ -26,9 +28,9 @@ def buildProject(useMbedTLS, thing_prefix) {
         chmod a+x cert_setup.sh &&
         ./cert_setup.sh ${thing_prefix} &&
         cd .. &&
-        mkdir -p build && 
-        cd build && 
-        ${configureCmd} && 
+        mkdir -p build &&
+        cd build &&
+        ${configureCmd} &&
         make"""
 }
 
@@ -105,9 +107,16 @@ def buildPeer(isMaster, params) {
 def buildSignaling(params) {
 
     // TODO: get the branch and version from orchestrator
+    // TODO: get the branch and version from orchestrator
     if (params.FIRST_ITERATION) {
-        deleteDir()
+        if(params.CACHED_WORKSPACE_ID == "${env.WORKSPACE}") {
+            echo "Same workspace: " + params.CACHED_WORKSPACE_ID
+            echo "New one: ${env.WORKSPACE}"
+        } else {
+            deleteDir()
+        }
     }
+
     def thing_prefix = "${env.JOB_NAME}-${params.RUNNER_LABEL}"
     buildProject(params.USE_MBEDTLS, thing_prefix)
 
@@ -165,6 +174,14 @@ pipeline {
     }
 
     stages {
+        stage('Set build description') {
+            steps {
+                script {
+                    currentBuild.displayName = "${params.RUNNER_LABEL} [#${BUILD_NUMBER}]"
+                    currentBuild.description = "Executed on: ${NODE_NAME}\n"
+                }
+            }
+        }
         stage('Preparation') {
             steps {
               echo params.toString()
@@ -211,6 +228,14 @@ pipeline {
                     buildSignaling(params)
                 }
             }
+            post {
+                always {
+                    script {
+                        CACHED_WORKSPACE_ID = "${env.WORKSPACE}"
+                        echo "Cached workspace id post job: ${CACHED_WORKSPACE_ID}"
+                    }
+                }
+            }
         }
 
         // In case of failures, we should add some delays so that we don't get into a tight loop of retrying
@@ -246,7 +271,7 @@ pipeline {
                       string(name: 'MIN_RETRY_DELAY_IN_SECONDS', value: params.MIN_RETRY_DELAY_IN_SECONDS),
                       string(name: 'GIT_URL', value: params.GIT_URL),
                       string(name: 'GIT_HASH', value: params.GIT_HASH),
-                      booleanParam(name: 'FIRST_ITERATION', value: false)
+                      booleanParam(name: 'FIRST_ITERATION', value: true)
                     ],
                     wait: false
                 )
