@@ -1,3 +1,8 @@
+
+
+# TODO: Need newer min cmake version for the new aws sdk - verify which one is needed
+
+
 cmake_minimum_required(VERSION 3.11)
 project(KVSWebRTCCanary LANGUAGES C CXX)
 
