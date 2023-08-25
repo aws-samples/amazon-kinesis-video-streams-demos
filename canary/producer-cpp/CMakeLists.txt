@@ -1,13 +1,9 @@
 cmake_minimum_required(VERSION 3.15)
 
 include(FetchContent)
+project(KinesisVideoProducerCloudwatch)
 
-
-if(APPLE AND NOT DEFINED ENV{MACOSX_DEPLOYMENT_TARGET} AND NOT DEFINED ENV{SDKROOT})
-  set(CMAKE_OSX_DEPLOYMENT_TARGET ${CMAKE_SYSTEM_VERSION})
-endif()
-
-project(KinesisVideoProducerCloudwatch LANGUAGES C CXX)
+set(CMAKE_CXX_STANDARD 17)
 
 set(CUSTOM_MEMORY_MANAGEMENT OFF CACHE BOOL "Tell AWS SDK to not use custom memory management" FORCE)
 set(ENABLE_TESTING OFF CACHE BOOL "Disable building tests for AWS SDK" FORCE)
@@ -16,7 +12,7 @@ set(BUILD_ONLY "monitoring;logs" CACHE STRING "Tell AWS SDK to only build monito
 FetchContent_Declare(
         producercpp
         GIT_REPOSITORY https://github.com/awslabs/amazon-kinesis-video-streams-producer-sdk-cpp.git
-        GIT_TAG        99230757f68817551c0cd401950088aabe8b0c1b
+        GIT_TAG        072ed19676df183e0f0477184b28051876b6abfb
 )
 
 FetchContent_Declare(

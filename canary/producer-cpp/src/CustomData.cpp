@@ -16,13 +16,13 @@ CustomData::CustomData()
     firstPts = GST_CLOCK_TIME_NONE;
     useAbsoluteFragmentTimes = true;
 
-    producerStartTime = chrono::duration_cast<nanoseconds>(systemCurrentTime().time_since_epoch()).count(); // [nanoSeconds]
-    startTime = chrono::duration_cast<nanoseconds>(systemCurrentTime().time_since_epoch()).count(); // [nanoSeconds]
+    producerStartTime = std::chrono::duration_cast<std::chrono::nanoseconds>(systemCurrentTime().time_since_epoch()).count(); // [nanoSeconds]
+    startTime = std::chrono::duration_cast<std::chrono::nanoseconds>(systemCurrentTime().time_since_epoch()).count(); // [nanoSeconds]
     clientConfig.region = "us-west-2";
     pCwClient = nullptr;
     pDimensionPerStream = nullptr;
     pAggregatedDimension = nullptr;
-    timeOfNextKeyFrame = new map<UINT64, UINT64>();
+    timeOfNextKeyFrame = new std::map<UINT64, UINT64>();
     timeCounter = producerStartTime / 1000000000; // [seconds]
     // Default first intermittent run to 1 min for testing
     runTill = producerStartTime / 1000000000 / 60 + 1; // [minutes]
