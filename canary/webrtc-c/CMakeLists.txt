@@ -11,6 +11,14 @@ set(ENABLE_TESTING OFF CACHE BOOL "Disable building tests for AWS SDK" FORCE)
 set(BUILD_ONLY "monitoring;logs" CACHE STRING "Tell AWS SDK to only build monitoring and logs" FORCE)
 set(BUILD_SAMPLE OFF CACHE BOOL "Disable sample building for WebRTC library" FORCE)
 
+if (NOT OPEN_SRC_INSTALL_PREFIX)
+  set(OPEN_SRC_INSTALL_PREFIX ${CMAKE_CURRENT_SOURCE_DIR}/build/_deps)
+  set(CMAKE_PREFIX_PATH ${CMAKE_PREFIX_PATH} ${OPEN_SRC_INSTALL_PREFIX})
+endif()
+if(NOT EXISTS ${OPEN_SRC_INSTALL_PREFIX})
+  file(MAKE_DIRECTORY ${OPEN_SRC_INSTALL_PREFIX})
+endif()
+
 FetchContent_Declare(
   webrtc
   GIT_REPOSITORY https://github.com/awslabs/amazon-kinesis-video-streams-webrtc-sdk-c
@@ -20,8 +28,8 @@ FetchContent_Declare(
 FetchContent_Declare(
   cloudwatch
   GIT_REPOSITORY https://github.com/aws/aws-sdk-cpp
-  GIT_TAG        1.9.67
-)
+  GIT_TAG        1.11.143
+  )
 
 FetchContent_GetProperties(webrtc)
 if(NOT webrtc_POPULATED)
