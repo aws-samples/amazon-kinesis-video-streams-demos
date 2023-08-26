@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.11)
+cmake_minimum_required(VERSION 3.13)
 project(KVSWebRTCCanary LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 11)
@@ -42,9 +42,13 @@ add_definitions(-DCMAKE_DETECTED_CACERT_PATH)
 include_directories(${cloudwatch_SOURCE_DIR}/aws-cpp-sdk-core/include)
 include_directories(${cloudwatch_SOURCE_DIR}/aws-cpp-sdk-monitoring/include)
 include_directories(${cloudwatch_SOURCE_DIR}/aws-cpp-sdk-logs/include)
+
 include_directories(${webrtc_SOURCE_DIR}/src/include)
 include_directories(${webrtc_SOURCE_DIR}/open-source/include)
 link_directories(${webrtc_SOURCE_DIR}/open-source/lib)
+
+link_directories(${CMAKE_CURRENT_SOURCE_DIR}/build/_deps/lib)
+
 add_library(
   kvsWebrtcCanary
   src/Config.cpp
