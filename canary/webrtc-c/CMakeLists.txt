@@ -29,7 +29,7 @@ FetchContent_Declare(
   cloudwatch
   GIT_REPOSITORY https://github.com/aws/aws-sdk-cpp
   GIT_TAG        1.11.143
-  )
+)
 
 FetchContent_GetProperties(webrtc)
 if(NOT webrtc_POPULATED)
