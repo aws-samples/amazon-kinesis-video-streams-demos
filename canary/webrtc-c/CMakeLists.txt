@@ -55,7 +55,7 @@ include_directories(${webrtc_SOURCE_DIR}/src/include)
 include_directories(${webrtc_SOURCE_DIR}/open-source/include)
 link_directories(${webrtc_SOURCE_DIR}/open-source/lib)
 
-link_directories(${CMAKE_CURRENT_SOURCE_DIR}/build/_deps/lib)
+link_directories(${OPEN_SRC_INSTALL_PREFIX}/lib)
 
 add_library(
   kvsWebrtcCanary
