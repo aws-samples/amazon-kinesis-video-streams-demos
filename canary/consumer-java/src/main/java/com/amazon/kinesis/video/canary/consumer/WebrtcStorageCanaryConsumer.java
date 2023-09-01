@@ -42,6 +42,7 @@ public class WebrtcStorageCanaryConsumer {
     static String canaryLabel;
     static String region;
     static SystemPropertiesCredentialsProvider credentialsProvider;
+    static AmazonKinesisVideo amazonKinesisVideo;
 
     private static void calculateFragmentContinuityMetric(AmazonKinesisVideo amazonKinesisVideo, CanaryFragmentList fragmentList) {
         try {
@@ -49,7 +50,6 @@ public class WebrtcStorageCanaryConsumer {
                 .withAPIName(APIName.LIST_FRAGMENTS).withStreamName(streamName);
             final String listFragmentsEndpoint = amazonKinesisVideo.getDataEndpoint(dataEndpointRequest).getDataEndpoint();
 
-            // TODO: eliminate this duplicated code, other metric function does this too.
             TimestampRange timestampRange = new TimestampRange();
             timestampRange.setStartTimestamp(canaryStartTime);
             timestampRange.setEndTimestamp(new Date());
@@ -71,11 +71,9 @@ public class WebrtcStorageCanaryConsumer {
                 newFragmentReceived = true;
             }
             log.info("New fragment received: {}", newFragmentReceived);
-
             fragmentList.setFragmentList(newFragmentList);
 
             publishMetricToCW("FragmentReceived", newFragmentReceived ? 1.0 : 0.0, StandardUnit.None);
-
         } catch (Exception e) {
             log.error(e);
         }
@@ -107,6 +105,9 @@ public class WebrtcStorageCanaryConsumer {
             if (payload.read() != -1) {
                 timeToFirstFragment = currentTime - canaryStartTime.getTime();
                 publishMetricToCW("TimeToFirstFragment", timeToFirstFragment, StandardUnit.Milliseconds);
+
+                // Cancel any further occurrences of timer task, as this is a startup metric
+                // The Canary will continue running for the specified period to allow for cooldown of Media-Server reconnection
                 intervalMetricsTimer.cancel();
             }
     
@@ -157,48 +158,43 @@ public class WebrtcStorageCanaryConsumer {
     }
 
     public static void main(final String[] args) throws Exception {
+        final Integer canaryRunTime = Integer.parseInt(System.getenv("CANARY_DURATION_IN_SECONDS"));
         streamName = System.getenv("CANARY_STREAM_NAME");
         canaryLabel = System.getenv("CANARY_LABEL");
         region = System.getenv("AWS_DEFAULT_REGION");
-        final Integer canaryRunTime = Integer.parseInt(System.getenv("CANARY_DURATION_IN_SECONDS"));
+        canaryStartTime = new Date();
 
         log.info("Stream name: {}", streamName);
 
         credentialsProvider = new SystemPropertiesCredentialsProvider();
-        final AmazonKinesisVideo amazonKinesisVideo = AmazonKinesisVideoClientBuilder.standard()
+        amazonKinesisVideo = AmazonKinesisVideoClientBuilder.standard()
                 .withRegion(region)
                 .withCredentials(credentialsProvider)
                 .build();
 
-        final GetDataEndpointRequest dataEndpointRequest = new GetDataEndpointRequest()
-                .withAPIName(APIName.LIST_FRAGMENTS).withStreamName(streamName);
-        final String dataEndpoint = amazonKinesisVideo.getDataEndpoint(dataEndpointRequest).getDataEndpoint();
-
-        canaryStartTime = new Date();
-
-        // TODO: put all things within switch case block that aren't shared
-        CanaryFragmentList fragmentList = new CanaryFragmentList();
         Timer intervalMetricsTimer = new Timer("IntervalMetricsTimer");
-
+        TimerTask intervalMetricsTask;
         switch (canaryLabel){
             case "WebrtcLongRunning": {
                 System.out.println("FragmentContinuity Case");
-                TimerTask intervalMetricsTask = new TimerTask() {
+                CanaryFragmentList fragmentList = new CanaryFragmentList();
+                intervalMetricsTask = new TimerTask() {
                     @Override
                     public void run() {
                         calculateFragmentContinuityMetric(amazonKinesisVideo, fragmentList);
                     }
                 };
+                final long intervalInitialDelay = 60000;
                 final long intervalDelay = 16000;
-                intervalMetricsTimer.scheduleAtFixedRate(intervalMetricsTask, 60000, intervalDelay); // initial delay of 60 s at an interval of intervalDelay ms
+                // NOTE: Metric publishing will NOT begin if canaryRunTime is < intervalInitialDelay
+                intervalMetricsTimer.scheduleAtFixedRate(intervalMetricsTask, intervalInitialDelay, intervalDelay); // initial delay of 'intervalInitialDelay' ms at an interval of 'intervalDelay' ms
                 break;
             }
             case "WebrtcPeriodic": {
                 System.out.println("TimeToFirstFragment Case");
-                TimerTask intervalMetricsTask = new TimerTask() {
+                intervalMetricsTask = new TimerTask() {
                     @Override
                     public void run() {
-                        // TODO: make endpoint all cases within funciton rather than passing amazonKinesisVideo
                         getMediaTimeToFirstFragment(amazonKinesisVideo, intervalMetricsTimer);
                     }
                 };
@@ -207,22 +203,15 @@ public class WebrtcStorageCanaryConsumer {
                 break;
             }
             default: {
-                log.info("Env var CANARY_LABEL: {} must be set to either WebrtcLongRunning or WebrtcPeriodic", canaryLabel);
-                System.out.println("Default Case");
-                break;
+                log.error("Env var CANARY_LABEL: {} must be set to either WebrtcLongRunning or WebrtcPeriodic", canaryLabel);
+                throw new Exception("CANARY_LABEL must be set to either WebrtcLongRunning or WebrtcPeriodic");
             }
         }
-
-        // TODO: Make this comment more clear or remove:
+        
         // Run this sleep for both FragmentReceived and TimeToFirstFrame metric cases to ensure
-        // connection can be made to media-server for periodic runs
+        //      connection can be reestablished to Media Server for periodic runs
+        //      (must wait >=5min to ensure it can reconnect)
         Thread.sleep(canaryRunTime * 1000);
-
-        // TODO: Test the below:
-
-        // Using System.exit(0) to exit from application. 
-        // The application does not exit on its own. Need to inspect what the issue
-        // is
-        System.exit(0);
+        intervalMetricsTask.cancel();
     }
 }
