@@ -37,7 +37,13 @@ import lombok.extern.log4j.Log4j2;
 
 @Log4j2
 public class WebrtcStorageCanaryConsumer {
-    private static void calculateFragmentContinuityMetric(CanaryFragmentList fragmentList, Date canaryStartTime, String streamName, String canaryLabel, SystemPropertiesCredentialsProvider credentialsProvider, String region) {
+    static Date canaryStartTime;
+    static String streamName;
+    static String canaryLabel;
+    static String region;
+    static SystemPropertiesCredentialsProvider credentialsProvider;
+
+    private static void calculateFragmentContinuityMetric(AmazonKinesisVideo amazonKinesisVideo, CanaryFragmentList fragmentList) {
         try {
             final GetDataEndpointRequest dataEndpointRequest = new GetDataEndpointRequest()
                 .withAPIName(APIName.LIST_FRAGMENTS).withStreamName(streamName);
@@ -68,14 +74,14 @@ public class WebrtcStorageCanaryConsumer {
 
             fragmentList.setFragmentList(newFragmentList);
 
-            publishMetricToCW("FragmentReceived", newFragmentReceived ? 1.0 : 0.0, StandardUnit.None, streamName, canaryLabel, credentialsProvider, region);
+            publishMetricToCW("FragmentReceived", newFragmentReceived ? 1.0 : 0.0, StandardUnit.None);
 
         } catch (Exception e) {
             log.error(e);
         }
     }
 
-    private static void getMediaTimeToFirstFragment(AmazonKinesisVideo amazonKinesisVideo, Timer intervalMetricsTimer, Date canaryStartTime, String streamName, String canaryLabel, SystemPropertiesCredentialsProvider credentialsProvider, String region) {
+    private static void getMediaTimeToFirstFragment(AmazonKinesisVideo amazonKinesisVideo, Timer intervalMetricsTimer) {
         try {
             final GetDataEndpointRequest dataEndpointRequestGetMedia = new GetDataEndpointRequest()
                 .withAPIName(APIName.GET_MEDIA).withStreamName(streamName);
@@ -100,7 +106,7 @@ public class WebrtcStorageCanaryConsumer {
             // If getMedia result payload is not empty, calculate TimeToFirstFragment
             if (payload.read() != -1) {
                 timeToFirstFragment = currentTime - canaryStartTime.getTime();
-                publishMetricToCW("TimeToFirstFragment", timeToFirstFragment, StandardUnit.Milliseconds, streamName, canaryLabel, credentialsProvider, region);
+                publishMetricToCW("TimeToFirstFragment", timeToFirstFragment, StandardUnit.Milliseconds);
                 intervalMetricsTimer.cancel();
             }
     
@@ -109,7 +115,7 @@ public class WebrtcStorageCanaryConsumer {
         }
     }
 
-    private static void publishMetricToCW(String metricName, double value, StandardUnit cwUnit, String streamName, String canaryLabel, SystemPropertiesCredentialsProvider credentialsProvider, String region) {
+    private static void publishMetricToCW(String metricName, double value, StandardUnit cwUnit) {
         try {
             System.out.println("Publishing a metric");
             final AmazonCloudWatchAsync cwClient = AmazonCloudWatchAsyncClientBuilder.standard()
@@ -151,29 +157,24 @@ public class WebrtcStorageCanaryConsumer {
     }
 
     public static void main(final String[] args) throws Exception {
-        final String streamName = System.getenv("CANARY_STREAM_NAME");
-        final String canaryLabel = System.getenv("CANARY_LABEL");
-        final String region = System.getenv("AWS_DEFAULT_REGION");
+        streamName = System.getenv("CANARY_STREAM_NAME");
+        canaryLabel = System.getenv("CANARY_LABEL");
+        region = System.getenv("AWS_DEFAULT_REGION");
         final Integer canaryRunTime = Integer.parseInt(System.getenv("CANARY_DURATION_IN_SECONDS"));
 
         log.info("Stream name: {}", streamName);
 
-        final SystemPropertiesCredentialsProvider credentialsProvider = new SystemPropertiesCredentialsProvider();
+        credentialsProvider = new SystemPropertiesCredentialsProvider();
         final AmazonKinesisVideo amazonKinesisVideo = AmazonKinesisVideoClientBuilder.standard()
                 .withRegion(region)
                 .withCredentials(credentialsProvider)
                 .build();
 
-        // final AmazonCloudWatchAsync amazonCloudWatch = AmazonCloudWatchAsyncClientBuilder.standard()
-        //         .withRegion(region)
-        //         .withCredentials(credentialsProvider)
-        //         .build();
-
         final GetDataEndpointRequest dataEndpointRequest = new GetDataEndpointRequest()
                 .withAPIName(APIName.LIST_FRAGMENTS).withStreamName(streamName);
         final String dataEndpoint = amazonKinesisVideo.getDataEndpoint(dataEndpointRequest).getDataEndpoint();
 
-        final Date canaryStartTime = new Date();
+        canaryStartTime = new Date();
 
         // TODO: put all things within switch case block that aren't shared
         CanaryFragmentList fragmentList = new CanaryFragmentList();
@@ -185,7 +186,7 @@ public class WebrtcStorageCanaryConsumer {
                 TimerTask intervalMetricsTask = new TimerTask() {
                     @Override
                     public void run() {
-                        calculateFragmentContinuityMetric(fragmentList, canaryStartTime, streamName, canaryLabel, credentialsProvider, dataEndpoint, region);
+                        calculateFragmentContinuityMetric(amazonKinesisVideo, fragmentList);
                     }
                 };
                 final long intervalDelay = 16000;
@@ -198,8 +199,7 @@ public class WebrtcStorageCanaryConsumer {
                     @Override
                     public void run() {
                         // TODO: make endpoint all cases within funciton rather than passing amazonKinesisVideo
-                        //getMediaTimeToFirstFragment(amazonKinesisVideo, intervalMetricsTimer, canaryStartTime, streamName, canaryLabel, credentialsProvider, dataEndpoint, region);
-                        modifiedCalculateTimeToFirstFragment(intervalMetricsTimer, canaryStartTime, streamName, canaryLabel, credentialsProvider, dataEndpoint, region);
+                        getMediaTimeToFirstFragment(amazonKinesisVideo, intervalMetricsTimer);
                     }
                 };
                 final long intervalDelay = 300;
