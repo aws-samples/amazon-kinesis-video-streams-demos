@@ -50,12 +50,12 @@ import lombok.extern.log4j.Log4j2;
 
 @Log4j2
 public class WebrtcStorageCanaryConsumer {
-    static Date canaryStartTime;
-    static String streamName;
-    static String canaryLabel;
-    static String region;
-    static SystemPropertiesCredentialsProvider credentialsProvider;
-    static AmazonKinesisVideo amazonKinesisVideo;
+    private static Date canaryStartTime;
+    private static String streamName;
+    private static String canaryLabel;
+    private static String region;
+    private static SystemPropertiesCredentialsProvider credentialsProvider;
+    private static AmazonKinesisVideo amazonKinesisVideo;
 
     private static void calculateFragmentContinuityMetric(CanaryFragmentList fragmentList) {
         try {
