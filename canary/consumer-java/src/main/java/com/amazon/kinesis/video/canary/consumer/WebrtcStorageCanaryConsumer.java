@@ -34,6 +34,19 @@ import com.amazonaws.services.kinesisvideo.model.GetMediaRequest;
 
 import lombok.extern.log4j.Log4j2;
 
+/*
+ * Canary for WebRTC with Storage Through Media Server
+ * 
+ * For longrun-configured jobs, this Canary will emit FragmentContinuity metrics by continuosly
+ * checking for any newly ingested fragments for the given stream. The fragment list is checked
+ * for new fragments every "max-fragment-duration + 1 sec." The max-fragment-duration is determined
+ * by Media Server.
+ * 
+ * For periodic-configured jobs, this Canary will emit TimeToFirstFragment metrics by continuously
+ * checking for consumable media from the specified stream via GetMedia calls. It takes ~1 sec for
+ * InputStream.read() to verify that a stream is empty, so the resolution of this metric is approx
+ * 1 sec.
+ */
 
 @Log4j2
 public class WebrtcStorageCanaryConsumer {
@@ -44,7 +57,7 @@ public class WebrtcStorageCanaryConsumer {
     static SystemPropertiesCredentialsProvider credentialsProvider;
     static AmazonKinesisVideo amazonKinesisVideo;
 
-    private static void calculateFragmentContinuityMetric(AmazonKinesisVideo amazonKinesisVideo, CanaryFragmentList fragmentList) {
+    private static void calculateFragmentContinuityMetric(CanaryFragmentList fragmentList) {
         try {
             final GetDataEndpointRequest dataEndpointRequest = new GetDataEndpointRequest()
                 .withAPIName(APIName.LIST_FRAGMENTS).withStreamName(streamName);
@@ -79,35 +92,35 @@ public class WebrtcStorageCanaryConsumer {
         }
     }
 
-    private static void getMediaTimeToFirstFragment(AmazonKinesisVideo amazonKinesisVideo, Timer intervalMetricsTimer) {
+    private static void getMediaTimeToFirstFragment(Timer intervalMetricsTimer) {
         try {
             final GetDataEndpointRequest dataEndpointRequestGetMedia = new GetDataEndpointRequest()
                 .withAPIName(APIName.GET_MEDIA).withStreamName(streamName);
             final String getMediaEndpoint = amazonKinesisVideo.getDataEndpoint(dataEndpointRequestGetMedia).getDataEndpoint();
 
             final AmazonKinesisVideoMedia videoMedia;
-            AmazonKinesisVideoMediaClientBuilder builder = AmazonKinesisVideoMediaClientBuilder.standard().withEndpointConfiguration(new AwsClientBuilder.EndpointConfiguration(getMediaEndpoint, region)).withCredentials(credentialsProvider);
+            final AmazonKinesisVideoMediaClientBuilder builder = AmazonKinesisVideoMediaClientBuilder.standard().withEndpointConfiguration(new AwsClientBuilder.EndpointConfiguration(getMediaEndpoint, region)).withCredentials(credentialsProvider);
             videoMedia = builder.build();
             
-            StartSelector startSelector = new StartSelector().withStartSelectorType(StartSelectorType.NOW);
+            final StartSelector startSelector = new StartSelector().withStartSelectorType(StartSelectorType.NOW);
             
             System.out.println(MessageFormat.format("Start GetMedia worker on stream {0}", streamName));
 
-            GetMediaResult result = videoMedia.getMedia(new GetMediaRequest().withStreamName(streamName).withStartSelector(startSelector));
-            InputStream payload = result.getPayload();
+            final GetMediaResult result = videoMedia.getMedia(new GetMediaRequest().withStreamName(streamName).withStartSelector(startSelector));
+            final InputStream payload = result.getPayload();
 
             System.out.println(MessageFormat.format("GetMedia called on stream {0} response {1} requestId {2}", streamName, result.getSdkHttpMetadata().getHttpStatusCode(), result.getSdkResponseMetadata().getRequestId()));
             
+            final long currentTime = new Date().getTime();
             double timeToFirstFragment = Double.MAX_VALUE;
-            long currentTime = new Date().getTime();
 
             // If getMedia result payload is not empty, calculate TimeToFirstFragment
             if (payload.read() != -1) {
                 timeToFirstFragment = currentTime - canaryStartTime.getTime();
                 publishMetricToCW("TimeToFirstFragment", timeToFirstFragment, StandardUnit.Milliseconds);
 
-                // Cancel any further occurrences of timer task, as this is a startup metric
-                // The Canary will continue running for the specified period to allow for cooldown of Media-Server reconnection
+                // Cancel any further occurrences of timer task, as this is a startup metric.
+                // The Canary will continue running for the specified period to allow for cooldown of Media-Server reconnection.
                 intervalMetricsTimer.cancel();
             }
     
@@ -158,6 +171,7 @@ public class WebrtcStorageCanaryConsumer {
     }
 
     public static void main(final String[] args) throws Exception {
+        // Import configurable parameters.
         final Integer canaryRunTime = Integer.parseInt(System.getenv("CANARY_DURATION_IN_SECONDS"));
         streamName = System.getenv("CANARY_STREAM_NAME");
         canaryLabel = System.getenv("CANARY_LABEL");
@@ -177,11 +191,11 @@ public class WebrtcStorageCanaryConsumer {
         switch (canaryLabel){
             case "WebrtcLongRunning": {
                 System.out.println("FragmentContinuity Case");
-                CanaryFragmentList fragmentList = new CanaryFragmentList();
+                final CanaryFragmentList fragmentList = new CanaryFragmentList();
                 intervalMetricsTask = new TimerTask() {
                     @Override
                     public void run() {
-                        calculateFragmentContinuityMetric(amazonKinesisVideo, fragmentList);
+                        calculateFragmentContinuityMetric(fragmentList);
                     }
                 };
                 final long intervalInitialDelay = 60000;
@@ -195,7 +209,7 @@ public class WebrtcStorageCanaryConsumer {
                 intervalMetricsTask = new TimerTask() {
                     @Override
                     public void run() {
-                        getMediaTimeToFirstFragment(amazonKinesisVideo, intervalMetricsTimer);
+                        getMediaTimeToFirstFragment(intervalMetricsTimer);
                     }
                 };
                 final long intervalDelay = 300;
@@ -212,6 +226,6 @@ public class WebrtcStorageCanaryConsumer {
         //      connection can be reestablished to Media Server for periodic runs
         //      (must wait >=5min to ensure it can reconnect)
         Thread.sleep(canaryRunTime * 1000);
-        intervalMetricsTask.cancel();
+        intervalMetricsTimer.cancel();
     }
 }
