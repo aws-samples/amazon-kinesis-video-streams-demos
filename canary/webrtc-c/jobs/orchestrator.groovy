@@ -9,7 +9,7 @@ DURATION_IN_SECONDS_45_MIN = 2700 // 45 min
 MIN_RETRY_DELAY_IN_SECONDS = 60
 COLD_STARTUP_DELAY_IN_SECONDS = 60 * 60
 GIT_URL = 'https://github.com/aws-samples/amazon-kinesis-video-streams-demos.git'
-GIT_HASH = 'ingestion-canary' // TODO: Revert to 'master'
+GIT_HASH = 'newer-ingestion-canary' // TODO: Revert to 'master'
 COMMON_PARAMS = [
     string(name: 'AWS_KVS_LOG_LEVEL', value: "2"),
     string(name: 'MIN_RETRY_DELAY_IN_SECONDS', value: MIN_RETRY_DELAY_IN_SECONDS.toString()),
