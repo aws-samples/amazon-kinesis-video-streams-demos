@@ -12,8 +12,8 @@ import java.io.InputStream;
 
 import com.amazonaws.auth.SystemPropertiesCredentialsProvider;
 import com.amazonaws.regions.Regions;
-import com.amazonaws.services.cloudwatch.AmazonCloudWatchAsync;
-import com.amazonaws.services.cloudwatch.AmazonCloudWatchAsyncClientBuilder;
+import com.amazonaws.services.cloudwatch.AmazonCloudWatch;
+import com.amazonaws.services.cloudwatch.AmazonCloudWatchClientBuilder;
 import com.amazonaws.services.kinesisvideo.AmazonKinesisVideo;
 import com.amazonaws.services.kinesisvideo.AmazonKinesisVideoClientBuilder;
 import com.amazonaws.services.kinesisvideo.model.APIName;
@@ -56,6 +56,7 @@ public class WebrtcStorageCanaryConsumer {
     private static String region;
     private static SystemPropertiesCredentialsProvider credentialsProvider;
     private static AmazonKinesisVideo amazonKinesisVideo;
+    private static AmazonCloudWatch cwClient;
 
     private static void calculateFragmentContinuityMetric(CanaryFragmentList fragmentList) {
         try {
@@ -104,12 +105,8 @@ public class WebrtcStorageCanaryConsumer {
             
             final StartSelector startSelector = new StartSelector().withStartSelectorType(StartSelectorType.NOW);
             
-            System.out.println(MessageFormat.format("Start GetMedia worker on stream {0}", streamName));
-
             final GetMediaResult result = videoMedia.getMedia(new GetMediaRequest().withStreamName(streamName).withStartSelector(startSelector));
             final InputStream payload = result.getPayload();
-
-            System.out.println(MessageFormat.format("GetMedia called on stream {0} response {1} requestId {2}", streamName, result.getSdkHttpMetadata().getHttpStatusCode(), result.getSdkResponseMetadata().getRequestId()));
             
             final long currentTime = new Date().getTime();
             double timeToFirstFragment = Double.MAX_VALUE;
@@ -125,18 +122,12 @@ public class WebrtcStorageCanaryConsumer {
             }
     
         } catch (Exception e) {
-            System.out.println(e);
+            log.error(e);
         }
     }
 
     private static void publishMetricToCW(String metricName, double value, StandardUnit cwUnit) {
         try {
-            System.out.println("Publishing a metric");
-            final AmazonCloudWatchAsync cwClient = AmazonCloudWatchAsyncClientBuilder.standard()
-                    .withRegion(region)
-                    .withCredentials(credentialsProvider)
-                    .build();
-
             final Dimension dimensionPerStream = new Dimension()
                     .withName("StorageWebRTCSDKCanaryStreamName")
                     .withValue(streamName);
@@ -161,9 +152,7 @@ public class WebrtcStorageCanaryConsumer {
             PutMetricDataRequest request = new PutMetricDataRequest()
                     .withNamespace("KinesisVideoSDKCanary")
                     .withMetricData(datumList);
-            cwClient.putMetricDataAsync(request);
-            System.out.println("Publishing metric: ");
-            System.out.println(value);
+            cwClient.putMetricData(request);
         } catch (Exception e) {
             System.out.println(e);
             log.error(e);
@@ -176,21 +165,25 @@ public class WebrtcStorageCanaryConsumer {
         streamName = System.getenv("CANARY_STREAM_NAME");
         canaryLabel = System.getenv("CANARY_LABEL");
         region = System.getenv("AWS_DEFAULT_REGION");
-        canaryStartTime = new Date();
 
         log.info("Stream name: {}", streamName);
+
+        canaryStartTime = new Date();
 
         credentialsProvider = new SystemPropertiesCredentialsProvider();
         amazonKinesisVideo = AmazonKinesisVideoClientBuilder.standard()
                 .withRegion(region)
                 .withCredentials(credentialsProvider)
                 .build();
+        cwClient = AmazonCloudWatchClientBuilder.standard()
+                    .withRegion(region)
+                    .withCredentials(credentialsProvider)
+                    .build();
 
         Timer intervalMetricsTimer = new Timer("IntervalMetricsTimer");
         TimerTask intervalMetricsTask;
         switch (canaryLabel){
             case "WebrtcLongRunning": {
-                System.out.println("FragmentContinuity Case");
                 final CanaryFragmentList fragmentList = new CanaryFragmentList();
                 intervalMetricsTask = new TimerTask() {
                     @Override
@@ -205,7 +198,6 @@ public class WebrtcStorageCanaryConsumer {
                 break;
             }
             case "WebrtcPeriodic": {
-                System.out.println("TimeToFirstFragment Case");
                 intervalMetricsTask = new TimerTask() {
                     @Override
                     public void run() {

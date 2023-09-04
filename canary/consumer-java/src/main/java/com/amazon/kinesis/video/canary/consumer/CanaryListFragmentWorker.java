@@ -17,8 +17,9 @@ import lombok.extern.log4j.Log4j2;
 /*
     This is a modified version of the ListFragmentWorker example found here:
     https://github.com/aws/amazon-kinesis-video-streams-parser-library/blob/0056da083402a96cffcdfd8bca9433dd25eb7470/src/main/java/com/amazonaws/kinesisvideo/parser/examples/ListFragmentWorker.java#L7
+
+    This version returns Fragment objects rather than only the Fragment Number
  */
-/* This worker retrieves all fragments within the specified TimestampRange from a specified Kinesis Video Stream and returns them in a list */
 
 @Log4j2
 public class CanaryListFragmentWorker implements Callable {
