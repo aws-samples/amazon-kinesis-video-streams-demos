@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.11)
+cmake_minimum_required(VERSION 3.15)
 
 project(KinesisVideoProducerCloudwatch LANGUAGES C CXX)
 include(FetchContent)
@@ -14,12 +14,15 @@ FetchContent_Declare(
 FetchContent_Declare(
         cloudwatch
         GIT_REPOSITORY https://github.com/aws/aws-sdk-cpp
-        GIT_TAG        1.11.92
+        GIT_TAG        1.10.9
 )
 
-FetchContent_GetProperties(webrtc)
+FetchContent_GetProperties(producerc)
 if(NOT producerc_POPULATED)
   FetchContent_Populate(producerc)
+  set(CMAKE_POLICY_DEFAULT_CMP0077 NEW)
+  set(USE_OPENSSL ON)
+  set(OPEN_SRC_INSTALL_PREFIX ${CMAKE_CURRENT_SOURCE_DIR})
   add_subdirectory(${producerc_SOURCE_DIR} ${producerc_BINARY_DIR} EXCLUDE_FROM_ALL)
 endif()
 
