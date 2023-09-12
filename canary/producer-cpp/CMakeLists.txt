@@ -5,10 +5,6 @@ project(KinesisVideoProducerCloudwatch)
 
 set(CMAKE_CXX_STANDARD 17)
 
-set(CUSTOM_MEMORY_MANAGEMENT OFF CACHE BOOL "Tell AWS SDK to not use custom memory management" FORCE)
-set(ENABLE_TESTING OFF CACHE BOOL "Disable building tests for AWS SDK" FORCE)
-set(BUILD_ONLY "monitoring;logs" CACHE STRING "Tell AWS SDK to only build monitoring and logs" FORCE)
-
 FetchContent_Declare(
         producercpp
         GIT_REPOSITORY https://github.com/awslabs/amazon-kinesis-video-streams-producer-sdk-cpp.git
@@ -30,6 +26,10 @@ endif()
 FetchContent_GetProperties(cloudwatch)
 if(NOT cloudwatch_POPULATED)
   FetchContent_Populate(cloudwatch)
+  set(CUSTOM_MEMORY_MANAGEMENT OFF CACHE BOOL "Tell AWS SDK to not use custom memory management" FORCE)
+  set(ENABLE_TESTING OFF CACHE BOOL "Disable building tests for AWS SDK" FORCE)
+  set(BUILD_ONLY "monitoring;logs" CACHE STRING "Tell AWS SDK to only build monitoring and logs" FORCE)
+  set(USE_OPENSSL OFF CACHE BOOL "Disable using system openssl" FORCE)
   add_subdirectory(${cloudwatch_SOURCE_DIR} ${cloudwatch_BINARY_DIR} EXCLUDE_FROM_ALL)
 endif()
 

@@ -5,12 +5,6 @@ set(CMAKE_CXX_STANDARD 11)
 
 include(FetchContent)
 
-# AWS SDK options
-set(CUSTOM_MEMORY_MANAGEMENT OFF CACHE BOOL "Tell AWS SDK to not use custom memory management" FORCE)
-set(ENABLE_TESTING OFF CACHE BOOL "Disable building tests for AWS SDK" FORCE)
-set(BUILD_ONLY "monitoring;logs" CACHE STRING "Tell AWS SDK to only build monitoring and logs" FORCE)
-set(BUILD_SAMPLE OFF CACHE BOOL "Disable sample building for WebRTC library" FORCE)
-
 FetchContent_Declare(
   webrtc
   GIT_REPOSITORY https://github.com/awslabs/amazon-kinesis-video-streams-webrtc-sdk-c
@@ -32,6 +26,12 @@ endif()
 FetchContent_GetProperties(cloudwatch)
 if(NOT cloudwatch_POPULATED)
   FetchContent_Populate(cloudwatch)
+  # AWS SDK options
+  set(CUSTOM_MEMORY_MANAGEMENT OFF CACHE BOOL "Tell AWS SDK to not use custom memory management" FORCE)
+  set(ENABLE_TESTING OFF CACHE BOOL "Disable building tests for AWS SDK" FORCE)
+  set(BUILD_ONLY "monitoring;logs" CACHE STRING "Tell AWS SDK to only build monitoring and logs" FORCE)
+  set(BUILD_SAMPLE OFF CACHE BOOL "Disable sample building for WebRTC library" FORCE)
+  set(USE_OPENSSL OFF CACHE BOOL "Disable sample building for WebRTC library" FORCE)
   add_subdirectory(${cloudwatch_SOURCE_DIR} ${cloudwatch_BINARY_DIR} EXCLUDE_FROM_ALL)
 endif()
 
