@@ -20,6 +20,9 @@ FetchContent_Declare(
 FetchContent_GetProperties(producercpp)
 if(NOT producercpp_POPULATED)
   FetchContent_Populate(producercpp)
+  set(CMAKE_POLICY_DEFAULT_CMP0077 NEW)
+  set(USE_OPENSSL ON)
+  set(OPEN_SRC_INSTALL_PREFIX ${CMAKE_CURRENT_SOURCE_DIR})
   add_subdirectory(${producercpp_SOURCE_DIR} ${producercpp_BINARY_DIR} EXCLUDE_FROM_ALL)
 endif()
 
@@ -29,7 +32,7 @@ if(NOT cloudwatch_POPULATED)
   set(CUSTOM_MEMORY_MANAGEMENT OFF)
   set(ENABLE_TESTING OFF)
   set(BUILD_ONLY "monitoring;logs")
-  set(USE_OPENSSL OFF)
+  set(CMAKE_PREFIX_PATH ${CMAKE_CURRENT_SOURCE_DIR}/lib)
   add_subdirectory(${cloudwatch_SOURCE_DIR} ${cloudwatch_BINARY_DIR} EXCLUDE_FROM_ALL)
 endif()
 
