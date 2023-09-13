@@ -13,12 +13,14 @@ CREDENTIALS = [
 ]
 
 def buildWebRTCProject(useMbedTLS, thing_prefix) {
+    echo 'Flag set to ' + useMbedTLS
     checkout([$class: 'GitSCM', branches: [[name: params.GIT_HASH ]],
               userRemoteConfigs: [[url: params.GIT_URL]]])
 
-    def configureCmd = "cmake .. -DCMAKE_INSTALL_PREFIX=\"\$PWD\""
+    def configureCmd = "cmake .. -DCMAKE_BUILD_TYPE=Debug -DCMAKE_CXX_FLAGS_DEBUG=\"-g -O0\" -DCMAKE_INSTALL_PREFIX=\"\$PWD\""
     if (useMbedTLS) {
-      configureCmd += " -DUSE_OPENSSL=OFF -DUSE_MBEDTLS=ON"
+        echo 'Using mbedtls'
+        configureCmd += " -DUSE_OPENSSL=OFF -DUSE_MBEDTLS=ON"
     }     
 
     sh """
@@ -26,9 +28,9 @@ def buildWebRTCProject(useMbedTLS, thing_prefix) {
         chmod a+x cert_setup.sh &&
         ./cert_setup.sh ${thing_prefix} &&
         cd .. &&
-        mkdir -p build && 
-        cd build && 
-        ${configureCmd} && 
+        mkdir -p build &&
+        cd build &&
+        ${configureCmd} &&
         make"""
 }
 
@@ -99,6 +101,7 @@ def buildPeer(isMaster, params) {
     def envs = [
       'AWS_KVS_LOG_LEVEL': params.AWS_KVS_LOG_LEVEL,
       'CANARY_USE_TURN': params.USE_TURN,
+      'CANARY_IS_PROFILING_MODE': params.IS_PROFILING,
       'CANARY_TRICKLE_ICE': params.TRICKLE_ICE,
       'CANARY_USE_IOT_PROVIDER': params.USE_IOT,
       'CANARY_LOG_GROUP_NAME': params.LOG_GROUP_NAME,
@@ -127,7 +130,12 @@ def buildSignaling(params) {
 
     // TODO: get the branch and version from orchestrator
     if (params.FIRST_ITERATION) {
-        deleteDir()
+        if(params.CACHED_WORKSPACE_ID == "${env.WORKSPACE}") {
+            echo "Same workspace: " + params.CACHED_WORKSPACE_ID
+            echo "New one: ${env.WORKSPACE}"
+        } else {
+            deleteDir()
+        }
     }
     def thing_prefix = "${env.JOB_NAME}-${params.RUNNER_LABEL}"
     buildWebRTCProject(params.USE_MBEDTLS, thing_prefix)
@@ -241,11 +249,14 @@ pipeline {
     parameters {
         choice(name: 'AWS_KVS_LOG_LEVEL', choices: ["1", "2", "3", "4", "5"])
         booleanParam(name: 'IS_SIGNALING')
+        booleanParam(name: 'IS_STORAGE', value: params.IS_STORAGE),
         booleanParam(name: 'USE_TURN')
+        booleanParam(name: 'IS_PROFILING')
         booleanParam(name: 'TRICKLE_ICE')
         booleanParam(name: 'USE_MBEDTLS', defaultValue: false)
         string(name: 'LOG_GROUP_NAME')
         string(name: 'MASTER_NODE_LABEL')
+        string(name: 'CONSUMER_NODE_LABEL'),
         string(name: 'VIEWER_NODE_LABEL')
         string(name: 'RUNNER_LABEL')
         string(name: 'SCENARIO_LABEL')
@@ -257,6 +268,14 @@ pipeline {
     }
 
     stages {
+        stage('Set build description') {
+            steps {
+                script {
+                    currentBuild.displayName = "${params.RUNNER_LABEL} [#${BUILD_NUMBER}]"
+                    currentBuild.description = "Executed on: ${NODE_NAME}\n"
+                }
+            }
+        }
         stage('Preparation') {
             steps {
               echo params.toString()
@@ -279,6 +298,7 @@ pipeline {
                         }
                     }
                 }
+
                 stage('Viewer') {
                     agent {
                         label params.VIEWER_NODE_LABEL
@@ -301,9 +321,18 @@ pipeline {
                     equals expected: false, actual: params.IS_STORAGE
                 }
             }
+
             steps {
                 script {
                     buildSignaling(params)
+                }
+            }
+            post {
+                always {
+                    script {
+                        CACHED_WORKSPACE_ID = "${env.WORKSPACE}"
+                        echo "Cached workspace id post job: ${CACHED_WORKSPACE_ID}"
+                    }
                 }
             }
         }
@@ -353,7 +382,6 @@ pipeline {
                 // TODO: Maybe there's a better way to write this instead of duplicating it
                 build(
                     job: env.JOB_NAME,
-
                     parameters: [
                       string(name: 'AWS_DEFAULT_REGION', value: params.AWS_DEFAULT_REGION),
                       string(name: 'AWS_KVS_LOG_LEVEL', value: params.AWS_KVS_LOG_LEVEL),
@@ -361,6 +389,7 @@ pipeline {
                       booleanParam(name: 'IS_STORAGE', value: params.IS_STORAGE),
                       booleanParam(name: 'USE_TURN', value: params.USE_TURN),
                       booleanParam(name: 'USE_IOT', value: params.USE_IOT),
+                      booleanParam(name: 'IS_PROFILING', value: params.IS_PROFILING),
                       booleanParam(name: 'TRICKLE_ICE', value: params.TRICKLE_ICE),
                       booleanParam(name: 'USE_MBEDTLS', value: params.USE_MBEDTLS),
                       string(name: 'LOG_GROUP_NAME', value: params.LOG_GROUP_NAME),
@@ -373,7 +402,7 @@ pipeline {
                       string(name: 'MIN_RETRY_DELAY_IN_SECONDS', value: params.MIN_RETRY_DELAY_IN_SECONDS),
                       string(name: 'GIT_URL', value: params.GIT_URL),
                       string(name: 'GIT_HASH', value: params.GIT_HASH),
-                      booleanParam(name: 'FIRST_ITERATION', value: false)
+                      booleanParam(name: 'FIRST_ITERATION', value: true)
                     ],
                     wait: false
                 )
