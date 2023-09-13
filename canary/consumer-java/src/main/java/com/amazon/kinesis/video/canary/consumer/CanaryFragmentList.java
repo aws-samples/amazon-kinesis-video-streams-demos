@@ -9,19 +9,18 @@ import java.util.ArrayList;
  */
 
 public class CanaryFragmentList {
+    private List<CanaryFragment> mFragmentList = new ArrayList<>();
 
-    private List<CanaryFragment> fragmentList = new ArrayList<>();
-
-
+    
     public CanaryFragmentList() {
     }
 
     public void setFragmentList(List<CanaryFragment> fragmentList) {
-        this.fragmentList = fragmentList;
+        this.mFragmentList = fragmentList;
     }
 
     public List<CanaryFragment> getFragmentList() {
-        return fragmentList;
+        return this.mFragmentList;
     }
 
 }

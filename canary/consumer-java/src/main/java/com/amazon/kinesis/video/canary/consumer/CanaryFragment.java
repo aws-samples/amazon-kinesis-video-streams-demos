@@ -12,20 +12,19 @@ import com.amazonaws.services.kinesisvideo.model.Fragment;
  */
 
 public class CanaryFragment{
-    private Integer fragmentNumberInt;
-    private Fragment fragment;
-    
+    private Fragment mFragment;
 
+    
     public CanaryFragment(Fragment fragment) {
-        this.fragment = fragment;
+        this.mFragment = fragment;
     }
 
     public Fragment getFragment(){
-        return this.fragment;
+        return this.mFragment;
     }
 
     public BigInteger getFragmentNumberInt() {
-        return new BigInteger(fragment.getFragmentNumber());
+        return new BigInteger(this.mFragment.getFragmentNumber());
     }
 
 
