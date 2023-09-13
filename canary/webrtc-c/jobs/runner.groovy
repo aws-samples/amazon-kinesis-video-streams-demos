@@ -249,14 +249,14 @@ pipeline {
     parameters {
         choice(name: 'AWS_KVS_LOG_LEVEL', choices: ["1", "2", "3", "4", "5"])
         booleanParam(name: 'IS_SIGNALING')
-        booleanParam(name: 'IS_STORAGE', value: params.IS_STORAGE),
+        booleanParam(name: 'IS_STORAGE', value: params.IS_STORAGE)
         booleanParam(name: 'USE_TURN')
         booleanParam(name: 'IS_PROFILING')
         booleanParam(name: 'TRICKLE_ICE')
         booleanParam(name: 'USE_MBEDTLS', defaultValue: false)
         string(name: 'LOG_GROUP_NAME')
         string(name: 'MASTER_NODE_LABEL')
-        string(name: 'CONSUMER_NODE_LABEL'),
+        string(name: 'CONSUMER_NODE_LABEL')
         string(name: 'VIEWER_NODE_LABEL')
         string(name: 'RUNNER_LABEL')
         string(name: 'SCENARIO_LABEL')
