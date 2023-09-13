@@ -272,7 +272,7 @@ pipeline {
                         )
 
                     }
-                }            
+                }
 
                 stage("Tear down old runners") {
                     when {
