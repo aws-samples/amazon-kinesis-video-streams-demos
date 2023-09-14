@@ -30,6 +30,7 @@ def buildProject(useMbedTLS, thing_prefix) {
         cd .. &&
         mkdir -p build &&
         cd build &&
+        export CFLAGS="-Wno-error=stringop-overflow"
         ${configureCmd} &&
         make"""
 }
