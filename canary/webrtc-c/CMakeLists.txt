@@ -5,10 +5,13 @@ set(CMAKE_CXX_STANDARD 11)
 
 include(FetchContent)
 
+option(CANARY_USE_OPENSSL "OPenssl" ON)
+option(CANARY_USE_MBEDTLS "MBedtls" OFF)
+
 FetchContent_Declare(
   webrtc
   GIT_REPOSITORY https://github.com/awslabs/amazon-kinesis-video-streams-webrtc-sdk-c
-  GIT_TAG        15e60193456709a3786f7c0f237c49ea7bd9c81f
+  GIT_TAG        mbedtls-warning-fix
 )
 
 FetchContent_Declare(
@@ -20,6 +23,16 @@ FetchContent_Declare(
 FetchContent_GetProperties(webrtc)
 if(NOT webrtc_POPULATED)
   FetchContent_Populate(webrtc)
+  set(CMAKE_POLICY_DEFAULT_CMP0077 NEW)
+  if(CANARY_USE_OPENSSL)
+    message(STATUS "Setting USE_OPENSSL to ON for webrtc")
+    set(USE_OPENSSL ON)
+  elseif(CANARY_USE_MBEDTLS)
+    message(STATUS "Setting USE_OPENSSL to OFF and USE_MBEDTLS to ON for webrtc")
+    set(USE_OPENSSL OFF)
+    set(USE_MBEDTLS ON)
+  endif()
+  set(BUILD_SAMPLES OFF)
   add_subdirectory(${webrtc_SOURCE_DIR} ${webrtc_BINARY_DIR} EXCLUDE_FROM_ALL)
 endif()
 
@@ -30,10 +43,7 @@ if(NOT cloudwatch_POPULATED)
   set(CUSTOM_MEMORY_MANAGEMENT OFF)
   set(ENABLE_TESTING OFF)
   set(BUILD_ONLY "monitoring;logs")
-  set(BUILD_SAMPLES OFF)
   set(USE_OPENSSL ON)
-  target_compile_options(kvsWebrtcClient PUBLIC -Wstringop-overflow)
-  target_compile_options(kvsWebrtcSignalingClient PUBLIC -Wstringop-overflow)
   add_subdirectory(${cloudwatch_SOURCE_DIR} ${cloudwatch_BINARY_DIR} EXCLUDE_FROM_ALL)
 endif()
 
