@@ -32,6 +32,8 @@ if(NOT cloudwatch_POPULATED)
   set(BUILD_ONLY "monitoring;logs")
   set(BUILD_SAMPLES OFF)
   set(USE_OPENSSL ON)
+  target_compile_options(kvsWebrtcClient PUBLIC -Wstringop-overflow)
+  target_compile_options(kvsWebrtcSignalingClient PUBLIC -Wstringop-overflow)
   add_subdirectory(${cloudwatch_SOURCE_DIR} ${cloudwatch_BINARY_DIR} EXCLUDE_FROM_ALL)
 endif()
 
