@@ -215,18 +215,6 @@ STATUS canaryStreamFragmentAckHandler(UINT64 customData, STREAM_HANDLE streamHan
     return STATUS_SUCCESS;
 }
 
-VOID onPutMetricDataResponseReceivedHandler(const Aws::CloudWatch::CloudWatchClient* cwClient,
-                                            const Aws::CloudWatch::Model::PutMetricDataRequest& request,
-                                            const Aws::CloudWatch::Model::PutMetricDataOutcome& outcome,
-                                            const std::shared_ptr<const Aws::Client::AsyncCallerContext>& context)
-{
-    if (!outcome.IsSuccess()) {
-        DLOGE("Failed to put sample metric data: %s", outcome.GetError().GetMessage().c_str());
-    } else {
-        DLOGS("Successfully put sample metric data");
-    }
-}
-
 VOID canaryStreamSendMetrics(PCanaryStreamCallbacks pCanaryStreamCallbacks, Aws::CloudWatch::Model::MetricDatum& metricDatum)
 {
     Aws::CloudWatch::Model::PutMetricDataRequest cwRequest;
