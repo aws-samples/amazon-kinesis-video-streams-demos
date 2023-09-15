@@ -182,7 +182,7 @@ pipeline {
         stage('Set build description') {
             steps {
                 script {
-                    currentBuild.displayName = "${CANARY_TYPE}-${params.RUNNER_LABEL} [#${BUILD_NUMBER}]"
+                    currentBuild.displayName = "${params.CANARY_TYPE}-${params.RUNNER_LABEL} [#${BUILD_NUMBER}]"
                     currentBuild.description = "Executed on: ${NODE_NAME}\n"
                 }
             }
