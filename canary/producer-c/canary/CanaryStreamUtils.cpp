@@ -4,6 +4,8 @@
 #define LOG_CLASS "CanaryStreamCallbacks"
 #include "CanaryUtils.h"
 
+std::atomic<UINT64> pendingMetrics;
+
 STATUS createCanaryStreamCallbacks(Aws::CloudWatch::CloudWatchClient* cwClient, PCHAR pStreamName, PCHAR canaryLabel, PCanaryStreamCallbacks* ppCanaryStreamCallbacks)
 {
     ENTERS();
@@ -242,6 +244,8 @@ VOID onPutMetricDataResponseReceivedHandler(const Aws::CloudWatch::CloudWatchCli
     } else {
         DLOGS("Successfully put sample metric data");
     }
+    pendingMetrics--;
+    DLOGI("Pending metrics in callback: %d", pendingMetrics.load());
 }
 
 VOID canaryStreamSendMetrics(PCanaryStreamCallbacks pCanaryStreamCallbacks, Aws::CloudWatch::Model::MetricDatum& metricDatum)
@@ -249,6 +253,8 @@ VOID canaryStreamSendMetrics(PCanaryStreamCallbacks pCanaryStreamCallbacks, Aws:
     Aws::CloudWatch::Model::PutMetricDataRequest cwRequest;
     cwRequest.SetNamespace("KinesisVideoSDKCanary");
     cwRequest.AddMetricData(metricDatum);
+    pendingMetrics++;
+    DLOGI("Pending metrics before callback: %d", pendingMetrics.load());
     pCanaryStreamCallbacks->pCwClient->PutMetricDataAsync(cwRequest, onPutMetricDataResponseReceivedHandler);
 }
 
@@ -424,5 +430,11 @@ VOID canaryStreamRecordFragmentEndSendTime(PCanaryStreamCallbacks pCanaryStreamC
         } else {
             break;
         }
+    }
+}
+
+VOID cleanupMonitoring() {
+    while(pendingMetrics.load() > 0) {
+        THREAD_SLEEP(HUNDREDS_OF_NANOS_IN_A_MILLISECOND * 500);
     }
 }

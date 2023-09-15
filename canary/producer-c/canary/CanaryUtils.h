@@ -180,6 +180,7 @@ STATUS optenv(PCHAR, PCHAR, PCHAR);
 STATUS optenvUint64(PCHAR, PUINT64, UINT64);
 STATUS printConfig(PCanaryConfig);
 STATUS initWithEnvVars(PCanaryConfig);
+VOID cleanupMonitoring();
 
 #ifdef __cplusplus
 }

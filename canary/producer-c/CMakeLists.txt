@@ -10,6 +10,7 @@ set(CUSTOM_MEMORY_MANAGEMENT OFF CACHE BOOL "Tell AWS SDK to not use custom memo
 set(ENABLE_TESTING OFF CACHE BOOL "Disable building tests for AWS SDK" FORCE)
 set(BUILD_ONLY "monitoring;logs" CACHE STRING "Tell AWS SDK to only build monitoring and logs" FORCE)
 set(BUILD_COMMON_CURL ON CACHE BOOL "Curl" FORCE)
+set(BUILD_DEPENDENCIES OFF CACHE BOOL "Deps in kvs" FORCE)
 
 FetchContent_Declare(
         producerc

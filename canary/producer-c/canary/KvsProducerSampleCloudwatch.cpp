@@ -522,6 +522,9 @@ INT32 main(INT32 argc, CHAR* argv[])
             frameIndex++;
         }
         CHK_LOG_ERR(retStatus);
+        DLOGI("Waiting to push all metrics");
+        cleanupMonitoring();
+        DLOGI("Cleaning up other objects");
         SAFE_MEMFREE(frame.frameData);
         freeDeviceInfo(&pDeviceInfo);
         freeStreamInfoProvider(&pStreamInfo);
