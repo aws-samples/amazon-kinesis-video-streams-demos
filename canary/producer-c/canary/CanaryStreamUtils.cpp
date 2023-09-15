@@ -188,39 +188,30 @@ STATUS canaryStreamFragmentAckHandler(UINT64 customData, STREAM_HANDLE streamHan
     Aws::CloudWatch::Model::MetricDatum ackDatum, aggAckDatum;
     switch (pFragmentAck->ackType) {
         case FRAGMENT_ACK_TYPE_BUFFERING:
-            ackDatum.SetMetricName("BufferedAckLatency");
-            ackDatum.AddDimensions(pCanaryStreamCallbacks->dimensionPerStream);
-            pushMetric(pCanaryStreamCallbacks, ackDatum, Aws::CloudWatch::Model::StandardUnit::Milliseconds, (GETTIME() - timeOfFragmentEndSent) / HUNDREDS_OF_NANOS_IN_A_MILLISECOND);
-
-            if (pCanaryStreamCallbacks->aggregateMetrics) {
-                aggAckDatum.SetMetricName("BufferedAckLatency");
-                aggAckDatum.AddDimensions(pCanaryStreamCallbacks->aggregatedDimension);
-                pushMetric(pCanaryStreamCallbacks, aggAckDatum, Aws::CloudWatch::Model::StandardUnit::Milliseconds, (GETTIME() - timeOfFragmentEndSent) / HUNDREDS_OF_NANOS_IN_A_MILLISECOND);
-            }
 
             break;
         case FRAGMENT_ACK_TYPE_RECEIVED:
-            ackDatum.SetMetricName("ReceivedAckLatency");
-            ackDatum.AddDimensions(pCanaryStreamCallbacks->dimensionPerStream);
-            pushMetric(pCanaryStreamCallbacks, ackDatum, Aws::CloudWatch::Model::StandardUnit::Milliseconds, (GETTIME() - timeOfFragmentEndSent) / HUNDREDS_OF_NANOS_IN_A_MILLISECOND);
-
-            if (pCanaryStreamCallbacks->aggregateMetrics) {
-                aggAckDatum.SetMetricName("ReceivedAckLatency");
-                aggAckDatum.AddDimensions(pCanaryStreamCallbacks->aggregatedDimension);
-                pushMetric(pCanaryStreamCallbacks, aggAckDatum, Aws::CloudWatch::Model::StandardUnit::Milliseconds, (GETTIME() - timeOfFragmentEndSent) / HUNDREDS_OF_NANOS_IN_A_MILLISECOND);
-            }
+//            ackDatum.SetMetricName("ReceivedAckLatency");
+//            ackDatum.AddDimensions(pCanaryStreamCallbacks->dimensionPerStream);
+//            pushMetric(pCanaryStreamCallbacks, ackDatum, Aws::CloudWatch::Model::StandardUnit::Milliseconds, (GETTIME() - timeOfFragmentEndSent) / HUNDREDS_OF_NANOS_IN_A_MILLISECOND);
+//
+//            if (pCanaryStreamCallbacks->aggregateMetrics) {
+//                aggAckDatum.SetMetricName("ReceivedAckLatency");
+//                aggAckDatum.AddDimensions(pCanaryStreamCallbacks->aggregatedDimension);
+//                pushMetric(pCanaryStreamCallbacks, aggAckDatum, Aws::CloudWatch::Model::StandardUnit::Milliseconds, (GETTIME() - timeOfFragmentEndSent) / HUNDREDS_OF_NANOS_IN_A_MILLISECOND);
+//            }
             break;
 
         case FRAGMENT_ACK_TYPE_PERSISTED:
-            ackDatum.SetMetricName("PersistedAckLatency");
-            ackDatum.AddDimensions(pCanaryStreamCallbacks->dimensionPerStream);
-            pushMetric(pCanaryStreamCallbacks, ackDatum, Aws::CloudWatch::Model::StandardUnit::Milliseconds, (GETTIME() - timeOfFragmentEndSent) / HUNDREDS_OF_NANOS_IN_A_MILLISECOND);
-
-            if (pCanaryStreamCallbacks->aggregateMetrics) {
-                aggAckDatum.SetMetricName("PersistedAckLatency");
-                aggAckDatum.AddDimensions(pCanaryStreamCallbacks->aggregatedDimension);
-                pushMetric(pCanaryStreamCallbacks, aggAckDatum, Aws::CloudWatch::Model::StandardUnit::Milliseconds, (GETTIME() - timeOfFragmentEndSent) / HUNDREDS_OF_NANOS_IN_A_MILLISECOND);
-            }
+//            ackDatum.SetMetricName("PersistedAckLatency");
+//            ackDatum.AddDimensions(pCanaryStreamCallbacks->dimensionPerStream);
+//            pushMetric(pCanaryStreamCallbacks, ackDatum, Aws::CloudWatch::Model::StandardUnit::Milliseconds, (GETTIME() - timeOfFragmentEndSent) / HUNDREDS_OF_NANOS_IN_A_MILLISECOND);
+//
+//            if (pCanaryStreamCallbacks->aggregateMetrics) {
+//                aggAckDatum.SetMetricName("PersistedAckLatency");
+//                aggAckDatum.AddDimensions(pCanaryStreamCallbacks->aggregatedDimension);
+//                pushMetric(pCanaryStreamCallbacks, aggAckDatum, Aws::CloudWatch::Model::StandardUnit::Milliseconds, (GETTIME() - timeOfFragmentEndSent) / HUNDREDS_OF_NANOS_IN_A_MILLISECOND);
+//            }
             pCanaryStreamCallbacks->timeOfNextKeyFrame->erase(pFragmentAck->timestamp);
 
             break;
@@ -255,6 +246,16 @@ VOID canaryStreamSendMetrics(PCanaryStreamCallbacks pCanaryStreamCallbacks, Aws:
     cwRequest.AddMetricData(metricDatum);
     pendingMetrics++;
     DLOGI("Pending metrics before callback: %d", pendingMetrics.load());
+//    if (!outcome.IsSuccess())
+//    {
+//        DLOGE("Failed to put sample metric data:" <<
+//                  outcome.GetError().GetMessage());
+//    }
+//    else
+//    {
+//        DLOGI("Successfully put sample metric data");
+//    }
+//    auto outcome = pCanaryStreamCallbacks->pCwClient->PutMetricData(cwRequest);
     pCanaryStreamCallbacks->pCwClient->PutMetricDataAsync(cwRequest, onPutMetricDataResponseReceivedHandler);
 }
 
