@@ -244,19 +244,18 @@ VOID canaryStreamSendMetrics(PCanaryStreamCallbacks pCanaryStreamCallbacks, Aws:
     Aws::CloudWatch::Model::PutMetricDataRequest cwRequest;
     cwRequest.SetNamespace("KinesisVideoSDKCanary");
     cwRequest.AddMetricData(metricDatum);
-    pendingMetrics++;
-    DLOGI("Pending metrics before callback: %d", pendingMetrics.load());
-//    if (!outcome.IsSuccess())
-//    {
-//        DLOGE("Failed to put sample metric data:" <<
-//                  outcome.GetError().GetMessage());
-//    }
-//    else
-//    {
-//        DLOGI("Successfully put sample metric data");
-//    }
-//    auto outcome = pCanaryStreamCallbacks->pCwClient->PutMetricData(cwRequest);
-    pCanaryStreamCallbacks->pCwClient->PutMetricDataAsync(cwRequest, onPutMetricDataResponseReceivedHandler);
+//    pendingMetrics++;
+//    DLOGI("Pending metrics before callback: %d", pendingMetrics.load());
+    auto outcome = pCanaryStreamCallbacks->pCwClient->PutMetricData(cwRequest);
+        if (!outcome.IsSuccess())
+    {
+        DLOGE("Failed to put sample metric data: %s" , outcome.GetError().GetMessage().c_str());
+    }
+    else
+    {
+        DLOGI("Successfully put sample metric data");
+    }
+//    pCanaryStreamCallbacks->pCwClient->PutMetricDataAsync(cwRequest, onPutMetricDataResponseReceivedHandler);
 }
 
 STATUS publishErrorRate(STREAM_HANDLE streamHandle, PCanaryStreamCallbacks pCanaryStreamCallbacks, UINT64 duration)
