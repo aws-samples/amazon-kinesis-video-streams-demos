@@ -334,7 +334,6 @@ INT32 main(INT32 argc, CHAR* argv[])
     initializeEndianness();
     SRAND(time(0));
     Aws::SDKOptions options;
-    options.httpOptions.installSigPipeHandler = true;
     Aws::InitAPI(options);
     {
         frame.frameData = NULL;
@@ -536,7 +535,6 @@ INT32 main(INT32 argc, CHAR* argv[])
             frame.presentationTs = frame.decodingTs;
             frameIndex++;
         }
-        cloudwatchMonitoringCleanUp(c.pCanaryStreamCallbacks);
         CHK_LOG_ERR(retStatus);
         if (IS_VALID_TIMER_QUEUE_HANDLE(timerQueueHandle)) {
             timerQueueFree(&timerQueueHandle);
@@ -548,9 +546,7 @@ INT32 main(INT32 argc, CHAR* argv[])
         freeStreamInfoProvider(&pStreamInfo);
         freeKinesisVideoStream(&c.streamHandle);
         freeKinesisVideoClient(&c.clientHandle);
-        DLOGI("Cleaned up everything in KVS");
         freeCallbacksProvider(&pClientCallbacks); // This will also take care of freeing canaryStreamCallbacks
-        DLOGI("Cleaned up everything in callbacks");
         if (IS_VALID_TIMER_QUEUE_HANDLE(timerQueueHandle)) {
             timerQueueFree(&timerQueueHandle);
         }
