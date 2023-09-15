@@ -5,8 +5,6 @@
 #include <numeric>
 #include "CanaryUtils.h"
 
-std::atomic<UINT64> pendingMetrics;
-
 STATUS createCanaryStreamCallbacks(Aws::CloudWatch::CloudWatchClient* cwClient, PCHAR pStreamName, PCHAR canaryLabel, PCanaryStreamCallbacks* ppCanaryStreamCallbacks)
 {
     ENTERS();
@@ -40,7 +38,7 @@ STATUS createCanaryStreamCallbacks(Aws::CloudWatch::CloudWatchClient* cwClient, 
 
     pCanaryStreamCallbacks->aggregateMetrics = TRUE;
 
-CleanUp:
+    CleanUp:
 
     if (STATUS_FAILED(retStatus)) {
         pCanaryStreamCallbacks = NULL;
@@ -75,7 +73,7 @@ STATUS freeCanaryStreamCallbacks(PStreamCallbacks* ppStreamCallbacks)
     // Set the pointer to NULL
     *ppStreamCallbacks = NULL;
 
-CleanUp:
+    CleanUp:
 
     LEAVES();
     return retStatus;
@@ -91,7 +89,7 @@ STATUS canaryStreamFreeHandler(PUINT64 customData)
     pStreamCallbacks = (PStreamCallbacks) *customData;
     CHK_STATUS(freeCanaryStreamCallbacks(&pStreamCallbacks));
 
-CleanUp:
+    CleanUp:
 
     LEAVES();
     return retStatus;
@@ -103,7 +101,7 @@ STATUS canaryStreamErrorReportHandler(UINT64 customData, STREAM_HANDLE streamHan
     PCanaryStreamCallbacks pCanaryStreamCallbacks = (PCanaryStreamCallbacks) customData;
     Aws::CloudWatch::Model::MetricDatum streamErrorDatum, aggstreamErrorDatum;
     DLOGE("CanaryStreamErrorReportHandler got error %lu at time %" PRIu64 " for stream % " PRIu64 " for upload handle %" PRIu64, statusCode,
-          erroredTimecode, streamHandle, uploadHandle);
+            erroredTimecode, streamHandle, uploadHandle);
     streamErrorDatum.SetMetricName("StreamError");
     streamErrorDatum.AddDimensions(pCanaryStreamCallbacks->dimensionPerStream);
     pushMetric(pCanaryStreamCallbacks, streamErrorDatum, Aws::CloudWatch::Model::StandardUnit::None, 1.0);
@@ -227,8 +225,6 @@ VOID onPutMetricDataResponseReceivedHandler(const Aws::CloudWatch::CloudWatchCli
     } else {
         DLOGS("Successfully put sample metric data");
     }
-    pendingMetrics--;
-    DLOGI("Pending metrics in callback: %d", pendingMetrics.load());
 }
 
 VOID canaryStreamSendMetrics(PCanaryStreamCallbacks pCanaryStreamCallbacks, Aws::CloudWatch::Model::MetricDatum& metricDatum)
@@ -236,10 +232,8 @@ VOID canaryStreamSendMetrics(PCanaryStreamCallbacks pCanaryStreamCallbacks, Aws:
     Aws::CloudWatch::Model::PutMetricDataRequest cwRequest;
     cwRequest.SetNamespace("KinesisVideoSDKCanary");
     cwRequest.AddMetricData(metricDatum);
-//    pendingMetrics++;
-//    DLOGI("Pending metrics before callback: %d", pendingMetrics.load());
     auto outcome = pCanaryStreamCallbacks->pCwClient->PutMetricData(cwRequest);
-        if (!outcome.IsSuccess())
+    if (!outcome.IsSuccess())
     {
         DLOGE("Failed to put sample metric data: %s" , outcome.GetError().GetMessage().c_str());
     }
@@ -247,7 +241,6 @@ VOID canaryStreamSendMetrics(PCanaryStreamCallbacks pCanaryStreamCallbacks, Aws:
     {
         DLOGI("Successfully put sample metric data");
     }
-//    pCanaryStreamCallbacks->pCwClient->PutMetricDataAsync(cwRequest, onPutMetricDataResponseReceivedHandler);
 }
 
 STATUS publishErrorRate(UINT32 timerId, UINT64 currentTime, UINT64 customData)
@@ -267,7 +260,7 @@ STATUS publishErrorRate(UINT32 timerId, UINT64 currentTime, UINT64 customData)
     CHK_STATUS(getKinesisVideoStreamMetrics(c->streamHandle, &canaryStreamMetrics));
 
     duration = currentTime - currentTimeLocal;
-    
+
     numberOfPutFrameErrors = canaryStreamMetrics.putFrameErrors - c->pCanaryStreamCallbacks->historicStreamMetric.prevPutFrameErrorCount;
     numberOfErrorAcks = canaryStreamMetrics.errorAcks - c->pCanaryStreamCallbacks->historicStreamMetric.prevErrorAckCount;
     putFrameErrorRate = (DOUBLE) (numberOfPutFrameErrors) / (DOUBLE) (duration / HUNDREDS_OF_NANOS_IN_A_SECOND);
@@ -465,11 +458,5 @@ VOID canaryStreamRecordFragmentEndSendTime(PCanaryStreamCallbacks pCanaryStreamC
         } else {
             break;
         }
-    }
-}
-
-VOID cleanupMonitoring() {
-    while(pendingMetrics.load() > 0) {
-        THREAD_SLEEP(HUNDREDS_OF_NANOS_IN_A_MILLISECOND * 500);
     }
 }

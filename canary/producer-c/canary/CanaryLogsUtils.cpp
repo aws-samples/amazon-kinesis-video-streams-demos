@@ -64,6 +64,9 @@ STATUS canaryStreamSendLogs(UINT32 timerId, UINT64 currentTime, UINT64 customDat
         pCloudwatchLogsObject->pCwl->PutLogEventsAsync(request, onPutLogEventResponseReceivedHandler);
         pCloudwatchLogsObject->canaryInputLogEventVec.clear();
     }
+
+    pCloudwatchLogsObject->pCwl->PutLogEventsAsync(request, onPutLogEventResponseReceivedHandler);
+    pCloudwatchLogsObject->canaryInputLogEventVec.clear();
     return STATUS_SUCCESS;
 }
 
