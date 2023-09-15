@@ -32,7 +32,7 @@ if(NOT webrtc_POPULATED)
     set(USE_OPENSSL OFF)
     set(USE_MBEDTLS ON)
   endif()
-  set(BUILD_SAMPLES OFF)
+  set(BUILD_SAMPLE OFF)
   add_subdirectory(${webrtc_SOURCE_DIR} ${webrtc_BINARY_DIR} EXCLUDE_FROM_ALL)
 endif()
 
