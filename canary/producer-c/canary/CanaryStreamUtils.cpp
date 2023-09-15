@@ -5,6 +5,8 @@
 #include <numeric>
 #include "CanaryUtils.h"
 
+std::atomic<UINT64> pendingMetrics;
+
 STATUS createCanaryStreamCallbacks(Aws::CloudWatch::CloudWatchClient* cwClient, PCHAR pStreamName, PCHAR canaryLabel, PCanaryStreamCallbacks* ppCanaryStreamCallbacks)
 {
     ENTERS();
@@ -446,5 +448,11 @@ VOID canaryStreamRecordFragmentEndSendTime(PCanaryStreamCallbacks pCanaryStreamC
         } else {
             break;
         }
+    }
+}
+
+VOID cloudwatchMonitoringCleanUp() {
+    while(pendingMetrics.load() > 0) {
+        THREAD_SLEEP(HUNDREDS_OF_NANOS_IN_A_MILLISECOND * 500);
     }
 }

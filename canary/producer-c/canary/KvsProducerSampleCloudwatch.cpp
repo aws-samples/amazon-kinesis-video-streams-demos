@@ -546,10 +546,9 @@ INT32 main(INT32 argc, CHAR* argv[])
         freeStreamInfoProvider(&pStreamInfo);
         freeKinesisVideoStream(&c.streamHandle);
         freeKinesisVideoClient(&c.clientHandle);
+        DLOGI("Cleaned up everything in KVS");
         freeCallbacksProvider(&pClientCallbacks); // This will also take care of freeing canaryStreamCallbacks
-        if (IS_VALID_TIMER_QUEUE_HANDLE(timerQueueHandle)) {
-            timerQueueFree(&timerQueueHandle);
-        }
+        DLOGI("Cleaned up everything in callbacks");
         RESET_INSTRUMENTED_ALLOCATORS();
         DLOGI("CleanUp Done");
         cleanUpDone = TRUE;
