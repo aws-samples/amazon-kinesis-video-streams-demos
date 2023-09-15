@@ -11,7 +11,7 @@ STATUS CloudwatchMonitoring::init()
 {
     STATUS retStatus = STATUS_SUCCESS;
 
-    this->channelDimension.SetName("WebRTCSDKCanaryChannelName");
+    this->isStorage ? this->channelDimension.SetName("StorageWebRTCSDKCanaryChannelName") : this->channelDimension.SetName("WebRTCSDKCanaryChannelName");
     this->channelDimension.SetValue(pConfig->channelName.value);
 
     this->isStorage ? this->labelDimension.SetName("StorageWebRTCSDKCanaryLabel") : this->labelDimension.SetName("WebRTCSDKCanaryLabel");
