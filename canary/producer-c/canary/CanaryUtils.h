@@ -136,6 +136,8 @@ struct __CanaryStreamCallbacks {
     PCHAR pStreamName;
     UINT64 totalNumberOfErrors;
     BOOL aggregateMetrics;
+    Aws::Vector<DOUBLE> receivedAckLatencyVec;
+    Aws::Vector<DOUBLE> persistedAckLatencyVec;
     Aws::CloudWatch::CloudWatchClient* pCwClient;
     Aws::CloudWatch::Model::PutMetricDataRequest* cwRequest;
     Aws::CloudWatch::Model::Dimension dimensionPerStream;

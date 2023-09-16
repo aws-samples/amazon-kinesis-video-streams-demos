@@ -50,9 +50,8 @@ VOID onPutLogEventResponseReceivedHandler(const Aws::CloudWatchLogs::CloudWatchL
     }
 }
 
-STATUS canaryStreamSendLogs(UINT32 timerId, UINT64 currentTime, UINT64 customData)
+VOID canaryStreamSendLogs(PCloudwatchLogsObject pCloudwatchLogsObject)
 {
-    PCloudwatchLogsObject pCloudwatchLogsObject = (PCloudwatchLogsObject) customData;
     Aws::CloudWatchLogs::Model::PutLogEventsOutcome outcome;
     if (pCloudwatchLogsObject->canaryInputLogEventVec.size() >= 128) {
         auto request = Aws::CloudWatchLogs::Model::PutLogEventsRequest()
@@ -65,7 +64,6 @@ STATUS canaryStreamSendLogs(UINT32 timerId, UINT64 currentTime, UINT64 customDat
         pCloudwatchLogsObject->pCwl->PutLogEventsAsync(request, onPutLogEventResponseReceivedHandler);
         pCloudwatchLogsObject->canaryInputLogEventVec.clear();
     }
-    return STATUS_SUCCESS;
 }
 
 VOID canaryStreamSendLogSync(PCloudwatchLogsObject pCloudwatchLogsObject)
