@@ -45,13 +45,13 @@ VOID onPutLogEventResponseReceivedHandler(const Aws::CloudWatchLogs::CloudWatchL
     if (!outcome.IsSuccess()) {
         DLOGE("Failed to push logs: %s", outcome.GetError().GetMessage().c_str());
     } else {
-        DLOGS("Successfully pushed logs to cloudwatch");
+        DLOGI("Successfully pushed logs to cloudwatch");
         gCloudwatchLogsObject->token = outcome.GetResult().GetNextSequenceToken();
     }
 }
 
-VOID canaryStreamSendLogs(PCloudwatchLogsObject pCloudwatchLogsObject)
-{
+STATUS canaryStreamSendLogs(UINT32 timerId, UINT64 currentTime, UINT64 customData) {
+    PCloudwatchLogsObject pCloudwatchLogsObject = (PCloudwatchLogsObject) customData;
     Aws::CloudWatchLogs::Model::PutLogEventsOutcome outcome;
     if (pCloudwatchLogsObject->canaryInputLogEventVec.size() >= 128) {
         auto request = Aws::CloudWatchLogs::Model::PutLogEventsRequest()
@@ -64,6 +64,7 @@ VOID canaryStreamSendLogs(PCloudwatchLogsObject pCloudwatchLogsObject)
         pCloudwatchLogsObject->pCwl->PutLogEventsAsync(request, onPutLogEventResponseReceivedHandler);
         pCloudwatchLogsObject->canaryInputLogEventVec.clear();
     }
+    return STATUS_SUCCESS;
 }
 
 VOID canaryStreamSendLogSync(PCloudwatchLogsObject pCloudwatchLogsObject)

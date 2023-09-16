@@ -147,6 +147,12 @@ struct __CanaryStreamCallbacks {
 };
 typedef struct __CanaryStreamCallbacks* PCanaryStreamCallbacks;
 
+typedef struct {
+    STREAM_HANDLE streamHandle;
+    CLIENT_HANDLE clientHandle;
+    PCanaryStreamCallbacks pCanaryStreamCallbacks;
+} CanaryCustomData;
+
 ////////////////////////////////////////////////////////////////////////
 // Callback function implementations
 ////////////////////////////////////////////////////////////////////////
@@ -161,16 +167,16 @@ STATUS computeStreamMetricsFromCanary(STREAM_HANDLE, PCanaryStreamCallbacks);
 STATUS computeClientMetricsFromCanary(CLIENT_HANDLE, PCanaryStreamCallbacks);
 VOID currentMemoryAllocation(PCanaryStreamCallbacks);
 VOID pushMetric(PCanaryStreamCallbacks pCanaryStreamCallback, Aws::CloudWatch::Model::MetricDatum&, Aws::CloudWatch::Model::StandardUnit, DOUBLE);
-STATUS publishErrorRate(STREAM_HANDLE, PCanaryStreamCallbacks, UINT64);
+STATUS publishErrorRate(UINT32 timerId, UINT64 currentTime, UINT64 customData);
 STATUS pushStartUpLatency(PCanaryStreamCallbacks, DOUBLE);
-STATUS publishMetrics(STREAM_HANDLE, CLIENT_HANDLE, PCanaryStreamCallbacks);
+STATUS publishMetrics(UINT32 timerId, UINT64 currentTime, UINT64 customData);
 
 ////////////////////////////////////////////////////////////////////////
 // Cloudwatch logging related functions
 ////////////////////////////////////////////////////////////////////////
 VOID cloudWatchLogger(UINT32, PCHAR, PCHAR, ...);
 STATUS initializeCloudwatchLogger(PCloudwatchLogsObject);
-VOID canaryStreamSendLogs(PCloudwatchLogsObject);
+STATUS canaryStreamSendLogs(UINT32 timerId, UINT64 currentTime, UINT64 customData);
 VOID canaryStreamSendLogSync(PCloudwatchLogsObject);
 
 ////////////////////////////////////////////////////////////////////////

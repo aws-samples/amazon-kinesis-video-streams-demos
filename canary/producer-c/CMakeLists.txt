@@ -21,7 +21,7 @@ FetchContent_Declare(
 FetchContent_Declare(
         cloudwatch
         GIT_REPOSITORY https://github.com/aws/aws-sdk-cpp
-        GIT_TAG        1.9.67
+        GIT_TAG        1.11.92
 )
 
 FetchContent_GetProperties(webrtc)
