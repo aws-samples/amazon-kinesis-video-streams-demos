@@ -2,6 +2,7 @@
  * Kinesis Video Producer Continuous Retry Stream Callbacks
  */
 #define LOG_CLASS "CanaryStreamCallbacks"
+#include <numeric>
 #include "CanaryUtils.h"
 
 std::atomic<UINT64> pendingMetrics;
@@ -409,30 +410,36 @@ VOID currentMemoryAllocation(PCanaryStreamCallbacks pCanaryStreamCallbacks)
 
 STATUS computeAckMetricsFromCanary(PCanaryStreamCallbacks pCanaryStreamCallbacks) {
     Aws::CloudWatch::Model::MetricDatum receiveAckDatum, persistedAckDatum, paggAckDatum, raggAckDatum;
-    DLOGI("Periodic Ack latency metric publish");
+    DOUBLE rAckAvg, pAckAvg;
+    rAckAvg = (std::accumulate(pCanaryStreamCallbacks->receivedAckLatencyVec.begin(), pCanaryStreamCallbacks->receivedAckLatencyVec.end(), 0.0)) / pCanaryStreamCallbacks->receivedAckLatencyVec.size();
+    pCanaryStreamCallbacks->receivedAckLatencyVec.clear();
+    pAckAvg = (std::accumulate(pCanaryStreamCallbacks->persistedAckLatencyVec.begin(), pCanaryStreamCallbacks->persistedAckLatencyVec.end(), 0.0)) / pCanaryStreamCallbacks->persistedAckLatencyVec.size();
+    pCanaryStreamCallbacks->persistedAckLatencyVec.clear();
+
+    DLOGI("Periodic Ack latency metric publish...%lf, %lf", rAckAvg, pAckAvg);
+
     receiveAckDatum.SetMetricName("ReceivedAckLatency");
     receiveAckDatum.AddDimensions(pCanaryStreamCallbacks->dimensionPerStream);
-    pushVectorMetric(pCanaryStreamCallbacks, persistedAckDatum, Aws::CloudWatch::Model::StandardUnit::Milliseconds,
-               pCanaryStreamCallbacks->persistedAckLatencyVec);
+    pushMetric(pCanaryStreamCallbacks, receiveAckDatum, Aws::CloudWatch::Model::StandardUnit::Milliseconds,
+               rAckAvg);
     if (pCanaryStreamCallbacks->aggregateMetrics) {
         raggAckDatum.SetMetricName("ReceivedAckLatency");
         raggAckDatum.AddDimensions(pCanaryStreamCallbacks->aggregatedDimension);
-        pushVectorMetric(pCanaryStreamCallbacks, raggAckDatum, Aws::CloudWatch::Model::StandardUnit::Milliseconds,
-                   pCanaryStreamCallbacks->persistedAckLatencyVec);
+        pushMetric(pCanaryStreamCallbacks, raggAckDatum, Aws::CloudWatch::Model::StandardUnit::Milliseconds,
+                   rAckAvg);
     }
-    pCanaryStreamCallbacks->receivedAckLatencyVec.clear();
 
     persistedAckDatum.SetMetricName("PersistedAckLatency");
     persistedAckDatum.AddDimensions(pCanaryStreamCallbacks->dimensionPerStream);
-    pushVectorMetric(pCanaryStreamCallbacks, persistedAckDatum, Aws::CloudWatch::Model::StandardUnit::Milliseconds,
-               pCanaryStreamCallbacks->persistedAckLatencyVec);
+    pushMetric(pCanaryStreamCallbacks, persistedAckDatum, Aws::CloudWatch::Model::StandardUnit::Milliseconds,
+               pAckAvg);
     if (pCanaryStreamCallbacks->aggregateMetrics) {
         paggAckDatum.SetMetricName("PersistedAckLatency");
         paggAckDatum.AddDimensions(pCanaryStreamCallbacks->aggregatedDimension);
-        pushVectorMetric(pCanaryStreamCallbacks, paggAckDatum, Aws::CloudWatch::Model::StandardUnit::Milliseconds,
-                   pCanaryStreamCallbacks->persistedAckLatencyVec);
+        pushMetric(pCanaryStreamCallbacks, paggAckDatum, Aws::CloudWatch::Model::StandardUnit::Milliseconds,
+                   pAckAvg);
     }
-    pCanaryStreamCallbacks->persistedAckLatencyVec.clear();
+    return STATUS_SUCCESS;
 }
 
 STATUS publishMetrics(STREAM_HANDLE streamHandle, CLIENT_HANDLE clientHandle, PCanaryStreamCallbacks pCanaryStreamCallbacks)
