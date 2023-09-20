@@ -79,6 +79,7 @@ def buildPeer(isMaster, params) {
     def envs = [
       'AWS_KVS_LOG_LEVEL': params.AWS_KVS_LOG_LEVEL,
       'CANARY_USE_TURN': params.USE_TURN,
+      'CANARY_FORCE_TURN': params.FORCE_TURN,
       'CANARY_IS_PROFILING_MODE': params.IS_PROFILING,
       'CANARY_TRICKLE_ICE': params.TRICKLE_ICE,
       'CANARY_USE_IOT_PROVIDER': params.USE_IOT,
@@ -258,6 +259,7 @@ pipeline {
                       string(name: 'AWS_KVS_LOG_LEVEL', value: params.AWS_KVS_LOG_LEVEL),
                       booleanParam(name: 'IS_SIGNALING', value: params.IS_SIGNALING),
                       booleanParam(name: 'USE_TURN', value: params.USE_TURN),
+                      booleanParam(name: 'FORCE_TURN', value: params.FORCE_TURN),
                       booleanParam(name: 'USE_IOT', value: params.USE_IOT),
                       booleanParam(name: 'IS_PROFILING', value: params.IS_PROFILING),
                       booleanParam(name: 'TRICKLE_ICE', value: params.TRICKLE_ICE),
