@@ -273,7 +273,7 @@ pipeline {
                       string(name: 'MIN_RETRY_DELAY_IN_SECONDS', value: params.MIN_RETRY_DELAY_IN_SECONDS),
                       string(name: 'GIT_URL', value: params.GIT_URL),
                       string(name: 'GIT_HASH', value: params.GIT_HASH),
-                      booleanParam(name: 'FIRST_ITERATION', value: true)
+                      booleanParam(name: 'FIRST_ITERATION', value: false)
                     ],
                     wait: false
                 )
