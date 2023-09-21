@@ -112,7 +112,6 @@ VOID runPeer(Canary::PConfig pConfig, TIMER_QUEUE_HANDLE timerQueueHandle, STATU
 
     Canary::Peer::Callbacks callbacks;
     callbacks.onNewConnection = onNewConnection;
-    callbacks.onDisconnected = []() { terminated = TRUE; };
 
     Canary::Peer peer;
 
