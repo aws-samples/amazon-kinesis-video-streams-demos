@@ -631,6 +631,7 @@ STATUS Peer::sendProfilingMetrics()
         DLOGP("[Signaling create client] %" PRIu64 " ms", this->signalingClientMetrics.signalingClientStats.createClientTime);
         DLOGP("[Signaling fetch client] %" PRIu64 " ms", this->signalingClientMetrics.signalingClientStats.fetchClientTime);
         DLOGP("[Signaling connect client] %" PRIu64 " ms", this->signalingClientMetrics.signalingClientStats.connectClientTime);
+        DLOGP("[Signaling Join session to offer received] %" PRIu64 " ms", this->signalingClientMetrics.signalingClientStats.joinSessionToOfferRecvTime);
         Canary::Cloudwatch::getInstance().monitoring.pushSignalingClientMetrics(&this->signalingClientMetrics);
     }
     if(STATUS_FAILED(peerConnectionGetMetrics(this->pPeerConnection, &this->peerConnectionMetrics))) {

@@ -5,3 +5,4 @@ canary/consumer-java/target/*
 canary/webrtc-c/.vscode/*
 canary/consumer-java/tmp_jar
 sigv4-signing/java/SigV4Signer.java/target/*
+.vscode/*

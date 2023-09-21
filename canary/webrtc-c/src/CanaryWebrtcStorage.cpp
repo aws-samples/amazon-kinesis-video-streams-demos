@@ -6,6 +6,7 @@ VOID runPeer(Canary::PConfig, TIMER_QUEUE_HANDLE, STATUS*);
 VOID sendLocalFrames(Canary::PPeer, MEDIA_STREAM_TRACK_KIND, const std::string&, UINT64, UINT32);
 STATUS canaryRtpOutboundStats(UINT32, UINT64, UINT64);
 STATUS canaryKvsStats(UINT32, UINT64, UINT64);
+VOID sendProfilingMetrics(Canary::PPeer);
 
 std::atomic<bool> terminated;
 VOID handleSignal(INT32 signal)
@@ -123,12 +124,15 @@ VOID runPeer(Canary::PConfig pConfig, TIMER_QUEUE_HANDLE timerQueueHandle, STATU
     CHK_STATUS(peer.connect());
 
     {
-        std::thread videoThread(sendLocalFrames, &peer, MEDIA_STREAM_TRACK_KIND_VIDEO, "../assets/h264SampleFrames/frame-%04d.h264", NUMBER_OF_H264_FRAME_FILES, SAMPLE_VIDEO_FRAME_DURATION);
-        std::thread audioThread(sendLocalFrames, &peer, MEDIA_STREAM_TRACK_KIND_AUDIO, "../assets/opusSampleFrames/sample-%03d.opus", NUMBER_OF_OPUS_FRAME_FILES, SAMPLE_AUDIO_FRAME_DURATION);
         // All metrics tracking will happen on a time queue to simplify handling periodicity
         CHK_STATUS(timerQueueAddTimer(timerQueueHandle, METRICS_INVOCATION_PERIOD, METRICS_INVOCATION_PERIOD, canaryRtpOutboundStats, (UINT64) &peer,
                                       &timeoutTimerId));
 
+        std::thread videoThread(sendLocalFrames, &peer, MEDIA_STREAM_TRACK_KIND_VIDEO, "../assets/h264SampleFrames/frame-%04d.h264", NUMBER_OF_H264_FRAME_FILES, SAMPLE_VIDEO_FRAME_DURATION);
+        std::thread audioThread(sendLocalFrames, &peer, MEDIA_STREAM_TRACK_KIND_AUDIO, "../assets/opusSampleFrames/sample-%03d.opus", NUMBER_OF_OPUS_FRAME_FILES, SAMPLE_AUDIO_FRAME_DURATION);
+        std::thread pushProfilingThread(sendProfilingMetrics, &peer);
+
+        pushProfilingThread.join();
         videoThread.join();
         audioThread.join();
     }
@@ -199,6 +203,25 @@ STATUS canaryKvsStats(UINT32 timerId, UINT64 currentTime, UINT64 customData)
     }
 
     return retStatus;
+}
+
+VOID sendProfilingMetrics(Canary::PPeer pPeer)
+{
+    STATUS retStatus = STATUS_SUCCESS;
+    BOOL done = FALSE;
+    while (!terminated.load()) {
+        retStatus = pPeer->sendProfilingMetrics();
+        if (retStatus == STATUS_WAITING_ON_FIRST_FRAME) {
+            THREAD_SLEEP(HUNDREDS_OF_NANOS_IN_A_MILLISECOND * 100); // to prevent busy waiting
+        } else if (retStatus == STATUS_SUCCESS) {
+            DLOGI("First frame sent out, pushed profiling metrics");
+            done = TRUE;
+            break;
+        }
+    }
+    if(!done) {
+        DLOGE("First frame never got sent out...no profiling metrics pushed to cloudwatch..error code: 0x%08x", retStatus);
+    }
 }
 
 VOID sendLocalFrames(Canary::PPeer pPeer, MEDIA_STREAM_TRACK_KIND kind, const std::string& pattern, UINT64 frameCount, UINT32 frameDuration)
