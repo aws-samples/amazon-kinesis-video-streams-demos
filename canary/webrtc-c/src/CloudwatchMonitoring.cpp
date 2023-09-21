@@ -305,8 +305,7 @@ VOID CloudwatchMonitoring::pushKvsIceAgentMetrics(PKvsIceAgentMetrics pKvsIceAge
 VOID CloudwatchMonitoring::pushSignalingClientMetrics(PSignalingClientMetrics pSignalingClientMetrics)
 {
     MetricDatum offerToAnswerDatum, getTokenDatum, describeDatum, createDatum, endpointDatum,
-                iceConfigDatum, connectDatum ,createClientDatum, fetchDatum, connectClientDatum,
-                joinSessionToOfferDatum;
+                iceConfigDatum, connectDatum ,createClientDatum, fetchDatum, connectClientDatum;
 
     offerToAnswerDatum.SetMetricName("OfferToAnswerTime");
     offerToAnswerDatum.SetValue(pSignalingClientMetrics->signalingClientStats.offerToAnswerTime);
@@ -358,11 +357,16 @@ VOID CloudwatchMonitoring::pushSignalingClientMetrics(PSignalingClientMetrics pS
     connectClientDatum.SetUnit(Aws::CloudWatch::Model::StandardUnit::Milliseconds);
     this->push(connectClientDatum);
 
-    std::cout << "JoinSessionToOfferReceived: " << pSignalingClientMetrics->signalingClientStats.joinSessionToOfferRecvTime << endl;
-    joinSessionToOfferDatum.SetMetricName("JoinSessionToOfferReceived");
-    joinSessionToOfferDatum.SetValue(pSignalingClientMetrics->signalingClientStats.joinSessionToOfferRecvTime / HUNDREDS_OF_NANOS_IN_A_MILLISECOND);
-    joinSessionToOfferDatum.SetUnit(Aws::CloudWatch::Model::StandardUnit::Milliseconds);
-    this->push(joinSessionToOfferDatum);
+    // If join session metric is populated for storage case.
+    UINT64 joinSessionToOffer = pSignalingClientMetrics->signalingClientStats.joinSessionToOfferRecvTime;
+    std::cout << "JoinSessionToOfferReceived: " << joinSessionToOffer << endl;
+    if(joinSessionToOffer != 0) {
+        MetricDatum joinSessionToOfferDatum;
+        joinSessionToOfferDatum.SetMetricName("JoinSessionToOfferReceived");
+        joinSessionToOfferDatum.SetValue(joinSessionToOffer / HUNDREDS_OF_NANOS_IN_A_MILLISECOND);
+        joinSessionToOfferDatum.SetUnit(Aws::CloudWatch::Model::StandardUnit::Milliseconds);
+        this->push(joinSessionToOfferDatum);
+    }
 }
 
 VOID CloudwatchMonitoring::pushInboundRtpStats(Canary::PIncomingRTPMetricsContext pIncomingRtpStats)
