@@ -145,6 +145,7 @@ CleanUp:
 
 STATUS onNewConnection(Canary::PPeer pPeer)
 {
+    std::cout << "TESTING onNewConnection(): called" << endl;
     STATUS retStatus = STATUS_SUCCESS;
     RtcMediaStreamTrack videoTrack, audioTrack;
 

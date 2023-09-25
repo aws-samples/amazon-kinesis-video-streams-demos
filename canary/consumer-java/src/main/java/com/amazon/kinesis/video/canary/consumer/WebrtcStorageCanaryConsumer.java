@@ -128,6 +128,7 @@ public class WebrtcStorageCanaryConsumer {
 
     private static void publishMetricToCW(String metricName, double value, StandardUnit cwUnit) {
         try {
+            System.out.println(MessageFormat.format("Emitting the following metric: {0} - {1}", metricName, value));
             final Dimension dimensionPerStream = new Dimension()
                     .withName("StorageWebRTCSDKCanaryStreamName")
                     .withValue(streamName);
