@@ -346,6 +346,8 @@ CleanUp:
 
 STATUS Peer::shutdown()
 {
+    std::cout << "TESTING Peer::shutdown(): called" << endl;
+
     this->terminated = TRUE;
 
     this->cvar.notify_all();
@@ -367,6 +369,8 @@ STATUS Peer::shutdown()
 
 STATUS Peer::connect()
 {
+    std::cout << "TESTING Peer::connect(): called" << endl;
+
     auto connectPeerConnection = [this]() -> STATUS {
         STATUS retStatus = STATUS_SUCCESS;
         RtcSessionDescriptionInit offerSDPInit;
@@ -408,6 +412,8 @@ CleanUp:
 
 STATUS Peer::send(PSignalingMessage pMsg)
 {
+    std::cout << "TESTING Peer::send(): called" << endl;
+
     STATUS retStatus = STATUS_SUCCESS;
 
     if (this->foundPeerId.load()) {
@@ -428,6 +434,8 @@ CleanUp:
 
 STATUS Peer::awaitIceGathering(PRtcSessionDescriptionInit pSDPInit)
 {
+    std::cout << "TESTING Peer::awaitIceGathering(): called" << endl;
+
     STATUS retStatus = STATUS_SUCCESS;
     std::unique_lock<std::recursive_mutex> lock(this->mutex);
     this->cvar.wait(lock, [this]() { return this->terminated.load() || this->iceGatheringDone.load(); });
@@ -442,6 +450,7 @@ CleanUp:
 
 STATUS Peer::handleSignalingMsg(PReceivedSignalingMessage pMsg)
 {
+    std::cout << "TESTING Peer::handleSignalingMsg(): called" << endl;
     auto handleOffer = [this](SignalingMessage& msg) -> STATUS {
         STATUS retStatus = STATUS_SUCCESS;
         RtcSessionDescriptionInit offerSDPInit, answerSDPInit;
@@ -545,6 +554,7 @@ CleanUp:
 
 STATUS Peer::addTransceiver(RtcMediaStreamTrack& track)
 {
+    std::cout << "TESTING Peer::addTransceiver(): called" << endl;
     auto handleBandwidthEstimation = [](UINT64 customData, DOUBLE maxiumBitrate) -> VOID {
         UNUSED_PARAM(customData);
         // TODO: Probably reexpose or add metrics here directly
@@ -603,6 +613,8 @@ CleanUp:
 
 STATUS Peer::addSupportedCodec(RTC_CODEC codec)
 {
+    std::cout << "TESTING Peer::addSupportedCodec(): called" << endl;
+
     STATUS retStatus = STATUS_SUCCESS;
 
     CHK_STATUS(::addSupportedCodec(pPeerConnection, codec));
@@ -614,6 +626,8 @@ CleanUp:
 
 STATUS Peer::sendProfilingMetrics()
 {
+    std::cout << "TESTING Peer::sendProfilingMetrics(): called" << endl;
+
     STATUS retStatus = STATUS_SUCCESS;
 
     CHK(!this->firstFrame, STATUS_WAITING_ON_FIRST_FRAME);
@@ -633,6 +647,12 @@ STATUS Peer::sendProfilingMetrics()
         DLOGP("[Signaling create client] %" PRIu64 " ms", this->signalingClientMetrics.signalingClientStats.createClientTime);
         DLOGP("[Signaling fetch client] %" PRIu64 " ms", this->signalingClientMetrics.signalingClientStats.fetchClientTime);
         DLOGP("[Signaling connect client] %" PRIu64 " ms", this->signalingClientMetrics.signalingClientStats.connectClientTime);
+
+        UINT64 joinSessionToOffer = this->signalingClientMetrics.signalingClientStats.joinSessionToOfferRecvTime;
+        if (joinSessionToOffer != 0) {
+            DLOGP("[Signaling Join session to offer received] %" PRIu64 " ms", joinSessionToOffer);
+        }
+        
         Canary::Cloudwatch::getInstance().monitoring.pushSignalingClientMetrics(&this->signalingClientMetrics);
     }
     if(STATUS_FAILED(peerConnectionGetMetrics(this->pPeerConnection, &this->peerConnectionMetrics))) {
@@ -651,6 +671,8 @@ CleanUp:
 
 STATUS Peer::writeFrame(PFrame pFrame, MEDIA_STREAM_TRACK_KIND kind)
 {
+    std::cout << "TESTING Peer::writeFrame(): called" << endl;
+
     STATUS retStatus = STATUS_SUCCESS;
     DOUBLE timeToFirstFrame;
     auto& transceivers = kind == MEDIA_STREAM_TRACK_KIND_VIDEO ? this->videoTransceivers : this->audioTransceivers;

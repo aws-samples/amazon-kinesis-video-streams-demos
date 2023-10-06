@@ -4,16 +4,17 @@ namespace Canary {
 
 CloudwatchMonitoring::CloudwatchMonitoring(PConfig pConfig, ClientConfiguration* pClientConfig) : pConfig(pConfig), client(*pClientConfig)
 {
+    pConfig->isStorage ? this->isStorage = true : this->isStorage = false;
 }
 
 STATUS CloudwatchMonitoring::init()
 {
     STATUS retStatus = STATUS_SUCCESS;
 
-    this->channelDimension.SetName("WebRTCSDKCanaryChannelName");
+    this->isStorage ? this->channelDimension.SetName("StorageWebRTCSDKCanaryChannelName") : this->channelDimension.SetName("WebRTCSDKCanaryChannelName");
     this->channelDimension.SetValue(pConfig->channelName.value);
 
-    this->labelDimension.SetName("WebRTCSDKCanaryLabel");
+    this->isStorage ? this->labelDimension.SetName("StorageWebRTCSDKCanaryLabel") : this->labelDimension.SetName("WebRTCSDKCanaryLabel");
     this->labelDimension.SetValue(pConfig->label.value);
 
     return retStatus;
@@ -355,6 +356,17 @@ VOID CloudwatchMonitoring::pushSignalingClientMetrics(PSignalingClientMetrics pS
     connectClientDatum.SetValue(pSignalingClientMetrics->signalingClientStats.connectClientTime);
     connectClientDatum.SetUnit(Aws::CloudWatch::Model::StandardUnit::Milliseconds);
     this->push(connectClientDatum);
+
+    // If join session metric is populated for storage case.
+    UINT64 joinSessionToOffer = pSignalingClientMetrics->signalingClientStats.joinSessionToOfferRecvTime;
+    std::cout << "JoinSessionToOfferReceived: " << joinSessionToOffer << endl;
+    if(joinSessionToOffer != 0) {
+        MetricDatum joinSessionToOfferDatum;
+        joinSessionToOfferDatum.SetMetricName("JoinSessionToOfferReceived");
+        joinSessionToOfferDatum.SetValue(joinSessionToOffer / HUNDREDS_OF_NANOS_IN_A_MILLISECOND);
+        joinSessionToOfferDatum.SetUnit(Aws::CloudWatch::Model::StandardUnit::Milliseconds);
+        this->push(joinSessionToOfferDatum);
+    }
 }
 
 VOID CloudwatchMonitoring::pushInboundRtpStats(Canary::PIncomingRTPMetricsContext pIncomingRtpStats)

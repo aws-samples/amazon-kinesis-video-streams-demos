@@ -88,4 +88,11 @@ target_link_libraries(
   kvsWebrtcCanarySignaling
   kvsWebrtcCanary)
 
+add_executable(
+  kvsWebrtcCanaryWebrtcStorage
+  src/CanaryWebrtcStorage.cpp)
+target_link_libraries(
+  kvsWebrtcCanaryWebrtcStorage
+  kvsWebrtcCanary)
+
 file(COPY "${CMAKE_CURRENT_SOURCE_DIR}/assets" DESTINATION .)
