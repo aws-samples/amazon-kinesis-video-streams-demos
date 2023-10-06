@@ -17,10 +17,10 @@ def buildProject(useMbedTLS, thing_prefix) {
     checkout([$class: 'GitSCM', branches: [[name: params.GIT_HASH ]],
               userRemoteConfigs: [[url: params.GIT_URL]]])
 
-    def configureCmd = "cmake .. -DCMAKE_BUILD_TYPE=Debug -DCMAKE_CXX_FLAGS_DEBUG=\"-g -O0\" -DCMAKE_INSTALL_PREFIX=\"\$PWD\""
+    def configureCmd = "cmake .. -DCMAKE_BUILD_TYPE=Debug -DCMAKE_INSTALL_PREFIX=\"\$PWD\""
     if (useMbedTLS) {
       echo 'Using mbedtls'
-      configureCmd += " -DUSE_OPENSSL=OFF -DUSE_MBEDTLS=ON"
+      configureCmd += " -DCANARY_USE_OPENSSL=OFF -DCANARY_USE_MBEDTLS=ON"
     }     
 
     sh """
@@ -79,6 +79,7 @@ def buildPeer(isMaster, params) {
     def envs = [
       'AWS_KVS_LOG_LEVEL': params.AWS_KVS_LOG_LEVEL,
       'CANARY_USE_TURN': params.USE_TURN,
+      'CANARY_FORCE_TURN': params.FORCE_TURN,
       'CANARY_IS_PROFILING_MODE': params.IS_PROFILING,
       'CANARY_TRICKLE_ICE': params.TRICKLE_ICE,
       'CANARY_USE_IOT_PROVIDER': params.USE_IOT,
@@ -258,6 +259,7 @@ pipeline {
                       string(name: 'AWS_KVS_LOG_LEVEL', value: params.AWS_KVS_LOG_LEVEL),
                       booleanParam(name: 'IS_SIGNALING', value: params.IS_SIGNALING),
                       booleanParam(name: 'USE_TURN', value: params.USE_TURN),
+                      booleanParam(name: 'FORCE_TURN', value: params.FORCE_TURN),
                       booleanParam(name: 'USE_IOT', value: params.USE_IOT),
                       booleanParam(name: 'IS_PROFILING', value: params.IS_PROFILING),
                       booleanParam(name: 'TRICKLE_ICE', value: params.TRICKLE_ICE),
@@ -271,7 +273,7 @@ pipeline {
                       string(name: 'MIN_RETRY_DELAY_IN_SECONDS', value: params.MIN_RETRY_DELAY_IN_SECONDS),
                       string(name: 'GIT_URL', value: params.GIT_URL),
                       string(name: 'GIT_HASH', value: params.GIT_HASH),
-                      booleanParam(name: 'FIRST_ITERATION', value: true)
+                      booleanParam(name: 'FIRST_ITERATION', value: false)
                     ],
                     wait: false
                 )

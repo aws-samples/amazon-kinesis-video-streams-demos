@@ -117,7 +117,7 @@ STATUS parseConfigFile(PCanaryConfig pCanaryConfig, PCHAR filePath)
             getJsonValue(params, tokens[i + 1], pCanaryConfig->canaryTrackType);
             i++;
         } else if (compareJsonString((PCHAR) params, &tokens[i], JSMN_STRING, CANARY_CP_API_ENV_VAR)) {
-            getJsonValue(params, tokens[i + 1], pCanaryConfig->canaryCpUrl);  
+            getJsonValue(params, tokens[i + 1], pCanaryConfig->canaryCpUrl);
             i++;
         }
 
@@ -532,7 +532,6 @@ INT32 main(INT32 argc, CHAR* argv[])
             timerQueueFree(&timerQueueHandle);
         }
         DLOGI("Waiting to push all metrics");
-        cleanupMonitoring();
         DLOGI("Cleaning up other objects");
         SAFE_MEMFREE(frame.frameData);
         freeDeviceInfo(&pDeviceInfo);

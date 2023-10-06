@@ -21,7 +21,7 @@ STATUS initializeCloudwatchLogger(PCloudwatchLogsObject pCloudwatchLogsObject)
     CHK_ERR(createLogStreamOutcome.IsSuccess(), STATUS_INVALID_OPERATION, "Failed to create \"%s\" log stream: %s",
             pCloudwatchLogsObject->logStreamName, createLogStreamOutcome.GetError().GetMessage().c_str());
     gCloudwatchLogsObject = pCloudwatchLogsObject;
-    CleanUp:
+CleanUp:
     return retStatus;
 }
 

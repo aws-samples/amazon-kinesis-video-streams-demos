@@ -51,7 +51,7 @@ ACTIVE_RUNNERS = []
 
 pipeline {
     agent {
-        label 'ec2-us-west-2'
+        label 'profiling'
     }
 
     options {
@@ -121,12 +121,13 @@ pipeline {
                             job: NEXT_AVAILABLE_RUNNER,
                             parameters: COMMON_PARAMS + [
                                 booleanParam(name: 'USE_TURN', value: true),
+                                booleanParam(name: 'FORCE_TURN', value: true),
                                 booleanParam(name: 'TRICKLE_ICE', value: true),
                                 booleanParam(name: 'USE_IOT', value: true),
                                 booleanParam(name: 'USE_MBEDTLS', value: false),
                                 string(name: 'DURATION_IN_SECONDS', value: PERIODIC_DURATION_IN_SECONDS.toString()),
-                                string(name: 'MASTER_NODE_LABEL', value: "ec2-us-west-2"),
-                                string(name: 'VIEWER_NODE_LABEL', value: "ec2-us-west-2"),
+                                string(name: 'MASTER_NODE_LABEL', value: "openssl-master"),
+                                string(name: 'VIEWER_NODE_LABEL', value: "openssl-viewer"),
                                 string(name: 'RUNNER_LABEL', value: "WebrtcPeriodicOpenSSL"),
                                 string(name: 'SCENARIO_LABEL', value: "WebrtcPeriodic"),
                             ],
@@ -141,8 +142,8 @@ pipeline {
                                 booleanParam(name: 'USE_IOT', value: true),
                                 booleanParam(name: 'USE_MBEDTLS', value: false),
                                 string(name: 'DURATION_IN_SECONDS', value: LONG_RUNNING_DURATION_IN_SECONDS.toString()),
-                                string(name: 'MASTER_NODE_LABEL', value: "ec2-us-west-2"),
-                                string(name: 'VIEWER_NODE_LABEL', value: "ec2-us-west-2"),
+                                string(name: 'MASTER_NODE_LABEL', value: "openssl-master"),
+                                string(name: 'VIEWER_NODE_LABEL', value: "openssl-viewer"),
                                 string(name: 'RUNNER_LABEL', value: "WebrtcLongRunningOpenSSL"),
                                 string(name: 'SCENARIO_LABEL', value: "WebrtcLongRunning"),
                             ],
@@ -157,8 +158,8 @@ pipeline {
                                 booleanParam(name: 'USE_IOT', value: false),
                                 booleanParam(name: 'USE_MBEDTLS', value: true),
                                 string(name: 'DURATION_IN_SECONDS', value: PERIODIC_DURATION_IN_SECONDS.toString()),
-                                string(name: 'MASTER_NODE_LABEL', value: "ec2-us-west-2"),
-                                string(name: 'VIEWER_NODE_LABEL', value: "ec2-us-west-2"),
+                                string(name: 'MASTER_NODE_LABEL', value: "mbedtls-master"),
+                                string(name: 'VIEWER_NODE_LABEL', value: "mbedtls-viewer"),
                                 string(name: 'RUNNER_LABEL', value: "WebrtcPeriodicStaticMbedTLS"),
                                 string(name: 'SCENARIO_LABEL', value: "WebrtcPeriodic"),
                             ],
@@ -173,8 +174,8 @@ pipeline {
                                 booleanParam(name: 'USE_IOT', value: false),
                                 booleanParam(name: 'USE_MBEDTLS', value: true),
                                 string(name: 'DURATION_IN_SECONDS', value: LONG_RUNNING_DURATION_IN_SECONDS.toString()),
-                                string(name: 'MASTER_NODE_LABEL', value: "ec2-us-west-2"),
-                                string(name: 'VIEWER_NODE_LABEL', value: "ec2-us-west-2"),
+                                string(name: 'MASTER_NODE_LABEL', value: "mbedtls-master"),
+                                string(name: 'VIEWER_NODE_LABEL', value: "mbedtls-viewer"),
                                 string(name: 'RUNNER_LABEL', value: "WebrtcLongRunningStaticMbedTLS"),
                                 string(name: 'SCENARIO_LABEL', value: "WebrtcLongRunning"),
                             ],
@@ -188,10 +189,10 @@ pipeline {
                                 booleanParam(name: 'USE_IOT', value: false),
                                 booleanParam(name: 'USE_MBEDTLS', value: false),
                                 string(name: 'DURATION_IN_SECONDS', value: PERIODIC_DURATION_IN_SECONDS.toString()),
-                                string(name: 'MASTER_NODE_LABEL', value: "ec2-us-west-2"),
+                                string(name: 'MASTER_NODE_LABEL', value: "signaling"),
                                 // TODO: should not need viewer node label for signaling. If not set, Jenkins pipeline will crash
                                 //       because it's used to defined an agent
-                                string(name: 'VIEWER_NODE_LABEL', value: "ec2-us-west-2"),
+                                string(name: 'VIEWER_NODE_LABEL', value: "signaling"),
                                 string(name: 'RUNNER_LABEL', value: "SignalingStaticPeriodic"),
                                 string(name: 'SCENARIO_LABEL', value: "SignalingPeriodic"),
                             ],
@@ -205,10 +206,10 @@ pipeline {
                                 booleanParam(name: 'USE_IOT', value: true),
                                 booleanParam(name: 'USE_MBEDTLS', value: false),
                                 string(name: 'DURATION_IN_SECONDS', value: LONG_RUNNING_DURATION_IN_SECONDS.toString()),
-                                string(name: 'MASTER_NODE_LABEL', value: "ec2-us-west-2"),
+                                string(name: 'MASTER_NODE_LABEL', value: "signaling"),
                                 // TODO: should not need viewer node label for signaling. If not set, Jenkins pipeline will crash
                                 //       because it's used to defined an agent
-                                string(name: 'VIEWER_NODE_LABEL', value: "ec2-us-west-2"),
+                                string(name: 'VIEWER_NODE_LABEL', value: "signaling"),
                                 string(name: 'RUNNER_LABEL', value: "SignalingLongRunning"),
                                 string(name: 'SCENARIO_LABEL', value: "SignalingLongRunning"),
                             ],
@@ -224,8 +225,8 @@ pipeline {
                                 booleanParam(name: 'USE_MBEDTLS', value: false),
                                 booleanParam(name: 'IS_PROFILING', value: true),
                                 string(name: 'DURATION_IN_SECONDS', value: PERIODIC_PROFILING_DURATION_IN_SECONDS.toString()),
-                                string(name: 'MASTER_NODE_LABEL', value: "ec2-profiling"),
-                                string(name: 'VIEWER_NODE_LABEL', value: "ec2-profiling"),
+                                string(name: 'MASTER_NODE_LABEL', value: "profiling"),
+                                string(name: 'VIEWER_NODE_LABEL', value: "profiling"),
                                 string(name: 'RUNNER_LABEL', value: "WebrtcPeriodicProfiling"),
                                 string(name: 'SCENARIO_LABEL', value: "WebrtcProfiling"),
                             ],
