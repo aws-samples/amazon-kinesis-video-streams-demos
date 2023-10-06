@@ -223,6 +223,8 @@ STATUS Peer::initRtcConfiguration(const Canary::PConfig pConfig)
 
     if (pConfig->forceTurn.value) {
         pConfiguration->iceTransportPolicy = ICE_TRANSPORT_POLICY_RELAY;
+    } else {
+        pConfiguration->iceTransportPolicy = ICE_TRANSPORT_POLICY_ALL;
     }
 
     // Set the  STUN server
