@@ -21,7 +21,7 @@ STATUS initializeCloudwatchLogger(PCloudwatchLogsObject pCloudwatchLogsObject)
     CHK_ERR(createLogStreamOutcome.IsSuccess(), STATUS_INVALID_OPERATION, "Failed to create \"%s\" log stream: %s",
             pCloudwatchLogsObject->logStreamName, createLogStreamOutcome.GetError().GetMessage().c_str());
     gCloudwatchLogsObject = pCloudwatchLogsObject;
-CleanUp:
+    CleanUp:
     return retStatus;
 }
 
@@ -32,7 +32,7 @@ VOID setUpLogEventVector(PCHAR logString)
         std::unique_lock<std::recursive_mutex> lock(gCloudwatchLogsObject->mutex);
         Aws::String awsCwString((Aws::String) logString);
         auto logEvent =
-            Aws::CloudWatchLogs::Model::InputLogEvent().WithMessage(awsCwString).WithTimestamp(GETTIME() / HUNDREDS_OF_NANOS_IN_A_MILLISECOND);
+                Aws::CloudWatchLogs::Model::InputLogEvent().WithMessage(awsCwString).WithTimestamp(GETTIME() / HUNDREDS_OF_NANOS_IN_A_MILLISECOND);
         gCloudwatchLogsObject->canaryInputLogEventVec.push_back(logEvent);
     }
 }
@@ -45,33 +45,34 @@ VOID onPutLogEventResponseReceivedHandler(const Aws::CloudWatchLogs::CloudWatchL
     if (!outcome.IsSuccess()) {
         DLOGE("Failed to push logs: %s", outcome.GetError().GetMessage().c_str());
     } else {
-        DLOGS("Successfully pushed logs to cloudwatch");
+        DLOGI("Successfully pushed logs to cloudwatch");
         gCloudwatchLogsObject->token = outcome.GetResult().GetNextSequenceToken();
     }
 }
 
-VOID canaryStreamSendLogs(PCloudwatchLogsObject pCloudwatchLogsObject)
-{
-    std::unique_lock<std::recursive_mutex> lock(pCloudwatchLogsObject->mutex);
+STATUS canaryStreamSendLogs(UINT32 timerId, UINT64 currentTime, UINT64 customData) {
+    PCloudwatchLogsObject pCloudwatchLogsObject = (PCloudwatchLogsObject) customData;
     Aws::CloudWatchLogs::Model::PutLogEventsOutcome outcome;
-    auto request = Aws::CloudWatchLogs::Model::PutLogEventsRequest()
-                       .WithLogGroupName(pCloudwatchLogsObject->logGroupName)
-                       .WithLogStreamName(pCloudwatchLogsObject->logStreamName)
-                       .WithLogEvents(pCloudwatchLogsObject->canaryInputLogEventVec);
-    if (pCloudwatchLogsObject->token != "") {
-        request.SetSequenceToken(pCloudwatchLogsObject->token);
+    if (pCloudwatchLogsObject->canaryInputLogEventVec.size() >= 128) {
+        auto request = Aws::CloudWatchLogs::Model::PutLogEventsRequest()
+                .WithLogGroupName(pCloudwatchLogsObject->logGroupName)
+                .WithLogStreamName(pCloudwatchLogsObject->logStreamName)
+                .WithLogEvents(pCloudwatchLogsObject->canaryInputLogEventVec);
+        if (pCloudwatchLogsObject->token != "") {
+            request.SetSequenceToken(pCloudwatchLogsObject->token);
+        }
+        pCloudwatchLogsObject->pCwl->PutLogEventsAsync(request, onPutLogEventResponseReceivedHandler);
+        pCloudwatchLogsObject->canaryInputLogEventVec.clear();
     }
-    pCloudwatchLogsObject->pCwl->PutLogEventsAsync(request, onPutLogEventResponseReceivedHandler);
-    pCloudwatchLogsObject->canaryInputLogEventVec.clear();
+    return STATUS_SUCCESS;
 }
 
 VOID canaryStreamSendLogSync(PCloudwatchLogsObject pCloudwatchLogsObject)
 {
-    std::unique_lock<std::recursive_mutex> lock(pCloudwatchLogsObject->mutex);
     auto request = Aws::CloudWatchLogs::Model::PutLogEventsRequest()
-                       .WithLogGroupName(pCloudwatchLogsObject->logGroupName)
-                       .WithLogStreamName(pCloudwatchLogsObject->logStreamName)
-                       .WithLogEvents(pCloudwatchLogsObject->canaryInputLogEventVec);
+            .WithLogGroupName(pCloudwatchLogsObject->logGroupName)
+            .WithLogStreamName(pCloudwatchLogsObject->logStreamName)
+            .WithLogEvents(pCloudwatchLogsObject->canaryInputLogEventVec);
     if (pCloudwatchLogsObject->token != "") {
         request.SetSequenceToken(pCloudwatchLogsObject->token);
     }

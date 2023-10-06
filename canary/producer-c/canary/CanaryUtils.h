@@ -136,6 +136,8 @@ struct __CanaryStreamCallbacks {
     PCHAR pStreamName;
     UINT64 totalNumberOfErrors;
     BOOL aggregateMetrics;
+    Aws::Vector<DOUBLE> receivedAckLatencyVec;
+    Aws::Vector<DOUBLE> persistedAckLatencyVec;
     Aws::CloudWatch::CloudWatchClient* pCwClient;
     Aws::CloudWatch::Model::PutMetricDataRequest* cwRequest;
     Aws::CloudWatch::Model::Dimension dimensionPerStream;
@@ -144,6 +146,12 @@ struct __CanaryStreamCallbacks {
     std::map<UINT64, UINT64>* timeOfNextKeyFrame;
 };
 typedef struct __CanaryStreamCallbacks* PCanaryStreamCallbacks;
+
+typedef struct {
+    STREAM_HANDLE streamHandle;
+    CLIENT_HANDLE clientHandle;
+    PCanaryStreamCallbacks pCanaryStreamCallbacks;
+} CanaryCustomData;
 
 ////////////////////////////////////////////////////////////////////////
 // Callback function implementations
@@ -159,16 +167,16 @@ STATUS computeStreamMetricsFromCanary(STREAM_HANDLE, PCanaryStreamCallbacks);
 STATUS computeClientMetricsFromCanary(CLIENT_HANDLE, PCanaryStreamCallbacks);
 VOID currentMemoryAllocation(PCanaryStreamCallbacks);
 VOID pushMetric(PCanaryStreamCallbacks pCanaryStreamCallback, Aws::CloudWatch::Model::MetricDatum&, Aws::CloudWatch::Model::StandardUnit, DOUBLE);
-STATUS publishErrorRate(STREAM_HANDLE, PCanaryStreamCallbacks, UINT64);
+STATUS publishErrorRate(UINT32 timerId, UINT64 currentTime, UINT64 customData);
 STATUS pushStartUpLatency(PCanaryStreamCallbacks, DOUBLE);
-STATUS publishMetrics(STREAM_HANDLE, CLIENT_HANDLE, PCanaryStreamCallbacks);
+STATUS publishMetrics(UINT32 timerId, UINT64 currentTime, UINT64 customData);
 
 ////////////////////////////////////////////////////////////////////////
 // Cloudwatch logging related functions
 ////////////////////////////////////////////////////////////////////////
 VOID cloudWatchLogger(UINT32, PCHAR, PCHAR, ...);
 STATUS initializeCloudwatchLogger(PCloudwatchLogsObject);
-VOID canaryStreamSendLogs(PCloudwatchLogsObject);
+STATUS canaryStreamSendLogs(UINT32 timerId, UINT64 currentTime, UINT64 customData);
 VOID canaryStreamSendLogSync(PCloudwatchLogsObject);
 
 ////////////////////////////////////////////////////////////////////////
@@ -180,6 +188,7 @@ STATUS optenv(PCHAR, PCHAR, PCHAR);
 STATUS optenvUint64(PCHAR, PUINT64, UINT64);
 STATUS printConfig(PCanaryConfig);
 STATUS initWithEnvVars(PCanaryConfig);
+VOID cleanupMonitoring();
 
 #ifdef __cplusplus
 }

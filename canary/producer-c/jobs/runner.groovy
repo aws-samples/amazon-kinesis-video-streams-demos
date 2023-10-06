@@ -179,6 +179,14 @@ pipeline {
                 echo params.toString()
             }
         }
+        stage('Set build description') {
+            steps {
+                script {
+                    currentBuild.displayName = "${params.CANARY_TYPE}-${params.RUNNER_LABEL} [#${BUILD_NUMBER}]"
+                    currentBuild.description = "Executed on: ${NODE_NAME}\n"
+                }
+            }
+        }
         stage('Run') {
             failFast true
             parallel {
