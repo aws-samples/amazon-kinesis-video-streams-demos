@@ -1,9 +1,16 @@
-cmake_minimum_required(VERSION 3.15)
+cmake_minimum_required(VERSION 3.11)
 
 project(KinesisVideoProducerCloudwatch LANGUAGES C CXX)
 include(FetchContent)
 
 set(CMAKE_CXX_STANDARD 11)
+
+# AWS SDK options
+set(CUSTOM_MEMORY_MANAGEMENT OFF CACHE BOOL "Tell AWS SDK to not use custom memory management" FORCE)
+set(ENABLE_TESTING OFF CACHE BOOL "Disable building tests for AWS SDK" FORCE)
+set(BUILD_ONLY "monitoring;logs" CACHE STRING "Tell AWS SDK to only build monitoring and logs" FORCE)
+set(BUILD_COMMON_CURL ON CACHE BOOL "Curl" FORCE)
+set(BUILD_DEPENDENCIES OFF CACHE BOOL "Deps in kvs" FORCE)
 
 FetchContent_Declare(
         producerc
@@ -17,12 +24,9 @@ FetchContent_Declare(
         GIT_TAG        1.11.92
 )
 
-FetchContent_GetProperties(producerc)
+FetchContent_GetProperties(webrtc)
 if(NOT producerc_POPULATED)
   FetchContent_Populate(producerc)
-  set(CMAKE_POLICY_DEFAULT_CMP0077 NEW)
-  set(USE_OPENSSL ON)
-  set(OPEN_SRC_INSTALL_PREFIX ${CMAKE_CURRENT_SOURCE_DIR})
   add_subdirectory(${producerc_SOURCE_DIR} ${producerc_BINARY_DIR} EXCLUDE_FROM_ALL)
 endif()
 

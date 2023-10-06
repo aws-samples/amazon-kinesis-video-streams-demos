@@ -21,7 +21,7 @@ STATUS initializeCloudwatchLogger(PCloudwatchLogsObject pCloudwatchLogsObject)
     CHK_ERR(createLogStreamOutcome.IsSuccess(), STATUS_INVALID_OPERATION, "Failed to create \"%s\" log stream: %s",
             pCloudwatchLogsObject->logStreamName, createLogStreamOutcome.GetError().GetMessage().c_str());
     gCloudwatchLogsObject = pCloudwatchLogsObject;
-    CleanUp:
+CleanUp:
     return retStatus;
 }
 
@@ -64,9 +64,6 @@ STATUS canaryStreamSendLogs(UINT32 timerId, UINT64 currentTime, UINT64 customDat
         pCloudwatchLogsObject->pCwl->PutLogEventsAsync(request, onPutLogEventResponseReceivedHandler);
         pCloudwatchLogsObject->canaryInputLogEventVec.clear();
     }
-
-    pCloudwatchLogsObject->pCwl->PutLogEventsAsync(request, onPutLogEventResponseReceivedHandler);
-    pCloudwatchLogsObject->canaryInputLogEventVec.clear();
     return STATUS_SUCCESS;
 }
 

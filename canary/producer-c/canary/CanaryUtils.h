@@ -76,7 +76,6 @@ extern "C" {
 #define CANARY_TRACK_TYPE_STR_LEN          20
 #define IOT_ENDPOINT_LENGTH                1023
 
-#define KVS_METRICS_INVOCATION_PERIOD       30
 
 #define STATUS_PRODUCER_CANARY_BASE                    0x80000000
 #define STATUS_PRODUCER_EMPTY_IOT_CRED_FILE            STATUS_PRODUCER_CANARY_BASE + 0x00000001
@@ -189,7 +188,6 @@ STATUS optenv(PCHAR, PCHAR, PCHAR);
 STATUS optenvUint64(PCHAR, PUINT64, UINT64);
 STATUS printConfig(PCanaryConfig);
 STATUS initWithEnvVars(PCanaryConfig);
-VOID cloudwatchMonitoringCleanUp();
 
 #ifdef __cplusplus
 }

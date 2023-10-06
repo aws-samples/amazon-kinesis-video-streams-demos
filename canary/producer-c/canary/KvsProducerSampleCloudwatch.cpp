@@ -117,7 +117,7 @@ STATUS parseConfigFile(PCanaryConfig pCanaryConfig, PCHAR filePath)
             getJsonValue(params, tokens[i + 1], pCanaryConfig->canaryTrackType);
             i++;
         } else if (compareJsonString((PCHAR) params, &tokens[i], JSMN_STRING, CANARY_CP_API_ENV_VAR)) {
-            getJsonValue(params, tokens[i + 1], pCanaryConfig->canaryCpUrl);  
+            getJsonValue(params, tokens[i + 1], pCanaryConfig->canaryCpUrl);
             i++;
         }
 
@@ -311,17 +311,9 @@ INT32 main(INT32 argc, CHAR* argv[])
     CanaryConfig config;
     BOOL firstFrame = TRUE;
     UINT64 startTime;
-    UINT64 startTimeInMacro = 0;
     DOUBLE startUpLatency;
     UINT64 runTill = MAX_UINT64;
     UINT64 randomTime = 0;
-    TIMER_QUEUE_HANDLE timerQueueHandle = 0;
-    UINT32 timeoutTimerId;
-    CanaryCustomData c;
-
-    c.clientHandle = INVALID_CLIENT_HANDLE_VALUE;
-    c.streamHandle = INVALID_STREAM_HANDLE_VALUE;
-    c.pCanaryStreamCallbacks = NULL;
 
     TIMER_QUEUE_HANDLE timerQueueHandle = 0;
     UINT32 timeoutTimerId;
@@ -393,7 +385,7 @@ INT32 main(INT32 argc, CHAR* argv[])
         }
 
         // adjust members of pDeviceInfo here if needed
-        pDeviceInfo->clientInfo.loggerLogLevel = LOG_LEVEL_INFO;
+        pDeviceInfo->clientInfo.loggerLogLevel = LOG_LEVEL_DEBUG;
         logLevel = getenv(DEBUG_LOG_LEVEL_ENV_VAR);
         if (logLevel != NULL) {
             STRTOUI32(logLevel, NULL, 10, &pDeviceInfo->clientInfo.loggerLogLevel);
@@ -411,20 +403,19 @@ INT32 main(INT32 argc, CHAR* argv[])
         CHK_STATUS(timerQueueCreate(&timerQueueHandle));
 
         startTime = GETTIME();
-
-        PROFILE_CALL(CHK_STATUS(createAbstractDefaultCallbacksProvider(DEFAULT_CALLBACK_CHAIN_COUNT, API_CALL_CACHE_TYPE_NONE,
+        CHK_STATUS(createAbstractDefaultCallbacksProvider(DEFAULT_CALLBACK_CHAIN_COUNT, API_CALL_CACHE_TYPE_NONE,
                                                           ENDPOINT_UPDATE_PERIOD_SENTINEL_VALUE, region, config.canaryCpUrl, cacertPath, NULL, NULL,
-                                                          &pClientCallbacks)), "createAbstractDefaultCallbacksProvider");
+                                                          &pClientCallbacks));
         if (config.useIotCredentialProvider) {
-            PROFILE_CALL(CHK_STATUS(createIotAuthCallbacks(pClientCallbacks, (PCHAR)config.iotEndpoint, config.iotCoreCert, config.iotCorePrivateKey, cacertPath, config.iotCoreRoleAlias,
-                                              streamName, &pAuthCallbacks)), "createIotAuthCallbacks");
+            CHK_STATUS(createIotAuthCallbacks(pClientCallbacks, (PCHAR)config.iotEndpoint, config.iotCoreCert, config.iotCorePrivateKey, cacertPath, config.iotCoreRoleAlias,
+                                              streamName, &pAuthCallbacks));
 
         } else {
             if ((accessKey = getenv(ACCESS_KEY_ENV_VAR)) == NULL || (secretKey = getenv(SECRET_KEY_ENV_VAR)) == NULL) {
                 DLOGE("Error missing credentials");
                 CHK(FALSE, STATUS_INVALID_ARG);
             }
-            PROFILE_CALL(CHK_STATUS(createStaticAuthCallbacks(pClientCallbacks, accessKey, secretKey, sessionToken, MAX_UINT64, &pAuthCallbacks)), "createStaticAuthCallbacks");
+            CHK_STATUS(createStaticAuthCallbacks(pClientCallbacks, accessKey, secretKey, sessionToken, MAX_UINT64, &pAuthCallbacks));
         }
 
         PStreamCallbacks pStreamcallbacks = &c.pCanaryStreamCallbacks->streamCallbacks;
@@ -442,6 +433,7 @@ INT32 main(INT32 argc, CHAR* argv[])
 
         CHK_STATUS(createCanaryStreamCallbacks(&cw, streamName, config.canaryLabel, &c.pCanaryStreamCallbacks));
         CHK_STATUS(addStreamCallbacks(pClientCallbacks, &c.pCanaryStreamCallbacks->streamCallbacks));
+
         if (!fileLoggingEnabled) {
             pClientCallbacks->logPrintFn = cloudWatchLogger;
         }
@@ -546,9 +538,7 @@ INT32 main(INT32 argc, CHAR* argv[])
         freeStreamInfoProvider(&pStreamInfo);
         freeKinesisVideoStream(&c.streamHandle);
         freeKinesisVideoClient(&c.clientHandle);
-        DLOGI("Cleaned up everything in KVS");
         freeCallbacksProvider(&pClientCallbacks); // This will also take care of freeing canaryStreamCallbacks
-        DLOGI("Cleaned up everything in callbacks");
         RESET_INSTRUMENTED_ALLOCATORS();
         DLOGI("CleanUp Done");
         cleanUpDone = TRUE;

@@ -40,7 +40,7 @@ STATUS createCanaryStreamCallbacks(Aws::CloudWatch::CloudWatchClient* cwClient, 
 
     pCanaryStreamCallbacks->aggregateMetrics = TRUE;
 
-    CleanUp:
+CleanUp:
 
     if (STATUS_FAILED(retStatus)) {
         pCanaryStreamCallbacks = NULL;
@@ -75,7 +75,7 @@ STATUS freeCanaryStreamCallbacks(PStreamCallbacks* ppStreamCallbacks)
     // Set the pointer to NULL
     *ppStreamCallbacks = NULL;
 
-    CleanUp:
+CleanUp:
 
     LEAVES();
     return retStatus;
@@ -91,7 +91,7 @@ STATUS canaryStreamFreeHandler(PUINT64 customData)
     pStreamCallbacks = (PStreamCallbacks) *customData;
     CHK_STATUS(freeCanaryStreamCallbacks(&pStreamCallbacks));
 
-    CleanUp:
+CleanUp:
 
     LEAVES();
     return retStatus;
@@ -217,11 +217,26 @@ STATUS canaryStreamFragmentAckHandler(UINT64 customData, STREAM_HANDLE streamHan
     return STATUS_SUCCESS;
 }
 
+VOID onPutMetricDataResponseReceivedHandler(const Aws::CloudWatch::CloudWatchClient* cwClient,
+                                            const Aws::CloudWatch::Model::PutMetricDataRequest& request,
+                                            const Aws::CloudWatch::Model::PutMetricDataOutcome& outcome,
+                                            const std::shared_ptr<const Aws::Client::AsyncCallerContext>& context)
+{
+    if (!outcome.IsSuccess()) {
+        DLOGE("Failed to put sample metric data: %s", outcome.GetError().GetMessage().c_str());
+    } else {
+        DLOGS("Successfully put sample metric data");
+    }
+    pendingMetrics--;
+    DLOGI("Pending metrics in callback: %d", pendingMetrics.load());
+}
+
 VOID canaryStreamSendMetrics(PCanaryStreamCallbacks pCanaryStreamCallbacks, Aws::CloudWatch::Model::MetricDatum& metricDatum)
 {
     Aws::CloudWatch::Model::PutMetricDataRequest cwRequest;
     cwRequest.SetNamespace("KinesisVideoSDKCanary");
     cwRequest.AddMetricData(metricDatum);
+
     auto outcome = pCanaryStreamCallbacks->pCwClient->PutMetricData(cwRequest);
     if (!outcome.IsSuccess())
     {
@@ -231,6 +246,7 @@ VOID canaryStreamSendMetrics(PCanaryStreamCallbacks pCanaryStreamCallbacks, Aws:
     {
         DLOGI("Successfully put sample metric data");
     }
+//    pCanaryStreamCallbacks->pCwClient->PutMetricDataAsync(cwRequest, onPutMetricDataResponseReceivedHandler);
 }
 
 STATUS publishErrorRate(UINT32 timerId, UINT64 currentTime, UINT64 customData)
@@ -448,11 +464,5 @@ VOID canaryStreamRecordFragmentEndSendTime(PCanaryStreamCallbacks pCanaryStreamC
         } else {
             break;
         }
-    }
-}
-
-VOID cloudwatchMonitoringCleanUp() {
-    while(pendingMetrics.load() > 0) {
-        THREAD_SLEEP(HUNDREDS_OF_NANOS_IN_A_MILLISECOND * 500);
     }
 }
