@@ -96,7 +96,7 @@ public class WebrtcStorageCanaryConsumer {
         }
     }
 
-    // TODO: shorten name as there is only a getMedia version now anyway, remove "getMedia" from name
+    // TODO: shorten name as there is only a getMedia version now anyway, so remove "getMedia" from name
     private static void getMediaTimeToFirstFragment(Timer intervalMetricsTimer) {
         try {
             final GetDataEndpointRequest dataEndpointRequestGetMedia = new GetDataEndpointRequest()
@@ -118,10 +118,20 @@ public class WebrtcStorageCanaryConsumer {
             // If getMedia result payload is not empty, calculate TimeToFirstFragment
             if (payload.read() != -1) {
                 timeToFirstFragment = currentTime - canaryStartTime.getTime();
+
+                String filePath = "../webrtc-c/build/" + "aTestChannel" + ".txt";
+                Scanner scanner = new Scanner(new FileReader(filePath));
+                System.out.println(currentTime - Long.parseLong(scanner.next()));
+                // while(scanner.hasNext()) {
+                //     System.out.println(scanner.next());
+                // }
+                scanner.close();
+
                 publishMetricToCW("TimeToFirstFragment", timeToFirstFragment, StandardUnit.Milliseconds);
 
                 // Cancel any further occurrences of timer task, as this is a startup metric.
-                // The Canary will continue running for the specified period to allow for cooldown of Media-Server reconnection.
+                // TODO: the below comment is not longer true, fix
+                // The Canary will continue running for the specified period to allow for cool-down of Media-Server reconnection.
                 intervalMetricsTimer.cancel();
             }
     
@@ -204,14 +214,6 @@ public class WebrtcStorageCanaryConsumer {
                 break;
             }
             case "WebrtcPeriodic": {
-                // String filePath = "../webrtc-c/build/" + streamName + ".txt";
-                String filePath = "../webrtc-c/build/" + "aTestChannel" + ".txt";
-                Scanner scanner = new Scanner(new FileReader(filePath));
-                while(scanner.hasNext()) {
-                    System.out.println(scanner.next());
-                }
-                scanner.close();
-
                 intervalMetricsTask = new TimerTask() {
                     @Override
                     public void run() {

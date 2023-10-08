@@ -706,7 +706,7 @@ STATUS Peer::writeFrame(PFrame pFrame, MEDIA_STREAM_TRACK_KIND kind)
             if (this->isStorage) {
                 std::string fileName = this->channelName + ".txt";
                 std::ofstream toConsumer(fileName);
-                toConsumer << GETTIME() << std::endl;
+                toConsumer << GETTIME() / HUNDREDS_OF_NANOS_IN_A_MILLISECOND << std::endl;
                 toConsumer.close();
             }
 
