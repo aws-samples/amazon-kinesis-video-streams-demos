@@ -1,4 +1,8 @@
 #include "Include.h"
+#include <fstream>
+#include <iostream>
+#include <filesystem>
+
 
 namespace Canary {
 
@@ -24,7 +28,9 @@ STATUS Peer::init(const Canary::PConfig pConfig, const Callbacks& callbacks)
 {
     STATUS retStatus = STATUS_SUCCESS;
 
+    this->channelName = pConfig->channelName.value;
     this->isMaster = pConfig->isMaster.value;
+    this->isStorage = pConfig->isStorage;
     this->trickleIce = pConfig->trickleIce.value;
     this->callbacks = callbacks;
     this->isProfilingMode = pConfig->isProfilingMode.value;
@@ -57,6 +63,12 @@ STATUS Peer::init(const Canary::PConfig pConfig, const Callbacks& callbacks)
                                                       (PCHAR) pConfig->sessionToken.value.c_str(), 0, MAX_UINT64, &pAwsCredentialProvider));
         }
 
+    }
+
+    // Remove toConsumer file from any previous run
+    if(this->isStorage) {
+        std::string fileName = this->channelName + ".txt";
+        remove(fileName.c_str());
     }
 
     CHK_STATUS(initSignaling(pConfig));
@@ -626,7 +638,7 @@ CleanUp:
 
 STATUS Peer::sendProfilingMetrics()
 {
-    std::cout << "TESTING Peer::sendProfilingMetrics(): called" << endl;
+    //std::cout << "TESTING Peer::sendProfilingMetrics(): called" << endl;
 
     STATUS retStatus = STATUS_SUCCESS;
 
@@ -648,10 +660,10 @@ STATUS Peer::sendProfilingMetrics()
         DLOGP("[Signaling fetch client] %" PRIu64 " ms", this->signalingClientMetrics.signalingClientStats.fetchClientTime);
         DLOGP("[Signaling connect client] %" PRIu64 " ms", this->signalingClientMetrics.signalingClientStats.connectClientTime);
 
-        UINT64 joinSessionToOffer = this->signalingClientMetrics.signalingClientStats.joinSessionToOfferRecvTime;
-        if (joinSessionToOffer != 0) {
-            DLOGP("[Signaling Join session to offer received] %" PRIu64 " ms", joinSessionToOffer);
-        }
+        // UINT64 joinSessionToOffer = this->signalingClientMetrics.signalingClientStats.joinSessionToOfferRecvTime;
+        // if (joinSessionToOffer != 0) {
+        //     DLOGP("[Signaling Join session to offer received] %" PRIu64 " ms", joinSessionToOffer);
+        // }
         
         Canary::Cloudwatch::getInstance().monitoring.pushSignalingClientMetrics(&this->signalingClientMetrics);
     }
@@ -671,7 +683,7 @@ CleanUp:
 
 STATUS Peer::writeFrame(PFrame pFrame, MEDIA_STREAM_TRACK_KIND kind)
 {
-    std::cout << "TESTING Peer::writeFrame(): called" << endl;
+    //std::cout << "TESTING Peer::writeFrame(): called" << endl;
 
     STATUS retStatus = STATUS_SUCCESS;
     DOUBLE timeToFirstFrame;
@@ -691,6 +703,13 @@ STATUS Peer::writeFrame(PFrame pFrame, MEDIA_STREAM_TRACK_KIND kind)
         CHK (retStatus == STATUS_SRTP_NOT_READY_YET || retStatus == STATUS_SUCCESS, retStatus);
 
         if (STATUS_SUCCEEDED(retStatus) && this->firstFrame && this->isMaster) {
+            if (this->isStorage) {
+                std::string fileName = this->channelName + ".txt";
+                std::ofstream toConsumer(fileName);
+                toConsumer << GETTIME() << std::endl;
+                toConsumer.close();
+            }
+
             this->firstFrame = FALSE;
             timeToFirstFrame = (DOUBLE) (GETTIME() - this->offerReceiveTimestamp) / HUNDREDS_OF_NANOS_IN_A_MILLISECOND;
             DLOGD("Start up latency from offer receive to first frame write: %lf ms", timeToFirstFrame);

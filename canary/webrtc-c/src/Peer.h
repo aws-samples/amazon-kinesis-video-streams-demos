@@ -65,6 +65,7 @@ class Peer {
     STATUS publishRetryCount();
 
   private:
+    std::string channelName;
     Callbacks callbacks;
     PAwsCredentialProvider pAwsCredentialProvider;
     SIGNALING_CLIENT_HANDLE signalingClientHandle;
@@ -85,6 +86,7 @@ class Peer {
     std::vector<PRtcRtpTransceiver> audioTransceivers;
     std::vector<PRtcRtpTransceiver> videoTransceivers;
     BOOL isMaster;
+    BOOL isStorage;
     BOOL trickleIce;
     BOOL isProfilingMode;
     UINT64 offerReceiveTimestamp;

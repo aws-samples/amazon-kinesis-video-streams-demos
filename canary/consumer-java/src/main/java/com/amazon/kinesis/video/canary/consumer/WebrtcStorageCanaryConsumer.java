@@ -206,7 +206,7 @@ public class WebrtcStorageCanaryConsumer {
                     }
                 };
                 final long intervalDelay = 250;
-                intervalMetricsTimer.scheduleAtFixedRate(intervalMetricsTask, 0, intervalDelay); // initial delay of 0 ms at an interval of 1 ms
+                intervalMetricsTimer.scheduleAtFixedRate(intervalMetricsTask, 0, intervalDelay); // initial delay of 0 ms at an interval of 'intervalDelay' ms
                 break;
             }
             default: {
