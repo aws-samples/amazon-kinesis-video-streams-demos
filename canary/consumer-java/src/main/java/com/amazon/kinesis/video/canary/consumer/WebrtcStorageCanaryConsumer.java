@@ -10,6 +10,9 @@ import java.util.TimerTask;
 import java.util.ArrayList;
 import java.io.InputStream;
 
+import java.util.Scanner;
+import java.io.FileReader;
+
 import com.amazonaws.auth.SystemPropertiesCredentialsProvider;
 import com.amazonaws.regions.Regions;
 import com.amazonaws.services.cloudwatch.AmazonCloudWatch;
@@ -37,7 +40,7 @@ import lombok.extern.log4j.Log4j2;
 /*
  * Canary for WebRTC with Storage Through Media Server
  * 
- * For longrun-configured jobs, this Canary will emit FragmentContinuity metrics by continuosly
+ * For longrun-configured jobs, this Canary will emit FragmentContinuity metrics by continuously
  * checking for any newly ingested fragments for the given stream. The fragment list is checked
  * for new fragments every "max-fragment-duration + 1 sec." The max-fragment-duration is determined
  * by Media Server.
@@ -93,6 +96,7 @@ public class WebrtcStorageCanaryConsumer {
         }
     }
 
+    // TODO: shorten name as there is only a getMedia version now anyway, remove "getMedia" from name
     private static void getMediaTimeToFirstFragment(Timer intervalMetricsTimer) {
         try {
             final GetDataEndpointRequest dataEndpointRequestGetMedia = new GetDataEndpointRequest()
@@ -183,6 +187,7 @@ public class WebrtcStorageCanaryConsumer {
 
         Timer intervalMetricsTimer = new Timer("IntervalMetricsTimer");
         TimerTask intervalMetricsTask;
+        // TODO: consider changing these labels to be "StorageWebrtc...", but might be not worth it if they are tied to dashboard terminology
         switch (canaryLabel){
             case "WebrtcLongRunning": {
                 final CanaryFragmentList fragmentList = new CanaryFragmentList();
@@ -199,6 +204,14 @@ public class WebrtcStorageCanaryConsumer {
                 break;
             }
             case "WebrtcPeriodic": {
+                // String filePath = "../webrtc-c/build/" + streamName + ".txt";
+                String filePath = "../webrtc-c/build/" + "aTestChannel" + ".txt";
+                Scanner scanner = new Scanner(new FileReader(filePath));
+                while(scanner.hasNext()) {
+                    System.out.println(scanner.next());
+                }
+                scanner.close();
+
                 intervalMetricsTask = new TimerTask() {
                     @Override
                     public void run() {
@@ -215,9 +228,7 @@ public class WebrtcStorageCanaryConsumer {
             }
         }
         
-        // Run this sleep for both FragmentReceived and TimeToFirstFrame metric cases to ensure
-        //      connection can be reestablished to Media Server for periodic runs
-        //      (must wait >=5min to ensure it can reconnect)
+        // TODO: consider not running this sleep for the periodic case if it only is measuring startup/timetofirst metrics (can do this now that the 5min cooldown is fixed)
         Thread.sleep(canaryRunTime * 1000);
         intervalMetricsTimer.cancel();
     }
