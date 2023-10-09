@@ -12,6 +12,7 @@ import java.io.InputStream;
 
 import java.util.Scanner;
 import java.io.FileReader;
+import java.io.File; // TODO: remove, just for testing
 
 import com.amazonaws.auth.SystemPropertiesCredentialsProvider;
 import com.amazonaws.regions.Regions;
@@ -115,11 +116,15 @@ public class WebrtcStorageCanaryConsumer {
             final long currentTime = new Date().getTime();
             double timeToFirstFragment = Double.MAX_VALUE;
 
+            // Note: this will create file in /consumer-java folder
+            // File myObj = new File("filename.txt");
+            // myObj.createNewFile();
+
             // If getMedia result payload is not empty, calculate TimeToFirstFragment
             if (payload.read() != -1) {
                 timeToFirstFragment = currentTime - canaryStartTime.getTime();
 
-                String filePath = "../../webrtc-c/" + streamName + ".txt";
+                String filePath = "../webrtc-c/" + streamName + ".txt";
                 Scanner scanner = new Scanner(new FileReader(filePath));
                 System.out.println(currentTime - Long.parseLong(scanner.next()));
                 // while(scanner.hasNext()) {
