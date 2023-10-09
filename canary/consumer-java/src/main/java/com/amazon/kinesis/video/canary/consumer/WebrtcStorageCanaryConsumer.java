@@ -108,7 +108,8 @@ public class WebrtcStorageCanaryConsumer {
             final AmazonKinesisVideoMediaClientBuilder builder = AmazonKinesisVideoMediaClientBuilder.standard().withEndpointConfiguration(new AwsClientBuilder.EndpointConfiguration(getMediaEndpoint, region)).withCredentials(credentialsProvider);
             videoMedia = builder.build();
             
-            final StartSelector startSelector = new StartSelector().withStartSelectorType(StartSelectorType.NOW);
+            //final StartSelector startSelector = new StartSelector().withStartSelectorType(StartSelectorType.NOW);
+            final StartSelector startSelector = new StartSelector().withStartSelectorType(StartSelectorType.PRODUCER_TIMESTAMP).withStartTimestamp(canaryStartTime);
             
             final GetMediaResult result = videoMedia.getMedia(new GetMediaRequest().withStreamName(streamName).withStartSelector(startSelector));
             final InputStream payload = result.getPayload();
