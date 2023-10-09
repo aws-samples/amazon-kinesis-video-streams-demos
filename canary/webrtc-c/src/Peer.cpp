@@ -65,7 +65,7 @@ STATUS Peer::init(const Canary::PConfig pConfig, const Callbacks& callbacks)
 
     // Remove toConsumer file from any previous run
     if(this->isStorage) {
-        std::string filePath = "../../.." + this->channelName + ".txt";
+        std::string filePath = "../" + this->channelName + ".txt";
         remove(filePath.c_str());
     }
 
