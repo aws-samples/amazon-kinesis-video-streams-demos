@@ -1,8 +1,6 @@
 #include "Include.h"
 #include <fstream>
 #include <iostream>
-#include <filesystem>
-
 
 namespace Canary {
 
