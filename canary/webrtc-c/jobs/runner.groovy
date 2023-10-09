@@ -373,7 +373,7 @@ pipeline {
 
 
         // TODO: make a single node with a unique label that this will use as an agent, this will ensure both stages happen on same node
-        stage('Build and Run Webrtc-Storage Master and Consumer Canaries') {
+        stage('Build and Run Webrtc-Storage Master and Consumer Canaries on Same Node') {
             failFast true
             when {
                 allOf {

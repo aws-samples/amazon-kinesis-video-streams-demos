@@ -54,7 +54,7 @@ ACTIVE_RUNNERS = []
 
 pipeline {
     agent {
-        label 'profiling'
+        label MASTER_NODE_LABEL
     }
 
     options {
