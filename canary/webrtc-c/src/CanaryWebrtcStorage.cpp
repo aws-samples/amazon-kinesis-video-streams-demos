@@ -23,6 +23,8 @@ INT32 main(INT32 argc, CHAR* argv[])
     signal(SIGINT, handleSignal);
 #endif
 
+    std::cout << "WEBRTC CANARY START TIME: " << GETTIME();
+
     STATUS retStatus = STATUS_SUCCESS;
     initializeEndianness();
     SET_INSTRUMENTED_ALLOCATORS();

@@ -183,6 +183,8 @@ public class WebrtcStorageCanaryConsumer {
     }
 
     public static void main(final String[] args) throws Exception {
+        System.out.printl("CONSUMER CANARY START TIME: " + new Date().getTime());
+
         // Import configurable parameters.
         final Integer canaryRunTime = Integer.parseInt(System.getenv("CANARY_DURATION_IN_SECONDS"));
         streamName = System.getenv("CANARY_STREAM_NAME");
