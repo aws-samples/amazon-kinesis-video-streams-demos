@@ -126,11 +126,14 @@ public class WebrtcStorageCanaryConsumer {
 
                 String filePath = "../webrtc-c/" + streamName + ".txt";
                 Scanner scanner = new Scanner(new FileReader(filePath));
-                System.out.println(currentTime - Long.parseLong(scanner.next()));
+                long rtpToFirstFragment = currentTime - Long.parseLong(scanner.next());
+                System.out.println(rtpToFirstFragment);
                 // while(scanner.hasNext()) {
                 //     System.out.println(scanner.next());
                 // }
                 scanner.close();
+
+                publishMetricToCW("RtpToFirstFragment", rtpToFirstFragment, StandardUnit.Milliseconds);
 
                 publishMetricToCW("TimeToFirstFragment", timeToFirstFragment, StandardUnit.Milliseconds);
 
