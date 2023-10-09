@@ -702,7 +702,8 @@ STATUS Peer::writeFrame(PFrame pFrame, MEDIA_STREAM_TRACK_KIND kind)
 
         if (STATUS_SUCCEEDED(retStatus) && this->firstFrame && this->isMaster) {
             if (this->isStorage) {
-                std::string filePath = "../.." + this->channelName + ".txt";
+                std::string filePath = "../" + this->channelName + ".txt";
+                std::cout << "PRINTING TO FILE" << std::endl;
                 std::ofstream toConsumer(filePath);
                 toConsumer << GETTIME() / HUNDREDS_OF_NANOS_IN_A_MILLISECOND << std::endl;
                 toConsumer.close();
