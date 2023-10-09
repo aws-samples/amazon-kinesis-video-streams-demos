@@ -119,7 +119,7 @@ public class WebrtcStorageCanaryConsumer {
             if (payload.read() != -1) {
                 timeToFirstFragment = currentTime - canaryStartTime.getTime();
 
-                String filePath = "../../../" + streamName + ".txt";
+                String filePath = "../../" + streamName + ".txt";
                 Scanner scanner = new Scanner(new FileReader(filePath));
                 System.out.println(currentTime - Long.parseLong(scanner.next()));
                 // while(scanner.hasNext()) {
