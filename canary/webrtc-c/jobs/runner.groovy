@@ -251,6 +251,7 @@ pipeline {
         choice(name: 'AWS_KVS_LOG_LEVEL', choices: ["1", "2", "3", "4", "5"])
         booleanParam(name: 'IS_SIGNALING')
         booleanParam(name: 'IS_STORAGE')
+        booleanParam(name: 'IS_STORAGE_SINGLE_NODE')
         booleanParam(name: 'USE_TURN')
         booleanParam(name: 'IS_PROFILING')
         booleanParam(name: 'TRICKLE_ICE')
@@ -289,6 +290,8 @@ pipeline {
                 allOf {
                     equals expected: false, actual: params.IS_SIGNALING
                     equals expected: false, actual: params.IS_STORAGE
+                    equals expected: false, actual: params.IS_STORAGE_SINGLE_NODE 
+
                 }
             }
             parallel {
@@ -344,6 +347,7 @@ pipeline {
                 allOf {
                     equals expected: false, actual: params.IS_SIGNALING
                     equals expected: true, actual: params.IS_STORAGE
+                    equals expected: false, actual: params.IS_STORAGE_SINGLE_NODE 
                 }
             }
             parallel {
@@ -358,6 +362,35 @@ pipeline {
                      agent {
                         label params.CONSUMER_NODE_LABEL
                     }
+                    steps {
+                        script {
+                            buildStorageEndpoint(true, params)
+                        }
+                    }
+                }
+            }
+        }
+
+
+        // TODO: make a single node with a unique label that this will use as an agent, this will ensure both stages happen on same node
+        stage('Build and Run Webrtc-Storage Master and Consumer Canaries') {
+            failFast true
+            when {
+                allOf {
+                    equals expected: false, actual: params.IS_SIGNALING
+                    equals expected: true, actual: params.IS_STORAGE
+                    equals expected: true, actual: params.IS_STORAGE_SINGLE_NODE 
+                }
+            }
+            parallel {
+                stage('StorageMaster') {
+                    steps {
+                        script {
+                            buildStorageEndpoint(false, params)
+                        }
+                    }
+                }
+                stage('StorageConsumer') {
                     steps {
                         script {
                             buildStorageEndpoint(true, params)
@@ -388,6 +421,7 @@ pipeline {
                       string(name: 'AWS_KVS_LOG_LEVEL', value: params.AWS_KVS_LOG_LEVEL),
                       booleanParam(name: 'IS_SIGNALING', value: params.IS_SIGNALING),
                       booleanParam(name: 'IS_STORAGE', value: params.IS_STORAGE),
+                      booleanParam(name: 'IS_STORAGE_SINGLE_NODE', value: params.IS_STORAGE_SINGLE_NODE),
                       booleanParam(name: 'USE_TURN', value: params.USE_TURN),
                       booleanParam(name: 'FORCE_TURN', value: params.FORCE_TURN),
                       booleanParam(name: 'USE_IOT', value: params.USE_IOT),
