@@ -65,8 +65,8 @@ STATUS Peer::init(const Canary::PConfig pConfig, const Callbacks& callbacks)
 
     // Remove toConsumer file from any previous run
     if(this->isStorage) {
-        std::string fileName = this->channelName + ".txt";
-        remove(fileName.c_str());
+        std::string filePath = "../../.." + this->channelName + ".txt";
+        remove(filePath.c_str());
     }
 
     CHK_STATUS(initSignaling(pConfig));
@@ -702,8 +702,8 @@ STATUS Peer::writeFrame(PFrame pFrame, MEDIA_STREAM_TRACK_KIND kind)
 
         if (STATUS_SUCCEEDED(retStatus) && this->firstFrame && this->isMaster) {
             if (this->isStorage) {
-                std::string fileName = this->channelName + ".txt";
-                std::ofstream toConsumer(fileName);
+                std::string filePath = "../../.." + this->channelName + ".txt";
+                std::ofstream toConsumer(filePath);
                 toConsumer << GETTIME() / HUNDREDS_OF_NANOS_IN_A_MILLISECOND << std::endl;
                 toConsumer.close();
             }
