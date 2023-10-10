@@ -21,25 +21,19 @@ import java.util.Optional;
 import java.util.zip.CRC32;
 
 public class RealTimeFrameProcessor implements FrameVisitor.FrameProcessor {
-    int lastFrameIndex = -1;
-    final AmazonCloudWatchAsync cwClient;
-    final Dimension dimensionPerStream;
-    final Dimension aggregatedDimension;
+    private Boolean isFirstFrameReceived;
+
+    public Boolean getIsFirstFrameReceived () {
+        return this.isFirstFrameReceived;
+    }
 
     public CanaryFrameProcessor(AmazonCloudWatchAsync cwClient, String streamName, String canaryLabel) {
-        this.cwClient = cwClient;
-        dimensionPerStream = new Dimension()
-                .withName("ProducerSDKCanaryStreamName")
-                .withValue(streamName);
-        aggregatedDimension = new Dimension()
-                .withName("ProducerSDKCanaryType")
-                .withValue(canaryLabel);
+        this.firstFrameReceived = false;
     }
 
     @Override
     public void process(Frame frame, MkvTrackMetadata trackMetadata, Optional<FragmentMetadata> fragmentMetadata, Optional<FragmentMetadataVisitor.MkvTagProcessor> tagProcessor) throws FrameProcessException {
-        // TODO: Change an reachedFirstFrame bool to TRUE
-
+        this.isFirstFrameReceived = true;
     }
 
     @Override
