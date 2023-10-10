@@ -20,20 +20,33 @@ import java.util.List;
 import java.util.Optional;
 import java.util.zip.CRC32;
 
-public class RealTimeFrameProcessor implements FrameVisitor.FrameProcessor {
+public class RealTimeFrameProcessor extends WebrtcStorageCanaryConsumer implements FrameVisitor.FrameProcessor {
     private Boolean isFirstFrameReceived;
+
+    public static RealTimeFrameProcessor create() {
+        return new RealTimeFrameProcessor();
+    }
 
     public Boolean getIsFirstFrameReceived () {
         return this.isFirstFrameReceived;
     }
 
-    public CanaryFrameProcessor(AmazonCloudWatchAsync cwClient, String streamName, String canaryLabel) {
+    private RealTimeFrameProcessor(AmazonCloudWatchAsync cwClient, String streamName, String canaryLabel) {
         this.firstFrameReceived = false;
     }
 
     @Override
     public void process(Frame frame, MkvTrackMetadata trackMetadata, Optional<FragmentMetadata> fragmentMetadata, Optional<FragmentMetadataVisitor.MkvTagProcessor> tagProcessor) throws FrameProcessException {
-        this.isFirstFrameReceived = true;
+        if (!this.isFirstFrameReceived) {
+            this.isFirstFrameReceived = true;
+
+            final long currentTime = new Date().getTime();
+            double timeToFirstFragment = currentTime - canaryStartTime.getTime();
+
+            super.publishMetricToCW(timeToFirstFragment, timeToFirstFragment, StandardUnit.Milliseconds);
+            super.keepProcessing = false;
+        }
+
     }
 
     @Override

@@ -35,6 +35,9 @@ import com.amazonaws.services.kinesisvideo.model.GetMediaResult;
 import com.amazonaws.services.kinesisvideo.model.StartSelector;
 import com.amazonaws.services.kinesisvideo.model.StartSelectorType;
 import com.amazonaws.services.kinesisvideo.model.GetMediaRequest;
+import com.amazonaws.kinesisvideo.parser.utilities.FrameVisitor;
+import com.amazonaws.kinesisvideo.parser.examples.GetMediaWorker;
+
 
 import lombok.extern.log4j.Log4j2;
 
@@ -61,6 +64,10 @@ public class WebrtcStorageCanaryConsumer {
     private static SystemPropertiesCredentialsProvider credentialsProvider;
     private static AmazonKinesisVideo amazonKinesisVideo;
     private static AmazonCloudWatch cwClient;
+
+    protected static Boolean keepProcessing;
+
+
 
     private static void calculateFragmentContinuityMetric(CanaryFragmentList fragmentList) {
         try {
@@ -113,14 +120,12 @@ public class WebrtcStorageCanaryConsumer {
             final StartSelector startSelector = new StartSelector().withStartSelectorType(StartSelectorType.PRODUCER_TIMESTAMP).withStartTimestamp(canaryStartTime);
             
             long t1 = new Date().getTime();
-
             System.out.println("t1: " + new Date().getTime());
 
-            final GetMediaResult result = videoMedia.getMedia(new GetMediaRequest().withStreamName(streamName).withStartSelector(startSelector));
-            final InputStream payload = result.getPayload();
+            // final GetMediaResult result = videoMedia.getMedia(new GetMediaRequest().withStreamName(streamName).withStartSelector(startSelector));
+            // final InputStream payload = result.getPayload();
 
             long t2 = new Date().getTime();
-
             System.out.println("t2 - t1 = " + (t2-t1));
 
             
@@ -131,30 +136,25 @@ public class WebrtcStorageCanaryConsumer {
             // File myObj = new File("filename.txt");
             // myObj.createNewFile();
 
-            GetMediaResponseStreamConsumerFactory consumerFactory = new GetMediaResponseStreamConsumerFactory() {
-                @Override
-                public GetMediaResponseStreamConsumer createConsumer() throws IOException {
-                    return new GetMediaResponseStreamConsumer() {
-                        @Override
-                        public void process(InputStream inputStream, FragmentMetadataCallback fragmentMetadataCallback) throws MkvElementVisitException, IOException {
-                            processWithFragmentEndCallbacks(inputStream, fragmentMetadataCallback,
-                                    FrameVisitor.create(new CanaryFrameProcessor(amazonCloudWatch, streamName, canaryLabel),
-                                            Optional.of(new FragmentMetadataVisitor.BasicMkvTagProcessor())));
-                        }
-                    };
-                }
-            };
-
-            RealTimeFrameProcessor realTimeFrameProcessor = RealTimeFrameProcessor.create(credentialsProvider, outputKvsStreamName, regionName); // TODO: Fix params
+            RealTimeFrameProcessor realTimeFrameProcessor = RealTimeFrameProcessor.create();
             final FrameVisitor frameVisitor = FrameVisitor.create(realTimeFrameProcessor);
 
-            final GetMediaWorker getMediaWorker = GetMediaForFragmentListWorker.create(
+            final GetMediaWorker getMediaWorker = GetMediaWorker.create(
                     Regions.fromName(region),
                     credentialsProvider,
                     streamName,
                     startSelector,
                     amazonKinesisVideo,
                     frameVisitor);
+
+            getMediaWorker.run();
+
+            while(keepProcessing)
+            {
+
+            }
+
+            /*
 
             // If getMedia result payload is not empty, calculate TimeToFirstFragment
             if (payload.read() != -1) {
@@ -181,6 +181,8 @@ public class WebrtcStorageCanaryConsumer {
                 // The Canary will continue running for the specified period to allow for cool-down of Media-Server reconnection.
                 intervalMetricsTimer.cancel();
             }
+
+            */
 
             long t3 = new Date().getTime();
             System.out.println("t3 - t2 = " + (t3-t2));
@@ -266,14 +268,16 @@ public class WebrtcStorageCanaryConsumer {
                 break;
             }
             case "WebrtcPeriodic": {
-                intervalMetricsTask = new TimerTask() {
-                    @Override
-                    public void run() {
-                        getMediaTimeToFirstFragment(intervalMetricsTimer);
-                    }
-                };
-                final long intervalDelay = 250;
-                intervalMetricsTimer.scheduleAtFixedRate(intervalMetricsTask, 0, intervalDelay); // initial delay of 0 ms at an interval of 'intervalDelay' ms
+                keepProcessing = true;
+                getMediaTimeToFirstFragment(intervalMetricsTimer);
+                // intervalMetricsTask = new TimerTask() {
+                //     @Override
+                //     public void run() {
+                //         getMediaTimeToFirstFragment(intervalMetricsTimer);
+                //     }
+                // };
+                // final long intervalDelay = 250;
+                // intervalMetricsTimer.scheduleAtFixedRate(intervalMetricsTask, 0, intervalDelay); // initial delay of 0 ms at an interval of 'intervalDelay' ms
                 break;
             }
             default: {
