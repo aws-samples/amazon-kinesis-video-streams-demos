@@ -100,6 +100,7 @@ public class WebrtcStorageCanaryConsumer {
     // TODO: shorten name as there is only a getMedia version now anyway, so remove "getMedia" from name
     private static void getMediaTimeToFirstFragment(Timer intervalMetricsTimer) {
         try {
+
             final GetDataEndpointRequest dataEndpointRequestGetMedia = new GetDataEndpointRequest()
                 .withAPIName(APIName.GET_MEDIA).withStreamName(streamName);
             final String getMediaEndpoint = amazonKinesisVideo.getDataEndpoint(dataEndpointRequestGetMedia).getDataEndpoint();
@@ -111,8 +112,17 @@ public class WebrtcStorageCanaryConsumer {
             //final StartSelector startSelector = new StartSelector().withStartSelectorType(StartSelectorType.NOW);
             final StartSelector startSelector = new StartSelector().withStartSelectorType(StartSelectorType.PRODUCER_TIMESTAMP).withStartTimestamp(canaryStartTime);
             
+            long t1 = new Date().getTime();
+
+            System.out.println("t1: " + new Date().getTime());
+
             final GetMediaResult result = videoMedia.getMedia(new GetMediaRequest().withStreamName(streamName).withStartSelector(startSelector));
             final InputStream payload = result.getPayload();
+
+            long t2 = new Date().getTime();
+
+            System.out.println("t2 - t1 = " + (t2-t1));
+
             
             final long currentTime = new Date().getTime();
             double timeToFirstFragment = Double.MAX_VALUE;
@@ -121,8 +131,36 @@ public class WebrtcStorageCanaryConsumer {
             // File myObj = new File("filename.txt");
             // myObj.createNewFile();
 
+            GetMediaResponseStreamConsumerFactory consumerFactory = new GetMediaResponseStreamConsumerFactory() {
+                @Override
+                public GetMediaResponseStreamConsumer createConsumer() throws IOException {
+                    return new GetMediaResponseStreamConsumer() {
+                        @Override
+                        public void process(InputStream inputStream, FragmentMetadataCallback fragmentMetadataCallback) throws MkvElementVisitException, IOException {
+                            processWithFragmentEndCallbacks(inputStream, fragmentMetadataCallback,
+                                    FrameVisitor.create(new CanaryFrameProcessor(amazonCloudWatch, streamName, canaryLabel),
+                                            Optional.of(new FragmentMetadataVisitor.BasicMkvTagProcessor())));
+                        }
+                    };
+                }
+            };
+
+            RealTimeFrameProcessor realTimeFrameProcessor = RealTimeFrameProcessor.create(credentialsProvider, outputKvsStreamName, regionName); // TODO: Fix params
+            final FrameVisitor frameVisitor = FrameVisitor.create(realTimeFrameProcessor);
+
+            final GetMediaWorker getMediaWorker = GetMediaForFragmentListWorker.create(
+                    Regions.fromName(region),
+                    credentialsProvider,
+                    streamName,
+                    startSelector,
+                    amazonKinesisVideo,
+                    frameVisitor);
+
             // If getMedia result payload is not empty, calculate TimeToFirstFragment
             if (payload.read() != -1) {
+                long ta = new Date().getTime();
+                System.out.println("ta - t2 = " + (ta-t2));
+
                 timeToFirstFragment = currentTime - canaryStartTime.getTime();
 
                 String filePath = "../webrtc-c/" + streamName + ".txt";
@@ -143,6 +181,9 @@ public class WebrtcStorageCanaryConsumer {
                 // The Canary will continue running for the specified period to allow for cool-down of Media-Server reconnection.
                 intervalMetricsTimer.cancel();
             }
+
+            long t3 = new Date().getTime();
+            System.out.println("t3 - t2 = " + (t3-t2));
     
         } catch (Exception e) {
             log.error(e);
