@@ -21,6 +21,10 @@ import java.util.Optional;
 import java.util.zip.CRC32;
 import java.util.Date;
 
+import java.util.Scanner;
+import java.io.FileReader;
+import java.io.FileNotFoundException;
+
 
 public class RealTimeFrameProcessor extends WebrtcStorageCanaryConsumer implements FrameVisitor.FrameProcessor {
     public static RealTimeFrameProcessor create() {
@@ -32,7 +36,6 @@ public class RealTimeFrameProcessor extends WebrtcStorageCanaryConsumer implemen
 
     @Override
     public void process(Frame frame, MkvTrackMetadata trackMetadata, Optional<FragmentMetadata> fragmentMetadata, Optional<FragmentMetadataVisitor.MkvTagProcessor> tagProcessor) throws FrameProcessException {
-        System.out.println("TESTING PROCESSOR");
         if (super.keepProcessing.compareAndSet(true, false)) {
 
             final long currentTime = new Date().getTime();
@@ -40,6 +43,23 @@ public class RealTimeFrameProcessor extends WebrtcStorageCanaryConsumer implemen
 
             super.publishMetricToCW("TimeToFirstFragment", timeToFirstFragment, StandardUnit.Milliseconds);
             //super.keepProcessing = false;
+
+            try
+            {
+                String filePath = "../webrtc-c/" + super.streamName + ".txt";
+                Scanner scanner = new Scanner(new FileReader(filePath));
+                long rtpToFirstFragment = currentTime - Long.parseLong(scanner.next());
+                System.out.println("rtpToFirstFragment: ");
+                System.out.println(rtpToFirstFragment);
+                scanner.close();
+                super.publishMetricToCW("RtpToFirstFragment", rtpToFirstFragment, StandardUnit.Milliseconds);       
+            }
+            catch (FileNotFoundException ex)  
+            {
+                // handle
+            }
+
+            
             this.close();
         }
 
@@ -47,6 +67,6 @@ public class RealTimeFrameProcessor extends WebrtcStorageCanaryConsumer implemen
 
     @Override
     public void close() {
-
+        // How can I close??
     }
 }

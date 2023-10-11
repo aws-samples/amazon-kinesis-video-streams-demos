@@ -59,7 +59,7 @@ import lombok.extern.log4j.Log4j2;
 @Log4j2
 public class WebrtcStorageCanaryConsumer {
     protected static Date canaryStartTime;
-    private static String streamName;
+    protected static String streamName;
     private static String canaryLabel;
     private static String region;
     private static SystemPropertiesCredentialsProvider credentialsProvider;
@@ -121,14 +121,13 @@ public class WebrtcStorageCanaryConsumer {
             //final StartSelector startSelector = new StartSelector().withStartSelectorType(StartSelectorType.NOW);
             final StartSelector startSelector = new StartSelector().withStartSelectorType(StartSelectorType.PRODUCER_TIMESTAMP).withStartTimestamp(canaryStartTime);
             
-            long t1 = new Date().getTime();
-            System.out.println("t1: " + new Date().getTime());
+            //long t1 = new Date().getTime();
 
             // final GetMediaResult result = videoMedia.getMedia(new GetMediaRequest().withStreamName(streamName).withStartSelector(startSelector));
             // final InputStream payload = result.getPayload();
 
             long t2 = new Date().getTime();
-            System.out.println("t2 - t1 = " + (t2-t1));
+            //System.out.println("t2 - t1 = " + (t2-t1));
 
             
             final long currentTime = new Date().getTime();
@@ -192,7 +191,7 @@ public class WebrtcStorageCanaryConsumer {
             */
 
             long t3 = new Date().getTime();
-            System.out.println("t3 - t2 = " + (t3-t2));
+            //System.out.println("t3 - t2 = " + (t3-t2));
 
             if (!keepProcessing.get()) {
                 intervalMetricsTimer.cancel();
