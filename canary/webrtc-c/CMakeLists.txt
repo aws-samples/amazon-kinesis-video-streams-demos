@@ -11,7 +11,7 @@ option(CANARY_USE_MBEDTLS "MBedtls" OFF)
 FetchContent_Declare(
   webrtc
   GIT_REPOSITORY https://github.com/awslabs/amazon-kinesis-video-streams-webrtc-sdk-c
-  GIT_TAG        dtls-logging
+  GIT_TAG        74c499cf69891c713566fbf2db6153c265f5877b
 )
 
 FetchContent_Declare(

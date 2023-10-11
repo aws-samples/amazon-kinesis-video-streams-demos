@@ -620,7 +620,7 @@ STATUS Peer::sendProfilingMetrics()
 
     // We want to batch send all the metrics once the first frame is sent out.
     signalingClientMetrics.version = SIGNALING_CLIENT_METRICS_CURRENT_VERSION;
-
+    MEMSET(&this->iceMetrics, 0, SIZEOF(this->iceMetrics));
     if(STATUS_FAILED(signalingClientGetMetrics(this->signalingClientHandle, &this->signalingClientMetrics))) {
         DLOGW("Could not get signaling client metrics (0x%08x)", retStatus);
     } else {
