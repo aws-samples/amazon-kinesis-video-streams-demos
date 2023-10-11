@@ -13,6 +13,7 @@ import java.io.InputStream;
 import java.util.Scanner;
 import java.io.FileReader;
 import java.io.File; // TODO: remove, just for testing
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import com.amazonaws.auth.SystemPropertiesCredentialsProvider;
 import com.amazonaws.regions.Regions;
@@ -65,7 +66,8 @@ public class WebrtcStorageCanaryConsumer {
     private static AmazonKinesisVideo amazonKinesisVideo;
     private static AmazonCloudWatch cwClient;
 
-    protected static Boolean keepProcessing;
+    //protected static Boolean keepProcessing;
+    final protected static AtomicBoolean keepProcessing = new AtomicBoolean(true);
 
 
 
@@ -136,6 +138,8 @@ public class WebrtcStorageCanaryConsumer {
             // File myObj = new File("filename.txt");
             // myObj.createNewFile();
 
+            
+            // TODO: pass this stuff into the function, then just start on new threads every time called
             RealTimeFrameProcessor realTimeFrameProcessor = RealTimeFrameProcessor.create();
             final FrameVisitor frameVisitor = FrameVisitor.create(realTimeFrameProcessor);
 
@@ -189,6 +193,10 @@ public class WebrtcStorageCanaryConsumer {
 
             long t3 = new Date().getTime();
             System.out.println("t3 - t2 = " + (t3-t2));
+
+            if (!keepProcessing.get()) {
+                intervalMetricsTimer.cancel();
+            }
     
         } catch (Exception e) {
             log.error(e);
@@ -271,7 +279,7 @@ public class WebrtcStorageCanaryConsumer {
                 break;
             }
             case "WebrtcPeriodic": {
-                keepProcessing = true;
+                //keepProcessing = true;
                 //getMediaTimeToFirstFragment(intervalMetricsTimer);
                 intervalMetricsTask = new TimerTask() {
                     @Override
@@ -279,7 +287,7 @@ public class WebrtcStorageCanaryConsumer {
                         getMediaTimeToFirstFragment(intervalMetricsTimer);
                     }
                 };
-                final long intervalDelay = 20;
+                final long intervalDelay = 200;
                 intervalMetricsTimer.scheduleAtFixedRate(intervalMetricsTask, 0, intervalDelay); // initial delay of 0 ms at an interval of 'intervalDelay' ms
                 break;
             }

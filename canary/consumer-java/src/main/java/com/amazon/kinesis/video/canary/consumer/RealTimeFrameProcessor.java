@@ -23,31 +23,24 @@ import java.util.Date;
 
 
 public class RealTimeFrameProcessor extends WebrtcStorageCanaryConsumer implements FrameVisitor.FrameProcessor {
-    private Boolean isFirstFrameReceived;
-
     public static RealTimeFrameProcessor create() {
         return new RealTimeFrameProcessor();
     }
 
-    public Boolean getIsFirstFrameReceived () {
-        return this.isFirstFrameReceived;
-    }
-
     private RealTimeFrameProcessor() {
-        this.isFirstFrameReceived = false;
     }
 
     @Override
     public void process(Frame frame, MkvTrackMetadata trackMetadata, Optional<FragmentMetadata> fragmentMetadata, Optional<FragmentMetadataVisitor.MkvTagProcessor> tagProcessor) throws FrameProcessException {
         System.out.println("TESTING PROCESSOR");
-        if (!this.isFirstFrameReceived) {
-            this.isFirstFrameReceived = true;
+        if (super.keepProcessing.compareAndSet(true, false)) {
 
             final long currentTime = new Date().getTime();
             double timeToFirstFragment = currentTime - super.canaryStartTime.getTime();
 
             super.publishMetricToCW("TimeToFirstFragment", timeToFirstFragment, StandardUnit.Milliseconds);
-            super.keepProcessing = false;
+            //super.keepProcessing = false;
+            this.close();
         }
 
     }
