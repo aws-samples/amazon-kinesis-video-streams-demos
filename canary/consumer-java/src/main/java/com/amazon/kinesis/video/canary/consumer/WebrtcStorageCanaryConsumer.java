@@ -209,6 +209,10 @@ public class WebrtcStorageCanaryConsumer {
     private static void calculateTimeToFirstFragment(Timer intervalMetricsTimer) {
         try {
             double timeToFirstFragment = Double.MAX_VALUE;
+
+            final GetDataEndpointRequest dataEndpointRequest = new GetDataEndpointRequest()
+                .withAPIName(APIName.LIST_FRAGMENTS).withStreamName(streamName);
+            final String listFragmentsEndpoint = amazonKinesisVideo.getDataEndpoint(dataEndpointRequest).getDataEndpoint();
         
             // TODO: make the below two blocks of code into a 
             // getFragmentSelector() function, reuse in the other metric
@@ -226,22 +230,31 @@ public class WebrtcStorageCanaryConsumer {
             long currentTime = new Date().getTime();
 
             final FutureTask<List<CanaryFragment>> futureTask = new FutureTask<>(
-                new CanaryListFragmentWorker(streamName, credentialsProvider, dataEndpoint, Regions.fromName(region), fragmentSelector)
+                new CanaryListFragmentWorker(streamName, credentialsProvider, listFragmentsEndpoint, Regions.fromName(region), fragmentSelector)
             );
             Thread thread = new Thread(futureTask);
             thread.start();
             List<CanaryFragment> fragmentList = futureTask.get();
 
             if (fragmentList.size() > 0) {
-                timeToFirstFragment = fragmentList[0].getFragment.getServerTimestamp() - canaryStartTime.getTime();
-                publishMetricToCW("TimeToFirstFragment", timeToFirstFragment, StandardUnit.Milliseconds, streamName, canaryLabel, credentialsProvider, region);
+                System.out.println(fragmentList.size());
+
+                String filePath = "../webrtc-c/" + streamName + ".txt";
+                Scanner scanner = new Scanner(new FileReader(filePath));
+                long rtpSendTime = Long.parseLong(scanner.next());
+                scanner.close();
+
+                timeToFirstFragment = fragmentList.get(0).getFragment().getServerTimestamp().getTime() - rtpSendTime;
+                publishMetricToCW("TimeToFirstFragment1", timeToFirstFragment, StandardUnit.Milliseconds);
+                timeToFirstFragment = fragmentList.get(0).getFragment().getServerTimestamp().getTime() - fragmentList.get(0).getFragment().getProducerTimestamp().getTime();
+                publishMetricToCW("TimeToFirstFragment2", timeToFirstFragment, StandardUnit.Milliseconds);
                 intervalMetricsTimer.cancel();
             }
 
         } catch (Exception e) {
             log.error(e);
         }
-                
+           
     }
     
     
