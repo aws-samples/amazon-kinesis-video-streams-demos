@@ -390,13 +390,13 @@ pipeline {
                         }
                     }
                 }
-                // stage('StorageConsumer') {
-                //     steps {
-                //         script {
-                //             buildStorageEndpoint(true, params)
-                //         }
-                //     }
-                // }
+                stage('StorageConsumer') {
+                    steps {
+                        script {
+                            buildStorageEndpoint(true, params)
+                        }
+                    }
+                }
             }
         }
 
