@@ -205,6 +205,46 @@ public class WebrtcStorageCanaryConsumer {
         }
     }
 
+    
+    private static void calculateTimeToFirstFragment(Timer intervalMetricsTimer) {
+        try {
+            double timeToFirstFragment = Double.MAX_VALUE;
+        
+            // TODO: make the below two blocks of code into a 
+            // getFragmentSelector() function, reuse in the other metric
+
+            // Time range for listFragments request
+            TimestampRange timestampRange = new TimestampRange();
+            timestampRange.setStartTimestamp(canaryStartTime);
+            timestampRange.setEndTimestamp(new Date());
+
+            // Configures listFragments request
+            FragmentSelector fragmentSelector = new FragmentSelector();
+            fragmentSelector.setFragmentSelectorType("SERVER_TIMESTAMP");
+            fragmentSelector.setTimestampRange(timestampRange);
+
+            long currentTime = new Date().getTime();
+
+            final FutureTask<List<CanaryFragment>> futureTask = new FutureTask<>(
+                new CanaryListFragmentWorker(streamName, credentialsProvider, dataEndpoint, Regions.fromName(region), fragmentSelector)
+            );
+            Thread thread = new Thread(futureTask);
+            thread.start();
+            List<CanaryFragment> fragmentList = futureTask.get();
+
+            if (fragmentList.size() > 0) {
+                timeToFirstFragment = fragmentList[0].getFragment.getServerTimestamp() - canaryStartTime.getTime();
+                publishMetricToCW("TimeToFirstFragment", timeToFirstFragment, StandardUnit.Milliseconds, streamName, canaryLabel, credentialsProvider, region);
+                intervalMetricsTimer.cancel();
+            }
+
+        } catch (Exception e) {
+            log.error(e);
+        }
+                
+    }
+    
+    
     protected static void publishMetricToCW(String metricName, double value, StandardUnit cwUnit) {
         try {
             System.out.println(MessageFormat.format("Emitting the following metric: {0} - {1}", metricName, value));
@@ -286,9 +326,11 @@ public class WebrtcStorageCanaryConsumer {
                 intervalMetricsTask = new TimerTask() {
                     @Override
                     public void run() {
-                        getMediaTimeToFirstFragment(intervalMetricsTimer);
+                        //getMediaTimeToFirstFragment(intervalMetricsTimer);
+                        calculateTimeToFirstFragment(intervalMetricsTimer);
                     }
                 };
+                // final long intervalDelay = 250;
                 final long intervalDelay = 250;
                 intervalMetricsTimer.scheduleAtFixedRate(intervalMetricsTask, 0, intervalDelay); // initial delay of 0 ms at an interval of 'intervalDelay' ms
                 break;
