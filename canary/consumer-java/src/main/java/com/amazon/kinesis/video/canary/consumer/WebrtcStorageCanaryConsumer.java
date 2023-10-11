@@ -57,7 +57,7 @@ import lombok.extern.log4j.Log4j2;
 
 @Log4j2
 public class WebrtcStorageCanaryConsumer {
-    private static Date canaryStartTime;
+    protected static Date canaryStartTime;
     private static String streamName;
     private static String canaryLabel;
     private static String region;
@@ -192,7 +192,7 @@ public class WebrtcStorageCanaryConsumer {
         }
     }
 
-    private static void publishMetricToCW(String metricName, double value, StandardUnit cwUnit) {
+    protected static void publishMetricToCW(String metricName, double value, StandardUnit cwUnit) {
         try {
             System.out.println(MessageFormat.format("Emitting the following metric: {0} - {1}", metricName, value));
             final Dimension dimensionPerStream = new Dimension()

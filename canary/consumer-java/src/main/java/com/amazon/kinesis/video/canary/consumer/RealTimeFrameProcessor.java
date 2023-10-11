@@ -19,6 +19,8 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 import java.util.zip.CRC32;
+import java.util.Date;
+
 
 public class RealTimeFrameProcessor extends WebrtcStorageCanaryConsumer implements FrameVisitor.FrameProcessor {
     private Boolean isFirstFrameReceived;
@@ -31,8 +33,8 @@ public class RealTimeFrameProcessor extends WebrtcStorageCanaryConsumer implemen
         return this.isFirstFrameReceived;
     }
 
-    private RealTimeFrameProcessor(AmazonCloudWatchAsync cwClient, String streamName, String canaryLabel) {
-        this.firstFrameReceived = false;
+    private RealTimeFrameProcessor() {
+        this.isFirstFrameReceived = false;
     }
 
     @Override
@@ -41,9 +43,9 @@ public class RealTimeFrameProcessor extends WebrtcStorageCanaryConsumer implemen
             this.isFirstFrameReceived = true;
 
             final long currentTime = new Date().getTime();
-            double timeToFirstFragment = currentTime - canaryStartTime.getTime();
+            double timeToFirstFragment = currentTime - super.canaryStartTime.getTime();
 
-            super.publishMetricToCW(timeToFirstFragment, timeToFirstFragment, StandardUnit.Milliseconds);
+            super.publishMetricToCW("TimeToFirstFragment", timeToFirstFragment, StandardUnit.Milliseconds);
             super.keepProcessing = false;
         }
 
