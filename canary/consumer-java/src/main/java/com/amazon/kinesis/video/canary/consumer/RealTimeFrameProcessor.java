@@ -39,6 +39,7 @@ public class RealTimeFrameProcessor extends WebrtcStorageCanaryConsumer implemen
 
     @Override
     public void process(Frame frame, MkvTrackMetadata trackMetadata, Optional<FragmentMetadata> fragmentMetadata, Optional<FragmentMetadataVisitor.MkvTagProcessor> tagProcessor) throws FrameProcessException {
+        System.out.println("TESTING PROCESSOR");
         if (!this.isFirstFrameReceived) {
             this.isFirstFrameReceived = true;
 

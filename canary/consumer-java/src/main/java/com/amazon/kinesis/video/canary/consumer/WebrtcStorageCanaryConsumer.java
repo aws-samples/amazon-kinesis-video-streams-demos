@@ -108,13 +108,13 @@ public class WebrtcStorageCanaryConsumer {
     private static void getMediaTimeToFirstFragment(Timer intervalMetricsTimer) {
         try {
 
-            final GetDataEndpointRequest dataEndpointRequestGetMedia = new GetDataEndpointRequest()
-                .withAPIName(APIName.GET_MEDIA).withStreamName(streamName);
-            final String getMediaEndpoint = amazonKinesisVideo.getDataEndpoint(dataEndpointRequestGetMedia).getDataEndpoint();
+            // final GetDataEndpointRequest dataEndpointRequestGetMedia = new GetDataEndpointRequest()
+            //     .withAPIName(APIName.GET_MEDIA).withStreamName(streamName);
+            // final String getMediaEndpoint = amazonKinesisVideo.getDataEndpoint(dataEndpointRequestGetMedia).getDataEndpoint();
 
-            final AmazonKinesisVideoMedia videoMedia;
-            final AmazonKinesisVideoMediaClientBuilder builder = AmazonKinesisVideoMediaClientBuilder.standard().withEndpointConfiguration(new AwsClientBuilder.EndpointConfiguration(getMediaEndpoint, region)).withCredentials(credentialsProvider);
-            videoMedia = builder.build();
+            // final AmazonKinesisVideoMedia videoMedia;
+            // final AmazonKinesisVideoMediaClientBuilder builder = AmazonKinesisVideoMediaClientBuilder.standard().withEndpointConfiguration(new AwsClientBuilder.EndpointConfiguration(getMediaEndpoint, region)).withCredentials(credentialsProvider);
+            // videoMedia = builder.build();
             
             //final StartSelector startSelector = new StartSelector().withStartSelectorType(StartSelectorType.NOW);
             final StartSelector startSelector = new StartSelector().withStartSelectorType(StartSelectorType.PRODUCER_TIMESTAMP).withStartTimestamp(canaryStartTime);
@@ -147,12 +147,15 @@ public class WebrtcStorageCanaryConsumer {
                     amazonKinesisVideo,
                     frameVisitor);
 
-            getMediaWorker.run();
+            Thread thread1 = new Thread(getMediaWorker);
+            thread1.start();
 
-            while(keepProcessing)
-            {
+            //getMediaWorker.run();
 
-            }
+            // while(keepProcessing)
+            // {
+
+            // }
 
             /*
 
@@ -269,15 +272,15 @@ public class WebrtcStorageCanaryConsumer {
             }
             case "WebrtcPeriodic": {
                 keepProcessing = true;
-                getMediaTimeToFirstFragment(intervalMetricsTimer);
-                // intervalMetricsTask = new TimerTask() {
-                //     @Override
-                //     public void run() {
-                //         getMediaTimeToFirstFragment(intervalMetricsTimer);
-                //     }
-                // };
-                // final long intervalDelay = 250;
-                // intervalMetricsTimer.scheduleAtFixedRate(intervalMetricsTask, 0, intervalDelay); // initial delay of 0 ms at an interval of 'intervalDelay' ms
+                //getMediaTimeToFirstFragment(intervalMetricsTimer);
+                intervalMetricsTask = new TimerTask() {
+                    @Override
+                    public void run() {
+                        getMediaTimeToFirstFragment(intervalMetricsTimer);
+                    }
+                };
+                final long intervalDelay = 20;
+                intervalMetricsTimer.scheduleAtFixedRate(intervalMetricsTask, 0, intervalDelay); // initial delay of 0 ms at an interval of 'intervalDelay' ms
                 break;
             }
             default: {
