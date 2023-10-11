@@ -36,6 +36,7 @@ public class RealTimeFrameProcessor extends WebrtcStorageCanaryConsumer implemen
 
     @Override
     public void process(Frame frame, MkvTrackMetadata trackMetadata, Optional<FragmentMetadata> fragmentMetadata, Optional<FragmentMetadataVisitor.MkvTagProcessor> tagProcessor) throws FrameProcessException {
+        System.out.println("Here 2");
         if (super.keepProcessing.compareAndSet(true, false)) {
 
             final long currentTime = new Date().getTime();
@@ -68,5 +69,6 @@ public class RealTimeFrameProcessor extends WebrtcStorageCanaryConsumer implemen
     @Override
     public void close() {
         // How can I close??
+        System.exit(0);
     }
 }

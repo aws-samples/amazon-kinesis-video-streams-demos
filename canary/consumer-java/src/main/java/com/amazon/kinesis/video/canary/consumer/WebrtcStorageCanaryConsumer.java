@@ -150,6 +150,9 @@ public class WebrtcStorageCanaryConsumer {
                     amazonKinesisVideo,
                     frameVisitor);
 
+            System.out.println("Here 1");
+
+
             Thread thread1 = new Thread(getMediaWorker);
             thread1.start();
 
