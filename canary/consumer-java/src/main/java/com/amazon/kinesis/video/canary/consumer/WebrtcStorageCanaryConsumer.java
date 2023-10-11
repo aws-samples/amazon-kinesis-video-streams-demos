@@ -224,7 +224,7 @@ public class WebrtcStorageCanaryConsumer {
 
             // Configures listFragments request
             FragmentSelector fragmentSelector = new FragmentSelector();
-            fragmentSelector.setFragmentSelectorType("SERVER_TIMESTAMP");
+            fragmentSelector.setFragmentSelectorType("PRODUCER_TIMESTAMP");
             fragmentSelector.setTimestampRange(timestampRange);
 
             long currentTime = new Date().getTime();
