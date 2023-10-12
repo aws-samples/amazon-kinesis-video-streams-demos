@@ -113,6 +113,11 @@ STATUS Peer::initSignaling(const Canary::PConfig pConfig)
     channelInfo.pCertPath = (PCHAR) DEFAULT_KVS_CACERT_PATH;
     channelInfo.messageTtl = 0; // Default is 60 seconds
 
+    if (pConfig->isStorage)
+    {
+        channelInfo.useMediaStorage = TRUE;
+    }
+
     this->clientInfo.signalingClientCreationMaxRetryAttempts = MAX_CALL_RETRY_COUNT;
 
     clientCallbacks.customData = (UINT64) this;
@@ -325,6 +330,10 @@ STATUS Peer::initPeerConnection()
                 // TODO: Replace this with a proper error code. Since there's no way to get the actual error code
                 // at this moment, STATUS_PEERCONNECTION_BASE seems to be the best error code.
                 pPeer->status = STATUS_PEERCONNECTION_BASE;
+                if (pPeer->isStorage) {
+                    DLOGI("PeerConnection Failed for Media Storage Session, reconnecting...");
+                    signalingClientConnectSync(pPeer->signalingClientHandle);
+                }
                 // explicit fallthrough
             case RTC_PEER_CONNECTION_STATE_CLOSED:
                 // explicit fallthrough

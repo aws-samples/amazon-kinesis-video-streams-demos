@@ -1,6 +1,9 @@
 package com.amazon.kinesis.video.canary.consumer;
 
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.FutureTask;
+import java.util.concurrent.TimeUnit;
 import java.lang.Exception;
 import java.util.Date;
 import java.text.MessageFormat;
@@ -24,6 +27,9 @@ import com.amazonaws.services.kinesisvideo.AmazonKinesisVideoClientBuilder;
 import com.amazonaws.services.kinesisvideo.model.APIName;
 import com.amazonaws.services.kinesisvideo.model.GetDataEndpointRequest;
 import com.amazonaws.services.kinesisvideo.model.TimestampRange;
+
+import java.util.concurrent.Future;
+
 import com.amazonaws.services.kinesisvideo.model.FragmentSelector;
 import com.amazonaws.services.cloudwatch.model.Dimension;
 import com.amazonaws.services.cloudwatch.model.MetricDatum;
@@ -81,6 +87,7 @@ public class WebrtcStorageCanaryConsumer {
             timestampRange.setStartTimestamp(canaryStartTime);
             timestampRange.setEndTimestamp(new Date());
 
+            // TODO: change this to be PRODUCER_TS instead...
             FragmentSelector fragmentSelector = new FragmentSelector();
             fragmentSelector.setFragmentSelectorType("SERVER_TIMESTAMP");
             fragmentSelector.setTimestampRange(timestampRange);
@@ -107,7 +114,7 @@ public class WebrtcStorageCanaryConsumer {
     }
 
     // TODO: shorten name as there is only a getMedia version now anyway, so remove "getMedia" from name
-    private static void getMediaTimeToFirstFragment(Timer intervalMetricsTimer) {
+private static void getMediaTimeToFirstFragment() {
         try {
 
             // final GetDataEndpointRequest dataEndpointRequestGetMedia = new GetDataEndpointRequest()
@@ -142,6 +149,7 @@ public class WebrtcStorageCanaryConsumer {
             RealTimeFrameProcessor realTimeFrameProcessor = RealTimeFrameProcessor.create();
             final FrameVisitor frameVisitor = FrameVisitor.create(realTimeFrameProcessor);
 
+            final ExecutorService executorService = Executors.newSingleThreadExecutor();
             final GetMediaWorker getMediaWorker = GetMediaWorker.create(
                     Regions.fromName(region),
                     credentialsProvider,
@@ -149,12 +157,13 @@ public class WebrtcStorageCanaryConsumer {
                     startSelector,
                     amazonKinesisVideo,
                     frameVisitor);
+            final long starTime = System.currentTimeMillis();
+            System.out.println("Before GetMediaWorker submit " + starTime);
+            final Future<?> task = executorService.submit(getMediaWorker);
+            System.out.println("After GetMediaWorker submit " + (System.currentTimeMillis() - starTime));
+            task.get(60, TimeUnit.SECONDS);
+            System.out.println("Wait after GetMedia " + (System.currentTimeMillis() - starTime));
 
-            System.out.println("Here 1");
-
-
-            Thread thread1 = new Thread(getMediaWorker);
-            thread1.start();
 
             //getMediaWorker.run();
 
@@ -193,12 +202,12 @@ public class WebrtcStorageCanaryConsumer {
 
             */
 
-            long t3 = new Date().getTime();
-            //System.out.println("t3 - t2 = " + (t3-t2));
+            // long t3 = new Date().getTime();
+            // //System.out.println("t3 - t2 = " + (t3-t2));
 
-            if (!keepProcessing.get()) {
-                intervalMetricsTimer.cancel();
-            }
+            // if (!keepProcessing.get()) {
+            //     intervalMetricsTimer.cancel();
+            // }
     
         } catch (Exception e) {
             log.error(e);
@@ -247,7 +256,7 @@ public class WebrtcStorageCanaryConsumer {
                 timeToFirstFragment = fragmentList.get(0).getFragment().getServerTimestamp().getTime() - rtpSendTime;
                 publishMetricToCW("TimeToFirstFragment1", timeToFirstFragment, StandardUnit.Milliseconds);
                 timeToFirstFragment = fragmentList.get(0).getFragment().getServerTimestamp().getTime() - fragmentList.get(0).getFragment().getProducerTimestamp().getTime();
-                publishMetricToCW("TimeToFirstFragment2", timeToFirstFragment, StandardUnit.Milliseconds);
+                publishMetricToCW("KVSSinkToInletLatency", timeToFirstFragment, StandardUnit.Milliseconds);
                 intervalMetricsTimer.cancel();
             }
 
@@ -315,47 +324,59 @@ public class WebrtcStorageCanaryConsumer {
                     .withCredentials(credentialsProvider)
                     .build();
 
-        Timer intervalMetricsTimer = new Timer("IntervalMetricsTimer");
-        TimerTask intervalMetricsTask;
-        // TODO: consider changing these labels to be "StorageWebrtc...", but might be not worth it if they are tied to dashboard terminology
-        switch (canaryLabel){
-            case "WebrtcLongRunning": {
-                final CanaryFragmentList fragmentList = new CanaryFragmentList();
-                intervalMetricsTask = new TimerTask() {
-                    @Override
-                    public void run() {
-                        calculateFragmentContinuityMetric(fragmentList);
-                    }
-                };
-                final long intervalInitialDelay = 60000;
-                final long intervalDelay = 16000;
-                // NOTE: Metric publishing will NOT begin if canaryRunTime is < intervalInitialDelay
-                intervalMetricsTimer.scheduleAtFixedRate(intervalMetricsTask, intervalInitialDelay, intervalDelay); // initial delay of 'intervalInitialDelay' ms at an interval of 'intervalDelay' ms
-                break;
-            }
-            case "WebrtcPeriodic": {
-                //keepProcessing = true;
-                //getMediaTimeToFirstFragment(intervalMetricsTimer);
-                intervalMetricsTask = new TimerTask() {
-                    @Override
-                    public void run() {
-                        //getMediaTimeToFirstFragment(intervalMetricsTimer);
-                        calculateTimeToFirstFragment(intervalMetricsTimer);
-                    }
-                };
-                // final long intervalDelay = 250;
-                final long intervalDelay = 250;
-                intervalMetricsTimer.scheduleAtFixedRate(intervalMetricsTask, 0, intervalDelay); // initial delay of 0 ms at an interval of 'intervalDelay' ms
-                break;
-            }
-            default: {
-                log.error("Env var CANARY_LABEL: {} must be set to either WebrtcLongRunning or WebrtcPeriodic", canaryLabel);
-                throw new Exception("CANARY_LABEL must be set to either WebrtcLongRunning or WebrtcPeriodic");
-            }
-        }
+        int pollNo = 0;
+        long startTime = System.currentTimeMillis();
+        System.out.println("Starting GetMedia poll...." + startTime);
+
         
-        // TODO: consider not running this sleep for the periodic case if it only is measuring startup/timetofirst metrics (can do this now that the 5min cooldown is fixed)
-        Thread.sleep(canaryRunTime * 1000);
-        intervalMetricsTimer.cancel();
+        while(((new Date()).getTime() - canaryStartTime.getTime()) < canaryRunTime*1000) {
+
+            final long currentTime = System.currentTimeMillis();
+            System.out.println("Poll " + ++pollNo + " at time : " + (currentTime - startTime));
+            startTime = currentTime;
+            getMediaTimeToFirstFragment();
+        }
+
+        System.exit(0);
+        // Timer intervalMetricsTimer = new Timer("IntervalMetricsTimer");
+        // TimerTask intervalMetricsTask;
+        // // TODO: consider changing these labels to be "StorageWebrtc...", but might be not worth it if they are tied to dashboard terminology
+        // switch (canaryLabel){
+        //     case "WebrtcLongRunning": {
+        //         final CanaryFragmentList fragmentList = new CanaryFragmentList();
+        //         intervalMetricsTask = new TimerTask() {
+        //             @Override
+        //             public void run() {
+        //                 calculateFragmentContinuityMetric(fragmentList);
+        //             }
+        //         };
+        //         final long intervalInitialDelay = 60000;
+        //         final long intervalDelay = 16000;
+        //         // NOTE: Metric publishing will NOT begin if canaryRunTime is < intervalInitialDelay
+        //         intervalMetricsTimer.scheduleAtFixedRate(intervalMetricsTask, intervalInitialDelay, intervalDelay); // initial delay of 'intervalInitialDelay' ms at an interval of 'intervalDelay' ms
+        //         break;
+        //     }
+        //     case "WebrtcPeriodic": {
+        //         intervalMetricsTask = new TimerTask() {
+        //             @Override
+        //             public void run() {
+        //                 getMediaTimeToFirstFragment(intervalMetricsTimer);
+        //                 //calculateTimeToFirstFragment(intervalMetricsTimer);
+        //             }
+        //         };
+        //         // final long intervalDelay = 250;
+        //         final long intervalDelay = 250;
+        //         intervalMetricsTimer.scheduleAtFixedRate(intervalMetricsTask, 0, intervalDelay); // initial delay of 0 ms at an interval of 'intervalDelay' ms
+        //         break;
+        //     }
+        //     default: {
+        //         log.error("Env var CANARY_LABEL: {} must be set to either WebrtcLongRunning or WebrtcPeriodic", canaryLabel);
+        //         throw new Exception("CANARY_LABEL must be set to either WebrtcLongRunning or WebrtcPeriodic");
+        //     }
+        // }
+        
+        // // TODO: consider not running this sleep for the periodic case if it only is measuring startup/timetofirst metrics (can do this now that the 5min cooldown is fixed)
+        // Thread.sleep(canaryRunTime * 1000);
+        // intervalMetricsTimer.cancel();
     }
 }

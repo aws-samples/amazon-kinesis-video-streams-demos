@@ -19,14 +19,22 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 import java.util.zip.CRC32;
+
+import org.apache.commons.io.FileUtils;
+
 import java.util.Date;
 
 import java.util.Scanner;
 import java.io.FileReader;
+import java.io.File;
 import java.io.FileNotFoundException;
+import java.io.IOException;
 
 
 public class RealTimeFrameProcessor extends WebrtcStorageCanaryConsumer implements FrameVisitor.FrameProcessor {
+
+    boolean isFirstFrame = false;
+
     public static RealTimeFrameProcessor create() {
         return new RealTimeFrameProcessor();
     }
@@ -36,39 +44,42 @@ public class RealTimeFrameProcessor extends WebrtcStorageCanaryConsumer implemen
 
     @Override
     public void process(Frame frame, MkvTrackMetadata trackMetadata, Optional<FragmentMetadata> fragmentMetadata, Optional<FragmentMetadataVisitor.MkvTagProcessor> tagProcessor) throws FrameProcessException {
-        System.out.println("Here 2");
-        if (super.keepProcessing.compareAndSet(true, false)) {
+        System.out.println("RealTimeFrameProcessor invoked for frame" + frame);
+        if (!isFirstFrame) {
 
-            final long currentTime = new Date().getTime();
-            double timeToFirstFragment = currentTime - super.canaryStartTime.getTime();
+            System.out.println("First Frame invoked for frame" + frame);
 
-            super.publishMetricToCW("TimeToFirstFragment", timeToFirstFragment, StandardUnit.Milliseconds);
+            //double timeToFirstFragment = currentTime - super.canaryStartTime.getTime();
+
+            //super.publishMetricToCW("TimeToFirstFragment", timeToFirstFragment, StandardUnit.Milliseconds);
             //super.keepProcessing = false;
 
             try
             {
+                long currentTime = System.currentTimeMillis();
                 String filePath = "../webrtc-c/" + super.streamName + ".txt";
-                Scanner scanner = new Scanner(new FileReader(filePath));
-                long rtpToFirstFragment = currentTime - Long.parseLong(scanner.next());
-                System.out.println("rtpToFirstFragment: ");
-                System.out.println(rtpToFirstFragment);
-                scanner.close();
+                final String startTimeStr = FileUtils.readFileToString(new File(filePath)).trim();
+                System.out.println("Start Time String :" + startTimeStr);
+                long startTime = Long.parseLong(startTimeStr);
+                System.out.println("RTP startTime : " + startTime);
+                System.out.println("RTP currentTime : " + currentTime);
+                long rtpToFirstFragment = currentTime - startTime;
+                System.out.println("rtpToFirstFragment: " + rtpToFirstFragment);
                 super.publishMetricToCW("RtpToFirstFragment", rtpToFirstFragment, StandardUnit.Milliseconds);       
             }
-            catch (FileNotFoundException ex)  
+            catch (FileNotFoundException ex)
             {
-                // handle
+                System.out.println("File not found!");
+            }
+            catch(IOException ioEx)
+            {
+                System.out.println("IO Exception!");
             }
 
-            
-            this.close();
+            isFirstFrame = true;
+        } else {
+            System.out.println("Non first frame. Skipping...");
         }
 
-    }
-
-    @Override
-    public void close() {
-        // How can I close??
-        System.exit(0);
     }
 }
