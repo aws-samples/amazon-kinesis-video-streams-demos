@@ -331,16 +331,15 @@ private static void getMediaTimeToFirstFragment() {
                     .withCredentials(credentialsProvider)
                     .build();
 
-        int pollNo = 0;
-        long startTime = System.currentTimeMillis();
-        System.out.println("Starting GetMedia poll...." + startTime);
+        //int pollNo = 0;
+        //long startTime = System.currentTimeMillis();
+        //System.out.println("Starting GetMedia poll...." + startTime);
 
         
-        while(((new Date()).getTime() - canaryStartTime.getTime()) < canaryRunTime*1000) {
-
-            final long currentTime = System.currentTimeMillis();
-            System.out.println("Poll " + ++pollNo + " at time : " + (currentTime - startTime));
-            startTime = currentTime;
+        while((System.currentTimeMillis() - canaryStartTime.getTime()) < canaryRunTime*1000) {
+            // final long currentTime = System.currentTimeMillis();
+            // System.out.println("Poll " + ++pollNo + " at time : " + (currentTime - startTime));
+            // startTime = currentTime;
             getMediaTimeToFirstFragment();
         }
 
