@@ -119,36 +119,11 @@ public class WebrtcStorageCanaryConsumer {
     // TODO: shorten name as there is only a getMedia version now anyway, so remove "getMedia" from name
 private static void getMediaTimeToFirstFragment() {
         try {
-
-            // final GetDataEndpointRequest dataEndpointRequestGetMedia = new GetDataEndpointRequest()
-            //     .withAPIName(APIName.GET_MEDIA).withStreamName(streamName);
-            // final String getMediaEndpoint = amazonKinesisVideo.getDataEndpoint(dataEndpointRequestGetMedia).getDataEndpoint();
-
-            // final AmazonKinesisVideoMedia videoMedia;
-            // final AmazonKinesisVideoMediaClientBuilder builder = AmazonKinesisVideoMediaClientBuilder.standard().withEndpointConfiguration(new AwsClientBuilder.EndpointConfiguration(getMediaEndpoint, region)).withCredentials(credentialsProvider);
-            // videoMedia = builder.build();
-            
-            //final StartSelector startSelector = new StartSelector().withStartSelectorType(StartSelectorType.NOW);
             final StartSelector startSelector = new StartSelector().withStartSelectorType(StartSelectorType.PRODUCER_TIMESTAMP).withStartTimestamp(canaryStartTime);
-            
-            //long t1 = new Date().getTime();
-
-            // final GetMediaResult result = videoMedia.getMedia(new GetMediaRequest().withStreamName(streamName).withStartSelector(startSelector));
-            // final InputStream payload = result.getPayload();
-
-            long t2 = new Date().getTime();
-            //System.out.println("t2 - t1 = " + (t2-t1));
-
-            
+        
             final long currentTime = new Date().getTime();
             double timeToFirstFragment = Double.MAX_VALUE;
 
-            // Note: this will create file in /consumer-java folder
-            // File myObj = new File("filename.txt");
-            // myObj.createNewFile();
-
-            
-            // TODO: pass this stuff into the function, then just start on new threads every time called
             RealTimeFrameProcessor realTimeFrameProcessor = RealTimeFrameProcessor.create();
             final FrameVisitor frameVisitor = FrameVisitor.create(realTimeFrameProcessor);
 
@@ -161,12 +136,8 @@ private static void getMediaTimeToFirstFragment() {
                     amazonKinesisVideo,
                     frameVisitor);
                     
-            final long starTime = System.currentTimeMillis();
-            System.out.println("Before GetMediaWorker submit " + starTime);
             final Future<?> task = executorService.submit(getMediaWorker);
-            System.out.println("After GetMediaWorker submit " + (System.currentTimeMillis() - starTime));
-            task.get(60, TimeUnit.SECONDS);
-            System.out.println("Wait after GetMedia " + (System.currentTimeMillis() - starTime));
+            task.get();
 
 
             //getMediaWorker.run();
@@ -323,66 +294,47 @@ private static void getMediaTimeToFirstFragment() {
         credentialsProvider = new EnvironmentVariableCredentialsProvider();
         amazonKinesisVideo = AmazonKinesisVideoClientBuilder.standard()
                 .withRegion(region)
-                // .withEndpointConfiguration(new AwsClientBuilder.EndpointConfiguration("https://us-east-2.acuity.amazonaws.com/", region))
                 .withCredentials(credentialsProvider)
                 .build();
         cwClient = AmazonCloudWatchClientBuilder.standard()
                     .withRegion(region)
                     .withCredentials(credentialsProvider)
                     .build();
-
-        //int pollNo = 0;
-        //long startTime = System.currentTimeMillis();
-        //System.out.println("Starting GetMedia poll...." + startTime);
-
         
-        while((System.currentTimeMillis() - canaryStartTime.getTime()) < canaryRunTime*1000) {
-            // final long currentTime = System.currentTimeMillis();
-            // System.out.println("Poll " + ++pollNo + " at time : " + (currentTime - startTime));
-            // startTime = currentTime;
-            getMediaTimeToFirstFragment();
-        }
 
-        System.exit(0);
-        // Timer intervalMetricsTimer = new Timer("IntervalMetricsTimer");
-        // TimerTask intervalMetricsTask;
-        // // TODO: consider changing these labels to be "StorageWebrtc...", but might be not worth it if they are tied to dashboard terminology
-        // switch (canaryLabel){
-        //     case "WebrtcLongRunning": {
-        //         final CanaryFragmentList fragmentList = new CanaryFragmentList();
-        //         intervalMetricsTask = new TimerTask() {
-        //             @Override
-        //             public void run() {
-        //                 calculateFragmentContinuityMetric(fragmentList);
-        //             }
-        //         };
-        //         final long intervalInitialDelay = 60000;
-        //         final long intervalDelay = 16000;
-        //         // NOTE: Metric publishing will NOT begin if canaryRunTime is < intervalInitialDelay
-        //         intervalMetricsTimer.scheduleAtFixedRate(intervalMetricsTask, intervalInitialDelay, intervalDelay); // initial delay of 'intervalInitialDelay' ms at an interval of 'intervalDelay' ms
-        //         break;
-        //     }
-        //     case "WebrtcPeriodic": {
-        //         intervalMetricsTask = new TimerTask() {
-        //             @Override
-        //             public void run() {
-        //                 getMediaTimeToFirstFragment(intervalMetricsTimer);
-        //                 //calculateTimeToFirstFragment(intervalMetricsTimer);
-        //             }
-        //         };
-        //         // final long intervalDelay = 250;
-        //         final long intervalDelay = 250;
-        //         intervalMetricsTimer.scheduleAtFixedRate(intervalMetricsTask, 0, intervalDelay); // initial delay of 0 ms at an interval of 'intervalDelay' ms
-        //         break;
-        //     }
-        //     default: {
-        //         log.error("Env var CANARY_LABEL: {} must be set to either WebrtcLongRunning or WebrtcPeriodic", canaryLabel);
-        //         throw new Exception("CANARY_LABEL must be set to either WebrtcLongRunning or WebrtcPeriodic");
-        //     }
-        // }
+        Timer intervalMetricsTimer = new Timer("IntervalMetricsTimer");
+        TimerTask intervalMetricsTask;
+        // TODO: consider changing these labels to be "StorageWebrtc...", but might be not worth it if they are tied to dashboard terminology
+        switch (canaryLabel){
+            case "WebrtcLongRunning": {
+                final CanaryFragmentList fragmentList = new CanaryFragmentList();
+                intervalMetricsTask = new TimerTask() {
+                    @Override
+                    public void run() {
+                        calculateFragmentContinuityMetric(fragmentList);
+                    }
+                };
+                final long intervalInitialDelay = 60000;
+                final long intervalDelay = 16000;
+                // NOTE: Metric publishing will NOT begin if canaryRunTime is < intervalInitialDelay
+                intervalMetricsTimer.scheduleAtFixedRate(intervalMetricsTask, intervalInitialDelay, intervalDelay); // initial delay of 'intervalInitialDelay' ms at an interval of 'intervalDelay' ms
+                break;
+            }
+            case "WebrtcPeriodic": {
+                while((System.currentTimeMillis() - canaryStartTime.getTime()) < canaryRunTime*1000) {
+                    getMediaTimeToFirstFragment();
+                }
+                break;
+            }
+            default: {
+                log.error("Env var CANARY_LABEL: {} must be set to either WebrtcLongRunning or WebrtcPeriodic", canaryLabel);
+                throw new Exception("CANARY_LABEL must be set to either WebrtcLongRunning or WebrtcPeriodic");
+            }
+        }
         
         // // TODO: consider not running this sleep for the periodic case if it only is measuring startup/timetofirst metrics (can do this now that the 5min cooldown is fixed)
         // Thread.sleep(canaryRunTime * 1000);
-        // intervalMetricsTimer.cancel();
+        //intervalMetricsTimer.cancel();
+        System.exit(0);
     }
 }
