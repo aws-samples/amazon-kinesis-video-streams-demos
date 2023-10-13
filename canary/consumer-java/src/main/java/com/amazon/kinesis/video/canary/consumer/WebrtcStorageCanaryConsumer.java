@@ -18,6 +18,7 @@ import java.io.FileReader;
 import java.io.File; // TODO: remove, just for testing
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import com.amazonaws.auth.EnvironmentVariableCredentialsProvider;
 import com.amazonaws.auth.SystemPropertiesCredentialsProvider;
 import com.amazonaws.regions.Regions;
 import com.amazonaws.services.cloudwatch.AmazonCloudWatch;
@@ -45,6 +46,8 @@ import com.amazonaws.services.kinesisvideo.model.GetMediaRequest;
 import com.amazonaws.kinesisvideo.parser.utilities.FrameVisitor;
 import com.amazonaws.kinesisvideo.parser.examples.GetMediaWorker;
 
+import com.amazonaws.SDKGlobalConfiguration;
+
 
 import lombok.extern.log4j.Log4j2;
 
@@ -68,7 +71,7 @@ public class WebrtcStorageCanaryConsumer {
     protected static String streamName;
     private static String canaryLabel;
     private static String region;
-    private static SystemPropertiesCredentialsProvider credentialsProvider;
+    private static EnvironmentVariableCredentialsProvider credentialsProvider;
     private static AmazonKinesisVideo amazonKinesisVideo;
     private static AmazonCloudWatch cwClient;
 
@@ -157,6 +160,7 @@ private static void getMediaTimeToFirstFragment() {
                     startSelector,
                     amazonKinesisVideo,
                     frameVisitor);
+                    
             final long starTime = System.currentTimeMillis();
             System.out.println("Before GetMediaWorker submit " + starTime);
             final Future<?> task = executorService.submit(getMediaWorker);
@@ -302,21 +306,24 @@ private static void getMediaTimeToFirstFragment() {
     }
 
     public static void main(final String[] args) throws Exception {
+        System.setProperty(SDKGlobalConfiguration.DISABLE_CERT_CHECKING_SYSTEM_PROPERTY, "true");
+
         System.out.println("CONSUMER CANARY START TIME: " + new Date().getTime());
 
         // Import configurable parameters.
         final Integer canaryRunTime = Integer.parseInt(System.getenv("CANARY_DURATION_IN_SECONDS"));
         streamName = System.getenv("CANARY_STREAM_NAME");
         canaryLabel = System.getenv("CANARY_LABEL");
-        region = System.getenv("AWS_DEFAULT_REGION");
-
+        region = "us-west-2";
+        
         log.info("Stream name: {}", streamName);
 
         canaryStartTime = new Date();
 
-        credentialsProvider = new SystemPropertiesCredentialsProvider();
+        credentialsProvider = new EnvironmentVariableCredentialsProvider();
         amazonKinesisVideo = AmazonKinesisVideoClientBuilder.standard()
                 .withRegion(region)
+                // .withEndpointConfiguration(new AwsClientBuilder.EndpointConfiguration("https://us-east-2.acuity.amazonaws.com/", region))
                 .withCredentials(credentialsProvider)
                 .build();
         cwClient = AmazonCloudWatchClientBuilder.standard()

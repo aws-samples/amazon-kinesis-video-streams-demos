@@ -256,8 +256,15 @@ VOID sendLocalFrames(Canary::PPeer pPeer, MEDIA_STREAM_TRACK_KIND kind, const st
         CHK_STATUS(readFile(filePath, TRUE, frame.frameData, &frameSize));
 
         frame.presentationTs += frameDuration;
-
-        pPeer->writeFrame(&frame, kind);
+        
+        DLOGD("Attempting to write frame number: %d", fileIndex);
+        STATUS writeFrameStatus = pPeer->writeFrame(&frame, kind);
+        // Stay on first frame if SRTP not ready
+        if(writeFrameStatus == STATUS_SRTP_NOT_READY_YET)
+        {
+            DLOGD("Setting fileIndex from %d to 0", fileIndex);
+            fileIndex = 0;
+        }
 
         // Adjust sleep in the case the sleep itself and writeFrame take longer than expected. Since sleep makes sure that the thread
         // will be paused at least until the given amount, we can assume that there's no too early frame scenario.

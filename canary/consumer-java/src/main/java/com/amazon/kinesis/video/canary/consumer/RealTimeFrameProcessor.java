@@ -65,7 +65,8 @@ public class RealTimeFrameProcessor extends WebrtcStorageCanaryConsumer implemen
                 System.out.println("RTP currentTime : " + currentTime);
                 long rtpToFirstFragment = currentTime - startTime;
                 System.out.println("rtpToFirstFragment: " + rtpToFirstFragment);
-                super.publishMetricToCW("RtpToFirstFragment", rtpToFirstFragment, StandardUnit.Milliseconds);       
+                super.publishMetricToCW("RtpToFirstFragment", rtpToFirstFragment, StandardUnit.Milliseconds);
+                //System.out.println("Would emit: " + rtpToFirstFragment);   
             }
             catch (FileNotFoundException ex)
             {

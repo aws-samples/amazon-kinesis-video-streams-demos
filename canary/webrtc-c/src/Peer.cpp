@@ -709,8 +709,14 @@ STATUS Peer::writeFrame(PFrame pFrame, MEDIA_STREAM_TRACK_KIND kind)
         retStatus = ::writeFrame(transceiver, pFrame);
         CHK (retStatus == STATUS_SRTP_NOT_READY_YET || retStatus == STATUS_SUCCESS, retStatus);
 
+        if (STATUS_SUCCEEDED(retStatus))
+        {
+            DLOGD("Write Frame Succeeded");
+        }
+
         if (STATUS_SUCCEEDED(retStatus) && this->firstFrame && this->isMaster) {
             if (this->isStorage) {
+                DLOGD("First Frame");
                 std::string filePath = "../" + this->channelName + ".txt";
                 std::cout << "PRINTING TO FILE" << std::endl;
                 std::ofstream toConsumer(filePath);
@@ -724,9 +730,9 @@ STATUS Peer::writeFrame(PFrame pFrame, MEDIA_STREAM_TRACK_KIND kind)
             Canary::Cloudwatch::getInstance().monitoring.pushTimeToFirstFrame(timeToFirstFrame,
                                                                               Aws::CloudWatch::Model::StandardUnit::Milliseconds);
         }
-        else {
-            retStatus = STATUS_SUCCESS;
-        }
+        // else {
+        //     retStatus = STATUS_SUCCESS;
+        // }
     }
 CleanUp:
     return retStatus;
