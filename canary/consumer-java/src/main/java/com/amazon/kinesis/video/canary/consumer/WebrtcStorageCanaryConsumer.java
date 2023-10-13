@@ -116,7 +116,7 @@ public class WebrtcStorageCanaryConsumer {
         }
     }
 
-    // TODO: shorten name as there is only a getMedia version now anyway, so remove "getMedia" from name
+    // TODO: eventually shorten name as there will only be a getMedia version anyway, so remove "getMedia" from name
 private static void getMediaTimeToFirstFragment() {
         try {
             final StartSelector startSelector = new StartSelector().withStartSelectorType(StartSelectorType.PRODUCER_TIMESTAMP).withStartTimestamp(canaryStartTime);
@@ -138,58 +138,13 @@ private static void getMediaTimeToFirstFragment() {
                     
             final Future<?> task = executorService.submit(getMediaWorker);
             task.get();
-
-
-            //getMediaWorker.run();
-
-            // while(keepProcessing)
-            // {
-
-            // }
-
-            /*
-
-            // If getMedia result payload is not empty, calculate TimeToFirstFragment
-            if (payload.read() != -1) {
-                long ta = new Date().getTime();
-                System.out.println("ta - t2 = " + (ta-t2));
-
-                timeToFirstFragment = currentTime - canaryStartTime.getTime();
-
-                String filePath = "../webrtc-c/" + streamName + ".txt";
-                Scanner scanner = new Scanner(new FileReader(filePath));
-                long rtpToFirstFragment = currentTime - Long.parseLong(scanner.next());
-                System.out.println(rtpToFirstFragment);
-                // while(scanner.hasNext()) {
-                //     System.out.println(scanner.next());
-                // }
-                scanner.close();
-
-                publishMetricToCW("RtpToFirstFragment", rtpToFirstFragment, StandardUnit.Milliseconds);
-
-                publishMetricToCW("TimeToFirstFragment", timeToFirstFragment, StandardUnit.Milliseconds);
-
-                // Cancel any further occurrences of timer task, as this is a startup metric.
-                // TODO: the below comment is not longer true, fix
-                // The Canary will continue running for the specified period to allow for cool-down of Media-Server reconnection.
-                intervalMetricsTimer.cancel();
-            }
-
-            */
-
-            // long t3 = new Date().getTime();
-            // //System.out.println("t3 - t2 = " + (t3-t2));
-
-            // if (!keepProcessing.get()) {
-            //     intervalMetricsTimer.cancel();
-            // }
     
         } catch (Exception e) {
             log.error(e);
         }
     }
 
-    
+    // NOTE: unused
     private static void calculateTimeToFirstFragment(Timer intervalMetricsTimer) {
         try {
             double timeToFirstFragment = Double.MAX_VALUE;
@@ -221,7 +176,7 @@ private static void getMediaTimeToFirstFragment() {
             List<CanaryFragment> fragmentList = futureTask.get();
 
             if (fragmentList.size() > 0) {
-                System.out.println(fragmentList.size());
+                //System.out.println(fragmentList.size());
 
                 String filePath = "../webrtc-c/" + streamName + ".txt";
                 Scanner scanner = new Scanner(new FileReader(filePath));
@@ -285,7 +240,7 @@ private static void getMediaTimeToFirstFragment() {
         final Integer canaryRunTime = Integer.parseInt(System.getenv("CANARY_DURATION_IN_SECONDS"));
         streamName = System.getenv("CANARY_STREAM_NAME");
         canaryLabel = System.getenv("CANARY_LABEL");
-        region = "us-west-2";
+        region = "us-west-2"; // TODO: remove this hardcode
         
         log.info("Stream name: {}", streamName);
 
