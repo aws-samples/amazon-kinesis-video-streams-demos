@@ -235,41 +235,43 @@ pipeline {
                         //     wait: false
                         // )
 
-                        // build(
-                        //     job: NEXT_AVAILABLE_RUNNER,
-                        //     parameters: COMMON_PARAMS + [
-                        //         booleanParam(name: 'IS_SIGNALING', value: false),
-                        //         booleanParam(name: 'IS_STORAGE', value: true),
-                        //         booleanParam(name: 'USE_TURN', value: true),
-                        //         booleanParam(name: 'TRICKLE_ICE', value: true),
-                        //         booleanParam(name: 'USE_IOT', value: false),
-                        //         string(name: 'DURATION_IN_SECONDS', value: DURATION_IN_SECONDS_65_MIN.toString()),
-                        //         string(name: 'MASTER_NODE_LABEL', value: "ec2-us-west-2"),
-                        //         string(name: 'CONSUMER_NODE_LABEL', value: "ec2-us-west-2-consumer"),
-                        //         string(name: 'RUNNER_LABEL', value: "Webrtc65min"),
-                        //         string(name: 'SCENARIO_LABEL', value: "WebrtcLongRunning"),
-                        //         string(name: 'AWS_DEFAULT_REGION', value: "us-west-2"),
-                        //     ],
-                        //     wait: false
-                        // )
+                        build(
+                            job: NEXT_AVAILABLE_RUNNER,
+                            parameters: COMMON_PARAMS + [
+                                booleanParam(name: 'IS_SIGNALING', value: false),
+                                booleanParam(name: 'IS_STORAGE', value: true),
+                                booleanParam(name: 'USE_TURN', value: true),
+                                booleanParam(name: 'TRICKLE_ICE', value: true),
+                                booleanParam(name: 'USE_IOT', value: false),
+                                string(name: 'DURATION_IN_SECONDS', value: DURATION_IN_SECONDS_65_MIN.toString()),
+                                string(name: 'MASTER_NODE_LABEL', value: "ec2-us-west-2"),
+                                string(name: 'CONSUMER_NODE_LABEL', value: "ec2-us-west-2-consumer"),
+                                string(name: 'RUNNER_LABEL', value: "Webrtc65min"),
+                                string(name: 'SCENARIO_LABEL', value: "WebrtcLongRunning"),
+                                string(name: 'AWS_DEFAULT_REGION', value: "us-west-2"),
+                            ],
+                            wait: false
+                        )
 
-                        // build(
-                        //     job: NEXT_AVAILABLE_RUNNER,
-                        //     parameters: COMMON_PARAMS + [
-                        //         booleanParam(name: 'IS_SIGNALING', value: false),
-                        //         booleanParam(name: 'IS_STORAGE', value: true),
-                        //         booleanParam(name: 'USE_TURN', value: true),
-                        //         booleanParam(name: 'TRICKLE_ICE', value: true),
-                        //         booleanParam(name: 'USE_IOT', value: false),
-                        //         string(name: 'DURATION_IN_SECONDS', value: DURATION_IN_SECONDS_45_MIN.toString()),
-                        //         string(name: 'MASTER_NODE_LABEL', value: "ec2-us-west-2"),
-                        //         string(name: 'CONSUMER_NODE_LABEL', value: "ec2-us-west-2-consumer"),
-                        //         string(name: 'RUNNER_LABEL', value: "Webrtc45min"),
-                        //         string(name: 'SCENARIO_LABEL', value: "WebrtcLongRunning"),
-                        //         string(name: 'AWS_DEFAULT_REGION', value: "us-west-2"),
-                        //     ],
-                        //     wait: false
-                        // )
+                        build(
+                            job: NEXT_AVAILABLE_RUNNER,
+                            parameters: COMMON_PARAMS + [
+                                booleanParam(name: 'IS_SIGNALING', value: false),
+                                booleanParam(name: 'IS_STORAGE', value: true),
+                                booleanParam(name: 'USE_TURN', value: true),
+                                booleanParam(name: 'TRICKLE_ICE', value: true),
+                                booleanParam(name: 'USE_IOT', value: false),
+                                string(name: 'DURATION_IN_SECONDS', value: DURATION_IN_SECONDS_45_MIN.toString()),
+                                string(name: 'MASTER_NODE_LABEL', value: "ec2-us-west-2"),
+                                string(name: 'CONSUMER_NODE_LABEL', value: "ec2-us-west-2-consumer"),
+                                string(name: 'RUNNER_LABEL', value: "Webrtc45min"),
+                                string(name: 'SCENARIO_LABEL', value: "WebrtcLongRunning"),
+                                string(name: 'AWS_DEFAULT_REGION', value: "us-west-2"),
+                            ],
+                            wait: false
+                        )
+
+                        // NOTE: For now, will run all periodic jobs on same node as consumer, in future can have TimeToFirstFragment case be on seperate nodes
 
                         // build(
                         //     job: NEXT_AVAILABLE_RUNNER,
