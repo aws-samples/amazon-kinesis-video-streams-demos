@@ -43,7 +43,7 @@ def buildConsumerProject() {
               userRemoteConfigs: [[url: params.GIT_URL]]])
               
     def consumerEnvs = [        
-        'JAVA_HOME': "/opt/jdk-13.0.1",
+        'JAVA_HOME': "/opt/jdk-11.0.20",
         'M2_HOME': "/opt/apache-maven-3.6.3"
     ].collect({k,v -> "${k}=${v}" })
 
