@@ -272,7 +272,7 @@ pipeline {
                             wait: false
                         )
 
-                        NOTE: For now, will run all periodic jobs on same node as consumer, in future can have TimeToFirstFragment case be on seperate nodes
+                        // NOTE: For now, will run all periodic jobs on same node as consumer, in future can have TimeToFirstFragment case be on seperate nodes
                         build(
                             job: NEXT_AVAILABLE_RUNNER,
                             parameters: COMMON_PARAMS + [
