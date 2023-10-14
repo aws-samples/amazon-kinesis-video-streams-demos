@@ -4,7 +4,7 @@ RUNNER_JOB_NAME_PREFIX = "webrtc-canary-runner"
 PERIODIC_DURATION_IN_SECONDS = 90
 PERIODIC_PROFILING_DURATION_IN_SECONDS = 90
 LONG_RUNNING_DURATION_IN_SECONDS = 0
-DURATION_IN_SECONDS_5_MIN = 120 // NOTE: changed it to 60 s, kept var name to make it easier for now... (the label is associated with 5min Stream name)
+DURATION_IN_SECONDS_5_MIN = 300 // NOTE: changed it to 60 s, kept var name to make it easier for now... (the label is associated with 5min Stream name)
 DURATION_IN_SECONDS_45_MIN = 2700
 DURATION_IN_SECONDS_65_MIN = 3900
 MIN_RETRY_DELAY_IN_SECONDS = 60
@@ -54,7 +54,7 @@ ACTIVE_RUNNERS = []
 
 pipeline {
     agent {
-        label 'ec2-us-west-2'
+        label 'profiling'
     }
 
     options {
@@ -120,120 +120,121 @@ pipeline {
 
                         // TODO: Use matrix to spawn runners
 
-                        // build(
-                        //     job: NEXT_AVAILABLE_RUNNER,
-                        //     parameters: COMMON_PARAMS + [
-                        //         booleanParam(name: 'USE_TURN', value: true),
-                        //         booleanParam(name: 'TRICKLE_ICE', value: true),
-                        //         booleanParam(name: 'USE_IOT', value: true),
-                        //         booleanParam(name: 'USE_MBEDTLS', value: false),
-                        //         string(name: 'DURATION_IN_SECONDS', value: PERIODIC_DURATION_IN_SECONDS.toString()),
-                        //         string(name: 'MASTER_NODE_LABEL', value: "ec2-us-west-2"),
-                        //         string(name: 'VIEWER_NODE_LABEL', value: "ec2-us-west-2"),
-                        //         string(name: 'RUNNER_LABEL', value: "WebrtcPeriodicOpenSSL"),
-                        //         string(name: 'SCENARIO_LABEL', value: "WebrtcPeriodic"),
-                        //     ],
-                        //     wait: false
-                        // )
+                        build(
+                            job: NEXT_AVAILABLE_RUNNER,
+                            parameters: COMMON_PARAMS + [
+                                booleanParam(name: 'USE_TURN', value: true),
+                                booleanParam(name: 'FORCE_TURN', value: true),
+                                booleanParam(name: 'TRICKLE_ICE', value: true),
+                                booleanParam(name: 'USE_IOT', value: true),
+                                booleanParam(name: 'USE_MBEDTLS', value: false),
+                                string(name: 'DURATION_IN_SECONDS', value: PERIODIC_DURATION_IN_SECONDS.toString()),
+                                string(name: 'MASTER_NODE_LABEL', value: "openssl-master"),
+                                string(name: 'VIEWER_NODE_LABEL', value: "openssl-viewer"),
+                                string(name: 'RUNNER_LABEL', value: "WebrtcPeriodicOpenSSL"),
+                                string(name: 'SCENARIO_LABEL', value: "WebrtcPeriodic"),
+                            ],
+                            wait: false
+                        )
 
-                        // build(
-                        //     job: NEXT_AVAILABLE_RUNNER,
-                        //     parameters: COMMON_PARAMS + [
-                        //         booleanParam(name: 'USE_TURN', value: true),
-                        //         booleanParam(name: 'TRICKLE_ICE', value: true),
-                        //         booleanParam(name: 'USE_IOT', value: true),
-                        //         booleanParam(name: 'USE_MBEDTLS', value: false),
-                        //         string(name: 'DURATION_IN_SECONDS', value: LONG_RUNNING_DURATION_IN_SECONDS.toString()),
-                        //         string(name: 'MASTER_NODE_LABEL', value: "ec2-us-west-2"),
-                        //         string(name: 'VIEWER_NODE_LABEL', value: "ec2-us-west-2"),
-                        //         string(name: 'RUNNER_LABEL', value: "WebrtcLongRunningOpenSSL"),
-                        //         string(name: 'SCENARIO_LABEL', value: "WebrtcLongRunning"),
-                        //     ],
-                        //     wait: false
-                        // )
+                        build(
+                            job: NEXT_AVAILABLE_RUNNER,
+                            parameters: COMMON_PARAMS + [
+                                booleanParam(name: 'USE_TURN', value: true),
+                                booleanParam(name: 'TRICKLE_ICE', value: true),
+                                booleanParam(name: 'USE_IOT', value: true),
+                                booleanParam(name: 'USE_MBEDTLS', value: false),
+                                string(name: 'DURATION_IN_SECONDS', value: LONG_RUNNING_DURATION_IN_SECONDS.toString()),
+                                string(name: 'MASTER_NODE_LABEL', value: "openssl-master"),
+                                string(name: 'VIEWER_NODE_LABEL', value: "openssl-viewer"),
+                                string(name: 'RUNNER_LABEL', value: "WebrtcLongRunningOpenSSL"),
+                                string(name: 'SCENARIO_LABEL', value: "WebrtcLongRunning"),
+                            ],
+                            wait: false
+                        )
 
-                        // build(
-                        //     job: NEXT_AVAILABLE_RUNNER,
-                        //     parameters: COMMON_PARAMS + [
-                        //         booleanParam(name: 'USE_TURN', value: true),
-                        //         booleanParam(name: 'TRICKLE_ICE', value: true),
-                        //         booleanParam(name: 'USE_IOT', value: false),
-                        //         booleanParam(name: 'USE_MBEDTLS', value: true),
-                        //         string(name: 'DURATION_IN_SECONDS', value: PERIODIC_DURATION_IN_SECONDS.toString()),
-                        //         string(name: 'MASTER_NODE_LABEL', value: "ec2-us-west-2"),
-                        //         string(name: 'VIEWER_NODE_LABEL', value: "ec2-us-west-2"),
-                        //         string(name: 'RUNNER_LABEL', value: "WebrtcPeriodicStaticMbedTLS"),
-                        //         string(name: 'SCENARIO_LABEL', value: "WebrtcPeriodic"),
-                        //     ],
-                        //     wait: false
-                        // )
+                        build(
+                            job: NEXT_AVAILABLE_RUNNER,
+                            parameters: COMMON_PARAMS + [
+                                booleanParam(name: 'USE_TURN', value: true),
+                                booleanParam(name: 'TRICKLE_ICE', value: true),
+                                booleanParam(name: 'USE_IOT', value: false),
+                                booleanParam(name: 'USE_MBEDTLS', value: true),
+                                string(name: 'DURATION_IN_SECONDS', value: PERIODIC_DURATION_IN_SECONDS.toString()),
+                                string(name: 'MASTER_NODE_LABEL', value: "mbedtls-master"),
+                                string(name: 'VIEWER_NODE_LABEL', value: "mbedtls-viewer"),
+                                string(name: 'RUNNER_LABEL', value: "WebrtcPeriodicStaticMbedTLS"),
+                                string(name: 'SCENARIO_LABEL', value: "WebrtcPeriodic"),
+                            ],
+                            wait: false
+                        )
 
-                        // build(
-                        //     job: NEXT_AVAILABLE_RUNNER,
-                        //     parameters: COMMON_PARAMS + [
-                        //         booleanParam(name: 'USE_TURN', value: true),
-                        //         booleanParam(name: 'TRICKLE_ICE', value: true),
-                        //         booleanParam(name: 'USE_IOT', value: false),
-                        //         booleanParam(name: 'USE_MBEDTLS', value: true),
-                        //         string(name: 'DURATION_IN_SECONDS', value: LONG_RUNNING_DURATION_IN_SECONDS.toString()),
-                        //         string(name: 'MASTER_NODE_LABEL', value: "ec2-us-west-2"),
-                        //         string(name: 'VIEWER_NODE_LABEL', value: "ec2-us-west-2"),
-                        //         string(name: 'RUNNER_LABEL', value: "WebrtcLongRunningStaticMbedTLS"),
-                        //         string(name: 'SCENARIO_LABEL', value: "WebrtcLongRunning"),
-                        //     ],
-                        //     wait: false
-                        // )
+                        build(
+                            job: NEXT_AVAILABLE_RUNNER,
+                            parameters: COMMON_PARAMS + [
+                                booleanParam(name: 'USE_TURN', value: true),
+                                booleanParam(name: 'TRICKLE_ICE', value: true),
+                                booleanParam(name: 'USE_IOT', value: false),
+                                booleanParam(name: 'USE_MBEDTLS', value: true),
+                                string(name: 'DURATION_IN_SECONDS', value: LONG_RUNNING_DURATION_IN_SECONDS.toString()),
+                                string(name: 'MASTER_NODE_LABEL', value: "mbedtls-master"),
+                                string(name: 'VIEWER_NODE_LABEL', value: "mbedtls-viewer"),
+                                string(name: 'RUNNER_LABEL', value: "WebrtcLongRunningStaticMbedTLS"),
+                                string(name: 'SCENARIO_LABEL', value: "WebrtcLongRunning"),
+                            ],
+                            wait: false
+                        )
 
-                        // build(
-                        //     job: NEXT_AVAILABLE_RUNNER,
-                        //     parameters: COMMON_PARAMS + [
-                        //         booleanParam(name: 'IS_SIGNALING', value: true),
-                        //         booleanParam(name: 'USE_IOT', value: false),
-                        //         booleanParam(name: 'USE_MBEDTLS', value: false),
-                        //         string(name: 'DURATION_IN_SECONDS', value: PERIODIC_DURATION_IN_SECONDS.toString()),
-                        //         string(name: 'MASTER_NODE_LABEL', value: "ec2-us-west-2"),
-                        //         // TODO: should not need viewer node label for signaling. If not set, Jenkins pipeline will crash
-                        //         //       because it's used to defined an agent
-                        //         string(name: 'VIEWER_NODE_LABEL', value: "ec2-us-west-2"),
-                        //         string(name: 'RUNNER_LABEL', value: "SignalingStaticPeriodic"),
-                        //         string(name: 'SCENARIO_LABEL', value: "SignalingPeriodic"),
-                        //     ],
-                        //     wait: false
-                        // )
+                        build(
+                            job: NEXT_AVAILABLE_RUNNER,
+                            parameters: COMMON_PARAMS + [
+                                booleanParam(name: 'IS_SIGNALING', value: true),
+                                booleanParam(name: 'USE_IOT', value: false),
+                                booleanParam(name: 'USE_MBEDTLS', value: false),
+                                string(name: 'DURATION_IN_SECONDS', value: PERIODIC_DURATION_IN_SECONDS.toString()),
+                                string(name: 'MASTER_NODE_LABEL', value: "signaling"),
+                                // TODO: should not need viewer node label for signaling. If not set, Jenkins pipeline will crash
+                                //       because it's used to defined an agent
+                                string(name: 'VIEWER_NODE_LABEL', value: "signaling"),
+                                string(name: 'RUNNER_LABEL', value: "SignalingStaticPeriodic"),
+                                string(name: 'SCENARIO_LABEL', value: "SignalingPeriodic"),
+                            ],
+                            wait: false
+                        )
 
-                        // build(
-                        //     job: NEXT_AVAILABLE_RUNNER,
-                        //     parameters: COMMON_PARAMS + [
-                        //         booleanParam(name: 'IS_SIGNALING', value: true),
-                        //         booleanParam(name: 'USE_IOT', value: true),
-                        //         booleanParam(name: 'USE_MBEDTLS', value: false),
-                        //         string(name: 'DURATION_IN_SECONDS', value: LONG_RUNNING_DURATION_IN_SECONDS.toString()),
-                        //         string(name: 'MASTER_NODE_LABEL', value: "ec2-us-west-2"),
-                        //         // TODO: should not need viewer node label for signaling. If not set, Jenkins pipeline will crash
-                        //         //       because it's used to defined an agent
-                        //         string(name: 'VIEWER_NODE_LABEL', value: "ec2-us-west-2"),
-                        //         string(name: 'RUNNER_LABEL', value: "SignalingLongRunning"),
-                        //         string(name: 'SCENARIO_LABEL', value: "SignalingLongRunning"),
-                        //     ],
-                        //     wait: false
-                        // )
+                        build(
+                            job: NEXT_AVAILABLE_RUNNER,
+                            parameters: COMMON_PARAMS + [
+                                booleanParam(name: 'IS_SIGNALING', value: true),
+                                booleanParam(name: 'USE_IOT', value: true),
+                                booleanParam(name: 'USE_MBEDTLS', value: false),
+                                string(name: 'DURATION_IN_SECONDS', value: LONG_RUNNING_DURATION_IN_SECONDS.toString()),
+                                string(name: 'MASTER_NODE_LABEL', value: "signaling"),
+                                // TODO: should not need viewer node label for signaling. If not set, Jenkins pipeline will crash
+                                //       because it's used to defined an agent
+                                string(name: 'VIEWER_NODE_LABEL', value: "signaling"),
+                                string(name: 'RUNNER_LABEL', value: "SignalingLongRunning"),
+                                string(name: 'SCENARIO_LABEL', value: "SignalingLongRunning"),
+                            ],
+                            wait: false
+                        )
 
-                        // build(
-                        //     job: NEXT_AVAILABLE_RUNNER,
-                        //     parameters: COMMON_PARAMS + [
-                        //         booleanParam(name: 'USE_TURN', value: true),
-                        //         booleanParam(name: 'TRICKLE_ICE', value: true),
-                        //         booleanParam(name: 'USE_IOT', value: false),
-                        //         booleanParam(name: 'USE_MBEDTLS', value: false),
-                        //         booleanParam(name: 'IS_PROFILING', value: true),
-                        //         string(name: 'DURATION_IN_SECONDS', value: PERIODIC_PROFILING_DURATION_IN_SECONDS.toString()),
-                        //         string(name: 'MASTER_NODE_LABEL', value: "ec2-profiling"),
-                        //         string(name: 'VIEWER_NODE_LABEL', value: "ec2-profiling"),
-                        //         string(name: 'RUNNER_LABEL', value: "WebrtcPeriodicProfiling"),
-                        //         string(name: 'SCENARIO_LABEL', value: "WebrtcProfiling"),
-                        //     ],
-                        //     wait: false
-                        // )
+                        build(
+                            job: NEXT_AVAILABLE_RUNNER,
+                            parameters: COMMON_PARAMS + [
+                                booleanParam(name: 'USE_TURN', value: true),
+                                booleanParam(name: 'TRICKLE_ICE', value: true),
+                                booleanParam(name: 'USE_IOT', value: false),
+                                booleanParam(name: 'USE_MBEDTLS', value: false),
+                                booleanParam(name: 'IS_PROFILING', value: true),
+                                string(name: 'DURATION_IN_SECONDS', value: PERIODIC_PROFILING_DURATION_IN_SECONDS.toString()),
+                                string(name: 'MASTER_NODE_LABEL', value: "profiling"),
+                                string(name: 'VIEWER_NODE_LABEL', value: "profiling"),
+                                string(name: 'RUNNER_LABEL', value: "WebrtcPeriodicProfiling"),
+                                string(name: 'SCENARIO_LABEL', value: "WebrtcProfiling"),
+                            ],
+                            wait: false
+                        )
 
                         build(
                             job: NEXT_AVAILABLE_RUNNER,
@@ -272,7 +273,6 @@ pipeline {
                         )
 
                         // NOTE: For now, will run all periodic jobs on same node as consumer, in future can have TimeToFirstFragment case be on seperate nodes
-
                         // build(
                         //     job: NEXT_AVAILABLE_RUNNER,
                         //     parameters: COMMON_PARAMS + [
@@ -305,7 +305,7 @@ pipeline {
                                 string(name: 'CONSUMER_NODE_LABEL', value: "ec2-us-west-2-consumer"),
                                 string(name: 'RUNNER_LABEL', value: "Webrtc5min"),
                                 string(name: 'SCENARIO_LABEL', value: "WebrtcPeriodic"),
-                                string(name: 'AWS_DEFAULT_REGION', value: "us-west-2"),
+                                string(name: 'AWS_DEFAULT_REGION', value: "unique-us-west-2"),
                             ],
                             wait: false
                         )
