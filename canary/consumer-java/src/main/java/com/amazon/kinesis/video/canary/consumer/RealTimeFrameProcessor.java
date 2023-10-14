@@ -68,8 +68,8 @@ public class RealTimeFrameProcessor extends WebrtcStorageCanaryConsumer implemen
             {
                 System.out.println("IO Exception!");
             }
-
             isFirstFrame = true;
+            System.exit(0);
         } else {
             System.out.println("Non first frame. Skipping...");
         }

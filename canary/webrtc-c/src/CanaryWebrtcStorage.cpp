@@ -147,7 +147,7 @@ CleanUp:
 
 STATUS onNewConnection(Canary::PPeer pPeer)
 {
-    std::cout << "TESTING onNewConnection(): called" << endl;
+    //std::cout << "TESTING onNewConnection(): called" << endl;
     STATUS retStatus = STATUS_SUCCESS;
     RtcMediaStreamTrack videoTrack, audioTrack;
 
@@ -257,12 +257,10 @@ VOID sendLocalFrames(Canary::PPeer pPeer, MEDIA_STREAM_TRACK_KIND kind, const st
 
         frame.presentationTs += frameDuration;
         
-        DLOGD("Attempting to write frame number: %d", fileIndex);
         STATUS writeFrameStatus = pPeer->writeFrame(&frame, kind);
         // Stay on first frame if SRTP not ready
         if(writeFrameStatus == STATUS_SRTP_NOT_READY_YET)
         {
-            DLOGD("Setting fileIndex from %d to 0", fileIndex);
             fileIndex = 0;
         }
 

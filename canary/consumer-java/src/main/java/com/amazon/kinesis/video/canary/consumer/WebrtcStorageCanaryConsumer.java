@@ -269,16 +269,20 @@ private static void getMediaTimeToFirstFragment() {
                         calculateFragmentContinuityMetric(fragmentList);
                     }
                 };
+                // TODO: the initial delay can be tweaked now that master-end latencies have been reduced
                 final long intervalInitialDelay = 60000;
                 final long intervalDelay = 16000;
                 // NOTE: Metric publishing will NOT begin if canaryRunTime is < intervalInitialDelay
                 intervalMetricsTimer.scheduleAtFixedRate(intervalMetricsTask, intervalInitialDelay, intervalDelay); // initial delay of 'intervalInitialDelay' ms at an interval of 'intervalDelay' ms
+                Thread.sleep(canaryRunTime * 1000);
+                intervalMetricsTimer.cancel();
                 break;
             }
             case "WebrtcPeriodic": {
                 while((System.currentTimeMillis() - canaryStartTime.getTime()) < canaryRunTime*1000) {
                     getMediaTimeToFirstFragment();
                 }
+                System.exit(0);
                 break;
             }
             default: {
@@ -288,8 +292,5 @@ private static void getMediaTimeToFirstFragment() {
         }
         
         // // TODO: consider not running this sleep for the periodic case if it only is measuring startup/timetofirst metrics (can do this now that the 5min cooldown is fixed)
-        // Thread.sleep(canaryRunTime * 1000);
-        //intervalMetricsTimer.cancel();
-        System.exit(0);
     }
 }
