@@ -49,8 +49,6 @@ def buildConsumerProject() {
 
     withEnv(consumerEnvs) {
         sh '''
-            PATH="$JAVA_HOME:$PATH"
-            export PATH="$M2_HOME/bin:$PATH"
             cd ./canary/consumer-java
             make -j4'''
     }
