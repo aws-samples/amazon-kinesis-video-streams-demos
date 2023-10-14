@@ -43,12 +43,14 @@ def buildConsumerProject() {
               userRemoteConfigs: [[url: params.GIT_URL]]])
               
     def consumerEnvs = [        
-        'JAVA_HOME': "/opt/jdk-11.0.20",
+        'JAVA_HOME': "/opt/jdk-13.0.1",
         'M2_HOME': "/opt/apache-maven-3.6.3"
     ].collect({k,v -> "${k}=${v}" })
 
     withEnv(consumerEnvs) {
         sh '''
+            PATH="$JAVA_HOME:$PATH"
+            export PATH="$M2_HOME/$PATH"
             cd ./canary/consumer-java
             make -j4'''
     }
