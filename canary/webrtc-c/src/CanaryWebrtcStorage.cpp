@@ -16,7 +16,6 @@ VOID handleSignal(INT32 signal)
 }
 
 
-
 INT32 main(INT32 argc, CHAR* argv[])
 {
 #ifndef _WIN32
@@ -119,26 +118,32 @@ VOID runPeer(Canary::PConfig pConfig, TIMER_QUEUE_HANDLE timerQueueHandle, STATU
 
     CHK(pConfig != NULL, STATUS_NULL_ARG);
     pConfig->print();
+
+    
     CHK_STATUS(timerQueueAddTimer(timerQueueHandle, KVS_METRICS_INVOCATION_PERIOD, KVS_METRICS_INVOCATION_PERIOD,
                                   canaryKvsStats, (UINT64) &peer, &timeoutTimerId));
     CHK_STATUS(peer.init(pConfig, callbacks));
-    CHK_STATUS(peer.connect());
 
+
+    while(!terminated.load())
     {
-        // All metrics tracking will happen on a time queue to simplify handling periodicity
-        CHK_STATUS(timerQueueAddTimer(timerQueueHandle, METRICS_INVOCATION_PERIOD, METRICS_INVOCATION_PERIOD, canaryRtpOutboundStats, (UINT64) &peer,
-                                      &timeoutTimerId));
+        CHK_STATUS(peer.connect());
+        // TODO: ask why does this happen in it's own block?
+        {
+            // All metrics tracking will happen on a time queue to simplify handling periodicity
+            CHK_STATUS(timerQueueAddTimer(timerQueueHandle, METRICS_INVOCATION_PERIOD, METRICS_INVOCATION_PERIOD, canaryRtpOutboundStats, (UINT64) &peer,
+                                        &timeoutTimerId));
 
-        std::thread videoThread(sendLocalFrames, &peer, MEDIA_STREAM_TRACK_KIND_VIDEO, "../assets/h264SampleFrames/frame-%04d.h264", NUMBER_OF_H264_FRAME_FILES, SAMPLE_VIDEO_FRAME_DURATION);
-        std::thread audioThread(sendLocalFrames, &peer, MEDIA_STREAM_TRACK_KIND_AUDIO, "../assets/opusSampleFrames/sample-%03d.opus", NUMBER_OF_OPUS_FRAME_FILES, SAMPLE_AUDIO_FRAME_DURATION);
-        std::thread pushProfilingThread(sendProfilingMetrics, &peer);
+            std::thread videoThread(sendLocalFrames, &peer, MEDIA_STREAM_TRACK_KIND_VIDEO, "../assets/h264SampleFrames/frame-%04d.h264", NUMBER_OF_H264_FRAME_FILES, SAMPLE_VIDEO_FRAME_DURATION);
+            std::thread audioThread(sendLocalFrames, &peer, MEDIA_STREAM_TRACK_KIND_AUDIO, "../assets/opusSampleFrames/sample-%03d.opus", NUMBER_OF_OPUS_FRAME_FILES, SAMPLE_AUDIO_FRAME_DURATION);
+            std::thread pushProfilingThread(sendProfilingMetrics, &peer);
 
-        pushProfilingThread.join();
-        videoThread.join();
-        audioThread.join();
+            pushProfilingThread.join();
+            videoThread.join();
+            audioThread.join();
+        }
+        CHK_STATUS(peer.shutdown());
     }
-
-    CHK_STATUS(peer.shutdown());
 
 CleanUp:
 
@@ -211,7 +216,7 @@ VOID sendProfilingMetrics(Canary::PPeer pPeer)
 {
     STATUS retStatus = STATUS_SUCCESS;
     BOOL done = FALSE;
-    while (!terminated.load()) {
+    while (!(pPeer->needToReconnect.load()) && !terminated.load()) {
         retStatus = pPeer->sendProfilingMetrics();
         if (retStatus == STATUS_WAITING_ON_FIRST_FRAME) {
             THREAD_SLEEP(HUNDREDS_OF_NANOS_IN_A_MILLISECOND * 100); // to prevent busy waiting
@@ -240,7 +245,7 @@ VOID sendLocalFrames(Canary::PPeer pPeer, MEDIA_STREAM_TRACK_KIND kind, const st
     startTime = GETTIME();
     lastFrameTime = startTime;
 
-    while (!terminated.load()) {
+    while (!(pPeer->needToReconnect.load()) && !terminated.load()) {
         fileIndex = fileIndex % frameCount + 1;
         SNPRINTF(filePath, MAX_PATH_LEN, pattern.c_str(), fileIndex);
 

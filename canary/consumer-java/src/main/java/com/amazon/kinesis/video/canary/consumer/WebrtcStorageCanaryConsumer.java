@@ -75,11 +75,6 @@ public class WebrtcStorageCanaryConsumer {
     private static AmazonKinesisVideo amazonKinesisVideo;
     private static AmazonCloudWatch cwClient;
 
-    //protected static Boolean keepProcessing;
-    final protected static AtomicBoolean keepProcessing = new AtomicBoolean(true);
-
-
-
     private static void calculateFragmentContinuityMetric(CanaryFragmentList fragmentList) {
         try {
             final GetDataEndpointRequest dataEndpointRequest = new GetDataEndpointRequest()

@@ -64,6 +64,9 @@ class Peer {
     STATUS publishEndToEndMetrics();
     STATUS publishRetryCount();
 
+    // TODO: make this private and add a getter, no setter needed
+    std::atomic<BOOL> needToReconnect;
+
   private:
     std::string channelName;
     Callbacks callbacks;

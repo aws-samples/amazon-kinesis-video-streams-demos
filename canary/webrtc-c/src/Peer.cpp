@@ -6,7 +6,7 @@ namespace Canary {
 
 Peer::Peer()
     : pAwsCredentialProvider(nullptr), terminated(FALSE), iceGatheringDone(FALSE), receivedOffer(FALSE), receivedAnswer(FALSE), foundPeerId(FALSE),
-      pPeerConnection(nullptr), status(STATUS_SUCCESS)
+      pPeerConnection(nullptr), status(STATUS_SUCCESS), needToReconnect(FALSE)
 {
 }
 
@@ -330,13 +330,10 @@ STATUS Peer::initPeerConnection()
                 // TODO: Replace this with a proper error code. Since there's no way to get the actual error code
                 // at this moment, STATUS_PEERCONNECTION_BASE seems to be the best error code.
                 pPeer->status = STATUS_PEERCONNECTION_BASE;
-                if (pPeer->isStorage) {
-                    DLOGI("PeerConnection Failed for Media Storage Session, reconnecting...");
-                    signalingClientConnectSync(pPeer->signalingClientHandle);
-                }
                 // explicit fallthrough
             case RTC_PEER_CONNECTION_STATE_CLOSED:
                 // explicit fallthrough
+                pPeer->needToReconnect = TRUE;
             case RTC_PEER_CONNECTION_STATE_DISCONNECTED:
                 // Let the higher level to terminate
                 if (pPeer->callbacks.onDisconnected != NULL) {
@@ -415,6 +412,8 @@ STATUS Peer::connect()
 
         return retStatus;
     };
+
+    this->needToReconnect = FALSE;
 
     STATUS retStatus = STATUS_SUCCESS;
     CHK_STATUS(signalingClientConnectSync(signalingClientHandle));
