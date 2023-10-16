@@ -232,7 +232,7 @@ private static void getMediaTimeToFirstFragment() {
     }
 
     public static void main(final String[] args) throws Exception {
-        System.setProperty(SDKGlobalConfiguration.DISABLE_CERT_CHECKING_SYSTEM_PROPERTY, "true");
+        //System.setProperty(SDKGlobalConfiguration.DISABLE_CERT_CHECKING_SYSTEM_PROPERTY, "true");
 
         System.out.println("CONSUMER CANARY START TIME: " + new Date().getTime());
 

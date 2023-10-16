@@ -62,7 +62,7 @@ public class RealTimeFrameProcessor extends WebrtcStorageCanaryConsumer implemen
             }
             catch (FileNotFoundException ex)
             {
-                System.out.println("File not found!");
+                System.out.println("Master-end timestamp file not found, reduce frequency of runs by increasing CANARY_DURATION_IN_SECONDS");
             }
             catch(IOException ioEx)
             {

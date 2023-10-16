@@ -63,8 +63,7 @@ STATUS Peer::init(const Canary::PConfig pConfig, const Callbacks& callbacks)
 
     }
 
-    // TODO: make this safer by also removing at the end of each run to be safe
-    // Remove toConsumer file from any previous run
+    // Remove toConsumer file from any previous run in case it did not get removed
     if(this->isStorage) {
         std::string filePath = "../" + this->channelName + ".txt";
         remove(filePath.c_str());
@@ -380,6 +379,12 @@ STATUS Peer::shutdown()
 
     if (!this->isMaster && IS_VALID_SIGNALING_CLIENT_HANDLE(this->signalingClientHandle)) {
         CHK_LOG_ERR(signalingClientDeleteSync(this->signalingClientHandle));
+    }
+
+    // Remove toConsumer file once finished
+    if(this->isStorage) {
+        std::string filePath = "../" + this->channelName + ".txt";
+        remove(filePath.c_str());
     }
 
     return this->status;
