@@ -227,7 +227,7 @@ pipeline {
                                 string(name: 'DURATION_IN_SECONDS', value: PERIODIC_PROFILING_DURATION_IN_SECONDS.toString()),
                                 string(name: 'MASTER_NODE_LABEL', value: "profiling"),
                                 string(name: 'VIEWER_NODE_LABEL', value: "profiling"),
-                                string(name: 'RUNNER_LABEL', value: "WebrtcLongRunningProfiling"),
+                                string(name: 'RUNNER_LABEL', value: "WebrtcPeriodicProfiling"),
                                 string(name: 'SCENARIO_LABEL', value: "WebrtcProfiling"),
                             ],
                             wait: false
@@ -244,7 +244,7 @@ pipeline {
                                 string(name: 'DURATION_IN_SECONDS', value: LONG_RUNNING_DURATION_IN_SECONDS.toString()),
                                 string(name: 'MASTER_NODE_LABEL', value: "profiling"),
                                 string(name: 'VIEWER_NODE_LABEL', value: "profiling"),
-                                string(name: 'RUNNER_LABEL', value: "WebrtcPeriodicProfiling"),
+                                string(name: 'RUNNER_LABEL', value: "WebrtcLongRunningProfiling"),
                                 string(name: 'SCENARIO_LABEL', value: "WebrtcLongRunning"),
                             ],
                             wait: false

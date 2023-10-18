@@ -236,7 +236,7 @@ VOID CloudwatchMonitoring::pushOutboundRtpStats(Canary::POutgoingRTPMetricsConte
 
 VOID CloudwatchMonitoring::pushPeerConnectionMetrics(PPeerConnectionMetrics pPeerConnectionMetrics)
 {
-    MetricDatum pcCreationDatum, dtlsSetupDatum, iceHolePunchingDatum;
+    MetricDatum pcCreationDatum, dtlsSetupDatum, iceHolePunchingDatum, stunResolveDatum;
 
     pcCreationDatum.SetMetricName("PcCreationTime");
     pcCreationDatum.SetValue(pPeerConnectionMetrics->peerConnectionStats.peerConnectionCreationTime);
@@ -252,6 +252,11 @@ VOID CloudwatchMonitoring::pushPeerConnectionMetrics(PPeerConnectionMetrics pPee
     iceHolePunchingDatum.SetValue(pPeerConnectionMetrics->peerConnectionStats.iceHolePunchingTime);
     iceHolePunchingDatum.SetUnit(Aws::CloudWatch::Model::StandardUnit::Milliseconds);
     this->push(iceHolePunchingDatum);
+
+    stunResolveDatum.SetMetricName("EarlySTUNDnsResolution");
+    stunResolveDatum.SetValue(pPeerConnectionMetrics->peerConnectionStats.stunDnsResolutionTime);
+    stunResolveDatum.SetUnit(Aws::CloudWatch::Model::StandardUnit::Milliseconds);
+    this->push(stunResolveDatum);
 }
 
 VOID CloudwatchMonitoring::pushKvsIceAgentMetrics(PKvsIceAgentMetrics pKvsIceAgentMetrics)
