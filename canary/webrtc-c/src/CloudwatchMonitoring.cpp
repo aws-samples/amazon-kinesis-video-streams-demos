@@ -207,7 +207,7 @@ VOID CloudwatchMonitoring::pushJoinSessionTime(UINT64 joinSessionTime, Aws::Clou
 {
     MetricDatum datum;
 
-    datum.SetMetricName("joinSessionTime");
+    datum.SetMetricName("JoinSessionTime");
     datum.SetValue(joinSessionTime);
     datum.SetUnit(unit);
 
