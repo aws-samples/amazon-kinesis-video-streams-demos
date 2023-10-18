@@ -140,6 +140,7 @@ private static void getMediaTimeToFirstFragment() {
     }
 
     // NOTE: unused
+    // TODO: remove this if not going to use...
     private static void calculateTimeToFirstFragment(Timer intervalMetricsTimer) {
         try {
             double timeToFirstFragment = Double.MAX_VALUE;
