@@ -188,6 +188,35 @@ VOID CloudwatchMonitoring::pushTimeToFirstFrame(UINT64 timeToFirstFrame, Aws::Cl
 
     this->push(datum);
 }
+
+
+
+// TODO: Remove this if never endup using it, or implement it.
+VOID CloudwatchMonitoring::pushAnswerToFirstFrame(UINT64 answerToFirstFrame, Aws::CloudWatch::Model::StandardUnit unit)
+{
+    MetricDatum datum;
+
+    datum.SetMetricName("answerReceivedToFirstFrameSentTime");
+    datum.SetValue(answerToFirstFrame);
+    datum.SetUnit(unit);
+
+    this->push(datum);
+}
+
+VOID CloudwatchMonitoring::pushJoinSessionTime(UINT64 joinSessionTime, Aws::CloudWatch::Model::StandardUnit unit)
+{
+    MetricDatum datum;
+
+    datum.SetMetricName("joinSessionTime");
+    datum.SetValue(joinSessionTime);
+    datum.SetUnit(unit);
+
+    this->push(datum);
+}
+
+
+
+
 VOID CloudwatchMonitoring::pushSignalingInitDelay(UINT64 delay, Aws::CloudWatch::Model::StandardUnit unit)
 {
     MetricDatum datum;
@@ -357,16 +386,20 @@ VOID CloudwatchMonitoring::pushSignalingClientMetrics(PSignalingClientMetrics pS
     connectClientDatum.SetUnit(Aws::CloudWatch::Model::StandardUnit::Milliseconds);
     this->push(connectClientDatum);
 
-    // If join session metric is populated for storage case.
-    UINT64 joinSessionToOffer = pSignalingClientMetrics->signalingClientStats.joinSessionToOfferRecvTime;
-    std::cout << "JoinSessionToOfferReceived: " << joinSessionToOffer << endl;
-    if(joinSessionToOffer != 0) {
+    // TODO: clean the below up.
+    if(this->isStorage) {
+        UINT64 joinSessionToOffer = pSignalingClientMetrics->signalingClientStats.joinSessionToOfferRecvTime;
         MetricDatum joinSessionToOfferDatum;
         joinSessionToOfferDatum.SetMetricName("JoinSessionToOfferReceived");
         joinSessionToOfferDatum.SetValue(joinSessionToOffer / HUNDREDS_OF_NANOS_IN_A_MILLISECOND);
         joinSessionToOfferDatum.SetUnit(Aws::CloudWatch::Model::StandardUnit::Milliseconds);
         this->push(joinSessionToOfferDatum);
-    }
+            
+        UINT64 joinSessionCallTime;
+        joinSessionCallTime = (pSignalingClientMetrics->signalingClientStats.joinSessionCallTime);
+        Canary::Cloudwatch::getInstance().monitoring.pushJoinSessionTime(joinSessionCallTime,
+                                                                    Aws::CloudWatch::Model::StandardUnit::Milliseconds);
+        }
 }
 
 VOID CloudwatchMonitoring::pushInboundRtpStats(Canary::PIncomingRTPMetricsContext pIncomingRtpStats)

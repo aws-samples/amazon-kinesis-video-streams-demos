@@ -115,7 +115,7 @@ VOID runPeer(Canary::PConfig pConfig, TIMER_QUEUE_HANDLE timerQueueHandle, STATU
     callbacks.onNewConnection = onNewConnection;
 
     Canary::Peer peer;
-
+    
     CHK(pConfig != NULL, STATUS_NULL_ARG);
     pConfig->print();
 
@@ -123,7 +123,6 @@ VOID runPeer(Canary::PConfig pConfig, TIMER_QUEUE_HANDLE timerQueueHandle, STATU
     CHK_STATUS(timerQueueAddTimer(timerQueueHandle, KVS_METRICS_INVOCATION_PERIOD, KVS_METRICS_INVOCATION_PERIOD,
                                   canaryKvsStats, (UINT64) &peer, &timeoutTimerId));
     CHK_STATUS(peer.init(pConfig, callbacks));
-
 
     while(!terminated.load())
     {
@@ -142,6 +141,12 @@ VOID runPeer(Canary::PConfig pConfig, TIMER_QUEUE_HANDLE timerQueueHandle, STATU
             videoThread.join();
             audioThread.join();
         }
+
+        // TODO: Is this still necessary?...
+        DLOGD("STORAGE_TESTING: sleeping for 5 min...");
+        sleep(300);
+        DLOGD("STORAGE_TESTING: finished sleeping");
+
         CHK_STATUS(peer.shutdown());
     }
 

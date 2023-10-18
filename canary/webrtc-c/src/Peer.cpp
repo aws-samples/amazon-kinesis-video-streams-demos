@@ -333,7 +333,11 @@ STATUS Peer::initPeerConnection()
                 // explicit fallthrough
             case RTC_PEER_CONNECTION_STATE_CLOSED:
                 // explicit fallthrough
-                pPeer->needToReconnect = TRUE;
+                // TODO: do we still need this functionality?...
+                if(pPeer->isStorage)
+                {
+                    pPeer->needToReconnect = TRUE;
+                }
             case RTC_PEER_CONNECTION_STATE_DISCONNECTED:
                 // Let the higher level to terminate
                 if (pPeer->callbacks.onDisconnected != NULL) {
@@ -660,10 +664,10 @@ STATUS Peer::sendProfilingMetrics()
         DLOGP("[Signaling fetch client] %" PRIu64 " ms", this->signalingClientMetrics.signalingClientStats.fetchClientTime);
         DLOGP("[Signaling connect client] %" PRIu64 " ms", this->signalingClientMetrics.signalingClientStats.connectClientTime);
 
-        // UINT64 joinSessionToOffer = this->signalingClientMetrics.signalingClientStats.joinSessionToOfferRecvTime;
-        // if (joinSessionToOffer != 0) {
-        //     DLOGP("[Signaling Join session to offer received] %" PRIu64 " ms", joinSessionToOffer);
-        // }
+        UINT64 joinSessionToOffer = this->signalingClientMetrics.signalingClientStats.joinSessionToOfferRecvTime;
+        if (joinSessionToOffer != 0) {
+            DLOGP("[Signaling Join session to offer received] %" PRIu64 " ms", joinSessionToOffer);
+        }
         
         Canary::Cloudwatch::getInstance().monitoring.pushSignalingClientMetrics(&this->signalingClientMetrics);
     }
