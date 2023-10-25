@@ -12,6 +12,7 @@ Peer::Peer()
 
 Peer::~Peer()
 {
+    DLOGD("Reached Peer destructor");
     CHK_LOG_ERR(freePeerConnection(&this->pPeerConnection));
     CHK_LOG_ERR(freeSignalingClient(&this->signalingClientHandle));
     if(this->useIotCredentialProvider) {
@@ -62,6 +63,7 @@ STATUS Peer::init(const Canary::PConfig pConfig, const Callbacks& callbacks)
         }
 
     }
+    this->correlationIdPostFix = 0;
 
     // Remove toConsumer file from any previous run in case it did not get removed
     if(this->isStorage) {
@@ -340,6 +342,7 @@ STATUS Peer::initPeerConnection()
                 }
             case RTC_PEER_CONNECTION_STATE_DISCONNECTED:
                 // Let the higher level to terminate
+                DLOGD("RTC_PEER_CONNECTION_STATE_DISCONNECTED");
                 if (pPeer->callbacks.onDisconnected != NULL) {
                     pPeer->callbacks.onDisconnected();
                 }
@@ -363,6 +366,33 @@ CleanUp:
 
     return retStatus;
 }
+
+
+
+STATUS Peer::softShutdown()
+{
+    this->terminated = TRUE;
+
+    this->cvar.notify_all();
+    {
+        // lock to wait until awoken thread finish.
+        std::lock_guard<std::recursive_mutex> lock(this->mutex);
+    }
+
+    if (this->pPeerConnection != NULL) {
+        CHK_LOG_ERR(closePeerConnection(this->pPeerConnection));
+    }
+
+    // Remove toConsumer file once finished
+    if(this->isStorage) {
+        std::string filePath = "../" + this->channelName + ".txt";
+        remove(filePath.c_str());
+    }
+
+    return this->status;
+}
+
+
 
 STATUS Peer::shutdown()
 {
@@ -440,9 +470,31 @@ STATUS Peer::send(PSignalingMessage pMsg)
 
     if (this->foundPeerId.load()) {
         pMsg->version = SIGNALING_MESSAGE_CURRENT_VERSION;
-        pMsg->correlationId[0] = '\0';
+
+        //pMsg->correlationId[0] = '\0';
+
         STRCPY(pMsg->peerClientId, peerId.c_str());
         pMsg->payloadLen = (UINT32) STRLEN(pMsg->payload);
+
+        // comment out for nonStorage
+        pMsg->peerClientId[0] = '\0';
+
+        DLOGD("Message peerClientId: %s", pMsg->peerClientId);
+        DLOGD("Peer:: peerClientId: %s", peerId.c_str());
+
+
+        if (pMsg->messageType == 1)
+        {
+            SNPRINTF(pMsg->correlationId, MAX_CORRELATION_ID_LEN, "%llu_%llu", GETTIME(), ATOMIC_INCREMENT(&this->correlationIdPostFix));
+            DLOGD("Setting correllation ID: %s", pMsg->correlationId);
+        } else
+        {
+            pMsg->correlationId[0] = '\0';
+        }
+    
+        DLOGD("For message: %d", pMsg->messageType);
+        DLOGD("For payload: %s", pMsg->payload);
+
         CHK_STATUS(signalingClientSendMessageSync(this->signalingClientHandle, pMsg));
     } else {
         // TODO: maybe queue messages when there's no peer id
@@ -450,7 +502,12 @@ STATUS Peer::send(PSignalingMessage pMsg)
     }
 
 CleanUp:
-
+    if (retStatus == STATUS_SIGNALING_DUPLICATE_MESSAGE_BEING_SENT)
+    {
+        DLOGE("Duplicate message sent for correllation ID: %s", pMsg->correlationId);
+        DLOGE("For message: %d", pMsg->messageType);
+        DLOGE("For payload: %s", pMsg->payload);
+    }
     return retStatus;
 }
 
@@ -687,7 +744,7 @@ CleanUp:
 
 STATUS Peer::writeFrame(PFrame pFrame, MEDIA_STREAM_TRACK_KIND kind)
 {
-    //std::cout << "TESTING Peer::writeFrame(): called" << endl;
+    //DLOGD("Here 1");
 
     STATUS retStatus = STATUS_SUCCESS;
     DOUBLE timeToFirstFrame;
@@ -702,9 +759,14 @@ STATUS Peer::writeFrame(PFrame pFrame, MEDIA_STREAM_TRACK_KIND kind)
         this->canaryOutgoingRTPMetricsContext.videoFramesGenerated++;
         this->canaryOutgoingRTPMetricsContext.videoBytesGenerated += pFrame->size;
     }
+
+    //DLOGD("Here 2");
+
     for (auto& transceiver : transceivers) {
+        //DLOGD("Here 3");
         retStatus = ::writeFrame(transceiver, pFrame);
         CHK (retStatus == STATUS_SRTP_NOT_READY_YET || retStatus == STATUS_SUCCESS, retStatus);
+        //DLOGD("Here 3.5");
 
         if (STATUS_SUCCEEDED(retStatus))
         {
@@ -713,6 +775,7 @@ STATUS Peer::writeFrame(PFrame pFrame, MEDIA_STREAM_TRACK_KIND kind)
 
         if (STATUS_SUCCEEDED(retStatus) && this->firstFrame && this->isMaster) {
             if (this->isStorage) {
+                //DLOGD("Here 4");
                 //DLOGD("First Frame");
                 std::string filePath = "../" + this->channelName + ".txt";
                 std::cout << "PRINTING TO FILE" << std::endl;
@@ -721,11 +784,14 @@ STATUS Peer::writeFrame(PFrame pFrame, MEDIA_STREAM_TRACK_KIND kind)
                 toConsumer.close();
             }
 
+            //DLOGD("Here 5");
             this->firstFrame = FALSE;
             timeToFirstFrame = (DOUBLE) (GETTIME() - this->offerReceiveTimestamp) / HUNDREDS_OF_NANOS_IN_A_MILLISECOND;
             DLOGD("Start up latency from offer receive to first frame write: %lf ms", timeToFirstFrame);
             Canary::Cloudwatch::getInstance().monitoring.pushTimeToFirstFrame(timeToFirstFrame,
                                                                               Aws::CloudWatch::Model::StandardUnit::Milliseconds);
+            //DLOGD("Here 6");
+
         }
         // else {
         //     retStatus = STATUS_SUCCESS;
@@ -834,6 +900,31 @@ STATUS Peer::publishRetryCount()
 {
     STATUS retStatus = STATUS_SUCCESS;
     Canary::Cloudwatch::getInstance().monitoring.pushRetryCount(this->clientInfo.stateMachineRetryCountReadOnly);
+CleanUp:
+    return retStatus;
+}
+
+
+STATUS Peer::reconnectStorageSession()
+{
+    DLOGD("TESTING : reconnectStorageSession() called");
+
+    STATUS retStatus = STATUS_SUCCESS;
+
+    // this->cvar.notify_all();
+    // {
+    //     // lock to wait until awoken thread finish.
+    //     std::lock_guard<std::recursive_mutex> lock(this->mutex);
+    // }
+
+    if (this->pPeerConnection != NULL) {
+        //CHK_LOG_ERR(closePeerConnection(this->pPeerConnection));
+        //CHK_LOG_ERR(freePeerConnection(&this->pPeerConnection));
+    }
+
+    CHK_STATUS(signalingClientDisconnectSync(signalingClientHandle));
+    CHK_STATUS(signalingClientFetchSync(signalingClientHandle));
+    CHK_STATUS(signalingClientConnectSync(signalingClientHandle));
 CleanUp:
     return retStatus;
 }

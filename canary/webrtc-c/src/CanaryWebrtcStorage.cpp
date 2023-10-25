@@ -8,11 +8,12 @@ STATUS canaryRtpOutboundStats(UINT32, UINT64, UINT64);
 STATUS canaryKvsStats(UINT32, UINT64, UINT64);
 VOID sendProfilingMetrics(Canary::PPeer);
 
-std::atomic<bool> terminated;
+std::atomic<bool> needToReconnect;
+std::atomic<bool> isTerminated;
 VOID handleSignal(INT32 signal)
 {
     UNUSED_PARAM(signal);
-    terminated = TRUE;
+    isTerminated = TRUE;
 }
 
 
@@ -80,7 +81,8 @@ STATUS run(Canary::PConfig pConfig)
             UNUSED_PARAM(timerId);
             UNUSED_PARAM(currentTime);
             UNUSED_PARAM(customData);
-            terminated = TRUE;
+            isTerminated = TRUE;
+            DLOGD("TESTING : Terminated by timer");
             return STATUS_TIMER_QUEUE_STOP_SCHEDULING;
         };
         CHK_STATUS(timerQueueAddTimer(timerQueueHandle, pConfig->duration.value, TIMER_QUEUE_SINGLE_INVOCATION_PERIOD, terminate, (UINT64) NULL,
@@ -113,51 +115,74 @@ VOID runPeer(Canary::PConfig pConfig, TIMER_QUEUE_HANDLE timerQueueHandle, STATU
 
     Canary::Peer::Callbacks callbacks;
     callbacks.onNewConnection = onNewConnection;
+    callbacks.onDisconnected = []() { needToReconnect = TRUE; };
 
-    Canary::Peer peer;
+    
+    BOOL firstIteration = TRUE;
     
     CHK(pConfig != NULL, STATUS_NULL_ARG);
     pConfig->print();
 
     
-    CHK_STATUS(timerQueueAddTimer(timerQueueHandle, KVS_METRICS_INVOCATION_PERIOD, KVS_METRICS_INVOCATION_PERIOD,
-                                  canaryKvsStats, (UINT64) &peer, &timeoutTimerId));
-    CHK_STATUS(peer.init(pConfig, callbacks));
+    //CHK_STATUS(timerQueueAddTimer(timerQueueHandle, KVS_METRICS_INVOCATION_PERIOD, KVS_METRICS_INVOCATION_PERIOD,
+    //                              canaryKvsStats, (UINT64) &peer, &timeoutTimerId));
 
-    while(!terminated.load())
+    while(!isTerminated.load())
     {
+        DLOGD("TESTING : Entering runPeer while loop");
+
+        Canary::Peer peer;
+
+        CHK_STATUS(peer.init(pConfig, callbacks));
         CHK_STATUS(peer.connect());
+
         // TODO: ask why does this happen in it's own block?
         {
+            if(needToReconnect)
+            {
+                DLOGD("TESTING : calling reconnectStorageSession");
+
+                // NOTE: commenting out for now to isolate debugging 0x5d00002b error
+                //CHK_STATUS(peer.reconnectStorageSession());
+
+                needToReconnect = FALSE;
+            }
+
+            DLOGD("TESTING : adding timerQueue");
             // All metrics tracking will happen on a time queue to simplify handling periodicity
             CHK_STATUS(timerQueueAddTimer(timerQueueHandle, METRICS_INVOCATION_PERIOD, METRICS_INVOCATION_PERIOD, canaryRtpOutboundStats, (UINT64) &peer,
                                         &timeoutTimerId));
 
+            DLOGD("TESTING : making audio,video threads");
             std::thread videoThread(sendLocalFrames, &peer, MEDIA_STREAM_TRACK_KIND_VIDEO, "../assets/h264SampleFrames/frame-%04d.h264", NUMBER_OF_H264_FRAME_FILES, SAMPLE_VIDEO_FRAME_DURATION);
             std::thread audioThread(sendLocalFrames, &peer, MEDIA_STREAM_TRACK_KIND_AUDIO, "../assets/opusSampleFrames/sample-%03d.opus", NUMBER_OF_OPUS_FRAME_FILES, SAMPLE_AUDIO_FRAME_DURATION);
-            std::thread pushProfilingThread(sendProfilingMetrics, &peer);
+            
+            if(firstIteration)
+            {
+                firstIteration = FALSE;
+                DLOGD("TESTING : making pushProfilingThread thread");
+                std::thread pushProfilingThread(sendProfilingMetrics, &peer);
+                pushProfilingThread.join();
+            }
 
-            pushProfilingThread.join();
+            DLOGD("TESTING : joining with audio,video threads");
             videoThread.join();
             audioThread.join();
+            DLOGD("TESTING : Audio,video threads stopped");
         }
-
-        // TODO: Is this still necessary?...
-        DLOGD("STORAGE_TESTING: sleeping for 5 min...");
-        sleep(300);
-        DLOGD("STORAGE_TESTING: finished sleeping");
-
-        CHK_STATUS(peer.shutdown());
+        CHK_STATUS(peer.softShutdown());
     }
 
-CleanUp:
+    DLOGD("TESTING : Final shutdown");
+    //CHK_STATUS(peer.shutdown());
 
+CleanUp:
     *pRetStatus = retStatus;
 }
 
 STATUS onNewConnection(Canary::PPeer pPeer)
 {
-    //std::cout << "TESTING onNewConnection(): called" << endl;
+    DLOGD("TESTING : onNewConnection called");
     STATUS retStatus = STATUS_SUCCESS;
     RtcMediaStreamTrack videoTrack, audioTrack;
 
@@ -192,7 +217,7 @@ STATUS canaryRtpOutboundStats(UINT32 timerId, UINT64 currentTime, UINT64 customD
     UNUSED_PARAM(timerId);
     UNUSED_PARAM(currentTime);
     STATUS retStatus = STATUS_SUCCESS;
-    if (!terminated.load()) {
+    if (!isTerminated.load()) {
         Canary::PPeer pPeer = (Canary::PPeer) customData;
         pPeer->publishStatsForCanary(RTC_STATS_TYPE_OUTBOUND_RTP);
     } else {
@@ -207,7 +232,7 @@ STATUS canaryKvsStats(UINT32 timerId, UINT64 currentTime, UINT64 customData)
     UNUSED_PARAM(timerId);
     UNUSED_PARAM(currentTime);
     STATUS retStatus = STATUS_SUCCESS;
-    if (!terminated.load()) {
+    if (!isTerminated.load()) {
         Canary::PPeer pPeer = (Canary::PPeer) customData;
         pPeer->publishRetryCount();
     } else {
@@ -221,7 +246,7 @@ VOID sendProfilingMetrics(Canary::PPeer pPeer)
 {
     STATUS retStatus = STATUS_SUCCESS;
     BOOL done = FALSE;
-    while (!(pPeer->needToReconnect.load()) && !terminated.load()) {
+    while (!needToReconnect.load() && !isTerminated.load()) {
         retStatus = pPeer->sendProfilingMetrics();
         if (retStatus == STATUS_WAITING_ON_FIRST_FRAME) {
             THREAD_SLEEP(HUNDREDS_OF_NANOS_IN_A_MILLISECOND * 100); // to prevent busy waiting
@@ -250,7 +275,8 @@ VOID sendLocalFrames(Canary::PPeer pPeer, MEDIA_STREAM_TRACK_KIND kind, const st
     startTime = GETTIME();
     lastFrameTime = startTime;
 
-    while (!(pPeer->needToReconnect.load()) && !terminated.load()) {
+    DLOGD("TESTING : entering while loop");
+    while (!needToReconnect.load() && !isTerminated.load()) {
         fileIndex = fileIndex % frameCount + 1;
         SNPRINTF(filePath, MAX_PATH_LEN, pattern.c_str(), fileIndex);
 
@@ -267,8 +293,10 @@ VOID sendLocalFrames(Canary::PPeer pPeer, MEDIA_STREAM_TRACK_KIND kind, const st
 
         frame.presentationTs += frameDuration;
         
+        //DLOGD("TESTING : calling writeFrame");
         STATUS writeFrameStatus = pPeer->writeFrame(&frame, kind);
         // Stay on first frame if SRTP not ready
+        //DLOGD("TESTING : finished calling writeFrame");
         if(writeFrameStatus == STATUS_SRTP_NOT_READY_YET)
         {
             fileIndex = 0;

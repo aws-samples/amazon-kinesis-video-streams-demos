@@ -52,6 +52,7 @@ class Peer {
     Peer();
     ~Peer();
     STATUS init(const Canary::PConfig, const Callbacks&);
+    STATUS softShutdown();
     STATUS shutdown();
     STATUS connect();
     STATUS addTransceiver(RtcMediaStreamTrack&);
@@ -66,6 +67,8 @@ class Peer {
 
     // TODO: make this private and add a getter, no setter needed
     std::atomic<BOOL> needToReconnect;
+
+    STATUS reconnectStorageSession();
 
   private:
     std::string channelName;
@@ -97,6 +100,7 @@ class Peer {
     BOOL useIotCredentialProvider;
     STATUS status;
     SignalingClientInfo clientInfo;
+    volatile SIZE_T correlationIdPostFix;
 
     // metrics
     UINT64 signalingStartTime;
