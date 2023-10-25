@@ -123,9 +123,6 @@ VOID runPeer(Canary::PConfig pConfig, TIMER_QUEUE_HANDLE timerQueueHandle, STATU
     CHK(pConfig != NULL, STATUS_NULL_ARG);
     pConfig->print();
 
-    
-    //CHK_STATUS(timerQueueAddTimer(timerQueueHandle, KVS_METRICS_INVOCATION_PERIOD, KVS_METRICS_INVOCATION_PERIOD,
-    //                              canaryKvsStats, (UINT64) &peer, &timeoutTimerId));
 
     while(!isTerminated.load())
     {
@@ -136,15 +133,14 @@ VOID runPeer(Canary::PConfig pConfig, TIMER_QUEUE_HANDLE timerQueueHandle, STATU
         CHK_STATUS(peer.init(pConfig, callbacks));
         CHK_STATUS(peer.connect());
 
+        CHK_STATUS(timerQueueAddTimer(timerQueueHandle, KVS_METRICS_INVOCATION_PERIOD, KVS_METRICS_INVOCATION_PERIOD,
+                                  canaryKvsStats, (UINT64) &peer, &timeoutTimerId));
+
         // TODO: ask why does this happen in it's own block?
         {
             if(needToReconnect)
             {
                 DLOGD("TESTING : calling reconnectStorageSession");
-
-                // NOTE: commenting out for now to isolate debugging 0x5d00002b error
-                //CHK_STATUS(peer.reconnectStorageSession());
-
                 needToReconnect = FALSE;
             }
 
@@ -170,11 +166,9 @@ VOID runPeer(Canary::PConfig pConfig, TIMER_QUEUE_HANDLE timerQueueHandle, STATU
             audioThread.join();
             DLOGD("TESTING : Audio,video threads stopped");
         }
+        DLOGD("TESTING : Calling softShutdown()");
         CHK_STATUS(peer.softShutdown());
     }
-
-    DLOGD("TESTING : Final shutdown");
-    //CHK_STATUS(peer.shutdown());
 
 CleanUp:
     *pRetStatus = retStatus;
@@ -293,10 +287,9 @@ VOID sendLocalFrames(Canary::PPeer pPeer, MEDIA_STREAM_TRACK_KIND kind, const st
 
         frame.presentationTs += frameDuration;
         
-        //DLOGD("TESTING : calling writeFrame");
         STATUS writeFrameStatus = pPeer->writeFrame(&frame, kind);
+
         // Stay on first frame if SRTP not ready
-        //DLOGD("TESTING : finished calling writeFrame");
         if(writeFrameStatus == STATUS_SRTP_NOT_READY_YET)
         {
             fileIndex = 0;
