@@ -44,6 +44,7 @@ STATUS Peer::init(const Canary::PConfig pConfig, const Callbacks& callbacks)
     this->canaryIncomingRTPMetricsContext.prevTs = GETTIME();
     this->firstFrame = TRUE;
     this->useIotCredentialProvider = pConfig->useIotCredentialProvider.value;
+    this->correlationIdPostFix = 0;
     if(this->useIotCredentialProvider) {
         CHK_STATUS(createLwsIotCredentialProvider((PCHAR) pConfig->iotEndpoint,
                                                   (PCHAR) pConfig->iotCoreCert.value.c_str(),
@@ -63,7 +64,6 @@ STATUS Peer::init(const Canary::PConfig pConfig, const Callbacks& callbacks)
         }
 
     }
-    this->correlationIdPostFix = 0;
 
     // Remove toConsumer file from any previous run in case it did not get removed
     if(this->isStorage) {
@@ -471,29 +471,31 @@ STATUS Peer::send(PSignalingMessage pMsg)
     if (this->foundPeerId.load()) {
         pMsg->version = SIGNALING_MESSAGE_CURRENT_VERSION;
 
-        //pMsg->correlationId[0] = '\0';
-
         STRCPY(pMsg->peerClientId, peerId.c_str());
         pMsg->payloadLen = (UINT32) STRLEN(pMsg->payload);
 
-        // comment out for nonStorage
-        pMsg->peerClientId[0] = '\0';
-
-        DLOGD("Message peerClientId: %s", pMsg->peerClientId);
-        DLOGD("Peer:: peerClientId: %s", peerId.c_str());
-
-
-        if (pMsg->messageType == 1)
-        {
-            SNPRINTF(pMsg->correlationId, MAX_CORRELATION_ID_LEN, "%llu_%llu", GETTIME(), ATOMIC_INCREMENT(&this->correlationIdPostFix));
-            DLOGD("Setting correllation ID: %s", pMsg->correlationId);
-        } else
+        if (!this->isStorage)
         {
             pMsg->correlationId[0] = '\0';
+        } else
+        {
+            pMsg->peerClientId[0] = '\0';
+
+            DLOGD("Message peerClientId: %s", pMsg->peerClientId);
+            DLOGD("Peer:: peerClientId: %s", peerId.c_str());
+
+            if (pMsg->messageType == 1)
+            {
+                SNPRINTF(pMsg->correlationId, MAX_CORRELATION_ID_LEN, "%llu_%llu", GETTIME(), ATOMIC_INCREMENT(&this->correlationIdPostFix));
+                DLOGD("Setting correllation ID: %s", pMsg->correlationId);
+            } else
+            {
+                pMsg->correlationId[0] = '\0';
+            }
+        
+            DLOGD("For message: %d", pMsg->messageType);
+            DLOGD("For payload: %s", pMsg->payload);
         }
-    
-        DLOGD("For message: %d", pMsg->messageType);
-        DLOGD("For payload: %s", pMsg->payload);
 
         CHK_STATUS(signalingClientSendMessageSync(this->signalingClientHandle, pMsg));
     } else {
@@ -744,8 +746,6 @@ CleanUp:
 
 STATUS Peer::writeFrame(PFrame pFrame, MEDIA_STREAM_TRACK_KIND kind)
 {
-    //DLOGD("Here 1");
-
     STATUS retStatus = STATUS_SUCCESS;
     DOUBLE timeToFirstFrame;
     auto& transceivers = kind == MEDIA_STREAM_TRACK_KIND_VIDEO ? this->videoTransceivers : this->audioTransceivers;
@@ -760,23 +760,12 @@ STATUS Peer::writeFrame(PFrame pFrame, MEDIA_STREAM_TRACK_KIND kind)
         this->canaryOutgoingRTPMetricsContext.videoBytesGenerated += pFrame->size;
     }
 
-    //DLOGD("Here 2");
-
     for (auto& transceiver : transceivers) {
-        //DLOGD("Here 3");
         retStatus = ::writeFrame(transceiver, pFrame);
         CHK (retStatus == STATUS_SRTP_NOT_READY_YET || retStatus == STATUS_SUCCESS, retStatus);
-        //DLOGD("Here 3.5");
-
-        if (STATUS_SUCCEEDED(retStatus))
-        {
-            //DLOGD("Write Frame Succeeded");
-        }
 
         if (STATUS_SUCCEEDED(retStatus) && this->firstFrame && this->isMaster) {
             if (this->isStorage) {
-                //DLOGD("Here 4");
-                //DLOGD("First Frame");
                 std::string filePath = "../" + this->channelName + ".txt";
                 std::cout << "PRINTING TO FILE" << std::endl;
                 std::ofstream toConsumer(filePath);
@@ -784,18 +773,13 @@ STATUS Peer::writeFrame(PFrame pFrame, MEDIA_STREAM_TRACK_KIND kind)
                 toConsumer.close();
             }
 
-            //DLOGD("Here 5");
             this->firstFrame = FALSE;
             timeToFirstFrame = (DOUBLE) (GETTIME() - this->offerReceiveTimestamp) / HUNDREDS_OF_NANOS_IN_A_MILLISECOND;
             DLOGD("Start up latency from offer receive to first frame write: %lf ms", timeToFirstFrame);
             Canary::Cloudwatch::getInstance().monitoring.pushTimeToFirstFrame(timeToFirstFrame,
                                                                               Aws::CloudWatch::Model::StandardUnit::Milliseconds);
-            //DLOGD("Here 6");
 
         }
-        // else {
-        //     retStatus = STATUS_SUCCESS;
-        // }
     }
 CleanUp:
     return retStatus;
@@ -904,7 +888,7 @@ CleanUp:
     return retStatus;
 }
 
-
+// NOTE: Not using this, working without
 STATUS Peer::reconnectStorageSession()
 {
     DLOGD("TESTING : reconnectStorageSession() called");
