@@ -344,6 +344,7 @@ STATUS Peer::initPeerConnection()
                 DLOGD("RTC_PEER_CONNECTION_STATE_DISCONNECTED");
                 if (pPeer->isStorage) {
                 }
+
                 if (pPeer->callbacks.onDisconnected != NULL) {
                     pPeer->callbacks.onDisconnected();
                 }
@@ -783,6 +784,7 @@ STATUS Peer::writeFrame(PFrame pFrame, MEDIA_STREAM_TRACK_KIND kind)
             DLOGD("Start up latency from offer receive to first frame write: %lf ms", timeToFirstFrame);
             Canary::Cloudwatch::getInstance().monitoring.pushTimeToFirstFrame(timeToFirstFrame,
                                                                               Aws::CloudWatch::Model::StandardUnit::Milliseconds);
+
         }
     }
 CleanUp:
