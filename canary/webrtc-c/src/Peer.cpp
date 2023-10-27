@@ -342,10 +342,8 @@ STATUS Peer::initPeerConnection()
             case RTC_PEER_CONNECTION_STATE_DISCONNECTED:
                 // Let the higher level to terminate
                 DLOGD("RTC_PEER_CONNECTION_STATE_DISCONNECTED");
-                if (pPeer->isStorage) {
-                }
 
-                if (pPeer->callbacks.onDisconnected != NULL) {
+                if (pPeer->isStorage && pPeer->callbacks.onDisconnected != NULL) {
                     pPeer->callbacks.onDisconnected();
                 }
                 break;
