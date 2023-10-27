@@ -45,6 +45,7 @@ STATUS Peer::init(const Canary::PConfig pConfig, const Callbacks& callbacks)
     this->firstFrame = TRUE;
     this->useIotCredentialProvider = pConfig->useIotCredentialProvider.value;
     this->correlationIdPostFix = 0;
+    this->storageDisconnectedTime = 0;
     if(this->useIotCredentialProvider) {
         CHK_STATUS(createLwsIotCredentialProvider((PCHAR) pConfig->iotEndpoint,
                                                   (PCHAR) pConfig->iotCoreCert.value.c_str(),
