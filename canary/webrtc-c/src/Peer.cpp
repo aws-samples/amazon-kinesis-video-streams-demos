@@ -45,7 +45,6 @@ STATUS Peer::init(const Canary::PConfig pConfig, const Callbacks& callbacks)
     this->firstFrame = TRUE;
     this->useIotCredentialProvider = pConfig->useIotCredentialProvider.value;
     this->correlationIdPostFix = 0;
-    this->storageDisconnectedTime = 0;
     if(this->useIotCredentialProvider) {
         CHK_STATUS(createLwsIotCredentialProvider((PCHAR) pConfig->iotEndpoint,
                                                   (PCHAR) pConfig->iotCoreCert.value.c_str(),
@@ -344,7 +343,6 @@ STATUS Peer::initPeerConnection()
                 // Let the higher level to terminate
                 DLOGD("RTC_PEER_CONNECTION_STATE_DISCONNECTED");
                 if (pPeer->isStorage) {
-                    pPeer->storageDisconnectedTime = GETTIME();
                 }
                 if (pPeer->callbacks.onDisconnected != NULL) {
                     pPeer->callbacks.onDisconnected();
@@ -774,6 +772,10 @@ STATUS Peer::writeFrame(PFrame pFrame, MEDIA_STREAM_TRACK_KIND kind)
                 std::ofstream toConsumer(filePath);
                 toConsumer << GETTIME() / HUNDREDS_OF_NANOS_IN_A_MILLISECOND << std::endl;
                 toConsumer.close();
+
+                if (this->callbacks.calculateDisconnectToFrameSentTime != NULL) {
+                    this->callbacks.calculateDisconnectToFrameSentTime();
+                }
             }
 
             this->firstFrame = FALSE;
@@ -781,13 +783,6 @@ STATUS Peer::writeFrame(PFrame pFrame, MEDIA_STREAM_TRACK_KIND kind)
             DLOGD("Start up latency from offer receive to first frame write: %lf ms", timeToFirstFrame);
             Canary::Cloudwatch::getInstance().monitoring.pushTimeToFirstFrame(timeToFirstFrame,
                                                                               Aws::CloudWatch::Model::StandardUnit::Milliseconds);
-        }
-
-        if (STATUS_SUCCEEDED(retStatus) && !this->firstFrame && this->isMaster && this->isStorage && this->storageDisconnectedTime != 0) {
-            DOUBLE storageDisconnectToFrameSentTime = (DOUBLE) (GETTIME() - this->storageDisconnectedTime) / HUNDREDS_OF_NANOS_IN_A_MILLISECOND;
-            Canary::Cloudwatch::getInstance().monitoring.pushStorageDisconnectToFrameSentTime(storageDisconnectToFrameSentTime,
-                                                                              Aws::CloudWatch::Model::StandardUnit::Milliseconds);
-            this->storageDisconnectedTime = 0;
         }
     }
 CleanUp:

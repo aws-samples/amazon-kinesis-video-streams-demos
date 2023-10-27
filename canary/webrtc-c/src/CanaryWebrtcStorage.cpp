@@ -1,6 +1,7 @@
 #include "Include.h"
 
 STATUS onNewConnection(Canary::PPeer);
+VOID calculateDisconnectToFrameSentTime();
 STATUS run(Canary::PConfig);
 VOID runPeer(Canary::PConfig, TIMER_QUEUE_HANDLE, STATUS*);
 VOID sendLocalFrames(Canary::PPeer, MEDIA_STREAM_TRACK_KIND, const std::string&, UINT64, UINT32);
@@ -10,6 +11,8 @@ VOID sendProfilingMetrics(Canary::PPeer);
 
 std::atomic<bool> needToReconnect;
 std::atomic<bool> isTerminated;
+std::atomic<UINT64> storageDisconnectedTime;
+
 VOID handleSignal(INT32 signal)
 {
     UNUSED_PARAM(signal);
@@ -115,7 +118,11 @@ VOID runPeer(Canary::PConfig pConfig, TIMER_QUEUE_HANDLE timerQueueHandle, STATU
 
     Canary::Peer::Callbacks callbacks;
     callbacks.onNewConnection = onNewConnection;
-    callbacks.onDisconnected = []() { needToReconnect = TRUE; };
+    callbacks.onDisconnected = []() {
+        needToReconnect = TRUE;
+        storageDisconnectedTime = GETTIME();
+        };
+    callbacks.calculateDisconnectToFrameSentTime = calculateDisconnectToFrameSentTime;
 
     
     BOOL firstIteration = TRUE;
@@ -204,6 +211,18 @@ STATUS onNewConnection(Canary::PPeer pPeer)
 CleanUp:
 
     return retStatus;
+}
+
+VOID calculateDisconnectToFrameSentTime()
+{
+    if (storageDisconnectedTime.load() != 0){
+        DOUBLE storageDisconnectToFrameSentTime = (DOUBLE) (GETTIME() - storageDisconnectedTime.load()) / HUNDREDS_OF_NANOS_IN_A_MILLISECOND;
+        Canary::Cloudwatch::getInstance().monitoring.pushStorageDisconnectToFrameSentTime(storageDisconnectToFrameSentTime,
+                                                                        Aws::CloudWatch::Model::StandardUnit::Milliseconds);
+        storageDisconnectedTime = 0;
+    } else {
+        DLOGE("Failed to send storageDisconnectToFrameSentTime metric, storageDisconnectedTime is zero (not set)");
+    }
 }
 
 STATUS canaryRtpOutboundStats(UINT32 timerId, UINT64 currentTime, UINT64 customData)

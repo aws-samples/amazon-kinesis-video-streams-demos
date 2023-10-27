@@ -47,6 +47,7 @@ class Peer {
     struct Callbacks {
         std::function<VOID()> onDisconnected;
         std::function<STATUS(PPeer)> onNewConnection;
+        std::function<VOID()> calculateDisconnectToFrameSentTime;
     };
 
     Peer();
@@ -112,7 +113,6 @@ class Peer {
     OutgoingRTPMetricsContext canaryOutgoingRTPMetricsContext;
     IncomingRTPMetricsContext canaryIncomingRTPMetricsContext;
     EndToEndMetricsContext endToEndMetricsContext;
-    UINT64 storageDisconnectedTime;
 
     STATUS initSignaling(const Canary::PConfig);
     STATUS initRtcConfiguration(const Canary::PConfig);
