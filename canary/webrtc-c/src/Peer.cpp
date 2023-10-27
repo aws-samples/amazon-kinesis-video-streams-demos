@@ -336,13 +336,15 @@ STATUS Peer::initPeerConnection()
             case RTC_PEER_CONNECTION_STATE_CLOSED:
                 // explicit fallthrough
                 // TODO: do we still need this functionality?...
-                if(pPeer->isStorage)
-                {
+                if(pPeer->isStorage) {
                     pPeer->needToReconnect = TRUE;
                 }
             case RTC_PEER_CONNECTION_STATE_DISCONNECTED:
                 // Let the higher level to terminate
                 DLOGD("RTC_PEER_CONNECTION_STATE_DISCONNECTED");
+                if (pPeer->isStorage) {
+                }
+
                 if (pPeer->callbacks.onDisconnected != NULL) {
                     pPeer->callbacks.onDisconnected();
                 }
@@ -771,6 +773,10 @@ STATUS Peer::writeFrame(PFrame pFrame, MEDIA_STREAM_TRACK_KIND kind)
                 std::ofstream toConsumer(filePath);
                 toConsumer << GETTIME() / HUNDREDS_OF_NANOS_IN_A_MILLISECOND << std::endl;
                 toConsumer.close();
+
+                if (this->callbacks.calculateDisconnectToFrameSentTime != NULL) {
+                    this->callbacks.calculateDisconnectToFrameSentTime();
+                }
             }
 
             this->firstFrame = FALSE;

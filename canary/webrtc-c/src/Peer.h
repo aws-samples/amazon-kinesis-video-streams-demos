@@ -47,6 +47,7 @@ class Peer {
     struct Callbacks {
         std::function<VOID()> onDisconnected;
         std::function<STATUS(PPeer)> onNewConnection;
+        std::function<VOID()> calculateDisconnectToFrameSentTime;
     };
 
     Peer();
