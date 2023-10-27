@@ -13,6 +13,7 @@ class CloudwatchMonitoring {
     VOID pushSignalingInitDelay(UINT64, Aws::CloudWatch::Model::StandardUnit);
     VOID pushTimeToFirstFrame(UINT64, Aws::CloudWatch::Model::StandardUnit);
 
+    VOID pushStorageDisconnectToFrameSentTime(UINT64, Aws::CloudWatch::Model::StandardUnit);
     VOID pushAnswerToFirstFrame(UINT64, Aws::CloudWatch::Model::StandardUnit);
     VOID pushJoinSessionTime(UINT64, Aws::CloudWatch::Model::StandardUnit);
 

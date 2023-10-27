@@ -112,6 +112,7 @@ class Peer {
     OutgoingRTPMetricsContext canaryOutgoingRTPMetricsContext;
     IncomingRTPMetricsContext canaryIncomingRTPMetricsContext;
     EndToEndMetricsContext endToEndMetricsContext;
+    UINT64 storageDisconnectedTime;
 
     STATUS initSignaling(const Canary::PConfig);
     STATUS initRtcConfiguration(const Canary::PConfig);

@@ -336,13 +336,15 @@ STATUS Peer::initPeerConnection()
             case RTC_PEER_CONNECTION_STATE_CLOSED:
                 // explicit fallthrough
                 // TODO: do we still need this functionality?...
-                if(pPeer->isStorage)
-                {
+                if(pPeer->isStorage) {
                     pPeer->needToReconnect = TRUE;
                 }
             case RTC_PEER_CONNECTION_STATE_DISCONNECTED:
                 // Let the higher level to terminate
                 DLOGD("RTC_PEER_CONNECTION_STATE_DISCONNECTED");
+                if (pPeer->isStorage) {
+                    pPeer->storageDisconnectedTime = GETTIME();
+                }
                 if (pPeer->callbacks.onDisconnected != NULL) {
                     pPeer->callbacks.onDisconnected();
                 }
@@ -778,7 +780,13 @@ STATUS Peer::writeFrame(PFrame pFrame, MEDIA_STREAM_TRACK_KIND kind)
             DLOGD("Start up latency from offer receive to first frame write: %lf ms", timeToFirstFrame);
             Canary::Cloudwatch::getInstance().monitoring.pushTimeToFirstFrame(timeToFirstFrame,
                                                                               Aws::CloudWatch::Model::StandardUnit::Milliseconds);
+        }
 
+        if (STATUS_SUCCEEDED(retStatus) && !this->firstFrame && this->isMaster && this->isStorage && this->storageDisconnectedTime != 0) {
+            DOUBLE storageDisconnectToFrameSentTime = (DOUBLE) (GETTIME() - this->storageDisconnectedTime) / HUNDREDS_OF_NANOS_IN_A_MILLISECOND;
+            Canary::Cloudwatch::getInstance().monitoring.pushStorageDisconnectToFrameSentTime(storageDisconnectToFrameSentTime,
+                                                                              Aws::CloudWatch::Model::StandardUnit::Milliseconds);
+            this->storageDisconnectedTime = 0;
         }
     }
 CleanUp:

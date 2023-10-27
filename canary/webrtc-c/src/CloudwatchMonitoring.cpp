@@ -189,7 +189,16 @@ VOID CloudwatchMonitoring::pushTimeToFirstFrame(UINT64 timeToFirstFrame, Aws::Cl
     this->push(datum);
 }
 
+VOID CloudwatchMonitoring::pushStorageDisconnectToFrameSentTime(UINT64 storageDisconnectToFrameSentTime, Aws::CloudWatch::Model::StandardUnit unit)
+{
+    MetricDatum datum;
 
+    datum.SetMetricName("StorageDisconnectToFrameSentTime");
+    datum.SetValue(storageDisconnectToFrameSentTime);
+    datum.SetUnit(unit);
+
+    this->push(datum);
+}
 
 // TODO: Remove this if never endup using it, or implement it.
 VOID CloudwatchMonitoring::pushAnswerToFirstFrame(UINT64 answerToFirstFrame, Aws::CloudWatch::Model::StandardUnit unit)
