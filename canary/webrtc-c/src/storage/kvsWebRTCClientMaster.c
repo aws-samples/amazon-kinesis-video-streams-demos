@@ -122,6 +122,22 @@ CleanUp:
     return retStatus;
 }
 
+PVOID writeFirstFrameSentTimeToFile(PSampleConfiguration pSampleConfiguration){
+    // Save first-frame-sent time to file for consumer-end access.
+    CHAR buffer[MAX_CHANNEL_NAME_LEN + 7];
+    SNPRINTF(buffer, SIZEOF(buffer) / SIZEOF(CHAR), "../%s.txt", pSampleConfiguration->channelInfo.pChannelName);
+
+    FILE *f = FOPEN("../fileName.txt", "w");
+    if (f == NULL)
+    {
+        printf("Error opening file!\n");
+        exit(1);
+    }
+    fprintf(f, "%lli\n", GETTIME());
+    FCLOSE(f);
+    
+}
+
 PVOID sendVideoPackets(PVOID args)
 {
     STATUS retStatus = STATUS_SUCCESS;
@@ -167,29 +183,7 @@ PVOID sendVideoPackets(PVOID args)
         for (i = 0; i < pSampleConfiguration->streamingSessionCount; ++i) {
             status = writeFrame(pSampleConfiguration->sampleStreamingSessionList[i]->pVideoRtcRtpTransceiver, &frame);
             if (pSampleConfiguration->sampleStreamingSessionList[i]->firstFrame && status == STATUS_SUCCESS) {
-                
-                // Save first-frame-sent time to file for consumer-end access.
-                // char buffer[1024];
-                // snprintf(buffer, MAX_CHANNEL_NAME_LEN, "../%s.txt", *pSampleConfiguration->channelInfo.pChannelName);
-
-                // FILE *f = fopen("file.txt", "w");
-                // if (f == NULL)
-                // {
-                //     printf("Error opening file!\n");
-                //     exit(1);
-                // }
-
-
-                /* print some text */
-                // const char *text = "Write this to the file";
-                // fprintf(f, "Some text: %s\n", text);
-                
-                // std::string filePath = "../" + this->channelName + ".txt";
-                // std::cout << "PRINTING TO FILE" << std::endl;
-                // std::ofstream toConsumer(filePath);
-                // toConsumer << GETTIME() / HUNDREDS_OF_NANOS_IN_A_MILLISECOND << std::endl;
-                // toConsumer.close();
-
+                writeFirstFrameSentTimeToFile(pSampleConfiguration);
                 PROFILE_WITH_START_TIME(pSampleConfiguration->sampleStreamingSessionList[i]->offerReceiveTime, "Time to first frame");
                 pSampleConfiguration->sampleStreamingSessionList[i]->firstFrame = FALSE;
             }
@@ -259,6 +253,7 @@ PVOID sendAudioPackets(PVOID args)
                 if (status != STATUS_SUCCESS) {
                     DLOGV("writeFrame() failed with 0x%08x", status);
                 } else if (pSampleConfiguration->sampleStreamingSessionList[i]->firstFrame && status == STATUS_SUCCESS) {
+                    writeFirstFrameSentTimeToFile(pSampleConfiguration);
                     PROFILE_WITH_START_TIME(pSampleConfiguration->sampleStreamingSessionList[i]->offerReceiveTime, "Time to first frame");
                     pSampleConfiguration->sampleStreamingSessionList[i]->firstFrame = FALSE;
                 }
