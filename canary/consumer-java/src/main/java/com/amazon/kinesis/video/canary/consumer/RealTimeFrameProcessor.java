@@ -44,19 +44,20 @@ public class RealTimeFrameProcessor extends WebrtcStorageCanaryConsumer implemen
 
     @Override
     public void process(Frame frame, MkvTrackMetadata trackMetadata, Optional<FragmentMetadata> fragmentMetadata, Optional<FragmentMetadataVisitor.MkvTagProcessor> tagProcessor) throws FrameProcessException {
-        System.out.println("RealTimeFrameProcessor invoked for frame" + frame);
         if (!isFirstFrame) {
-
             System.out.println("First Frame invoked for frame" + frame);
-
             try
             {
                 long currentTime = System.currentTimeMillis();
+
+                // Import master-end first frame sent timestamp from file 
                 String filePath = "../webrtc-c/" + super.streamName + ".txt";
-                final String startTimeStr = FileUtils.readFileToString(new File(filePath)).trim();
-                long startTime = Long.parseLong(startTimeStr);
-                long rtpToFirstFragment = currentTime - startTime;
+                final String firstFrameSentTimeString = FileUtils.readFileToString(new File(filePath)).trim();
+                long firstFrameSentTime = Long.parseLong(firstFrameSentTimeString);
+
+                long rtpToFirstFragment = currentTime - firstFrameSentTime;
                 super.publishMetricToCW("FirstFrameSentToFirstFrameConsumed", rtpToFirstFragment, StandardUnit.Milliseconds);
+
                 long timeToFirstFragment = currentTime - super.canaryStartTime.getTime();
                 super.publishMetricToCW("TotalTimeToFirstFrameConsumed", timeToFirstFragment, StandardUnit.Milliseconds);
             }
@@ -66,13 +67,10 @@ public class RealTimeFrameProcessor extends WebrtcStorageCanaryConsumer implemen
             }
             catch(IOException ioEx)
             {
-                System.out.println("IO Exception!");
+                System.out.println("IO Exception.");
             }
             isFirstFrame = true;
             System.exit(0);
-        } else {
-            System.out.println("Non first frame. Skipping...");
         }
-
     }
 }

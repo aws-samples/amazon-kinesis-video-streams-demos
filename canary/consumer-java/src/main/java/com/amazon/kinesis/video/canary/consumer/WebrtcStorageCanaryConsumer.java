@@ -85,7 +85,7 @@ public class WebrtcStorageCanaryConsumer {
             timestampRange.setStartTimestamp(canaryStartTime);
             timestampRange.setEndTimestamp(new Date());
 
-            // TODO: change this to be PRODUCER_TS instead...
+            // TODO: change this to be PRODUCER_TS instead?
             FragmentSelector fragmentSelector = new FragmentSelector();
             fragmentSelector.setFragmentSelectorType("SERVER_TIMESTAMP");
             fragmentSelector.setTimestampRange(timestampRange);
@@ -139,60 +139,6 @@ private static void getMediaTimeToFirstFragment() {
         }
     }
 
-    // NOTE: unused
-    // TODO: remove this if not going to use...
-    private static void calculateTimeToFirstFragment(Timer intervalMetricsTimer) {
-        try {
-            double timeToFirstFragment = Double.MAX_VALUE;
-
-            final GetDataEndpointRequest dataEndpointRequest = new GetDataEndpointRequest()
-                .withAPIName(APIName.LIST_FRAGMENTS).withStreamName(streamName);
-            final String listFragmentsEndpoint = amazonKinesisVideo.getDataEndpoint(dataEndpointRequest).getDataEndpoint();
-        
-            // TODO: make the below two blocks of code into a 
-            // getFragmentSelector() function, reuse in the other metric
-
-            // Time range for listFragments request
-            TimestampRange timestampRange = new TimestampRange();
-            timestampRange.setStartTimestamp(canaryStartTime);
-            timestampRange.setEndTimestamp(new Date());
-
-            // Configures listFragments request
-            FragmentSelector fragmentSelector = new FragmentSelector();
-            fragmentSelector.setFragmentSelectorType("PRODUCER_TIMESTAMP");
-            fragmentSelector.setTimestampRange(timestampRange);
-
-            long currentTime = new Date().getTime();
-
-            final FutureTask<List<CanaryFragment>> futureTask = new FutureTask<>(
-                new CanaryListFragmentWorker(streamName, credentialsProvider, listFragmentsEndpoint, Regions.fromName(region), fragmentSelector)
-            );
-            Thread thread = new Thread(futureTask);
-            thread.start();
-            List<CanaryFragment> fragmentList = futureTask.get();
-
-            if (fragmentList.size() > 0) {
-                //System.out.println(fragmentList.size());
-
-                String filePath = "../webrtc-c/" + streamName + ".txt";
-                Scanner scanner = new Scanner(new FileReader(filePath));
-                long rtpSendTime = Long.parseLong(scanner.next());
-                scanner.close();
-
-                timeToFirstFragment = fragmentList.get(0).getFragment().getServerTimestamp().getTime() - rtpSendTime;
-                publishMetricToCW("TimeToFirstFragment1", timeToFirstFragment, StandardUnit.Milliseconds);
-                timeToFirstFragment = fragmentList.get(0).getFragment().getServerTimestamp().getTime() - fragmentList.get(0).getFragment().getProducerTimestamp().getTime();
-                publishMetricToCW("KVSSinkToInletLatency", timeToFirstFragment, StandardUnit.Milliseconds);
-                intervalMetricsTimer.cancel();
-            }
-
-        } catch (Exception e) {
-            log.error(e);
-        }
-           
-    }
-    
-    
     protected static void publishMetricToCW(String metricName, double value, StandardUnit cwUnit) {
         try {
             System.out.println(MessageFormat.format("Emitting the following metric: {0} - {1}", metricName, value));
@@ -230,7 +176,7 @@ private static void getMediaTimeToFirstFragment() {
     public static void main(final String[] args) throws Exception {
         //System.setProperty(SDKGlobalConfiguration.DISABLE_CERT_CHECKING_SYSTEM_PROPERTY, "true");
 
-        System.out.println("CONSUMER CANARY START TIME: " + new Date().getTime());
+        System.out.println("Consumer Canary start time: " + new Date().getTime());
 
         // Import configurable parameters.
         final Integer canaryRunTime = Integer.parseInt(System.getenv("CANARY_DURATION_IN_SECONDS"));
