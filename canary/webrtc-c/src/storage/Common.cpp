@@ -902,7 +902,7 @@ STATUS populateOutgoingRtpMetricsContext(PSampleStreamingSession pSampleStreamin
 
     currentDuration = (DOUBLE)(pSampleStreamingSession->canaryMetrics.timestamp - pSampleStreamingSession->canaryOutgoingRTPMetricsContext.prevTs) / HUNDREDS_OF_NANOS_IN_A_SECOND;
     {
-        //std::lock_guard<std::mutex> lock(pSampleStreamingSession->countUpdateMutex);
+        std::lock_guard<std::mutex> lock(pSampleStreamingSession->countUpdateMutex);
         pSampleStreamingSession->canaryOutgoingRTPMetricsContext.framesPercentageDiscarded =
             ((DOUBLE)(pSampleStreamingSession->canaryMetrics.rtcStatsObject.outboundRtpStreamStats.framesDiscardedOnSend -
                       pSampleStreamingSession->canaryOutgoingRTPMetricsContext.prevFramesDiscardedOnSend) /
@@ -966,7 +966,7 @@ STATUS initMetricTimers(PSampleStreamingSession pSampleStreamingSession)
     UINT32 timeoutTimerId;
     CHK_STATUS(timerQueueCreate(&timerQueueHandle));
 
-    CHK_STATUS(timerQueueAddTimer(timerQueueHandle, (10 * HUNDREDS_OF_NANOS_IN_A_SECOND), METRICS_INVOCATION_PERIOD, canaryRtpOutboundStats, (UINT64) pSampleStreamingSession,
+    CHK_STATUS(timerQueueAddTimer(timerQueueHandle, METRICS_INVOCATION_PERIOD, METRICS_INVOCATION_PERIOD, canaryRtpOutboundStats, (UINT64) pSampleStreamingSession,
                                       &timeoutTimerId));
 
 CleanUp:
@@ -1012,6 +1012,13 @@ STATUS initSignaling(PSampleConfiguration pSampleConfiguration, PCHAR clientId)
     for (i = 0; i < pSampleConfiguration->streamingSessionCount; ++i) {
         DLOGD("Setting up metrics timer for session %d", i);
         pSampleStreamingSession = pSampleConfiguration->sampleStreamingSessionList[i];
+        
+        pSampleStreamingSession->canaryOutgoingRTPMetricsContext.prevTs = GETTIME();
+        pSampleStreamingSession->canaryOutgoingRTPMetricsContext.prevFramesDiscardedOnSend = 0;
+        pSampleStreamingSession->canaryOutgoingRTPMetricsContext.prevNackCount = 0;
+        pSampleStreamingSession->canaryOutgoingRTPMetricsContext.prevRetxBytesSent = 0;
+        pSampleStreamingSession->canaryOutgoingRTPMetricsContext.prevFramesSent = 0;
+
         CHK_STATUS(initMetricTimers(pSampleStreamingSession));
     }
 
@@ -1740,4 +1747,16 @@ STATUS removeExpiredMessageQueues(PStackQueue pPendingQueue)
 CleanUp:
 
     return retStatus;
+}
+
+STATUS handleWriteFrameMetricIncrementation(PSampleStreamingSession pSampleStreamingSession, UINT32 frameSize)
+{
+    std::lock_guard<std::mutex> lock(pSampleStreamingSession->countUpdateMutex);
+    if (pSampleStreamingSession->recorded.load()) {
+            pSampleStreamingSession->canaryOutgoingRTPMetricsContext.videoFramesGenerated = 0;
+            pSampleStreamingSession->canaryOutgoingRTPMetricsContext.videoBytesGenerated = 0;
+            pSampleStreamingSession->recorded = FALSE;
+        }
+        pSampleStreamingSession->canaryOutgoingRTPMetricsContext.videoFramesGenerated++;
+        pSampleStreamingSession->canaryOutgoingRTPMetricsContext.videoBytesGenerated += frameSize;
 }

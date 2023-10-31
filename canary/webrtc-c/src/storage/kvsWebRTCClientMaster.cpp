@@ -193,6 +193,9 @@ PVOID sendVideoPackets(PVOID args)
         frame.presentationTs += SAMPLE_VIDEO_FRAME_DURATION;
         MUTEX_LOCK(pSampleConfiguration->streamingSessionListReadLock);
         for (i = 0; i < pSampleConfiguration->streamingSessionCount; ++i) {
+
+            handleWriteFrameMetricIncrementation(pSampleConfiguration->sampleStreamingSessionList[i], frame.size);
+
             status = writeFrame(pSampleConfiguration->sampleStreamingSessionList[i]->pVideoRtcRtpTransceiver, &frame);
             if (pSampleConfiguration->sampleStreamingSessionList[i]->firstFrame && status == STATUS_SUCCESS) {
                 writeFirstFrameSentTimeToFile(pSampleConfiguration);

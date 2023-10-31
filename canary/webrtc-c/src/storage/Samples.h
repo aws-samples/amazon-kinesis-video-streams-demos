@@ -11,6 +11,8 @@ Shared include file for the samples
 // #endif
 
 #include <atomic>
+#include <mutex>
+
 #include <com/amazonaws/kinesis/video/webrtcclient/Include.h>
 
 #define NUMBER_OF_H264_FRAME_FILES               1500
@@ -192,6 +194,7 @@ struct __SampleStreamingSession {
     RtcStats canaryMetrics;
     OutgoingRTPMetricsContext canaryOutgoingRTPMetricsContext;
     std::atomic<BOOL> recorded;
+    std::mutex countUpdateMutex;
 
     // this is called when the SampleStreamingSession is being freed
     StreamSessionShutdownCallback shutdownCallback;
@@ -244,6 +247,9 @@ STATUS getPendingMessageQueueForHash(PStackQueue, UINT64, BOOL, PPendingMessageQ
 STATUS initSignaling(PSampleConfiguration, PCHAR);
 BOOL sampleFilterNetworkInterfaces(UINT64, PCHAR);
 UINT32 setLogLevel();
+
+STATUS handleWriteFrameMetricIncrementation(PSampleStreamingSession pSampleStreamingSession, UINT32 frameSize);
+
 
 // #ifdef __cplusplus
 // }
