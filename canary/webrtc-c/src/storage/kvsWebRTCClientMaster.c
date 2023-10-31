@@ -124,17 +124,19 @@ CleanUp:
 
 PVOID writeFirstFrameSentTimeToFile(PSampleConfiguration pSampleConfiguration){
     // Save first-frame-sent time to file for consumer-end access.
-    CHAR buffer[MAX_CHANNEL_NAME_LEN + 7];
-    SNPRINTF(buffer, SIZEOF(buffer) / SIZEOF(CHAR), "../%s.txt", pSampleConfiguration->channelInfo.pChannelName);
 
-    FILE *f = FOPEN("../fileName.txt", "w");
-    if (f == NULL)
+    // Below is for using channel name as file name, decided it's unecessary
+    //CHAR fileNameBuffer[MAX_CHANNEL_NAME_LEN + 7];
+    //SNPRINTF(fileNameBuffer, SIZEOF(fileNameBuffer) / SIZEOF(CHAR), "../%s.txt", pSampleConfiguration->channelInfo.pChannelName);
+
+    FILE *toConsumer = FOPEN("../toConsumer.txt", "w");
+    if (toConsumer == NULL)
     {
-        printf("Error opening file!\n");
+        printf("Error opening toConsumer file\n");
         exit(1);
     }
-    fprintf(f, "%lli\n", GETTIME());
-    FCLOSE(f);
+    fprintf(toConsumer, "%lli\n", GETTIME());
+    FCLOSE(toConsumer);
     
 }
 
