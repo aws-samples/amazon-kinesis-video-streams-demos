@@ -1,15 +1,16 @@
 /*******************************************
 Shared include file for the samples
 *******************************************/
-#ifndef __KINESIS_VIDEO_SAMPLE_INCLUDE__
+//#ifndef __KINESIS_VIDEO_SAMPLE_INCLUDE__
 #define __KINESIS_VIDEO_SAMPLE_INCLUDE__
 
 #pragma once
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+// #ifdef __cplusplus
+// extern "C" {
+// #endif
 
+#include <atomic>
 #include <com/amazonaws/kinesis/video/webrtcclient/Include.h>
 
 #define NUMBER_OF_H264_FRAME_FILES               1500
@@ -147,6 +148,27 @@ typedef struct {
 
 typedef VOID (*StreamSessionShutdownCallback)(UINT64, PSampleStreamingSession);
 
+
+typedef struct {
+    UINT64 prevNumberOfPacketsSent;
+    UINT64 prevNumberOfPacketsReceived;
+    UINT64 prevNumberOfBytesSent;
+    UINT64 prevNumberOfBytesReceived;
+    UINT64 prevFramesDiscardedOnSend;
+    UINT64 prevTs;
+    UINT64 prevVideoFramesGenerated;
+    UINT64 prevFramesSent;
+    UINT64 prevNackCount;
+    UINT64 prevRetxBytesSent;
+    std::atomic<UINT64> videoFramesGenerated;
+    UINT64 videoBytesGenerated;
+    DOUBLE framesPercentageDiscarded;
+    DOUBLE nacksPerSecond;
+    DOUBLE averageFramesSentPerSecond;
+    DOUBLE retxBytesPercentage;
+} OutgoingRTPMetricsContext;
+typedef OutgoingRTPMetricsContext* POutgoingRTPMetricsContext;
+
 struct __SampleStreamingSession {
     volatile ATOMIC_BOOL terminateFlag;
     volatile ATOMIC_BOOL candidateGatheringDone;
@@ -166,6 +188,10 @@ struct __SampleStreamingSession {
     UINT64 startUpLatency;
     RtcMetricsHistory rtcMetricsHistory;
     BOOL remoteCanTrickleIce;
+
+    RtcStats canaryMetrics;
+    OutgoingRTPMetricsContext canaryOutgoingRTPMetricsContext;
+    std::atomic<BOOL> recorded;
 
     // this is called when the SampleStreamingSession is being freed
     StreamSessionShutdownCallback shutdownCallback;
@@ -219,7 +245,7 @@ STATUS initSignaling(PSampleConfiguration, PCHAR);
 BOOL sampleFilterNetworkInterfaces(UINT64, PCHAR);
 UINT32 setLogLevel();
 
-#ifdef __cplusplus
-}
-#endif
-#endif /* __KINESIS_VIDEO_SAMPLE_INCLUDE__ */
+// #ifdef __cplusplus
+// }
+// #endif
+// #endif /* __KINESIS_VIDEO_SAMPLE_INCLUDE__ */

@@ -1,4 +1,6 @@
 #include "Samples.h"
+#include "../Include.h"
+
 
 extern PSampleConfiguration gSampleConfiguration;
 
@@ -282,3 +284,4 @@ CleanUp:
 
     return (PVOID) (ULONG_PTR) retStatus;
 }
+

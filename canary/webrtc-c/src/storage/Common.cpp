@@ -1,5 +1,6 @@
 #define LOG_CLASS "WebRtcSamples"
 #include "Samples.h"
+#include "../Include.h"
 
 PSampleConfiguration gSampleConfiguration = NULL;
 
@@ -58,9 +59,10 @@ VOID onConnectionStateChange(UINT64 customData, RTC_PEER_CONNECTION_STATE newSta
 {
     STATUS retStatus = STATUS_SUCCESS;
     PSampleStreamingSession pSampleStreamingSession = (PSampleStreamingSession) customData;
+    PSampleConfiguration pSampleConfiguration = pSampleStreamingSession->pSampleConfiguration;
+
     CHK(pSampleStreamingSession != NULL && pSampleStreamingSession->pSampleConfiguration != NULL, STATUS_INTERNAL_ERROR);
 
-    PSampleConfiguration pSampleConfiguration = pSampleStreamingSession->pSampleConfiguration;
     DLOGI("New connection state %u", newState);
 
     switch (newState) {
@@ -369,6 +371,7 @@ STATUS initializePeerConnection(PSampleConfiguration pSampleConfiguration, PRtcP
     PIceConfigInfo pIceConfigInfo;
     UINT64 data;
     PRtcCertificate pRtcCertificate = NULL;
+    PCHAR pKinesisVideoStunUrlPostFix = KINESIS_VIDEO_STUN_URL_POSTFIX;
 
     CHK(pSampleConfiguration != NULL && ppRtcPeerConnection != NULL, STATUS_NULL_ARG);
 
@@ -381,7 +384,6 @@ STATUS initializePeerConnection(PSampleConfiguration pSampleConfiguration, PRtcP
     configuration.iceTransportPolicy = ICE_TRANSPORT_POLICY_ALL;
 
     // Set the  STUN server
-    PCHAR pKinesisVideoStunUrlPostFix = KINESIS_VIDEO_STUN_URL_POSTFIX;
     // If region is in CN, add CN region uri postfix
     if (STRSTR(pSampleConfiguration->channelInfo.pRegion, "cn-")) {
         pKinesisVideoStunUrlPostFix = KINESIS_VIDEO_STUN_URL_POSTFIX_CN;
@@ -890,6 +892,93 @@ CleanUp:
     return retStatus;
 }
 
+
+
+
+
+STATUS populateOutgoingRtpMetricsContext(PSampleStreamingSession pSampleStreamingSession)
+{
+    DOUBLE currentDuration = 0;
+
+    currentDuration = (DOUBLE)(pSampleStreamingSession->canaryMetrics.timestamp - pSampleStreamingSession->canaryOutgoingRTPMetricsContext.prevTs) / HUNDREDS_OF_NANOS_IN_A_SECOND;
+    {
+        //std::lock_guard<std::mutex> lock(pSampleStreamingSession->countUpdateMutex);
+        pSampleStreamingSession->canaryOutgoingRTPMetricsContext.framesPercentageDiscarded =
+            ((DOUBLE)(pSampleStreamingSession->canaryMetrics.rtcStatsObject.outboundRtpStreamStats.framesDiscardedOnSend -
+                      pSampleStreamingSession->canaryOutgoingRTPMetricsContext.prevFramesDiscardedOnSend) /
+             (DOUBLE) pSampleStreamingSession->canaryOutgoingRTPMetricsContext.videoFramesGenerated) *
+            100.0;
+        pSampleStreamingSession->canaryOutgoingRTPMetricsContext.retxBytesPercentage =
+            (((DOUBLE) pSampleStreamingSession->canaryMetrics.rtcStatsObject.outboundRtpStreamStats.retransmittedBytesSent -
+              (DOUBLE)(pSampleStreamingSession->canaryOutgoingRTPMetricsContext.prevRetxBytesSent)) /
+             (DOUBLE) pSampleStreamingSession->canaryOutgoingRTPMetricsContext.videoBytesGenerated) *
+            100.0;
+    }
+
+    // This flag ensures the reset of video bytes count is done only when this flag is set
+    pSampleStreamingSession->recorded = TRUE;
+    pSampleStreamingSession->canaryOutgoingRTPMetricsContext.averageFramesSentPerSecond =
+        ((DOUBLE)(pSampleStreamingSession->canaryMetrics.rtcStatsObject.outboundRtpStreamStats.framesSent -
+                  (DOUBLE) pSampleStreamingSession->canaryOutgoingRTPMetricsContext.prevFramesSent)) /
+        currentDuration;
+    pSampleStreamingSession->canaryOutgoingRTPMetricsContext.nacksPerSecond =
+        ((DOUBLE) pSampleStreamingSession->canaryMetrics.rtcStatsObject.outboundRtpStreamStats.nackCount - pSampleStreamingSession->canaryOutgoingRTPMetricsContext.prevNackCount) /
+        currentDuration;
+    pSampleStreamingSession->canaryOutgoingRTPMetricsContext.prevFramesSent = pSampleStreamingSession->canaryMetrics.rtcStatsObject.outboundRtpStreamStats.framesSent;
+    pSampleStreamingSession->canaryOutgoingRTPMetricsContext.prevTs = pSampleStreamingSession->canaryMetrics.timestamp;
+    pSampleStreamingSession->canaryOutgoingRTPMetricsContext.prevFramesDiscardedOnSend = pSampleStreamingSession->canaryMetrics.rtcStatsObject.outboundRtpStreamStats.framesDiscardedOnSend;
+    pSampleStreamingSession->canaryOutgoingRTPMetricsContext.prevNackCount = pSampleStreamingSession->canaryMetrics.rtcStatsObject.outboundRtpStreamStats.nackCount;
+    pSampleStreamingSession->canaryOutgoingRTPMetricsContext.prevRetxBytesSent = pSampleStreamingSession->canaryMetrics.rtcStatsObject.outboundRtpStreamStats.retransmittedBytesSent;
+
+    return STATUS_SUCCESS;
+}
+
+STATUS canaryRtpOutboundStats(UINT32 timerId, UINT64 currentTime, UINT64 customData)
+{
+    UNUSED_PARAM(timerId);
+    UNUSED_PARAM(currentTime);
+    STATUS retStatus = STATUS_SUCCESS;
+    //if (!terminated.load())
+    if (true)
+    {
+        PSampleStreamingSession pSampleStreamingSession = (PSampleStreamingSession) customData;
+        if (pSampleStreamingSession->pVideoRtcRtpTransceiver) {
+                pSampleStreamingSession->canaryMetrics.requestedTypeOfStats = RTC_STATS_TYPE_OUTBOUND_RTP;
+                CHK_LOG_ERR(rtcPeerConnectionGetMetrics(pSampleStreamingSession->pPeerConnection, pSampleStreamingSession->pVideoRtcRtpTransceiver, &(pSampleStreamingSession->canaryMetrics)));
+                populateOutgoingRtpMetricsContext(pSampleStreamingSession);
+                Canary::POutgoingRTPMetricsContext pCanaryOutgoingRTPMetricsContext = reinterpret_cast<Canary::POutgoingRTPMetricsContext>(&(pSampleStreamingSession->canaryOutgoingRTPMetricsContext));
+                Canary::Cloudwatch::getInstance().monitoring.pushOutboundRtpStats(pCanaryOutgoingRTPMetricsContext);
+            }
+    } else {
+        retStatus = STATUS_TIMER_QUEUE_STOP_SCHEDULING;
+    }
+
+    return retStatus;
+}
+
+STATUS initMetricTimers(PSampleStreamingSession pSampleStreamingSession)
+{
+    STATUS retStatus = STATUS_SUCCESS;
+    TIMER_QUEUE_HANDLE timerQueueHandle = 0;
+    UINT32 timeoutTimerId;
+    CHK_STATUS(timerQueueCreate(&timerQueueHandle));
+
+    CHK_STATUS(timerQueueAddTimer(timerQueueHandle, METRICS_INVOCATION_PERIOD, METRICS_INVOCATION_PERIOD, canaryRtpOutboundStats, (UINT64) pSampleStreamingSession,
+                                      &timeoutTimerId));
+
+CleanUp:
+    if (IS_VALID_TIMER_QUEUE_HANDLE(timerQueueHandle)) {
+        timerQueueFree(&timerQueueHandle);
+    }
+    return retStatus;
+}
+
+
+
+
+
+
+
 STATUS initSignaling(PSampleConfiguration pSampleConfiguration, PCHAR clientId)
 {
     STATUS retStatus = STATUS_SUCCESS;
@@ -899,6 +988,10 @@ STATUS initSignaling(PSampleConfiguration pSampleConfiguration, PCHAR clientId)
     CHK_STATUS(createSignalingClientSync(&pSampleConfiguration->clientInfo, &pSampleConfiguration->channelInfo,
                                          &pSampleConfiguration->signalingClientCallbacks, pSampleConfiguration->pCredentialProvider,
                                          &pSampleConfiguration->signalingClientHandle));
+    
+    UINT32 i;
+    PSampleStreamingSession pSampleStreamingSession;
+
 
     // Enable the processing of the messages
     CHK_STATUS(signalingClientFetchSync(pSampleConfiguration->signalingClientHandle));
@@ -910,6 +1003,15 @@ STATUS initSignaling(PSampleConfiguration pSampleConfiguration, PCHAR clientId)
     CHK_STATUS(signalingClientConnectSync(pSampleConfiguration->signalingClientHandle));
 
     signalingClientGetMetrics(pSampleConfiguration->signalingClientHandle, &signalingClientMetrics);
+
+
+
+    for (i = 0; i < pSampleConfiguration->streamingSessionCount; ++i) {
+        DLOGD("Setting up metrics timer for session %d", i);
+        pSampleStreamingSession = pSampleConfiguration->sampleStreamingSessionList[i];
+        CHK_STATUS(initMetricTimers(pSampleStreamingSession));
+    }
+
 
     // Logging this here since the logs in signaling library do not get routed to file
     DLOGP("[Signaling Get token] %" PRIu64 " ms", signalingClientMetrics.signalingClientStats.getTokenCallTime);
@@ -927,6 +1029,7 @@ STATUS initSignaling(PSampleConfiguration pSampleConfiguration, PCHAR clientId)
     DLOGP("[Signaling connect client] %" PRIu64 " ms", signalingClientMetrics.signalingClientStats.connectClientTime);
     pSampleConfiguration->signalingClientMetrics = signalingClientMetrics;
     gSampleConfiguration = pSampleConfiguration;
+
 CleanUp:
     return retStatus;
 }
