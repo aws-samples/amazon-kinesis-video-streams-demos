@@ -13,6 +13,9 @@ INT32 main(INT32 argc, CHAR* argv[])
     SignalingClientMetrics signalingClientMetrics;
     signalingClientMetrics.version = SIGNALING_CLIENT_METRICS_CURRENT_VERSION;
 
+    auto config = Canary::Config();
+    Aws::SDKOptions options;
+
     SET_INSTRUMENTED_ALLOCATORS();
     UINT32 logLevel = setLogLevel();
 
@@ -55,6 +58,11 @@ INT32 main(INT32 argc, CHAR* argv[])
     // Initialize KVS WebRTC. This must be done before anything else, and must only be done once.
     CHK_STATUS(initKvsWebRtc());
     DLOGI("[KVS Master] KVS WebRTC initialization completed successfully");
+
+
+    Aws::InitAPI(options);
+    CHK_STATUS(config.init(argc, argv));
+    CHK_STATUS(Canary::Cloudwatch::init(&config));
 
     CHK_STATUS(initSignaling(pSampleConfiguration, SAMPLE_MASTER_CLIENT_ID));
     DLOGI("[KVS Master] Channel %s set up done ", pChannelName);

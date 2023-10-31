@@ -935,6 +935,7 @@ STATUS populateOutgoingRtpMetricsContext(PSampleStreamingSession pSampleStreamin
 
 STATUS canaryRtpOutboundStats(UINT32 timerId, UINT64 currentTime, UINT64 customData)
 {
+    DLOGD("TIMER FUNCTION INVOKED");
     UNUSED_PARAM(timerId);
     UNUSED_PARAM(currentTime);
     STATUS retStatus = STATUS_SUCCESS;
@@ -947,7 +948,9 @@ STATUS canaryRtpOutboundStats(UINT32 timerId, UINT64 currentTime, UINT64 customD
                 CHK_LOG_ERR(rtcPeerConnectionGetMetrics(pSampleStreamingSession->pPeerConnection, pSampleStreamingSession->pVideoRtcRtpTransceiver, &(pSampleStreamingSession->canaryMetrics)));
                 populateOutgoingRtpMetricsContext(pSampleStreamingSession);
                 Canary::POutgoingRTPMetricsContext pCanaryOutgoingRTPMetricsContext = reinterpret_cast<Canary::POutgoingRTPMetricsContext>(&(pSampleStreamingSession->canaryOutgoingRTPMetricsContext));
+                DLOGD("Calling pushOutboundRtpStats...");
                 Canary::Cloudwatch::getInstance().monitoring.pushOutboundRtpStats(pCanaryOutgoingRTPMetricsContext);
+                DLOGD("Finished calling pushOutboundRtpStats");
             }
     } else {
         retStatus = STATUS_TIMER_QUEUE_STOP_SCHEDULING;
@@ -963,13 +966,13 @@ STATUS initMetricTimers(PSampleStreamingSession pSampleStreamingSession)
     UINT32 timeoutTimerId;
     CHK_STATUS(timerQueueCreate(&timerQueueHandle));
 
-    CHK_STATUS(timerQueueAddTimer(timerQueueHandle, METRICS_INVOCATION_PERIOD, METRICS_INVOCATION_PERIOD, canaryRtpOutboundStats, (UINT64) pSampleStreamingSession,
+    CHK_STATUS(timerQueueAddTimer(timerQueueHandle, (10 * HUNDREDS_OF_NANOS_IN_A_SECOND), METRICS_INVOCATION_PERIOD, canaryRtpOutboundStats, (UINT64) pSampleStreamingSession,
                                       &timeoutTimerId));
 
 CleanUp:
-    if (IS_VALID_TIMER_QUEUE_HANDLE(timerQueueHandle)) {
-        timerQueueFree(&timerQueueHandle);
-    }
+    // if (IS_VALID_TIMER_QUEUE_HANDLE(timerQueueHandle)) {
+    //     timerQueueFree(&timerQueueHandle);
+    // }
     return retStatus;
 }
 
