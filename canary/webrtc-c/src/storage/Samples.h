@@ -12,6 +12,7 @@ Shared include file for the samples
 
 #include <atomic>
 #include <mutex>
+#include <thread>
 
 #include <com/amazonaws/kinesis/video/webrtcclient/Include.h>
 
@@ -196,6 +197,7 @@ struct __SampleStreamingSession {
     std::atomic<BOOL> recorded;
     std::mutex countUpdateMutex;
     TIMER_QUEUE_HANDLE outboundRTPMetricsTimerQueueHandle;
+    std::thread pushProfilingThread;
 
     // this is called when the SampleStreamingSession is being freed
     StreamSessionShutdownCallback shutdownCallback;

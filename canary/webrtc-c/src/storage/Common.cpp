@@ -579,9 +579,10 @@ CleanUp:
 
 VOID sendProfilingMetricsTryer(PSampleStreamingSession pSampleStreamingSession, PSampleConfiguration pSampleConfiguration)
 {
+    DLOGD("sendProfilingMetricsTryer called");
     STATUS retStatus = STATUS_SUCCESS;
     BOOL done = FALSE;
-    while (true) {
+    while (!ATOMIC_LOAD_BOOL(&pSampleStreamingSession->terminateFlag)) {
         retStatus = sendProfilingMetrics(pSampleStreamingSession, pSampleConfiguration);
         if (retStatus == STATUS_WAITING_ON_FIRST_FRAME) {
             THREAD_SLEEP(HUNDREDS_OF_NANOS_IN_A_MILLISECOND * 100); // to prevent busy waiting
@@ -596,6 +597,11 @@ VOID sendProfilingMetricsTryer(PSampleStreamingSession pSampleStreamingSession, 
     }
 }
 
+VOID something()
+{
+    sleep(500);
+}
+
 STATUS initMetricTimers(PSampleStreamingSession pSampleStreamingSession, PSampleConfiguration pSampleConfiguration)
 {
     DLOGD("Here 1");
@@ -603,7 +609,8 @@ STATUS initMetricTimers(PSampleStreamingSession pSampleStreamingSession, PSample
     UINT32 timeoutTimerId;
 
     DLOGD("Here 2");
-    std::thread pushProfilingThread;
+    pSampleStreamingSession->pushProfilingThread = std::thread(sendProfilingMetricsTryer, pSampleStreamingSession, pSampleConfiguration);
+    //std::thread pushProfilingThread(something);
 
     CHK_STATUS(timerQueueCreate(&pSampleStreamingSession->outboundRTPMetricsTimerQueueHandle));
 
@@ -613,9 +620,7 @@ STATUS initMetricTimers(PSampleStreamingSession pSampleStreamingSession, PSample
                                       &timeoutTimerId));
 
     DLOGD("Here 4");
-
-    //pushProfilingThread = thread(sendProfilingMetricsTryer, pSampleStreamingSession, pSampleConfiguration);
-
+    //pushProfilingThread.join();
     DLOGD("Here 5");
 
 
@@ -712,7 +717,6 @@ STATUS createSampleStreamingSession(PSampleConfiguration pSampleConfiguration, P
     CHK_STATUS(peerConnectionOnSenderBandwidthEstimation(pSampleStreamingSession->pPeerConnection, (UINT64) pSampleStreamingSession,
                                                          sampleSenderBandwidthEstimationHandler));
     pSampleStreamingSession->startUpLatency = 0;
-
 
     DLOGD("Setting up metrics timer for session");
     pSampleStreamingSession->canaryOutgoingRTPMetricsContext.prevTs = GETTIME();
@@ -1606,6 +1610,7 @@ STATUS signalingMessageReceived(UINT64 customData, PReceivedSignalingMessage pRe
             }
             CHK_STATUS(createSampleStreamingSession(pSampleConfiguration, pReceivedSignalingMessage->signalingMessage.peerClientId, TRUE,
                                                     &pSampleStreamingSession));
+            DLOGD("Got pastcreateSampleStreamingSession ");
             MUTEX_LOCK(pSampleConfiguration->streamingSessionListReadLock);
             pSampleConfiguration->sampleStreamingSessionList[pSampleConfiguration->streamingSessionCount++] = pSampleStreamingSession;
             MUTEX_UNLOCK(pSampleConfiguration->streamingSessionListReadLock);
