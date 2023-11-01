@@ -195,6 +195,7 @@ struct __SampleStreamingSession {
     OutgoingRTPMetricsContext canaryOutgoingRTPMetricsContext;
     std::atomic<BOOL> recorded;
     std::mutex countUpdateMutex;
+    TIMER_QUEUE_HANDLE outboundRTPMetricsTimerQueueHandle;
 
     // this is called when the SampleStreamingSession is being freed
     StreamSessionShutdownCallback shutdownCallback;
