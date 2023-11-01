@@ -597,11 +597,6 @@ VOID sendProfilingMetricsTryer(PSampleStreamingSession pSampleStreamingSession, 
     }
 }
 
-VOID something()
-{
-    sleep(500);
-}
-
 STATUS initMetricTimers(PSampleStreamingSession pSampleStreamingSession, PSampleConfiguration pSampleConfiguration)
 {
     DLOGD("Here 1");
@@ -610,7 +605,6 @@ STATUS initMetricTimers(PSampleStreamingSession pSampleStreamingSession, PSample
 
     DLOGD("Here 2");
     pSampleStreamingSession->pushProfilingThread = std::thread(sendProfilingMetricsTryer, pSampleStreamingSession, pSampleConfiguration);
-    //std::thread pushProfilingThread(something);
 
     CHK_STATUS(timerQueueCreate(&pSampleStreamingSession->outboundRTPMetricsTimerQueueHandle));
 
@@ -620,9 +614,6 @@ STATUS initMetricTimers(PSampleStreamingSession pSampleStreamingSession, PSample
                                       &timeoutTimerId));
 
     DLOGD("Here 4");
-    //pushProfilingThread.join();
-    DLOGD("Here 5");
-
 
 CleanUp:
     return retStatus;
@@ -1610,7 +1601,6 @@ STATUS signalingMessageReceived(UINT64 customData, PReceivedSignalingMessage pRe
             }
             CHK_STATUS(createSampleStreamingSession(pSampleConfiguration, pReceivedSignalingMessage->signalingMessage.peerClientId, TRUE,
                                                     &pSampleStreamingSession));
-            DLOGD("Got pastcreateSampleStreamingSession ");
             MUTEX_LOCK(pSampleConfiguration->streamingSessionListReadLock);
             pSampleConfiguration->sampleStreamingSessionList[pSampleConfiguration->streamingSessionCount++] = pSampleStreamingSession;
             MUTEX_UNLOCK(pSampleConfiguration->streamingSessionListReadLock);
