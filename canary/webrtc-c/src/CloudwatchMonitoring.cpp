@@ -6,6 +6,7 @@ CloudwatchMonitoring::CloudwatchMonitoring(PConfig pConfig, ClientConfiguration*
 {
 }
 
+// TODO: Configure to storage dimension based on isStorage config member
 STATUS CloudwatchMonitoring::init()
 {
     STATUS retStatus = STATUS_SUCCESS;

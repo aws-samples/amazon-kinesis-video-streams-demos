@@ -13,11 +13,18 @@ INT32 main(INT32 argc, CHAR* argv[])
     SignalingClientMetrics signalingClientMetrics;
     signalingClientMetrics.version = SIGNALING_CLIENT_METRICS_CURRENT_VERSION;
 
-    auto config = Canary::Config();
+    auto canaryConfig = Canary::Config();
     Aws::SDKOptions options;
+    UINT64 t1;
 
     SET_INSTRUMENTED_ALLOCATORS();
     UINT32 logLevel = setLogLevel();
+
+    t1 = GETTIME() / HUNDREDS_OF_NANOS_IN_A_MILLISECOND;
+    Aws::InitAPI(options);
+    CHK_STATUS(canaryConfig.init(argc, argv));
+    CHK_STATUS(Canary::Cloudwatch::init(&canaryConfig));
+    DLOGD("Canary init time: %d [ms]", (GETTIME() / HUNDREDS_OF_NANOS_IN_A_MILLISECOND) - t1);
 
 #ifndef _WIN32
     signal(SIGINT, sigintHandler);
@@ -26,7 +33,10 @@ INT32 main(INT32 argc, CHAR* argv[])
 #ifdef IOT_CORE_ENABLE_CREDENTIALS
     CHK_ERR((pChannelName = getenv(IOT_CORE_THING_NAME)) != NULL, STATUS_INVALID_OPERATION, "AWS_IOT_CORE_THING_NAME must be set");
 #else
-    pChannelName = argc > 1 ? argv[1] : SAMPLE_CHANNEL_NAME;
+    // Changed sample to use Canary env var for channel name rather than command argument.
+    //pChannelName = argc > 1 ? argv[1] : SAMPLE_CHANNEL_NAME;
+    pChannelName = (PCHAR) canaryConfig.channelName.value.c_str();
+
 #endif
 
     CHK_STATUS(createSampleConfiguration(pChannelName, SIGNALING_CHANNEL_ROLE_TYPE_MASTER, TRUE, TRUE, logLevel, &pSampleConfiguration));
@@ -36,9 +46,10 @@ INT32 main(INT32 argc, CHAR* argv[])
     pSampleConfiguration->videoSource = sendVideoPackets;
     pSampleConfiguration->receiveAudioVideoSource = sampleReceiveAudioVideoFrame;
 
-    if (argc > 2 && STRNCMP(argv[2], "1", 2) == 0) {
+    // Force sample to use storage mode.
+    //if (argc > 2 && STRNCMP(argv[2], "1", 2) == 0) {
         pSampleConfiguration->channelInfo.useMediaStorage = TRUE;
-    }
+    //}
 
 #ifdef ENABLE_DATA_CHANNEL
     pSampleConfiguration->onDataChannel = onDataChannel;
@@ -58,11 +69,6 @@ INT32 main(INT32 argc, CHAR* argv[])
     // Initialize KVS WebRTC. This must be done before anything else, and must only be done once.
     CHK_STATUS(initKvsWebRtc());
     DLOGI("[KVS Master] KVS WebRTC initialization completed successfully");
-
-
-    Aws::InitAPI(options);
-    CHK_STATUS(config.init(argc, argv));
-    CHK_STATUS(Canary::Cloudwatch::init(&config));
 
     CHK_STATUS(initSignaling(pSampleConfiguration, SAMPLE_MASTER_CLIENT_ID));
     DLOGI("[KVS Master] Channel %s set up done ", pChannelName);
