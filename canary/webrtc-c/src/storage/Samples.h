@@ -136,6 +136,8 @@ typedef struct {
 
     MUTEX signalingSendMessageLock;
 
+    std::atomic<UINT64> storageDisconnectedTime;
+
     UINT32 pregenerateCertTimerId;
     PStackQueue pregeneratedCertificates; // Max MAX_RTCCONFIGURATION_CERTIFICATES certificates
 

@@ -4,6 +4,7 @@ namespace Canary {
 
 CloudwatchMonitoring::CloudwatchMonitoring(PConfig pConfig, ClientConfiguration* pClientConfig) : pConfig(pConfig), client(*pClientConfig)
 {
+    pConfig->isStorage ? this->isStorage = true : this->isStorage = false;
 }
 
 // TODO: Configure to storage dimension based on isStorage config member
@@ -11,10 +12,10 @@ STATUS CloudwatchMonitoring::init()
 {
     STATUS retStatus = STATUS_SUCCESS;
 
-    this->channelDimension.SetName("WebRTCSDKCanaryChannelName");
+    this->isStorage ? this->channelDimension.SetName("StorageWebRTCSDKCanaryChannelName") : this->channelDimension.SetName("WebRTCSDKCanaryChannelName");
     this->channelDimension.SetValue(pConfig->channelName.value);
 
-    this->labelDimension.SetName("WebRTCSDKCanaryLabel");
+    this->isStorage ? this->labelDimension.SetName("StorageWebRTCSDKCanaryLabel") : this->labelDimension.SetName("WebRTCSDKCanaryLabel");
     this->labelDimension.SetValue(pConfig->label.value);
 
     return retStatus;
@@ -188,6 +189,33 @@ VOID CloudwatchMonitoring::pushTimeToFirstFrame(UINT64 timeToFirstFrame, Aws::Cl
 
     this->push(datum);
 }
+
+
+
+VOID CloudwatchMonitoring::pushStorageDisconnectToFrameSentTime(UINT64 storageDisconnectToFrameSentTime, Aws::CloudWatch::Model::StandardUnit unit)
+{
+    MetricDatum datum;
+
+    datum.SetMetricName("StorageDisconnectToFrameSentTime");
+    datum.SetValue(storageDisconnectToFrameSentTime);
+    datum.SetUnit(unit);
+
+    this->push(datum);
+}
+
+VOID CloudwatchMonitoring::pushJoinSessionTime(UINT64 joinSessionTime, Aws::CloudWatch::Model::StandardUnit unit)
+{
+    MetricDatum datum;
+
+    datum.SetMetricName("JoinSessionTime");
+    datum.SetValue(joinSessionTime);
+    datum.SetUnit(unit);
+
+    this->push(datum);
+}
+
+
+
 VOID CloudwatchMonitoring::pushSignalingInitDelay(UINT64 delay, Aws::CloudWatch::Model::StandardUnit unit)
 {
     MetricDatum datum;
@@ -356,6 +384,21 @@ VOID CloudwatchMonitoring::pushSignalingClientMetrics(PSignalingClientMetrics pS
     connectClientDatum.SetValue(pSignalingClientMetrics->signalingClientStats.connectClientTime);
     connectClientDatum.SetUnit(Aws::CloudWatch::Model::StandardUnit::Milliseconds);
     this->push(connectClientDatum);
+
+    // TODO: clean the below up.
+    if(this->isStorage) {
+        UINT64 joinSessionToOffer = pSignalingClientMetrics->signalingClientStats.joinSessionToOfferRecvTime;
+        MetricDatum joinSessionToOfferDatum;
+        joinSessionToOfferDatum.SetMetricName("JoinSessionToOfferReceived");
+        joinSessionToOfferDatum.SetValue(joinSessionToOffer / HUNDREDS_OF_NANOS_IN_A_MILLISECOND);
+        joinSessionToOfferDatum.SetUnit(Aws::CloudWatch::Model::StandardUnit::Milliseconds);
+        this->push(joinSessionToOfferDatum);
+            
+        UINT64 joinSessionCallTime;
+        joinSessionCallTime = (pSignalingClientMetrics->signalingClientStats.joinSessionCallTime);
+        Canary::Cloudwatch::getInstance().monitoring.pushJoinSessionTime(joinSessionCallTime,
+                                                                    Aws::CloudWatch::Model::StandardUnit::Milliseconds);
+        }
 }
 
 VOID CloudwatchMonitoring::pushInboundRtpStats(Canary::PIncomingRTPMetricsContext pIncomingRtpStats)

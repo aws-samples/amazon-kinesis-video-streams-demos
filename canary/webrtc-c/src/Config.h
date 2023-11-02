@@ -26,6 +26,8 @@ class Config {
     Value<BOOL> useIotCredentialProvider;
     Value<BOOL> isProfilingMode;
 
+    BOOL isStorage;
+
     // credentials
     Value<std::string> accessKey;
     Value<std::string> secretKey;

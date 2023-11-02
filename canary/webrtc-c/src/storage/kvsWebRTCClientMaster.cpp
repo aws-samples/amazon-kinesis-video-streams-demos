@@ -14,11 +14,16 @@ INT32 main(INT32 argc, CHAR* argv[])
     signalingClientMetrics.version = SIGNALING_CLIENT_METRICS_CURRENT_VERSION;
 
     auto canaryConfig = Canary::Config();
+    canaryConfig.isStorage = true;	
     Aws::SDKOptions options;
     UINT64 t1;
 
     SET_INSTRUMENTED_ALLOCATORS();
     UINT32 logLevel = setLogLevel();
+
+
+    std::string filePath = "../toConsumer.txt";
+    remove(filePath.c_str());
 
     t1 = GETTIME() / HUNDREDS_OF_NANOS_IN_A_MILLISECOND;
     Aws::InitAPI(options);
@@ -49,6 +54,7 @@ INT32 main(INT32 argc, CHAR* argv[])
     // Force sample to use storage mode.
     //if (argc > 2 && STRNCMP(argv[2], "1", 2) == 0) {
         pSampleConfiguration->channelInfo.useMediaStorage = TRUE;
+        pSampleConfiguration->storageDisconnectedTime = 0;
     //}
 
 #ifdef ENABLE_DATA_CHANNEL
@@ -156,6 +162,18 @@ PVOID writeFirstFrameSentTimeToFile(PSampleConfiguration pSampleConfiguration){
     
 }
 
+VOID calculateDisconnectToFrameSentTime(PSampleConfiguration pSampleConfiguration)
+{
+    if (storageDisconnectedTime.load() != 0){
+        DOUBLE storageDisconnectToFrameSentTime = (DOUBLE) (GETTIME() - storageDisconnectedTime.load()) / HUNDREDS_OF_NANOS_IN_A_MILLISECOND;
+        Canary::Cloudwatch::getInstance().monitoring.pushStorageDisconnectToFrameSentTime(storageDisconnectToFrameSentTime,
+                                                                        Aws::CloudWatch::Model::StandardUnit::Milliseconds);
+        storageDisconnectedTime = 0;
+    } else {
+        DLOGE("Failed to send storageDisconnectToFrameSentTime metric, storageDisconnectedTime is zero (not set)");
+    }
+}
+
 PVOID sendVideoPackets(PVOID args)
 {
     STATUS retStatus = STATUS_SUCCESS;
@@ -206,6 +224,9 @@ PVOID sendVideoPackets(PVOID args)
             if (pSampleConfiguration->sampleStreamingSessionList[i]->firstFrame && status == STATUS_SUCCESS) {
                 writeFirstFrameSentTimeToFile(pSampleConfiguration);
                 PROFILE_WITH_START_TIME(pSampleConfiguration->sampleStreamingSessionList[i]->offerReceiveTime, "Time to first frame");
+                
+                calculateDisconnectToFrameSentTime(pSampleConfiguration);
+
                 pSampleConfiguration->sampleStreamingSessionList[i]->firstFrame = FALSE;
             }
             encoderStats.encodeTimeMsec = 4; // update encode time to an arbitrary number to demonstrate stats update

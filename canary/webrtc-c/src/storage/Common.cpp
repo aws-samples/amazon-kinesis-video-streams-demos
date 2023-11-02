@@ -85,6 +85,7 @@ VOID onConnectionStateChange(UINT64 customData, RTC_PEER_CONNECTION_STATE newSta
             DLOGD("p2p connection disconnected");
             ATOMIC_STORE_BOOL(&pSampleStreamingSession->terminateFlag, TRUE);
             CVAR_BROADCAST(pSampleConfiguration->cvar);
+            pSampleConfiguration->storageDisconnectedTime = GETTIME();
             // explicit fallthrough
         default:
             ATOMIC_STORE_BOOL(&pSampleConfiguration->connected, FALSE);
@@ -475,7 +476,17 @@ CleanUp:
 
 
 
-
+VOID calculateDisconnectToFrameSentTime()
+{
+    if (storageDisconnectedTime.load() != 0){
+        DOUBLE storageDisconnectToFrameSentTime = (DOUBLE) (GETTIME() - storageDisconnectedTime.load()) / HUNDREDS_OF_NANOS_IN_A_MILLISECOND;
+        Canary::Cloudwatch::getInstance().monitoring.pushStorageDisconnectToFrameSentTime(storageDisconnectToFrameSentTime,
+                                                                        Aws::CloudWatch::Model::StandardUnit::Milliseconds);
+        storageDisconnectedTime = 0;
+    } else {
+        DLOGE("Failed to send storageDisconnectToFrameSentTime metric, storageDisconnectedTime is zero (not set)");
+    }
+}
 
 STATUS populateOutgoingRtpMetricsContext(PSampleStreamingSession pSampleStreamingSession)
 {
@@ -561,6 +572,12 @@ STATUS sendProfilingMetrics(PSampleStreamingSession pSampleStreamingSession, PSa
         DLOGP("[Signaling create client] %" PRIu64 " ms", pSampleConfiguration->signalingClientMetrics.signalingClientStats.createClientTime);
         DLOGP("[Signaling fetch client] %" PRIu64 " ms", pSampleConfiguration->signalingClientMetrics.signalingClientStats.fetchClientTime);
         DLOGP("[Signaling connect client] %" PRIu64 " ms", pSampleConfiguration->signalingClientMetrics.signalingClientStats.connectClientTime);
+        
+        UINT64 joinSessionToOffer = pSampleConfiguration->signalingClientMetrics.signalingClientStats.joinSessionToOfferRecvTime;
+        if (joinSessionToOffer != 0) {
+            DLOGP("[Signaling Join session to offer received] %" PRIu64 " ms", joinSessionToOffer);
+        }
+
         Canary::Cloudwatch::getInstance().monitoring.pushSignalingClientMetrics(&pSampleConfiguration->signalingClientMetrics);
     }
     if(STATUS_FAILED(peerConnectionGetMetrics(pSampleStreamingSession->pPeerConnection, &pSampleStreamingSession->peerConnectionMetrics))) {
@@ -1301,10 +1318,14 @@ STATUS freeSampleConfiguration(PSampleConfiguration* ppSampleConfiguration)
     StackQueueIterator iterator;
     BOOL locked = FALSE;
 
+    std::string filePath = "../toConsumer.txt";
+
     CHK(ppSampleConfiguration != NULL, STATUS_NULL_ARG);
     pSampleConfiguration = *ppSampleConfiguration;
 
     CHK(pSampleConfiguration != NULL, retStatus);
+
+    remove(filePath.c_str());
 
     if (IS_VALID_TIMER_QUEUE_HANDLE(pSampleConfiguration->timerQueueHandle)) {
         if (pSampleConfiguration->iceCandidatePairStatsTimerId != MAX_UINT32) {
