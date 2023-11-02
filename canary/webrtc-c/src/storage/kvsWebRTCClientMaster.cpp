@@ -164,11 +164,12 @@ PVOID writeFirstFrameSentTimeToFile(PSampleConfiguration pSampleConfiguration){
 
 VOID calculateDisconnectToFrameSentTime(PSampleConfiguration pSampleConfiguration)
 {
-    if (storageDisconnectedTime.load() != 0){
-        DOUBLE storageDisconnectToFrameSentTime = (DOUBLE) (GETTIME() - storageDisconnectedTime.load()) / HUNDREDS_OF_NANOS_IN_A_MILLISECOND;
+    UINT64 disconnectTime = pSampleConfiguration->storageDisconnectedTime.load();
+    if (disconnectTime != 0){
+        DOUBLE storageDisconnectToFrameSentTime = (DOUBLE) (GETTIME() - disconnectTime) / HUNDREDS_OF_NANOS_IN_A_MILLISECOND;
         Canary::Cloudwatch::getInstance().monitoring.pushStorageDisconnectToFrameSentTime(storageDisconnectToFrameSentTime,
                                                                         Aws::CloudWatch::Model::StandardUnit::Milliseconds);
-        storageDisconnectedTime = 0;
+        pSampleConfiguration->storageDisconnectedTime = 0;
     } else {
         DLOGE("Failed to send storageDisconnectToFrameSentTime metric, storageDisconnectedTime is zero (not set)");
     }

@@ -476,18 +476,6 @@ CleanUp:
 
 
 
-VOID calculateDisconnectToFrameSentTime()
-{
-    if (storageDisconnectedTime.load() != 0){
-        DOUBLE storageDisconnectToFrameSentTime = (DOUBLE) (GETTIME() - storageDisconnectedTime.load()) / HUNDREDS_OF_NANOS_IN_A_MILLISECOND;
-        Canary::Cloudwatch::getInstance().monitoring.pushStorageDisconnectToFrameSentTime(storageDisconnectToFrameSentTime,
-                                                                        Aws::CloudWatch::Model::StandardUnit::Milliseconds);
-        storageDisconnectedTime = 0;
-    } else {
-        DLOGE("Failed to send storageDisconnectToFrameSentTime metric, storageDisconnectedTime is zero (not set)");
-    }
-}
-
 STATUS populateOutgoingRtpMetricsContext(PSampleStreamingSession pSampleStreamingSession)
 {
     DOUBLE currentDuration = 0;
