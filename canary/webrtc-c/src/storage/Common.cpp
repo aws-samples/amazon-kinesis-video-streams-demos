@@ -85,6 +85,7 @@ VOID onConnectionStateChange(UINT64 customData, RTC_PEER_CONNECTION_STATE newSta
             DLOGD("p2p connection disconnected");
             ATOMIC_STORE_BOOL(&pSampleStreamingSession->terminateFlag, TRUE);
             CVAR_BROADCAST(pSampleConfiguration->cvar);
+            DLOGI("Setting storageDisconnectedTime member to current time");
             pSampleConfiguration->storageDisconnectedTime = GETTIME();
             // explicit fallthrough
         default:
@@ -515,7 +516,7 @@ STATUS populateOutgoingRtpMetricsContext(PSampleStreamingSession pSampleStreamin
 
 STATUS canaryRtpOutboundStats(UINT32 timerId, UINT64 currentTime, UINT64 customData)
 {
-    DLOGD("TIMER FUNCTION INVOKED");
+    DLOGD("canaryRtpOutboundStats function invoked");
     UNUSED_PARAM(timerId);
     UNUSED_PARAM(currentTime);
     STATUS retStatus = STATUS_SUCCESS;
@@ -602,13 +603,19 @@ VOID sendProfilingMetricsTryer(PSampleStreamingSession pSampleStreamingSession, 
     }
 }
 
-STATUS initMetricsTimers(PSampleStreamingSession pSampleStreamingSession, PSampleConfiguration pSampleConfiguration)
+STATUS initMetricsTimers(PSampleStreamingSession pSampleStreamingSession)
 {
     DLOGD("Here 1");
+
     STATUS retStatus = STATUS_SUCCESS;
+    PSampleConfiguration pSampleConfiguration;
+    CHK(pSampleStreamingSession != NULL, STATUS_NULL_ARG);
+    pSampleConfiguration = pSampleStreamingSession->pSampleConfiguration;
+    CHK(pSampleConfiguration != NULL, STATUS_NULL_ARG);
 
     DLOGD("Here 2");
     pSampleStreamingSession->pushProfilingThread = std::thread(sendProfilingMetricsTryer, pSampleStreamingSession, pSampleConfiguration);
+    pSampleStreamingSession->pushProfilingThread.detach();
 
     DLOGD("Here 3");
 
@@ -717,7 +724,7 @@ STATUS createSampleStreamingSession(PSampleConfiguration pSampleConfiguration, P
     pSampleStreamingSession->canaryOutgoingRTPMetricsContext.prevNackCount = 0;
     pSampleStreamingSession->canaryOutgoingRTPMetricsContext.prevRetxBytesSent = 0;
     pSampleStreamingSession->canaryOutgoingRTPMetricsContext.prevFramesSent = 0;
-    CHK_STATUS(initMetricsTimers(pSampleStreamingSession, pSampleConfiguration));
+    CHK_STATUS(initMetricsTimers(pSampleStreamingSession));
 
 CleanUp:
     if (STATUS_FAILED(retStatus) && pSampleStreamingSession != NULL) {

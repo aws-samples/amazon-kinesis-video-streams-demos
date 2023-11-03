@@ -64,6 +64,8 @@ INT32 main(INT32 argc, CHAR* argv[])
     // Force sample to use storage mode.
     //if (argc > 2 && STRNCMP(argv[2], "1", 2) == 0) {
         pSampleConfiguration->channelInfo.useMediaStorage = TRUE;
+        
+        DLOGI("Initializing storageDisconnectedTime member as zero");
         pSampleConfiguration->storageDisconnectedTime = 0;
     //}
 
@@ -93,6 +95,7 @@ INT32 main(INT32 argc, CHAR* argv[])
     if(canaryConfig.duration.value != 0) {
         DLOGD("Scheduling canary duration for %lu seconds", canaryConfig.duration.value / HUNDREDS_OF_NANOS_IN_A_SECOND);
         canaryDurationThread = std::thread(shceduleShutdown, canaryConfig.duration.value, pSampleConfiguration);
+        canaryDurationThread.detach();
     }
 
     // Checking for termination
@@ -104,9 +107,6 @@ CleanUp:
     if (retStatus != STATUS_SUCCESS) {
         DLOGE("[KVS Master] Terminated with status code 0x%08x", retStatus);
     }
-
-    canaryDurationThread.join();
-
 
     DLOGI("[KVS Master] Cleaning up....");
     if (pSampleConfiguration != NULL) {
@@ -188,9 +188,10 @@ VOID calculateDisconnectToFrameSentTime(PSampleConfiguration pSampleConfiguratio
         DOUBLE storageDisconnectToFrameSentTime = (DOUBLE) (GETTIME() - disconnectTime) / HUNDREDS_OF_NANOS_IN_A_MILLISECOND;
         Canary::Cloudwatch::getInstance().monitoring.pushStorageDisconnectToFrameSentTime(storageDisconnectToFrameSentTime,
                                                                         Aws::CloudWatch::Model::StandardUnit::Milliseconds);
+        DLOGI("Setting storageDisconnectedTime member to zero");
         pSampleConfiguration->storageDisconnectedTime = 0;
     } else {
-        DLOGE("Not sending storageDisconnectToFrameSentTime metric, storageDisconnectedTime is zero (not set)");
+        DLOGI("Not sending storageDisconnectToFrameSentTime metric, storageDisconnectedTime is zero (not set)");
     }
 }
 
