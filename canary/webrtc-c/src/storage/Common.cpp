@@ -519,10 +519,10 @@ STATUS canaryRtpOutboundStats(UINT32 timerId, UINT64 currentTime, UINT64 customD
     UNUSED_PARAM(timerId);
     UNUSED_PARAM(currentTime);
     STATUS retStatus = STATUS_SUCCESS;
-    //if (!terminated.load())
-    if (true)
-    {
-        PSampleStreamingSession pSampleStreamingSession = (PSampleStreamingSession) customData;
+
+    PSampleStreamingSession pSampleStreamingSession = (PSampleStreamingSession) customData;
+
+    if(!ATOMIC_LOAD_BOOL(&pSampleStreamingSession->terminateFlag)) {
         if (pSampleStreamingSession->pVideoRtcRtpTransceiver) {
                 pSampleStreamingSession->canaryMetrics.requestedTypeOfStats = RTC_STATS_TYPE_OUTBOUND_RTP;
                 CHK_LOG_ERR(rtcPeerConnectionGetMetrics(pSampleStreamingSession->pPeerConnection, pSampleStreamingSession->pVideoRtcRtpTransceiver, &(pSampleStreamingSession->canaryMetrics)));

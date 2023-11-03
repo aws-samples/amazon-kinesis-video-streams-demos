@@ -4,6 +4,13 @@
 
 extern PSampleConfiguration gSampleConfiguration;
 
+VOID shceduleShutdown(UINT64 duration, PSampleConfiguration pSampleConfiguration)
+{
+    THREAD_SLEEP(duration);
+    DLOGD("Terminating canary due to duration reached");
+    ATOMIC_STORE_BOOL(&pSampleConfiguration->interrupted, TRUE);
+}
+
 INT32 main(INT32 argc, CHAR* argv[])
 {
     STATUS retStatus = STATUS_SUCCESS;
@@ -22,13 +29,16 @@ INT32 main(INT32 argc, CHAR* argv[])
     UINT32 logLevel = setLogLevel();
 
 
+    t1 = GETTIME() / HUNDREDS_OF_NANOS_IN_A_MILLISECOND;
     std::string filePath = "../toConsumer.txt";
     remove(filePath.c_str());
 
-    t1 = GETTIME() / HUNDREDS_OF_NANOS_IN_A_MILLISECOND;
+    std::thread canaryDurationThread;
+
     Aws::InitAPI(options);
     CHK_STATUS(canaryConfig.init(argc, argv));
     CHK_STATUS(Canary::Cloudwatch::init(&canaryConfig));
+    canaryConfig.print();
     DLOGD("Canary init time: %d [ms]", (GETTIME() / HUNDREDS_OF_NANOS_IN_A_MILLISECOND) - t1);
 
 #ifndef _WIN32
@@ -80,6 +90,11 @@ INT32 main(INT32 argc, CHAR* argv[])
     CHK_STATUS(initSignaling(pSampleConfiguration, SAMPLE_MASTER_CLIENT_ID));
     DLOGI("[KVS Master] Channel %s set up done ", pChannelName);
 
+    if(canaryConfig.duration.value != 0) {
+        DLOGD("Scheduling canary duration for %lu seconds", canaryConfig.duration.value / HUNDREDS_OF_NANOS_IN_A_SECOND);
+        canaryDurationThread = std::thread(shceduleShutdown, canaryConfig.duration.value, pSampleConfiguration);
+    }
+
     // Checking for termination
     CHK_STATUS(sessionCleanupWait(pSampleConfiguration));
     DLOGI("[KVS Master] Streaming session terminated");
@@ -89,6 +104,9 @@ CleanUp:
     if (retStatus != STATUS_SUCCESS) {
         DLOGE("[KVS Master] Terminated with status code 0x%08x", retStatus);
     }
+
+    canaryDurationThread.join();
+
 
     DLOGI("[KVS Master] Cleaning up....");
     if (pSampleConfiguration != NULL) {
