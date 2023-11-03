@@ -170,6 +170,7 @@ PVOID writeFirstFrameSentTimeToFile(PSampleConfiguration pSampleConfiguration){
     //CHAR fileNameBuffer[MAX_CHANNEL_NAME_LEN + 7];
     //SNPRINTF(fileNameBuffer, SIZEOF(fileNameBuffer) / SIZEOF(CHAR), "../%s.txt", pSampleConfiguration->channelInfo.pChannelName);
 
+    DLOGI("Opening toConsumer file");
     FILE *toConsumer = FOPEN("../toConsumer.txt", "w");
     if (toConsumer == NULL)
     {
@@ -318,6 +319,9 @@ PVOID sendAudioPackets(PVOID args)
                 } else if (pSampleConfiguration->sampleStreamingSessionList[i]->firstFrame && status == STATUS_SUCCESS) {
                     writeFirstFrameSentTimeToFile(pSampleConfiguration);
                     PROFILE_WITH_START_TIME(pSampleConfiguration->sampleStreamingSessionList[i]->offerReceiveTime, "Time to first frame");
+
+                    calculateDisconnectToFrameSentTime(pSampleConfiguration);
+
                     pSampleConfiguration->sampleStreamingSessionList[i]->firstFrame = FALSE;
                 }
             }
