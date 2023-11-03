@@ -57,6 +57,7 @@ INT32 main(INT32 argc, CHAR* argv[])
         pSampleConfiguration->storageDisconnectedTime = 0;
     //}
 
+
 #ifdef ENABLE_DATA_CHANNEL
     pSampleConfiguration->onDataChannel = onDataChannel;
 #endif
@@ -171,7 +172,7 @@ VOID calculateDisconnectToFrameSentTime(PSampleConfiguration pSampleConfiguratio
                                                                         Aws::CloudWatch::Model::StandardUnit::Milliseconds);
         pSampleConfiguration->storageDisconnectedTime = 0;
     } else {
-        DLOGE("Failed to send storageDisconnectToFrameSentTime metric, storageDisconnectedTime is zero (not set)");
+        DLOGE("Not sending storageDisconnectToFrameSentTime metric, storageDisconnectedTime is zero (not set)");
     }
 }
 

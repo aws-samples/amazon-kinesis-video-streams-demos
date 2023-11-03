@@ -602,21 +602,18 @@ VOID sendProfilingMetricsTryer(PSampleStreamingSession pSampleStreamingSession, 
     }
 }
 
-STATUS initMetricTimers(PSampleStreamingSession pSampleStreamingSession, PSampleConfiguration pSampleConfiguration)
+STATUS initMetricsTimers(PSampleStreamingSession pSampleStreamingSession, PSampleConfiguration pSampleConfiguration)
 {
     DLOGD("Here 1");
     STATUS retStatus = STATUS_SUCCESS;
-    UINT32 timeoutTimerId;
 
     DLOGD("Here 2");
     pSampleStreamingSession->pushProfilingThread = std::thread(sendProfilingMetricsTryer, pSampleStreamingSession, pSampleConfiguration);
 
-    CHK_STATUS(timerQueueCreate(&pSampleStreamingSession->outboundRTPMetricsTimerQueueHandle));
-
     DLOGD("Here 3");
 
-    CHK_STATUS(timerQueueAddTimer(pSampleStreamingSession->outboundRTPMetricsTimerQueueHandle, METRICS_INVOCATION_PERIOD, METRICS_INVOCATION_PERIOD, canaryRtpOutboundStats, (UINT64) pSampleStreamingSession,
-                                      &timeoutTimerId));
+    CHK_STATUS(timerQueueAddTimer(pSampleStreamingSession->pSampleConfiguration->timerQueueHandle, METRICS_INVOCATION_PERIOD, METRICS_INVOCATION_PERIOD, canaryRtpOutboundStats, (UINT64) pSampleStreamingSession,
+                                      &pSampleStreamingSession->metricsTimerId));
 
     DLOGD("Here 4");
 
@@ -720,8 +717,7 @@ STATUS createSampleStreamingSession(PSampleConfiguration pSampleConfiguration, P
     pSampleStreamingSession->canaryOutgoingRTPMetricsContext.prevNackCount = 0;
     pSampleStreamingSession->canaryOutgoingRTPMetricsContext.prevRetxBytesSent = 0;
     pSampleStreamingSession->canaryOutgoingRTPMetricsContext.prevFramesSent = 0;
-    pSampleStreamingSession->outboundRTPMetricsTimerQueueHandle = 0;
-    CHK_STATUS(initMetricTimers(pSampleStreamingSession, pSampleConfiguration));
+    CHK_STATUS(initMetricsTimers(pSampleStreamingSession, pSampleConfiguration));
 
 CleanUp:
     if (STATUS_FAILED(retStatus) && pSampleStreamingSession != NULL) {
@@ -749,9 +745,11 @@ STATUS freeSampleStreamingSession(PSampleStreamingSession* ppSampleStreamingSess
 
     DLOGD("Freeing streaming session with peer id: %s ", pSampleStreamingSession->peerId);
 
+    // Free the metrics timer, make new one for each session (threfore making a new one for each 60min storage sesssion).
     DLOGD("Cleaningup Metrics Timer");
-    if (IS_VALID_TIMER_QUEUE_HANDLE(pSampleStreamingSession->outboundRTPMetricsTimerQueueHandle)) {
-        timerQueueFree(&pSampleStreamingSession->outboundRTPMetricsTimerQueueHandle);
+    if (IS_VALID_TIMER_QUEUE_HANDLE(pSampleConfiguration->timerQueueHandle)) {
+        CHK_LOG_ERR(timerQueueCancelTimer(pSampleConfiguration->timerQueueHandle, pSampleStreamingSession->metricsTimerId,
+                                          (UINT64) pSampleConfiguration));
     }
 
     ATOMIC_STORE_BOOL(&pSampleStreamingSession->terminateFlag, TRUE);
