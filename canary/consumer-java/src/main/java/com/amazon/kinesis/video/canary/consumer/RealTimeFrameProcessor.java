@@ -52,7 +52,7 @@ public class RealTimeFrameProcessor extends WebrtcStorageCanaryConsumer implemen
             try
             {
                 long currentTime = System.currentTimeMillis();
-                String filePath = "../webrtc-c/" + super.streamName + ".txt";
+                String filePath = "../webrtc-c/toConsumer.txt";
                 final String startTimeStr = FileUtils.readFileToString(new File(filePath)).trim();
                 long startTime = Long.parseLong(startTimeStr);
                 long rtpToFirstFragment = currentTime - startTime;

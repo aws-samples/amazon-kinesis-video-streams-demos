@@ -177,7 +177,7 @@ PVOID writeFirstFrameSentTimeToFile(PSampleConfiguration pSampleConfiguration){
         printf("Error opening toConsumer file\n");
         exit(1);
     }
-    fprintf(toConsumer, "%lli\n", GETTIME());
+    fprintf(toConsumer, "%lli\n", GETTIME() / HUNDREDS_OF_NANOS_IN_A_MILLISECOND);
     FCLOSE(toConsumer);
     
 }
