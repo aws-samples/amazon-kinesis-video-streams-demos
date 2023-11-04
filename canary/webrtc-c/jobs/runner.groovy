@@ -12,7 +12,7 @@ CREDENTIALS = [
     ]
 ]
 
-def buildProject(useMbedTLS, thing_prefix) {
+def buildWebRTCProject(useMbedTLS, thing_prefix) {
     echo 'Flag set to ' + useMbedTLS
     checkout([$class: 'GitSCM', branches: [[name: params.GIT_HASH ]],
               userRemoteConfigs: [[url: params.GIT_URL]]])
@@ -32,6 +32,28 @@ def buildProject(useMbedTLS, thing_prefix) {
         cd build &&
         ${configureCmd} &&
         make"""
+}
+
+def buildConsumerProject() {
+    // TODO: should probably remove this - not needed for webrtc consumer
+    def consumerStartUpDelay = 45
+    sleep consumerStartUpDelay
+
+    checkout([$class: 'GitSCM', branches: [[name: params.GIT_HASH ]],
+              userRemoteConfigs: [[url: params.GIT_URL]]])
+              
+    def consumerEnvs = [        
+        'JAVA_HOME': "/usr/lib/jvm/default-java",
+        'M2_HOME': "/usr/share/maven"
+    ].collect({k,v -> "${k}=${v}" })
+
+    withEnv(consumerEnvs) {
+        sh '''
+            PATH="$JAVA_HOME/bin:$PATH"
+            export PATH="$M2_HOME/bin:$PATH"
+            cd ./canary/consumer-java
+            make -j4'''
+    }
 }
 
 def withRunnerWrapper(envs, fn) {
@@ -61,7 +83,7 @@ def buildPeer(isMaster, params) {
     }
 
     def thing_prefix = "${env.JOB_NAME}-${params.RUNNER_LABEL}"
-    buildProject(params.USE_MBEDTLS, thing_prefix)
+    buildWebRTCProject(params.USE_MBEDTLS, thing_prefix)
 
     RUNNING_NODES_IN_BUILDING--
     
@@ -108,7 +130,6 @@ def buildPeer(isMaster, params) {
 def buildSignaling(params) {
 
     // TODO: get the branch and version from orchestrator
-    // TODO: get the branch and version from orchestrator
     if (params.FIRST_ITERATION) {
         if(params.CACHED_WORKSPACE_ID == "${env.WORKSPACE}") {
             echo "Same workspace: " + params.CACHED_WORKSPACE_ID
@@ -117,9 +138,8 @@ def buildSignaling(params) {
             deleteDir()
         }
     }
-
     def thing_prefix = "${env.JOB_NAME}-${params.RUNNER_LABEL}"
-    buildProject(params.USE_MBEDTLS, thing_prefix)
+    buildWebRTCProject(params.USE_MBEDTLS, thing_prefix)
 
     def scripts_dir = "$WORKSPACE/canary/webrtc-c/scripts"
     def endpoint = "${scripts_dir}/iot-credential-provider.txt"
@@ -150,6 +170,78 @@ def buildSignaling(params) {
     }
 }
 
+def buildStorageCanary(isConsumer, params) {
+    def scripts_dir = !isConsumer ? "$WORKSPACE/canary/webrtc-c/scripts" :
+        "$WORKSPACE/canary/webrtc-c/scripts"
+    def thing_prefix = "${env.JOB_NAME}-${params.RUNNER_LABEL}"
+    def endpoint = "${scripts_dir}/iot-credential-provider.txt"
+    def core_cert_file = "${scripts_dir}/${thing_prefix}_certificate.pem"
+    def private_key_file = "${scripts_dir}/${thing_prefix}_private.key"
+    def role_alias = "${thing_prefix}_role_alias"
+    def thing_name = "${thing_prefix}_thing"
+
+    def commonEnvs = [
+      'AWS_KVS_LOG_LEVEL': params.AWS_KVS_LOG_LEVEL,
+      'CANARY_USE_IOT_PROVIDER': params.USE_IOT,
+      'CANARY_LABEL': params.SCENARIO_LABEL,
+      'CANARY_DURATION_IN_SECONDS': params.DURATION_IN_SECONDS,
+      'AWS_IOT_CORE_CREDENTIAL_ENDPOINT': "${endpoint}",
+      'AWS_IOT_CORE_CERT': "${core_cert_file}",
+      'AWS_IOT_CORE_PRIVATE_KEY': "${private_key_file}",
+      'AWS_IOT_CORE_ROLE_ALIAS': "${role_alias}",
+      'AWS_IOT_CORE_THING_NAME': "${thing_name}"
+    ]
+
+    def masterEnvs = [
+      'CANARY_USE_TURN': params.USE_TURN,
+      'CANARY_TRICKLE_ICE': params.TRICKLE_ICE,
+      'CANARY_LOG_GROUP_NAME': params.LOG_GROUP_NAME,
+      'CANARY_LOG_STREAM_NAME': "${params.RUNNER_LABEL}-StorageMaster-${START_TIMESTAMP}",
+      'CANARY_CLIENT_ID': "Master",
+      'CANARY_IS_MASTER': true,
+      'CANARY_CHANNEL_NAME': "${env.JOB_NAME}-${params.RUNNER_LABEL}"
+    ]
+
+    def consumerEnvs = [
+      'JAVA_HOME': "/opt/jdk-11.0.20",
+      'M2_HOME': "/opt/apache-maven-3.6.3",
+      'AWS_DEFAULT_REGION': params.AWS_DEFAULT_REGION,
+      'CANARY_STREAM_NAME': "${env.JOB_NAME}-${params.RUNNER_LABEL}"
+    ]
+
+    RUNNING_NODES_IN_BUILDING++
+    if (params.FIRST_ITERATION) {
+        deleteDir()
+    }
+    if (!isConsumer){
+        buildWebRTCProject(params.USE_MBEDTLS, thing_prefix)
+    } else {
+        buildConsumerProject()
+    }
+    RUNNING_NODES_IN_BUILDING--
+    
+    waitUntil {
+        RUNNING_NODES_IN_BUILDING == 0
+    }
+
+    if (!isConsumer) {
+        def envs = (commonEnvs + masterEnvs).collect{ k, v -> "${k}=${v}" }
+        withRunnerWrapper(envs) {
+            sh """
+                cd ./canary/webrtc-c/build &&
+                ./kvsWebrtcStorageSample"""
+        }
+    } else {
+        def envs = (commonEnvs + consumerEnvs).collect{ k, v -> "${k}=${v}" }
+        withRunnerWrapper(envs) {
+            sh '''
+                cd $WORKSPACE/canary/consumer-java
+                java -classpath target/aws-kinesisvideo-producer-sdk-canary-consumer-1.0-SNAPSHOT.jar:$(cat tmp_jar) -Daws.accessKeyId=${AWS_ACCESS_KEY_ID} -Daws.secretKey=${AWS_SECRET_ACCESS_KEY} com.amazon.kinesis.video.canary.consumer.WebrtcStorageCanaryConsumer
+            '''
+        }
+    }
+}
+
 pipeline {
     agent {
         label params.MASTER_NODE_LABEL
@@ -158,12 +250,15 @@ pipeline {
     parameters {
         choice(name: 'AWS_KVS_LOG_LEVEL', choices: ["1", "2", "3", "4", "5"])
         booleanParam(name: 'IS_SIGNALING')
+        booleanParam(name: 'IS_STORAGE')
+        booleanParam(name: 'IS_STORAGE_SINGLE_NODE')
         booleanParam(name: 'USE_TURN')
         booleanParam(name: 'IS_PROFILING')
         booleanParam(name: 'TRICKLE_ICE')
         booleanParam(name: 'USE_MBEDTLS', defaultValue: false)
         string(name: 'LOG_GROUP_NAME')
         string(name: 'MASTER_NODE_LABEL')
+        string(name: 'CONSUMER_NODE_LABEL')
         string(name: 'VIEWER_NODE_LABEL')
         string(name: 'RUNNER_LABEL')
         string(name: 'SCENARIO_LABEL')
@@ -192,9 +287,13 @@ pipeline {
         stage('Build and Run Webrtc Canary') {
             failFast true
             when {
-                equals expected: false, actual: params.IS_SIGNALING
-            }
+                allOf {
+                    equals expected: false, actual: params.IS_SIGNALING
+                    equals expected: false, actual: params.IS_STORAGE
+                    equals expected: false, actual: params.IS_STORAGE_SINGLE_NODE 
 
+                }
+            }
             parallel {
                 stage('Master') {
                     steps {
@@ -221,7 +320,10 @@ pipeline {
         stage('Build and Run Signaling Canary') {
             failFast true
             when {
-                equals expected: true, actual: params.IS_SIGNALING
+                allOf {
+                    equals expected: true, actual: params.IS_SIGNALING
+                    equals expected: false, actual: params.IS_STORAGE
+                }
             }
 
             steps {
@@ -234,6 +336,65 @@ pipeline {
                     script {
                         CACHED_WORKSPACE_ID = "${env.WORKSPACE}"
                         echo "Cached workspace id post job: ${CACHED_WORKSPACE_ID}"
+                    }
+                }
+            }
+        }
+
+        stage('Build and Run Webrtc-Storage Master and Consumer Canaries') {
+            failFast true
+            when {
+                allOf {
+                    equals expected: false, actual: params.IS_SIGNALING
+                    equals expected: true, actual: params.IS_STORAGE
+                    equals expected: false, actual: params.IS_STORAGE_SINGLE_NODE 
+                }
+            }
+            parallel {
+                stage('StorageMaster') {
+                    steps {
+                        script {
+                            buildStorageCanary(false, params)
+                        }
+                    }
+                }
+                stage('StorageConsumer') {
+                     agent {
+                        label params.CONSUMER_NODE_LABEL
+                    }
+                    steps {
+                        script {
+                            buildStorageCanary(true, params)
+                        }
+                    }
+                }
+            }
+        }
+
+
+        // TODO: make a single node with a unique label that this will use as an agent, this will ensure both stages happen on same node
+        stage('Build and Run Webrtc-Storage Master and Consumer Canaries on Same Node') {
+            failFast true
+            when {
+                allOf {
+                    equals expected: false, actual: params.IS_SIGNALING
+                    equals expected: true, actual: params.IS_STORAGE
+                    equals expected: true, actual: params.IS_STORAGE_SINGLE_NODE 
+                }
+            }
+            parallel {
+                stage('StorageMaster') {
+                    steps {
+                        script {
+                            buildStorageCanary(false, params)
+                        }
+                    }
+                }
+                stage('StorageConsumer') {
+                    steps {
+                        script {
+                            buildStorageCanary(true, params)
+                        }
                     }
                 }
             }
@@ -256,8 +417,11 @@ pipeline {
                 build(
                     job: env.JOB_NAME,
                     parameters: [
+                      string(name: 'AWS_DEFAULT_REGION', value: params.AWS_DEFAULT_REGION),
                       string(name: 'AWS_KVS_LOG_LEVEL', value: params.AWS_KVS_LOG_LEVEL),
                       booleanParam(name: 'IS_SIGNALING', value: params.IS_SIGNALING),
+                      booleanParam(name: 'IS_STORAGE', value: params.IS_STORAGE),
+                      booleanParam(name: 'IS_STORAGE_SINGLE_NODE', value: params.IS_STORAGE_SINGLE_NODE),
                       booleanParam(name: 'USE_TURN', value: params.USE_TURN),
                       booleanParam(name: 'FORCE_TURN', value: params.FORCE_TURN),
                       booleanParam(name: 'USE_IOT', value: params.USE_IOT),
@@ -266,6 +430,7 @@ pipeline {
                       booleanParam(name: 'USE_MBEDTLS', value: params.USE_MBEDTLS),
                       string(name: 'LOG_GROUP_NAME', value: params.LOG_GROUP_NAME),
                       string(name: 'MASTER_NODE_LABEL', value: params.MASTER_NODE_LABEL),
+                      string(name: 'CONSUMER_NODE_LABEL', value: params.CONSUMER_NODE_LABEL),
                       string(name: 'VIEWER_NODE_LABEL', value: params.VIEWER_NODE_LABEL),
                       string(name: 'RUNNER_LABEL', value: params.RUNNER_LABEL),
                       string(name: 'SCENARIO_LABEL', value: params.SCENARIO_LABEL),
