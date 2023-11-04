@@ -21,7 +21,6 @@ INT32 main(INT32 argc, CHAR* argv[])
     signalingClientMetrics.version = SIGNALING_CLIENT_METRICS_CURRENT_VERSION;
 
     auto canaryConfig = Canary::Config();
-    canaryConfig.isStorage = true;	
     Aws::SDKOptions options;
     UINT64 t1;
 
@@ -37,8 +36,10 @@ INT32 main(INT32 argc, CHAR* argv[])
 
     Aws::InitAPI(options);
     CHK_STATUS(canaryConfig.init(argc, argv));
+    canaryConfig.isStorage = true;	
     CHK_STATUS(Canary::Cloudwatch::init(&canaryConfig));
     canaryConfig.print();
+    SET_LOGGER_LOG_LEVEL(canaryConfig.logLevel.value);
     DLOGD("Canary init time: %d [ms]", (GETTIME() / HUNDREDS_OF_NANOS_IN_A_MILLISECOND) - t1);
 
 #ifndef _WIN32
