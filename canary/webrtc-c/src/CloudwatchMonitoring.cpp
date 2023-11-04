@@ -393,12 +393,13 @@ VOID CloudwatchMonitoring::pushSignalingClientMetrics(PSignalingClientMetrics pS
         joinSessionToOfferDatum.SetValue(joinSessionToOffer / HUNDREDS_OF_NANOS_IN_A_MILLISECOND);
         joinSessionToOfferDatum.SetUnit(Aws::CloudWatch::Model::StandardUnit::Milliseconds);
         this->push(joinSessionToOfferDatum);
-            
-        UINT64 joinSessionCallTime;
-        joinSessionCallTime = (pSignalingClientMetrics->signalingClientStats.joinSessionCallTime);
-        Canary::Cloudwatch::getInstance().monitoring.pushJoinSessionTime(joinSessionCallTime,
-                                                                    Aws::CloudWatch::Model::StandardUnit::Milliseconds);
+        
+        UINT64 joinSessionCallTime = (pSignalingClientMetrics->signalingClientStats.joinSessionCallTime);
+        if(joinSessionCallTime != 0){
+            Canary::Cloudwatch::getInstance().monitoring.pushJoinSessionTime(joinSessionCallTime,
+                                                                                Aws::CloudWatch::Model::StandardUnit::Milliseconds);
         }
+    }
 }
 
 VOID CloudwatchMonitoring::pushInboundRtpStats(Canary::PIncomingRTPMetricsContext pIncomingRtpStats)

@@ -1595,6 +1595,8 @@ STATUS signalingMessageReceived(UINT64 customData, PReceivedSignalingMessage pRe
             CHK_ERR(!peerConnectionFound, STATUS_INVALID_OPERATION, "Peer connection %s is in progress",
                     pReceivedSignalingMessage->signalingMessage.peerClientId);
 
+            pSampleConfiguration->offerReceiveTimestamp = GETTIME();
+
             /*
              * Create new streaming session for each offer, then insert the client id and streaming session into
              * pRtcPeerConnectionForRemoteClient for subsequent ice candidate messages. Lastly check if there is

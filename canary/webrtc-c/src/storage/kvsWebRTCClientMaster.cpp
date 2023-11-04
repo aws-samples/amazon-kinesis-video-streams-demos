@@ -238,6 +238,11 @@ PVOID sendVideoPackets(PVOID args)
         encoderStats.targetBitrate = 262000;
         frame.presentationTs += SAMPLE_VIDEO_FRAME_DURATION;
         MUTEX_LOCK(pSampleConfiguration->streamingSessionListReadLock);
+
+        // TODO: make the below captured metrics on a per session basis rather than per configuration,
+        //          will requiring passing session pointer to metric functions and using session structs rather than
+        //          config pointers and structs. This will make it safer, eliminate chance of metrics being overlapped
+        //          between sessions - although there should only ever be one session at a time for canary.
         for (i = 0; i < pSampleConfiguration->streamingSessionCount; ++i) {
 
             handleWriteFrameMetricIncrementation(pSampleConfiguration->sampleStreamingSessionList[i], frame.size);
@@ -247,6 +252,10 @@ PVOID sendVideoPackets(PVOID args)
                 writeFirstFrameSentTimeToFile(pSampleConfiguration);
                 PROFILE_WITH_START_TIME(pSampleConfiguration->sampleStreamingSessionList[i]->offerReceiveTime, "Time to first frame");
                 
+                DOUBLE timeToFirstFrame = (DOUBLE) (GETTIME() - pSampleConfiguration->offerReceiveTimestamp) / HUNDREDS_OF_NANOS_IN_A_MILLISECOND;
+                DLOGD("Start up latency from offer receive to first frame write: %lf ms", timeToFirstFrame);
+                Canary::Cloudwatch::getInstance().monitoring.pushTimeToFirstFrame(timeToFirstFrame,
+                                                                                Aws::CloudWatch::Model::StandardUnit::Milliseconds);
                 calculateDisconnectToFrameSentTime(pSampleConfiguration);
 
                 pSampleConfiguration->sampleStreamingSessionList[i]->firstFrame = FALSE;
