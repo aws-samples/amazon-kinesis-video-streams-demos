@@ -73,9 +73,6 @@ VOID onConnectionStateChange(UINT64 customData, RTC_PEER_CONNECTION_STATE newSta
             CHK_STATUS(peerConnectionGetMetrics(pSampleStreamingSession->pPeerConnection, &pSampleStreamingSession->peerConnectionMetrics));
             CHK_STATUS(iceAgentGetMetrics(pSampleStreamingSession->pPeerConnection, &pSampleStreamingSession->iceMetrics));
 
-            Canary::Cloudwatch::getInstance().monitoring.pushPeerConnectionMetrics(&pSampleStreamingSession->peerConnectionMetrics);
-            Canary::Cloudwatch::getInstance().monitoring.pushKvsIceAgentMetrics(&pSampleStreamingSession->iceMetrics);
-
             if (STATUS_FAILED(retStatus = logSelectedIceCandidatesInformation(pSampleStreamingSession))) {
                 DLOGW("Failed to get information about selected Ice candidates: 0x%08x", retStatus);
             }
@@ -551,18 +548,26 @@ CleanUp:
 }
 
 
-/*STATUS sendProfilingMetrics(PSampleStreamingSession pSampleStreamingSession, PSampleConfiguration pSampleConfiguration)
+STATUS sendProfilingMetrics(PSampleStreamingSession pSampleStreamingSession)
 {
     STATUS retStatus = STATUS_SUCCESS;
+    UINT64 joinSessionToOfferRecvTime;
+    PSampleConfiguration pSampleConfiguration;
+    
+    CHK(pSampleStreamingSession != NULL, STATUS_NULL_ARG);
+    pSampleConfiguration = pSampleStreamingSession->pSampleConfiguration;
+    CHK(pSampleConfiguration != NULL, STATUS_NULL_ARG);
 
     CHK(!pSampleStreamingSession->firstFrame, STATUS_WAITING_ON_FIRST_FRAME);
 
     // We want to batch send all the metrics once the first frame is sent out.
-    pSampleConfiguration->signalingClientMetrics.version = SIGNALING_CLIENT_METRICS_CURRENT_VERSION;
+    //pSampleConfiguration->signalingClientMetrics.version = SIGNALING_CLIENT_METRICS_CURRENT_VERSION;
 
     if(STATUS_FAILED(signalingClientGetMetrics(pSampleConfiguration->signalingClientHandle, &pSampleConfiguration->signalingClientMetrics))) {
         DLOGW("Could not get signaling client metrics (0x%08x)", retStatus);
     } else {
+        joinSessionToOfferRecvTime = pSampleConfiguration->signalingClientMetrics.signalingClientStats.joinSessionToOfferRecvTime;
+
         DLOGP("[Signaling Get token] %" PRIu64 " ms", pSampleConfiguration->signalingClientMetrics.signalingClientStats.getTokenCallTime);
         DLOGP("[Signaling Describe] %" PRIu64 " ms", pSampleConfiguration->signalingClientMetrics.signalingClientStats.describeCallTime);
         DLOGP("[Signaling Create Channel] %" PRIu64 " ms", pSampleConfiguration->signalingClientMetrics.signalingClientStats.createCallTime);
@@ -572,14 +577,13 @@ CleanUp:
         DLOGP("[Signaling create client] %" PRIu64 " ms", pSampleConfiguration->signalingClientMetrics.signalingClientStats.createClientTime);
         DLOGP("[Signaling fetch client] %" PRIu64 " ms", pSampleConfiguration->signalingClientMetrics.signalingClientStats.fetchClientTime);
         DLOGP("[Signaling connect client] %" PRIu64 " ms", pSampleConfiguration->signalingClientMetrics.signalingClientStats.connectClientTime);
-        
-        UINT64 joinSessionToOfferRecvTime = pSampleConfiguration->signalingClientMetrics.signalingClientStats.joinSessionToOfferRecvTime;
         if (joinSessionToOfferRecvTime != 0) {
             DLOGP("[Signaling Join session to offer received] %" PRIu64 " ms", joinSessionToOfferRecvTime);
         }
 
         Canary::Cloudwatch::getInstance().monitoring.pushSignalingClientMetrics(&pSampleConfiguration->signalingClientMetrics);
     }
+
     if(STATUS_FAILED(peerConnectionGetMetrics(pSampleStreamingSession->pPeerConnection, &pSampleStreamingSession->peerConnectionMetrics))) {
         DLOGW("Could not get peer connection metrics (0x%08x)", retStatus);
     } else {
@@ -590,18 +594,25 @@ CleanUp:
     } else {
         Canary::Cloudwatch::getInstance().monitoring.pushKvsIceAgentMetrics(&pSampleStreamingSession->iceMetrics);
     }
+
 CleanUp:
     return retStatus;
 }
-*/
 
-/*VOID sendProfilingMetricsTryer(PSampleStreamingSession pSampleStreamingSession, PSampleConfiguration pSampleConfiguration)
+
+STATUS sendProfilingMetricsTryer(PSampleStreamingSession pSampleStreamingSession)
 {
     DLOGD("sendProfilingMetricsTryer called");
     STATUS retStatus = STATUS_SUCCESS;
+    PSampleConfiguration pSampleConfiguration;
     BOOL done = FALSE;
+
+    CHK(pSampleStreamingSession != NULL, STATUS_NULL_ARG);
+    pSampleConfiguration = pSampleStreamingSession->pSampleConfiguration;
+    CHK(pSampleConfiguration != NULL, STATUS_NULL_ARG);
+
     while (!ATOMIC_LOAD_BOOL(&pSampleStreamingSession->terminateFlag) && !ATOMIC_LOAD_BOOL(&pSampleConfiguration->appTerminateFlag)) {
-        retStatus = sendProfilingMetrics(pSampleStreamingSession, pSampleConfiguration);
+        retStatus = sendProfilingMetrics(pSampleStreamingSession);
         if (retStatus == STATUS_WAITING_ON_FIRST_FRAME) {
             THREAD_SLEEP(HUNDREDS_OF_NANOS_IN_A_MILLISECOND * 100); // to prevent busy waiting
         } else if (retStatus == STATUS_SUCCESS) {
@@ -613,8 +624,11 @@ CleanUp:
     if(!done) {
         DLOGE("First frame never got sent out...no profiling metrics pushed to cloudwatch..error code: 0x%08x", retStatus);
     }
+
+CleanUp:
+    return retStatus;
 }
-*/
+
 
 STATUS initMetricsTimers(PSampleStreamingSession pSampleStreamingSession)
 {
@@ -625,8 +639,8 @@ STATUS initMetricsTimers(PSampleStreamingSession pSampleStreamingSession)
     pSampleConfiguration = pSampleStreamingSession->pSampleConfiguration;
     CHK(pSampleConfiguration != NULL, STATUS_NULL_ARG);
 
-    //pSampleStreamingSession->pushProfilingThread = std::thread(sendProfilingMetricsTryer, pSampleStreamingSession, pSampleConfiguration);
-    //pSampleStreamingSession->pushProfilingThread.detach();
+    pSampleStreamingSession->pushProfilingThread = std::thread(sendProfilingMetricsTryer, pSampleStreamingSession);
+    pSampleStreamingSession->pushProfilingThread.detach();
 
     CHK_STATUS(timerQueueAddTimer(pSampleConfiguration->timerQueueHandle, METRICS_INVOCATION_PERIOD, METRICS_INVOCATION_PERIOD, canaryRtpOutboundStats, (UINT64) pSampleStreamingSession,
                                       &pSampleStreamingSession->metricsTimerId));
@@ -1097,8 +1111,6 @@ STATUS initSignaling(PSampleConfiguration pSampleConfiguration, PCHAR clientId)
     CHK_STATUS(signalingClientConnectSync(pSampleConfiguration->signalingClientHandle));
 
     signalingClientGetMetrics(pSampleConfiguration->signalingClientHandle, &signalingClientMetrics);
-
-    Canary::Cloudwatch::getInstance().monitoring.pushSignalingClientMetrics(&pSampleConfiguration->signalingClientMetrics);
 
     // Logging this here since the logs in signaling library do not get routed to file
     DLOGP("[Signaling Get token] %" PRIu64 " ms", signalingClientMetrics.signalingClientStats.getTokenCallTime);
