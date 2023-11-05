@@ -73,6 +73,9 @@ VOID onConnectionStateChange(UINT64 customData, RTC_PEER_CONNECTION_STATE newSta
             CHK_STATUS(peerConnectionGetMetrics(pSampleStreamingSession->pPeerConnection, &pSampleStreamingSession->peerConnectionMetrics));
             CHK_STATUS(iceAgentGetMetrics(pSampleStreamingSession->pPeerConnection, &pSampleStreamingSession->iceMetrics));
 
+            Canary::Cloudwatch::getInstance().monitoring.pushPeerConnectionMetrics(&pSampleStreamingSession->peerConnectionMetrics);
+            Canary::Cloudwatch::getInstance().monitoring.pushKvsIceAgentMetrics(&pSampleStreamingSession->iceMetrics);
+
             if (STATUS_FAILED(retStatus = logSelectedIceCandidatesInformation(pSampleStreamingSession))) {
                 DLOGW("Failed to get information about selected Ice candidates: 0x%08x", retStatus);
             }
@@ -522,9 +525,14 @@ STATUS canaryRtpOutboundStats(UINT32 timerId, UINT64 currentTime, UINT64 customD
     STATUS retStatus = STATUS_SUCCESS;
 
     PSampleStreamingSession pSampleStreamingSession = (PSampleStreamingSession) customData;
+    PSampleConfiguration pSampleConfiguration;
+    
+    CHK(pSampleStreamingSession != NULL, STATUS_NULL_ARG);
+    pSampleConfiguration = pSampleStreamingSession->pSampleConfiguration;
+    CHK(pSampleConfiguration != NULL, STATUS_NULL_ARG);
 
     // TODO: cleanup the below
-    if(!ATOMIC_LOAD_BOOL(&pSampleStreamingSession->terminateFlag) && !ATOMIC_LOAD_BOOL(&pSampleStreamingSession->pSampleConfiguration->appTerminateFlag)) {
+    if(!ATOMIC_LOAD_BOOL(&pSampleStreamingSession->terminateFlag) && !ATOMIC_LOAD_BOOL(&pSampleConfiguration->appTerminateFlag)) {
         if (pSampleStreamingSession->pVideoRtcRtpTransceiver) {
                 pSampleStreamingSession->canaryMetrics.requestedTypeOfStats = RTC_STATS_TYPE_OUTBOUND_RTP;
                 CHK_LOG_ERR(rtcPeerConnectionGetMetrics(pSampleStreamingSession->pPeerConnection, pSampleStreamingSession->pVideoRtcRtpTransceiver, &(pSampleStreamingSession->canaryMetrics)));
@@ -538,10 +546,12 @@ STATUS canaryRtpOutboundStats(UINT32 timerId, UINT64 currentTime, UINT64 customD
         retStatus = STATUS_TIMER_QUEUE_STOP_SCHEDULING;
     }
 
+CleanUp:
     return retStatus;
 }
 
-STATUS sendProfilingMetrics(PSampleStreamingSession pSampleStreamingSession, PSampleConfiguration pSampleConfiguration)
+
+/*STATUS sendProfilingMetrics(PSampleStreamingSession pSampleStreamingSession, PSampleConfiguration pSampleConfiguration)
 {
     STATUS retStatus = STATUS_SUCCESS;
 
@@ -563,9 +573,9 @@ STATUS sendProfilingMetrics(PSampleStreamingSession pSampleStreamingSession, PSa
         DLOGP("[Signaling fetch client] %" PRIu64 " ms", pSampleConfiguration->signalingClientMetrics.signalingClientStats.fetchClientTime);
         DLOGP("[Signaling connect client] %" PRIu64 " ms", pSampleConfiguration->signalingClientMetrics.signalingClientStats.connectClientTime);
         
-        UINT64 joinSessionToOffer = pSampleConfiguration->signalingClientMetrics.signalingClientStats.joinSessionToOfferRecvTime;
-        if (joinSessionToOffer != 0) {
-            DLOGP("[Signaling Join session to offer received] %" PRIu64 " ms", joinSessionToOffer);
+        UINT64 joinSessionToOfferRecvTime = pSampleConfiguration->signalingClientMetrics.signalingClientStats.joinSessionToOfferRecvTime;
+        if (joinSessionToOfferRecvTime != 0) {
+            DLOGP("[Signaling Join session to offer received] %" PRIu64 " ms", joinSessionToOfferRecvTime);
         }
 
         Canary::Cloudwatch::getInstance().monitoring.pushSignalingClientMetrics(&pSampleConfiguration->signalingClientMetrics);
@@ -583,8 +593,9 @@ STATUS sendProfilingMetrics(PSampleStreamingSession pSampleStreamingSession, PSa
 CleanUp:
     return retStatus;
 }
+*/
 
-VOID sendProfilingMetricsTryer(PSampleStreamingSession pSampleStreamingSession, PSampleConfiguration pSampleConfiguration)
+/*VOID sendProfilingMetricsTryer(PSampleStreamingSession pSampleStreamingSession, PSampleConfiguration pSampleConfiguration)
 {
     DLOGD("sendProfilingMetricsTryer called");
     STATUS retStatus = STATUS_SUCCESS;
@@ -603,34 +614,26 @@ VOID sendProfilingMetricsTryer(PSampleStreamingSession pSampleStreamingSession, 
         DLOGE("First frame never got sent out...no profiling metrics pushed to cloudwatch..error code: 0x%08x", retStatus);
     }
 }
+*/
 
 STATUS initMetricsTimers(PSampleStreamingSession pSampleStreamingSession)
 {
-    DLOGD("Here 1");
-
     STATUS retStatus = STATUS_SUCCESS;
     PSampleConfiguration pSampleConfiguration;
+    
     CHK(pSampleStreamingSession != NULL, STATUS_NULL_ARG);
     pSampleConfiguration = pSampleStreamingSession->pSampleConfiguration;
     CHK(pSampleConfiguration != NULL, STATUS_NULL_ARG);
 
-    DLOGD("Here 2");
-    pSampleStreamingSession->pushProfilingThread = std::thread(sendProfilingMetricsTryer, pSampleStreamingSession, pSampleConfiguration);
-    pSampleStreamingSession->pushProfilingThread.detach();
+    //pSampleStreamingSession->pushProfilingThread = std::thread(sendProfilingMetricsTryer, pSampleStreamingSession, pSampleConfiguration);
+    //pSampleStreamingSession->pushProfilingThread.detach();
 
-    DLOGD("Here 3");
-
-    CHK_STATUS(timerQueueAddTimer(pSampleStreamingSession->pSampleConfiguration->timerQueueHandle, METRICS_INVOCATION_PERIOD, METRICS_INVOCATION_PERIOD, canaryRtpOutboundStats, (UINT64) pSampleStreamingSession,
+    CHK_STATUS(timerQueueAddTimer(pSampleConfiguration->timerQueueHandle, METRICS_INVOCATION_PERIOD, METRICS_INVOCATION_PERIOD, canaryRtpOutboundStats, (UINT64) pSampleStreamingSession,
                                       &pSampleStreamingSession->metricsTimerId));
-
-    DLOGD("Here 4");
 
 CleanUp:
     return retStatus;
 }
-
-
-
 
 
 
@@ -753,13 +756,6 @@ STATUS freeSampleStreamingSession(PSampleStreamingSession* ppSampleStreamingSess
 
     DLOGD("Freeing streaming session with peer id: %s ", pSampleStreamingSession->peerId);
 
-    // Free the metrics timer, make new one for each session (threfore making a new one for each 60min storage sesssion).
-    DLOGD("Cleaningup Metrics Timer");
-    if (IS_VALID_TIMER_QUEUE_HANDLE(pSampleConfiguration->timerQueueHandle)) {
-        CHK_LOG_ERR(timerQueueCancelTimer(pSampleConfiguration->timerQueueHandle, pSampleStreamingSession->metricsTimerId,
-                                          (UINT64) pSampleConfiguration));
-    }
-
     ATOMIC_STORE_BOOL(&pSampleStreamingSession->terminateFlag, TRUE);
 
     if (pSampleStreamingSession->shutdownCallback != NULL) {
@@ -779,6 +775,13 @@ STATUS freeSampleStreamingSession(PSampleStreamingSession* ppSampleStreamingSess
         CHK_LOG_ERR(timerQueueCancelTimer(pSampleConfiguration->timerQueueHandle, pSampleConfiguration->iceCandidatePairStatsTimerId,
                                           (UINT64) pSampleConfiguration));
         pSampleConfiguration->iceCandidatePairStatsTimerId = MAX_UINT32;
+    }
+
+    // Free the metrics timer, make new one for each session (therefore making a new one for each 60min storage session).
+    DLOGD("Cleaningup Metrics Timer");
+    if (IS_VALID_TIMER_QUEUE_HANDLE(pSampleConfiguration->timerQueueHandle)) {
+        CHK_LOG_ERR(timerQueueCancelTimer(pSampleConfiguration->timerQueueHandle, pSampleStreamingSession->metricsTimerId,
+                                          (UINT64) pSampleConfiguration));
     }
     MUTEX_UNLOCK(pSampleConfiguration->sampleConfigurationObjLock);
 
@@ -1074,17 +1077,6 @@ CleanUp:
     return retStatus;
 }
 
-
-
-
-
-
-
-
-
-
-
-
 STATUS initSignaling(PSampleConfiguration pSampleConfiguration, PCHAR clientId)
 {
     STATUS retStatus = STATUS_SUCCESS;
@@ -1106,6 +1098,7 @@ STATUS initSignaling(PSampleConfiguration pSampleConfiguration, PCHAR clientId)
 
     signalingClientGetMetrics(pSampleConfiguration->signalingClientHandle, &signalingClientMetrics);
 
+    Canary::Cloudwatch::getInstance().monitoring.pushSignalingClientMetrics(&pSampleConfiguration->signalingClientMetrics);
 
     // Logging this here since the logs in signaling library do not get routed to file
     DLOGP("[Signaling Get token] %" PRIu64 " ms", signalingClientMetrics.signalingClientStats.getTokenCallTime);

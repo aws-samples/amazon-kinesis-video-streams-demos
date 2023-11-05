@@ -50,7 +50,7 @@ INT32 main(INT32 argc, CHAR* argv[])
 #ifdef IOT_CORE_ENABLE_CREDENTIALS
     CHK_ERR((pChannelName = getenv(IOT_CORE_THING_NAME)) != NULL, STATUS_INVALID_OPERATION, "AWS_IOT_CORE_THING_NAME must be set");
 #else
-    // Changed sample to use Canary env var for channel name rather than command argument.
+    // Change sample to use Canary env var for channel name rather than command argument.
     //pChannelName = argc > 1 ? argv[1] : SAMPLE_CHANNEL_NAME;
     pChannelName = (PCHAR) canaryConfig.channelName.value.c_str();
 
@@ -63,11 +63,9 @@ INT32 main(INT32 argc, CHAR* argv[])
     pSampleConfiguration->videoSource = sendVideoPackets;
     pSampleConfiguration->receiveAudioVideoSource = sampleReceiveAudioVideoFrame;
 
-    // Force sample to use storage mode.
+    // Force sample to use storage mode...
     //if (argc > 2 && STRNCMP(argv[2], "1", 2) == 0) {
         pSampleConfiguration->channelInfo.useMediaStorage = TRUE;
-        
-        DLOGI("Initializing storageDisconnectedTime member as zero");
         pSampleConfiguration->storageDisconnectedTime = 0;
     //}
 
