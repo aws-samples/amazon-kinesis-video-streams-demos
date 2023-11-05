@@ -523,7 +523,8 @@ STATUS canaryRtpOutboundStats(UINT32 timerId, UINT64 currentTime, UINT64 customD
 
     PSampleStreamingSession pSampleStreamingSession = (PSampleStreamingSession) customData;
 
-    if(!ATOMIC_LOAD_BOOL(&pSampleStreamingSession->terminateFlag)) {
+    // TODO: cleanup the below
+    if(!ATOMIC_LOAD_BOOL(&pSampleStreamingSession->terminateFlag) && !ATOMIC_LOAD_BOOL(&pSampleStreamingSession->pSampleConfiguration->appTerminateFlag)) {
         if (pSampleStreamingSession->pVideoRtcRtpTransceiver) {
                 pSampleStreamingSession->canaryMetrics.requestedTypeOfStats = RTC_STATS_TYPE_OUTBOUND_RTP;
                 CHK_LOG_ERR(rtcPeerConnectionGetMetrics(pSampleStreamingSession->pPeerConnection, pSampleStreamingSession->pVideoRtcRtpTransceiver, &(pSampleStreamingSession->canaryMetrics)));
@@ -588,7 +589,7 @@ VOID sendProfilingMetricsTryer(PSampleStreamingSession pSampleStreamingSession, 
     DLOGD("sendProfilingMetricsTryer called");
     STATUS retStatus = STATUS_SUCCESS;
     BOOL done = FALSE;
-    while (!ATOMIC_LOAD_BOOL(&pSampleStreamingSession->terminateFlag)) {
+    while (!ATOMIC_LOAD_BOOL(&pSampleStreamingSession->terminateFlag) && !ATOMIC_LOAD_BOOL(&pSampleConfiguration->appTerminateFlag)) {
         retStatus = sendProfilingMetrics(pSampleStreamingSession, pSampleConfiguration);
         if (retStatus == STATUS_WAITING_ON_FIRST_FRAME) {
             THREAD_SLEEP(HUNDREDS_OF_NANOS_IN_A_MILLISECOND * 100); // to prevent busy waiting
