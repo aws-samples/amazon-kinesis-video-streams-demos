@@ -952,27 +952,29 @@ STATUS createSampleConfiguration(PCHAR channelName, SIGNALING_CHANNEL_ROLE_TYPE 
 
     pSessionToken = GETENV(SESSION_TOKEN_ENV_VAR);
 
+
+    /*Comment out below for canary logging*/
     // If the env is set, we generate normal log files apart from filtered profile log files
     // If not set, we generate only the filtered profile log files
-    if (NULL != GETENV(ENABLE_FILE_LOGGING)) {
-        retStatus = createFileLoggerWithLevelFiltering(FILE_LOGGING_BUFFER_SIZE, MAX_NUMBER_OF_LOG_FILES, (PCHAR) FILE_LOGGER_LOG_FILE_DIRECTORY_PATH,
-                                                       TRUE, TRUE, TRUE, LOG_LEVEL_PROFILE, NULL);
+    // if (NULL != GETENV(ENABLE_FILE_LOGGING)) {
+    //     retStatus = createFileLoggerWithLevelFiltering(FILE_LOGGING_BUFFER_SIZE, MAX_NUMBER_OF_LOG_FILES, (PCHAR) FILE_LOGGER_LOG_FILE_DIRECTORY_PATH,
+    //                                                    TRUE, TRUE, TRUE, LOG_LEVEL_PROFILE, NULL);
 
-        if (retStatus != STATUS_SUCCESS) {
-            DLOGW("[KVS Master] createFileLogger(): operation returned status code: 0x%08x", retStatus);
-        } else {
-            pSampleConfiguration->enableFileLogging = TRUE;
-        }
-    } else {
-        retStatus = createFileLoggerWithLevelFiltering(FILE_LOGGING_BUFFER_SIZE, MAX_NUMBER_OF_LOG_FILES, (PCHAR) FILE_LOGGER_LOG_FILE_DIRECTORY_PATH,
-                                                       TRUE, TRUE, FALSE, LOG_LEVEL_PROFILE, NULL);
+    //     if (retStatus != STATUS_SUCCESS) {
+    //         DLOGW("[KVS Master] createFileLogger(): operation returned status code: 0x%08x", retStatus);
+    //     } else {
+    //         pSampleConfiguration->enableFileLogging = TRUE;
+    //     }
+    // } else {
+    //     retStatus = createFileLoggerWithLevelFiltering(FILE_LOGGING_BUFFER_SIZE, MAX_NUMBER_OF_LOG_FILES, (PCHAR) FILE_LOGGER_LOG_FILE_DIRECTORY_PATH,
+    //                                                    TRUE, TRUE, FALSE, LOG_LEVEL_PROFILE, NULL);
 
-        if (retStatus != STATUS_SUCCESS) {
-            DLOGW("[KVS Master] createFileLogger(): operation returned status code: 0x%08x", retStatus);
-        } else {
-            pSampleConfiguration->enableFileLogging = TRUE;
-        }
-    }
+    //     if (retStatus != STATUS_SUCCESS) {
+    //         DLOGW("[KVS Master] createFileLogger(): operation returned status code: 0x%08x", retStatus);
+    //     } else {
+    //         pSampleConfiguration->enableFileLogging = TRUE;
+    //     }
+    // }
 
     if ((pSampleConfiguration->channelInfo.pRegion = GETENV(DEFAULT_REGION_ENV_VAR)) == NULL) {
         pSampleConfiguration->channelInfo.pRegion = DEFAULT_AWS_REGION;

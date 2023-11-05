@@ -23,6 +23,7 @@ INT32 main(INT32 argc, CHAR* argv[])
     auto canaryConfig = Canary::Config();
     Aws::SDKOptions options;
     UINT64 t1;
+    BOOL initialized = FALSE;
 
     SET_INSTRUMENTED_ALLOCATORS();
     UINT32 logLevel = setLogLevel();
@@ -89,6 +90,7 @@ INT32 main(INT32 argc, CHAR* argv[])
     // Initialize KVS WebRTC. This must be done before anything else, and must only be done once.
     CHK_STATUS(initKvsWebRtc());
     DLOGI("[KVS Master] KVS WebRTC initialization completed successfully");
+    initialized = TRUE;
 
     CHK_STATUS(initSignaling(pSampleConfiguration, SAMPLE_MASTER_CLIENT_ID));
     DLOGI("[KVS Master] Channel %s set up done ", pChannelName);
@@ -108,6 +110,12 @@ CleanUp:
     if (retStatus != STATUS_SUCCESS) {
         DLOGE("[KVS Master] Terminated with status code 0x%08x", retStatus);
     }
+
+    DLOGI("Exiting with 0x%08x", retStatus);
+    if (initialized) {
+        Canary::Cloudwatch::getInstance().monitoring.pushExitStatus(retStatus);
+    }
+    Canary::Cloudwatch::deinit();
 
     DLOGI("[KVS Master] Cleaning up....");
     if (pSampleConfiguration != NULL) {
