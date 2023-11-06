@@ -385,7 +385,7 @@ VOID CloudwatchMonitoring::pushSignalingClientMetrics(PSignalingClientMetrics pS
     connectClientDatum.SetUnit(Aws::CloudWatch::Model::StandardUnit::Milliseconds);
     this->push(connectClientDatum);
 
-    // TODO: clean the below up.
+    // TODO: clean the below up. Add zero check for JS to offer metric too?
     if(this->isStorage) {
         UINT64 joinSessionToOffer = pSignalingClientMetrics->signalingClientStats.joinSessionToOfferRecvTime;
         MetricDatum joinSessionToOfferDatum;

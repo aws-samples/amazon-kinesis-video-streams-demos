@@ -336,6 +336,11 @@ PVOID sendAudioPackets(PVOID args)
                     writeFirstFrameSentTimeToFile(pSampleConfiguration);
                     PROFILE_WITH_START_TIME(pSampleConfiguration->sampleStreamingSessionList[i]->offerReceiveTime, "Time to first frame");
 
+                    DOUBLE timeToFirstFrame = (DOUBLE) (GETTIME() - pSampleConfiguration->offerReceiveTimestamp) / HUNDREDS_OF_NANOS_IN_A_MILLISECOND;
+                    DLOGD("Start up latency from offer receive to first frame write: %lf ms", timeToFirstFrame);
+                    Canary::Cloudwatch::getInstance().monitoring.pushTimeToFirstFrame(timeToFirstFrame,
+                                                                                Aws::CloudWatch::Model::StandardUnit::Milliseconds);
+
                     calculateDisconnectToFrameSentTime(pSampleConfiguration);
 
                     pSampleConfiguration->sampleStreamingSessionList[i]->firstFrame = FALSE;
