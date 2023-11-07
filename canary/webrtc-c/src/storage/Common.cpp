@@ -523,10 +523,18 @@ STATUS canaryRtpOutboundStats(UINT32 timerId, UINT64 currentTime, UINT64 customD
 
     PSampleStreamingSession pSampleStreamingSession = (PSampleStreamingSession) customData;
     PSampleConfiguration pSampleConfiguration;
+    BOOL locked = FALSE;
     
     CHK(pSampleStreamingSession != NULL, STATUS_NULL_ARG);
     pSampleConfiguration = pSampleStreamingSession->pSampleConfiguration;
     CHK(pSampleConfiguration != NULL, STATUS_NULL_ARG);
+
+    // Use MUTEX_TRYLOCK to avoid possible dead lock when canceling timerQueue
+    if (!MUTEX_TRYLOCK(pSampleConfiguration->sampleConfigurationObjLock)) {
+        return retStatus;
+    } else {
+        locked = TRUE;
+    }
 
     // TODO: cleanup the below
     if(!ATOMIC_LOAD_BOOL(&pSampleStreamingSession->terminateFlag) && !ATOMIC_LOAD_BOOL(&pSampleConfiguration->appTerminateFlag)) {
@@ -544,8 +552,12 @@ STATUS canaryRtpOutboundStats(UINT32 timerId, UINT64 currentTime, UINT64 customD
     }
 
 CleanUp:
+    if (locked) {
+        MUTEX_UNLOCK(pSampleConfiguration->sampleConfigurationObjLock);
+    }
     return retStatus;
 }
+
 
 
 STATUS sendProfilingMetrics(PSampleStreamingSession pSampleStreamingSession)
@@ -970,7 +982,7 @@ STATUS createSampleConfiguration(PCHAR channelName, SIGNALING_CHANNEL_ROLE_TYPE 
     pSessionToken = GETENV(SESSION_TOKEN_ENV_VAR);
 
 
-    /*Comment out below for canary logging*/
+    /*Commented out below to use canary logging instead*/
     // If the env is set, we generate normal log files apart from filtered profile log files
     // If not set, we generate only the filtered profile log files
     // if (NULL != GETENV(ENABLE_FILE_LOGGING)) {
