@@ -529,6 +529,7 @@ STATUS canaryRtpOutboundStats(UINT32 timerId, UINT64 currentTime, UINT64 customD
     pSampleConfiguration = pSampleStreamingSession->pSampleConfiguration;
     CHK(pSampleConfiguration != NULL, STATUS_NULL_ARG);
 
+    DLOGD("Locking mutex");
     // Use MUTEX_TRYLOCK to avoid possible dead lock when canceling timerQueue
     if (!MUTEX_TRYLOCK(pSampleConfiguration->sampleConfigurationObjLock)) {
         return retStatus;
@@ -536,16 +537,23 @@ STATUS canaryRtpOutboundStats(UINT32 timerId, UINT64 currentTime, UINT64 customD
         locked = TRUE;
     }
 
+    DLOGD("Checking for terminate flags");
     // TODO: cleanup the below
     if(!ATOMIC_LOAD_BOOL(&pSampleStreamingSession->terminateFlag) && !ATOMIC_LOAD_BOOL(&pSampleConfiguration->appTerminateFlag)) {
+        DLOGD("Checking for transceiver");
         if (pSampleStreamingSession->pVideoRtcRtpTransceiver) {
+                DLOGD("Setting requestedTypeOfStats");
                 pSampleStreamingSession->canaryMetrics.requestedTypeOfStats = RTC_STATS_TYPE_OUTBOUND_RTP;
+                DLOGD("Getting metrics");
                 CHK_LOG_ERR(rtcPeerConnectionGetMetrics(pSampleStreamingSession->pPeerConnection, pSampleStreamingSession->pVideoRtcRtpTransceiver, &(pSampleStreamingSession->canaryMetrics)));
+                DLOGD("Populating metrics context");
                 populateOutgoingRtpMetricsContext(pSampleStreamingSession);
+                DLOGD("Sending metrics");
                 Canary::POutgoingRTPMetricsContext pCanaryOutgoingRTPMetricsContext = reinterpret_cast<Canary::POutgoingRTPMetricsContext>(&(pSampleStreamingSession->canaryOutgoingRTPMetricsContext));
                 DLOGD("Calling pushOutboundRtpStats...");
                 Canary::Cloudwatch::getInstance().monitoring.pushOutboundRtpStats(pCanaryOutgoingRTPMetricsContext);
                 DLOGD("Finished calling pushOutboundRtpStats");
+                DLOGD("Past sending metrics");
             }
     } else {
         retStatus = STATUS_TIMER_QUEUE_STOP_SCHEDULING;
@@ -553,6 +561,7 @@ STATUS canaryRtpOutboundStats(UINT32 timerId, UINT64 currentTime, UINT64 customD
 
 CleanUp:
     if (locked) {
+        DLOGD("Unlocking mutex");
         MUTEX_UNLOCK(pSampleConfiguration->sampleConfigurationObjLock);
     }
     return retStatus;
@@ -654,8 +663,11 @@ STATUS initMetricsTimers(PSampleStreamingSession pSampleStreamingSession)
     pSampleStreamingSession->pushProfilingThread = std::thread(sendProfilingMetricsTryer, pSampleStreamingSession);
     pSampleStreamingSession->pushProfilingThread.detach();
 
+    DLOGD("Adding metricsTimer");
     CHK_STATUS(timerQueueAddTimer(pSampleConfiguration->timerQueueHandle, METRICS_INVOCATION_PERIOD, METRICS_INVOCATION_PERIOD, canaryRtpOutboundStats, (UINT64) pSampleStreamingSession,
                                       &pSampleStreamingSession->metricsTimerId));
+    DLOGD("Done adding metricsTimer");
+
 
 CleanUp:
     return retStatus;
@@ -1637,22 +1649,33 @@ STATUS signalingMessageReceived(UINT64 customData, PReceivedSignalingMessage pRe
             }
             CHK_STATUS(createSampleStreamingSession(pSampleConfiguration, pReceivedSignalingMessage->signalingMessage.peerClientId, TRUE,
                                                     &pSampleStreamingSession));
+            DLOGD("Finished calling createSampleStreamingSession");
+                                                
             MUTEX_LOCK(pSampleConfiguration->streamingSessionListReadLock);
+            DLOGD("Adding pSampleStreamingSession ");
             pSampleConfiguration->sampleStreamingSessionList[pSampleConfiguration->streamingSessionCount++] = pSampleStreamingSession;
+            DLOGD("Added pSampleStreamingSession ");
             MUTEX_UNLOCK(pSampleConfiguration->streamingSessionListReadLock);
 
+            DLOGD("Calling handleOffer");
             CHK_STATUS(handleOffer(pSampleConfiguration, pSampleStreamingSession, &pReceivedSignalingMessage->signalingMessage));
+            DLOGD("Calling hashTablePut");
             CHK_STATUS(hashTablePut(pSampleConfiguration->pRtcPeerConnectionForRemoteClient, clientIdHash, (UINT64) pSampleStreamingSession));
+
+            DLOGD("Calling getPendingMessageQueueForHash");
 
             // If there are any ice candidate messages in the queue for this client id, submit them now.
             CHK_STATUS(getPendingMessageQueueForHash(pSampleConfiguration->pPendingSignalingMessageForRemoteClient, clientIdHash, TRUE,
                                                      &pPendingMessageQueue));
             if (pPendingMessageQueue != NULL) {
+                DLOGD("Calling submitPendingIceCandidate");
                 CHK_STATUS(submitPendingIceCandidate(pPendingMessageQueue, pSampleStreamingSession));
 
                 // NULL the pointer to avoid it being freed in the cleanup
                 pPendingMessageQueue = NULL;
             }
+
+            DLOGD("Setting iceCandidatePairStatsTimerId");
 
             startStats = pSampleConfiguration->iceCandidatePairStatsTimerId == MAX_UINT32;
             break;
