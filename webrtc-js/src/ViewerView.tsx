@@ -25,22 +25,22 @@ function uid() {
     return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
 }
 
-interface LiveFeedViewProps {
+interface ViewerViewProps {
     region: string;
     credentials: { accessKeyId: string, secretAccessKey: string, sessionToken: string | undefined };
     channelName: string;
     onStop: () => void;
 }
 
-interface LiveFeedViewState {
+interface ViewerViewState {
     masterVideoRef: React.RefObject<HTMLVideoElement>;
     viewerVideoRef: React.RefObject<HTMLVideoElement>;
     dataChannelMessages: string;
     dataChannel: RTCDataChannel | null;
 }
 
-class ViewerView extends React.Component<LiveFeedViewProps, LiveFeedViewState> {
-    constructor(props: LiveFeedViewProps) {
+class ViewerView extends React.Component<ViewerViewProps, ViewerViewState> {
+    constructor(props: ViewerViewProps) {
         super(props);
 
         this.state = {
