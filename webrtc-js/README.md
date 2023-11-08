@@ -30,10 +30,14 @@ npm start
 
 ![Channel Configuration](./images/configuration-screen.png)
 
-5. Fill in the fields and choose "Start Master" or "Start Viewer". The buttons will be enabled once the fields 
-are filled in. You can test this with the other JS sample page as well: https://awslabs.github.io/amazon-kinesis-video-streams-webrtc-sdk-js/examples/index.html
+5. Fill in the fields and choose "Start Master". The button will be enabled once the fields 
+are filled in. You can also use the other JS test page as Master if preferred: https://awslabs.github.io/amazon-kinesis-video-streams-webrtc-sdk-js/examples/index.html.
 
-![Peers Connected](./images/sample-peer-connection.png)
+![Master View](./images/sample-peer-connection.png)
+
+6. Open another tab of http://localhost:3000 or the [JS test page](https://awslabs.github.io/amazon-kinesis-video-streams-webrtc-sdk-js/examples/index.html). Connect the other peer to the Signaling Channel as Viewer.
+
+![Master and Viewer View](./images/sample-peer-connection-labeled.png)
 
 ------
 
