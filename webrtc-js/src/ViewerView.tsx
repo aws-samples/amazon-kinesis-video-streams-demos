@@ -82,7 +82,7 @@ class ViewerView extends React.Component<LiveFeedViewProps, LiveFeedViewState> {
         try {
             // Create KVS client
             const kinesisVideoClient = new KinesisVideoClient({
-                region: 'us-west-2',
+                region: this.props.region,
                 credentials: this.props.credentials,
             } as KinesisVideoClientConfig);
 

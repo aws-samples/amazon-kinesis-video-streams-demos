@@ -80,7 +80,7 @@ class MasterView extends React.Component<MasterViewProps, MasterViewState> {
         try {
             // Create KVS client
             const kinesisVideoClient = new KinesisVideoClient({
-                region: 'us-west-2',
+                region: this.props.region,
                 credentials: this.props.credentials,
             } as KinesisVideoClientConfig);
 
