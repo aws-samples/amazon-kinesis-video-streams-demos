@@ -94,7 +94,15 @@ class ViewerView extends React.Component<ViewerViewProps, ViewerViewState> {
             const channelARN: string = describeSignalingChannelResponse!.ChannelInfo!.ChannelARN!;
             console.log('[VIEWER] Channel ARN:', channelARN);
 
-            // Get signaling channel endpoints
+            // Get endpoints needed to connect to Amazon Kinesis Video Signaling. Endpoints are different
+            // depending on the specified role.
+            //   https://docs.aws.amazon.com/kinesisvideostreams/latest/dg/API_SingleMasterChannelEndpointConfiguration.html
+            //
+            // HTTPS endpoint is used for the Amazon Kinesis Video Signaling Channels client
+            //   https://docs.aws.amazon.com/kinesisvideostreams/latest/dg/API_Operations_Amazon_Kinesis_Video_Signaling_Channels.html
+            //
+            // WSS endpoint is the endpoint needed to connect to Amazon Kinesis Video Signaling client as viewer
+            //   https://docs.aws.amazon.com/kinesisvideostreams-webrtc-dg/latest/devguide/kvswebrtc-websocket-apis-2.html
             const getSignalingChannelEndpointResponse: GetSignalingChannelEndpointOutput = await kinesisVideoClient.send(
                 new GetSignalingChannelEndpointCommand({
                     ChannelARN: channelARN,
@@ -111,7 +119,7 @@ class ViewerView extends React.Component<ViewerViewProps, ViewerViewState> {
             }, {});
             console.log('[VIEWER] Endpoints:', endpointsByProtocol);
 
-            // Create KVS signaling client
+            // Create KVS signaling client - HTTPS endpoint (above) is needed here
             const kinesisVideoSignalingClient = new KinesisVideoSignalingClient({
                 region: this.props.region,
                 credentials: this.props.credentials,
@@ -130,7 +138,6 @@ class ViewerView extends React.Component<ViewerViewProps, ViewerViewState> {
                     ChannelARN: channelARN,
                 })
             );
-            console.log(getIceServerConfigResponse);
             getIceServerConfigResponse!.IceServerList!.forEach(iceServer =>
                 iceServers.push({
                     urls: iceServer.Uris,
@@ -140,7 +147,9 @@ class ViewerView extends React.Component<ViewerViewProps, ViewerViewState> {
             );
             console.log('[VIEWER] ICE servers:', iceServers);
 
-            // Create Signaling Client
+            // Create Kinesis Video Signaling Client - As viewer
+            //   WSS endpoint is needed here
+            //      https://docs.aws.amazon.com/kinesisvideostreams-webrtc-dg/latest/devguide/kvswebrtc-websocket-apis-2.html
             viewer.signalingClient = new SignalingClient({
                 channelARN,
                 channelEndpoint: endpointsByProtocol.WSS,
@@ -154,6 +163,8 @@ class ViewerView extends React.Component<ViewerViewProps, ViewerViewState> {
                 },
             });
 
+            // Configure the RTCPeerConnection. A list of options can be found here:
+            // https://developer.mozilla.org/en-US/docs/Web/API/RTCPeerConnection/RTCPeerConnection#parameters
             const configuration = {
                 iceServers,
                 iceTransportPolicy: 'all',
@@ -235,7 +246,7 @@ class ViewerView extends React.Component<ViewerViewProps, ViewerViewState> {
             console.log('[VIEWER] Starting viewer connection');
             viewer.signalingClient.open();
 
-            // Send any ICE candidates to the other peer
+            // Send any ICE candidates to the other peer (remote/master)
             viewer.peerConnection.addEventListener('icecandidate', ({candidate}: any) => {
                 if (candidate) {
                     console.log('[VIEWER] Generated ICE candidate', candidate);
@@ -258,7 +269,7 @@ class ViewerView extends React.Component<ViewerViewProps, ViewerViewState> {
             });
         } catch (e) {
             alert('An error occurred. Check the debug console.')
-            console.error(e);
+            console.error('[VIEWER]', e);
         }
     }
 

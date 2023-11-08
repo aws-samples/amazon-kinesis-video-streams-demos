@@ -92,7 +92,15 @@ class MasterView extends React.Component<MasterViewProps, MasterViewState> {
             const channelARN: string = describeSignalingChannelResponse!.ChannelInfo!.ChannelARN!;
             console.log('[MASTER] Channel ARN:', channelARN);
 
-            // Get signaling channel endpoints
+            // Get endpoints needed to connect to Amazon Kinesis Video Signaling. Endpoints are different
+            // depending on the specified role.
+            //   https://docs.aws.amazon.com/kinesisvideostreams/latest/dg/API_SingleMasterChannelEndpointConfiguration.html
+            //
+            // HTTPS endpoint is used for the Amazon Kinesis Video Signaling Channels client
+            //   https://docs.aws.amazon.com/kinesisvideostreams/latest/dg/API_Operations_Amazon_Kinesis_Video_Signaling_Channels.html
+            //
+            // WSS endpoint is the endpoint needed to connect to Amazon Kinesis Video Signaling client as master
+            //   https://docs.aws.amazon.com/kinesisvideostreams-webrtc-dg/latest/devguide/kvswebrtc-websocket-apis-2.html
             const getSignalingChannelEndpointResponse: GetSignalingChannelEndpointOutput = await kinesisVideoClient.send(
                 new GetSignalingChannelEndpointCommand({
                     ChannelARN: channelARN,
@@ -109,7 +117,7 @@ class MasterView extends React.Component<MasterViewProps, MasterViewState> {
             }, {});
             console.log('[MASTER] Endpoints:', endpointsByProtocol);
 
-            // Create KVS signaling client
+            // Create KVS signaling client - HTTPS endpoint (above) is needed here
             const kinesisVideoSignalingClient = new KinesisVideoSignalingClient({
                 region: this.props.region,
                 credentials: this.props.credentials,
@@ -128,7 +136,6 @@ class MasterView extends React.Component<MasterViewProps, MasterViewState> {
                     ChannelARN: channelARN,
                 })
             );
-            console.log(getIceServerConfigResponse);
             getIceServerConfigResponse!.IceServerList!.forEach(iceServer =>
                 iceServers.push({
                     urls: iceServer.Uris,
@@ -138,7 +145,9 @@ class MasterView extends React.Component<MasterViewProps, MasterViewState> {
             );
             console.log('[MASTER] ICE servers:', iceServers);
 
-            // Create Signaling Client
+            // Create Kinesis Video Signaling Client - As master
+            //   WSS endpoint is needed here
+            //      https://docs.aws.amazon.com/kinesisvideostreams-webrtc-dg/latest/devguide/kvswebrtc-websocket-apis-2.html
             master.signalingClient = new SignalingClient({
                 channelARN,
                 channelEndpoint: endpointsByProtocol.WSS,
@@ -174,6 +183,8 @@ class MasterView extends React.Component<MasterViewProps, MasterViewState> {
                     master.peerConnection.close();
                 }
 
+                // Configure the RTCPeerConnection. A list of options can be found here:
+                // https://developer.mozilla.org/en-US/docs/Web/API/RTCPeerConnection/RTCPeerConnection#parameters
                 const configuration = {
                     // @ts-ignore
                     iceServers,
@@ -198,7 +209,7 @@ class MasterView extends React.Component<MasterViewProps, MasterViewState> {
                     console.log('[MASTER] Connection state changed:', peerConnection.connectionState)
                 });
 
-                // Send any ICE candidates to the other peer
+                // Send any ICE candidates to the other peer (remote/viewer)
                 // @ts-ignore
                 peerConnection.addEventListener('icecandidate', ({candidate}) => {
                     if (candidate) {
@@ -234,13 +245,13 @@ class MasterView extends React.Component<MasterViewProps, MasterViewState> {
 
                 console.log('[MASTER] Sending SDP answer to client', remoteClientId);
                 const correlationId = uid();
-                console.debug('SDP answer:', peerConnection.localDescription, 'correlationId:', correlationId);
+                console.debug('[MASTER] SDP answer:', peerConnection.localDescription, 'correlationId:', correlationId);
                 master.signalingClient.sendSdpAnswer(peerConnection.localDescription, remoteClientId, correlationId);
                 console.log('[MASTER] Generating ICE candidates for client', remoteClientId);
             });
 
             master.signalingClient.on('iceCandidate', async (candidate: any, remoteClientId: string) => {
-                console.log('[MASTER] Received ICE candidate from client', remoteClientId, candidate);
+                console.log('[MASTER] Received ICE candidate from remote peer (viewer)', remoteClientId, candidate);
 
                 // Add the ICE candidate received from the client to the peer connection
                 const peerConnection = master.peerConnection;
@@ -266,7 +277,7 @@ class MasterView extends React.Component<MasterViewProps, MasterViewState> {
             master.signalingClient.open();
         } catch (e) {
             alert('An error occurred. Check the debug console.')
-            console.error(e);
+            console.error('[MASTER]', e);
         }
     }
 
