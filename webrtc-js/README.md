@@ -35,3 +35,24 @@ are filled in. You can test this with the other JS sample page as well: https://
 
 ![Peers Connected](./images/sample-peer-connection.png)
 
+------
+
+## App Layout
+
+The App component has 3 different states it can be in: Configuration state, Master state, and Viewer state.
+
+### Configuration state
+
+![Channel Configuration](./images/ui-configuration-screen.png)
+
+### Master state
+
+![Channel Configuration](./images/ui-master-screen.png)
+
+### Viewer state
+
+![Channel Configuration](./images/ui-viewer-screen.png)
+
+### Data channel component
+
+![Channel Configuration](./images/ui-data-channel-component.png)
