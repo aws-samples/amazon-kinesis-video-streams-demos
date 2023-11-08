@@ -110,7 +110,7 @@ class App extends React.Component<{}, AppState> {
                     <Container fluid className="m-lg-auto">
                         <h2>KVS WebRTC Test Page in React</h2>
                         <p>Use this page to connect to a signaling channel as a
-                            VIEWER.</p>
+                            MASTER or VIEWER.</p>
 
                         <CredentialsProvider
                             credentialsChanged={this.onUpdatedCredentials}/>
