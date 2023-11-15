@@ -3,6 +3,7 @@
 #include "../Include.h"
 
 PSampleConfiguration gSampleConfiguration = NULL;
+MUTEX sessionCoummunalLock = MUTEX_CREATE(FALSE);
 
 VOID sigintHandler(INT32 sigNum)
 {
@@ -524,16 +525,44 @@ STATUS canaryRtpOutboundStats(UINT32 timerId, UINT64 currentTime, UINT64 customD
     PSampleStreamingSession pSampleStreamingSession = (PSampleStreamingSession) customData;
     PSampleConfiguration pSampleConfiguration;
     BOOL locked = FALSE;
-    
-    CHK(pSampleStreamingSession != NULL, STATUS_NULL_ARG);
-    pSampleConfiguration = pSampleStreamingSession->pSampleConfiguration;
-    CHK(pSampleConfiguration != NULL, STATUS_NULL_ARG);
+    BOOL sessionCoummunalLockLocked = FALSE;
 
-    DLOGD("Locking mutex");
-    // Use MUTEX_TRYLOCK to avoid possible dead lock when canceling timerQueue
-    if (!MUTEX_TRYLOCK(pSampleConfiguration->sampleConfigurationObjLock)) {
+    if (!MUTEX_TRYLOCK(sessionCoummunalLock)) {
+        DLOGD("Failed to lock sessionCoummunalLock mutex");
         return retStatus;
     } else {
+        DLOGD("Succesfully locked sessionCoummunalLock mutex");
+        sessionCoummunalLockLocked = TRUE;
+    }
+
+    DLOGD("Checking for null pSampleStreamingSession");
+    CHK(pSampleStreamingSession != NULL, STATUS_NULL_ARG);
+
+    CHK(!ATOMIC_LOAD_BOOL(&pSampleStreamingSession->terminateFlag), retStatus);
+
+    pSampleConfiguration = pSampleStreamingSession->pSampleConfiguration; // HERE could be causing the segfault
+    DLOGD("Checking for null pSampleConfiguration");
+    CHK(pSampleConfiguration != NULL, STATUS_NULL_ARG);
+
+    // Print out pSampleConfiguration address at creation time and here.
+    DLOGD("pSampleConfiguration address at metric function: %d", pSampleConfiguration);
+
+    CHK(!ATOMIC_LOAD_BOOL(&pSampleConfiguration->appTerminateFlag), retStatus); // Accessing pSampleConfig member causes seg fault.
+
+    // NOTES: Moved the mutex lock above terminate flag check, still segfaulting, 
+    //          does not make sense for the config pointer to get nullified here 
+    //          as it is only the stream that gets freed.
+    // TODO: remove the above.
+
+    CHK(!ATOMIC_LOAD_BOOL(&pSampleStreamingSession->terminateFlag), retStatus);
+
+    DLOGD("Attmempting to lock sampleConfigurationObjLock mutex");
+    // Use MUTEX_TRYLOCK to avoid possible dead lock when canceling timerQueue
+    if (!MUTEX_TRYLOCK(pSampleConfiguration->sampleConfigurationObjLock)) {
+        DLOGD("Failed to lock sampleConfigurationObjLock mutex");
+        return retStatus;
+    } else {
+        DLOGD("Succesfully locked sampleConfigurationObjLock mutex");
         locked = TRUE;
     }
 
@@ -561,8 +590,12 @@ STATUS canaryRtpOutboundStats(UINT32 timerId, UINT64 currentTime, UINT64 customD
 
 CleanUp:
     if (locked) {
-        DLOGD("Unlocking mutex");
+        DLOGD("Unlocking sampleConfigurationObjLock mutex");
         MUTEX_UNLOCK(pSampleConfiguration->sampleConfigurationObjLock);
+    }
+    if (sessionCoummunalLockLocked) {
+        DLOGD("Unlocking sessionCoummunalLock mutex");
+        MUTEX_UNLOCK(sessionCoummunalLock);
     }
     return retStatus;
 }
@@ -632,6 +665,7 @@ STATUS sendProfilingMetricsTryer(PSampleStreamingSession pSampleStreamingSession
     pSampleConfiguration = pSampleStreamingSession->pSampleConfiguration;
     CHK(pSampleConfiguration != NULL, STATUS_NULL_ARG);
 
+    // TODO: Add locks for streaming session config
     while (!ATOMIC_LOAD_BOOL(&pSampleStreamingSession->terminateFlag) && !ATOMIC_LOAD_BOOL(&pSampleConfiguration->appTerminateFlag)) {
         retStatus = sendProfilingMetrics(pSampleStreamingSession);
         if (retStatus == STATUS_WAITING_ON_FIRST_FRAME) {
@@ -642,14 +676,13 @@ STATUS sendProfilingMetricsTryer(PSampleStreamingSession pSampleStreamingSession
             break;
         }
     }
-    if(!done) {
-        DLOGE("First frame never got sent out...no profiling metrics pushed to cloudwatch..error code: 0x%08x", retStatus);
-    }
 
 CleanUp:
+    if(!done) {
+            DLOGE("First frame never got sent out...no profiling metrics pushed to cloudwatch..error code: 0x%08x", retStatus);
+        }
     return retStatus;
 }
-
 
 STATUS initMetricsTimers(PSampleStreamingSession pSampleStreamingSession)
 {
@@ -667,6 +700,8 @@ STATUS initMetricsTimers(PSampleStreamingSession pSampleStreamingSession)
     CHK_STATUS(timerQueueAddTimer(pSampleConfiguration->timerQueueHandle, METRICS_INVOCATION_PERIOD, METRICS_INVOCATION_PERIOD, canaryRtpOutboundStats, (UINT64) pSampleStreamingSession,
                                       &pSampleStreamingSession->metricsTimerId));
     DLOGD("Done adding metricsTimer");
+    DLOGD("Metrics Timer created with ID: %lu", pSampleStreamingSession->metricsTimerId);
+    DLOGD("...and for timerQueueHandle: %llu", pSampleConfiguration->timerQueueHandle);
 
 
 CleanUp:
@@ -712,6 +747,8 @@ STATUS createSampleStreamingSession(PSampleConfiguration pSampleConfiguration, P
 
     pSampleStreamingSession->peerConnectionMetrics.version = PEER_CONNECTION_METRICS_CURRENT_VERSION;
     pSampleStreamingSession->iceMetrics.version = ICE_AGENT_METRICS_CURRENT_VERSION;
+
+    pSampleStreamingSession->metricsTimerId = MAX_UINT32;
 
     // if we're the viewer, we control the trickle ice mode
     pSampleStreamingSession->remoteCanTrickleIce = !isMaster && pSampleConfiguration->trickleIce;
@@ -786,11 +823,21 @@ STATUS freeSampleStreamingSession(PSampleStreamingSession* ppSampleStreamingSess
     STATUS retStatus = STATUS_SUCCESS;
     PSampleStreamingSession pSampleStreamingSession = NULL;
     PSampleConfiguration pSampleConfiguration;
+    BOOL locked = FALSE;
+    BOOL sessionCoummunalLockLocked = FALSE;
 
     CHK(ppSampleStreamingSession != NULL, STATUS_NULL_ARG);
     pSampleStreamingSession = *ppSampleStreamingSession;
     CHK(pSampleStreamingSession != NULL && pSampleStreamingSession->pSampleConfiguration != NULL, retStatus);
     pSampleConfiguration = pSampleStreamingSession->pSampleConfiguration;
+
+    if (!MUTEX_TRYLOCK(sessionCoummunalLock)) {
+        DLOGD("Failed to lock sessionCoummunalLock mutex from free()");
+        return retStatus;
+    } else {
+        DLOGD("Successfully locked sessionCoummunalLock mutex from free()");
+        sessionCoummunalLockLocked = TRUE;
+    }
 
     DLOGD("Freeing streaming session with peer id: %s ", pSampleStreamingSession->peerId);
 
@@ -807,7 +854,12 @@ STATUS freeSampleStreamingSession(PSampleStreamingSession* ppSampleStreamingSess
     // De-initialize the session stats timer if there are no active sessions
     // NOTE: we need to perform this under the lock which might be acquired by
     // the running thread but it's OK as it's re-entrant
-    MUTEX_LOCK(pSampleConfiguration->sampleConfigurationObjLock);
+    if (!MUTEX_TRYLOCK(pSampleConfiguration->sampleConfigurationObjLock)) {
+        return retStatus;
+    } else {
+        locked = TRUE;
+    }
+
     if (pSampleConfiguration->iceCandidatePairStatsTimerId != MAX_UINT32 && pSampleConfiguration->streamingSessionCount == 0 &&
         IS_VALID_TIMER_QUEUE_HANDLE(pSampleConfiguration->timerQueueHandle)) {
         CHK_LOG_ERR(timerQueueCancelTimer(pSampleConfiguration->timerQueueHandle, pSampleConfiguration->iceCandidatePairStatsTimerId,
@@ -816,10 +868,12 @@ STATUS freeSampleStreamingSession(PSampleStreamingSession* ppSampleStreamingSess
     }
 
     // Free the metrics timer, make new one for each session (therefore making a new one for each 60min storage session).
-    DLOGD("Cleaningup Metrics Timer");
-    if (IS_VALID_TIMER_QUEUE_HANDLE(pSampleConfiguration->timerQueueHandle)) {
+    DLOGD("Checking for Cleaningup Metrics Timer");
+    if (pSampleStreamingSession->metricsTimerId != MAX_UINT32 && IS_VALID_TIMER_QUEUE_HANDLE(pSampleConfiguration->timerQueueHandle)) {
+        DLOGD("Cleaningup Metrics Timer with ID: %lu", pSampleStreamingSession->metricsTimerId);
+        DLOGD("...and for timerQueueHandle: %llu", pSampleConfiguration->timerQueueHandle);
         CHK_LOG_ERR(timerQueueCancelTimer(pSampleConfiguration->timerQueueHandle, pSampleStreamingSession->metricsTimerId,
-                                          (UINT64) pSampleConfiguration));
+                                          (UINT64) pSampleStreamingSession));
     }
     MUTEX_UNLOCK(pSampleConfiguration->sampleConfigurationObjLock);
 
@@ -828,6 +882,14 @@ STATUS freeSampleStreamingSession(PSampleStreamingSession* ppSampleStreamingSess
     SAFE_MEMFREE(pSampleStreamingSession);
 
 CleanUp:
+
+    if (locked) {
+        MUTEX_UNLOCK(pSampleConfiguration->sampleConfigurationObjLock);
+    }
+    if (sessionCoummunalLockLocked) {
+        DLOGD("Unlocking sessionCoummunalLock mutex from Free()");
+        MUTEX_UNLOCK(sessionCoummunalLock);
+    }
 
     CHK_LOG_ERR(retStatus);
 
