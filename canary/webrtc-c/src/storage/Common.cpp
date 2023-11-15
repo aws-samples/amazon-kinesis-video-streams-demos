@@ -831,13 +831,13 @@ STATUS freeSampleStreamingSession(PSampleStreamingSession* ppSampleStreamingSess
     CHK(pSampleStreamingSession != NULL && pSampleStreamingSession->pSampleConfiguration != NULL, retStatus);
     pSampleConfiguration = pSampleStreamingSession->pSampleConfiguration;
 
-    if (!MUTEX_TRYLOCK(sessionCoummunalLock)) {
-        DLOGD("Failed to lock sessionCoummunalLock mutex from free()");
-        return retStatus;
-    } else {
-        DLOGD("Successfully locked sessionCoummunalLock mutex from free()");
-        sessionCoummunalLockLocked = TRUE;
-    }
+    // Changed from TRYLOCK due to session recovering from disconnect before next loop iteration if it failed to lock here
+    // this would cause 2 sessions to occur at the same time as disconnect triggers a new session.
+    // It might be worth moving the new session creation to be called at the end of freeSession if config terminate is not true.
+    // OR is there a way to not allow session to reconnect? Calling create session on the same master-viewer seems to be a totally new use case
+    DLOGD("Going to lock sessionCoummunalLock mutex from free()");
+    MUTEX_LOCK(sessionCoummunalLock);
+    DLOGD("Successfully locked sessionCoummunalLock mutex from free()");
 
     DLOGD("Freeing streaming session with peer id: %s ", pSampleStreamingSession->peerId);
 
