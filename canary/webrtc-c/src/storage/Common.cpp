@@ -824,7 +824,6 @@ STATUS freeSampleStreamingSession(PSampleStreamingSession* ppSampleStreamingSess
     PSampleStreamingSession pSampleStreamingSession = NULL;
     PSampleConfiguration pSampleConfiguration;
     BOOL locked = FALSE;
-    BOOL sessionCoummunalLockLocked = FALSE;
 
     CHK(ppSampleStreamingSession != NULL, STATUS_NULL_ARG);
     pSampleStreamingSession = *ppSampleStreamingSession;
@@ -886,10 +885,8 @@ CleanUp:
     if (locked) {
         MUTEX_UNLOCK(pSampleConfiguration->sampleConfigurationObjLock);
     }
-    if (sessionCoummunalLockLocked) {
-        DLOGD("Unlocking sessionCoummunalLock mutex from Free()");
-        MUTEX_UNLOCK(sessionCoummunalLock);
-    }
+    
+    MUTEX_UNLOCK(sessionCoummunalLock);
 
     CHK_LOG_ERR(retStatus);
 
