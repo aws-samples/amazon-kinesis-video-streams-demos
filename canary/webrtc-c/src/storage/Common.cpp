@@ -560,6 +560,12 @@ STATUS canaryRtpOutboundStats(UINT32 timerId, UINT64 currentTime, UINT64 customD
     // Use MUTEX_TRYLOCK to avoid possible dead lock when canceling timerQueue
     if (!MUTEX_TRYLOCK(pSampleConfiguration->sampleConfigurationObjLock)) {
         DLOGD("Failed to lock sampleConfigurationObjLock mutex");
+        
+        if (sessionCoummunalLockLocked) {
+            DLOGD("Unlocking sessionCoummunalLock mutex");
+            MUTEX_UNLOCK(sessionCoummunalLock);
+        }
+
         return retStatus;
     } else {
         DLOGD("Succesfully locked sampleConfigurationObjLock mutex");
@@ -823,7 +829,6 @@ STATUS freeSampleStreamingSession(PSampleStreamingSession* ppSampleStreamingSess
     STATUS retStatus = STATUS_SUCCESS;
     PSampleStreamingSession pSampleStreamingSession = NULL;
     PSampleConfiguration pSampleConfiguration;
-    BOOL locked = FALSE;
 
     CHK(ppSampleStreamingSession != NULL, STATUS_NULL_ARG);
     pSampleStreamingSession = *ppSampleStreamingSession;
@@ -853,11 +858,10 @@ STATUS freeSampleStreamingSession(PSampleStreamingSession* ppSampleStreamingSess
     // De-initialize the session stats timer if there are no active sessions
     // NOTE: we need to perform this under the lock which might be acquired by
     // the running thread but it's OK as it's re-entrant
-    if (!MUTEX_TRYLOCK(pSampleConfiguration->sampleConfigurationObjLock)) {
-        return retStatus;
-    } else {
-        locked = TRUE;
-    }
+
+    DLOGD("Going to lock sampleConfigurationObjLock mutex from free()");
+    MUTEX_LOCK(pSampleConfiguration->sampleConfigurationObjLock);
+    DLOGD("Successfully locked sampleConfigurationObjLock mutex from free()");
 
     if (pSampleConfiguration->iceCandidatePairStatsTimerId != MAX_UINT32 && pSampleConfiguration->streamingSessionCount == 0 &&
         IS_VALID_TIMER_QUEUE_HANDLE(pSampleConfiguration->timerQueueHandle)) {
@@ -882,10 +886,7 @@ STATUS freeSampleStreamingSession(PSampleStreamingSession* ppSampleStreamingSess
 
 CleanUp:
 
-    if (locked) {
-        MUTEX_UNLOCK(pSampleConfiguration->sampleConfigurationObjLock);
-    }
-    
+    MUTEX_UNLOCK(pSampleConfiguration->sampleConfigurationObjLock);
     MUTEX_UNLOCK(sessionCoummunalLock);
 
     CHK_LOG_ERR(retStatus);
