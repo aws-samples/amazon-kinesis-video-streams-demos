@@ -172,6 +172,7 @@ CleanUp:
     return retStatus;
 }
 
+// TODO: Remove the unused param
 PVOID writeFirstFrameSentTimeToFile(PSampleConfiguration pSampleConfiguration){
     // Save first-frame-sent time to file for consumer-end access.
 

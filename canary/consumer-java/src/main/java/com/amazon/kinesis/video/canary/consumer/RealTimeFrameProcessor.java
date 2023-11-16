@@ -52,12 +52,20 @@ public class RealTimeFrameProcessor extends WebrtcStorageCanaryConsumer implemen
             try
             {
                 long currentTime = System.currentTimeMillis();
+                long canaryStartTime = super.canaryStartTime.getTime();
+
                 String filePath = "../webrtc-c/toConsumer.txt";
-                final String startTimeStr = FileUtils.readFileToString(new File(filePath)).trim();
-                long startTime = Long.parseLong(startTimeStr);
-                long rtpToFirstFragment = currentTime - startTime;
-                super.publishMetricToCW("FirstFrameSentToFirstFrameConsumed", rtpToFirstFragment, StandardUnit.Milliseconds);
-                long timeToFirstFragment = currentTime - super.canaryStartTime.getTime();
+                final String frameSentTimeStr = FileUtils.readFileToString(new File(filePath)).trim();
+                long frameSentTime = Long.parseLong(frameSentTimeStr);
+                // Check for a late consumer end start that may add to the observed FirstFrameSentToFirstFrameConsumed time
+                if (canaryStartTime > frameSentTime){
+                    System.out.println("Consumer started after master sent out first frame, not pushing FirstFrameSentToFirstFrameConsumed metric.");
+                } else {
+                    long rtpToFirstFragment = currentTime - frameSentTime;
+                    super.publishMetricToCW("FirstFrameSentToFirstFrameConsumed", rtpToFirstFragment, StandardUnit.Milliseconds);
+                }
+
+                long timeToFirstFragment = currentTime - canaryStartTime;
                 super.publishMetricToCW("TotalTimeToFirstFrameConsumed", timeToFirstFragment, StandardUnit.Milliseconds);
             }
             catch (FileNotFoundException ex)
