@@ -62,10 +62,11 @@ VOID onConnectionStateChange(UINT64 customData, RTC_PEER_CONNECTION_STATE newSta
 {
     STATUS retStatus = STATUS_SUCCESS;
     PSampleStreamingSession pSampleStreamingSession = (PSampleStreamingSession) customData;
-    PSampleConfiguration pSampleConfiguration = pSampleStreamingSession->pSampleConfiguration;
+    PSampleConfiguration pSampleConfiguration;
 
     CHK(pSampleStreamingSession != NULL && pSampleStreamingSession->pSampleConfiguration != NULL, STATUS_INTERNAL_ERROR);
-
+    pSampleConfiguration = pSampleStreamingSession->pSampleConfiguration;
+    
     DLOGI("New connection state %u", newState);
 
     switch (newState) {
