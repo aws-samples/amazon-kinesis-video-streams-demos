@@ -3,6 +3,8 @@
 #include "../Include.h"
 
 PSampleConfiguration gSampleConfiguration = NULL;
+
+// To ensure we don't try to send outbound RTP metrics during freeing of session.
 MUTEX sessionCoummunalLock = MUTEX_CREATE(FALSE);
 
 VOID sigintHandler(INT32 sigNum)
@@ -474,10 +476,6 @@ CleanUp:
     return retStatus;
 }
 
-
-
-
-
 STATUS populateOutgoingRtpMetricsContext(PSampleStreamingSession pSampleStreamingSession)
 {
     DOUBLE currentDuration = 0;
@@ -527,6 +525,8 @@ STATUS canaryRtpOutboundStats(UINT32 timerId, UINT64 currentTime, UINT64 customD
     BOOL locked = FALSE;
     BOOL sessionCoummunalLockLocked = FALSE;
 
+    //TODO: can remove some of the below logs after done testing. 
+
     if (!MUTEX_TRYLOCK(sessionCoummunalLock)) {
         DLOGD("Failed to lock sessionCoummunalLock mutex");
         return retStatus;
@@ -544,28 +544,18 @@ STATUS canaryRtpOutboundStats(UINT32 timerId, UINT64 currentTime, UINT64 customD
     DLOGD("Checking for null pSampleConfiguration");
     CHK(pSampleConfiguration != NULL, STATUS_NULL_ARG);
 
-    // Print out pSampleConfiguration address at creation time and here.
     DLOGD("pSampleConfiguration address at metric function: %d", pSampleConfiguration);
 
-    CHK(!ATOMIC_LOAD_BOOL(&pSampleConfiguration->appTerminateFlag), retStatus); // Accessing pSampleConfig member causes seg fault.
-
-    // NOTES: Moved the mutex lock above terminate flag check, still segfaulting, 
-    //          does not make sense for the config pointer to get nullified here 
-    //          as it is only the stream that gets freed.
-    // TODO: remove the above.
-
-    CHK(!ATOMIC_LOAD_BOOL(&pSampleStreamingSession->terminateFlag), retStatus);
+    CHK(!ATOMIC_LOAD_BOOL(&pSampleConfiguration->appTerminateFlag), retStatus);
 
     DLOGD("Attmempting to lock sampleConfigurationObjLock mutex");
     // Use MUTEX_TRYLOCK to avoid possible dead lock when canceling timerQueue
     if (!MUTEX_TRYLOCK(pSampleConfiguration->sampleConfigurationObjLock)) {
         DLOGD("Failed to lock sampleConfigurationObjLock mutex");
-        
         if (sessionCoummunalLockLocked) {
             DLOGD("Unlocking sessionCoummunalLock mutex");
             MUTEX_UNLOCK(sessionCoummunalLock);
         }
-
         return retStatus;
     } else {
         DLOGD("Succesfully locked sampleConfigurationObjLock mutex");
@@ -573,7 +563,7 @@ STATUS canaryRtpOutboundStats(UINT32 timerId, UINT64 currentTime, UINT64 customD
     }
 
     DLOGD("Checking for terminate flags");
-    // TODO: cleanup the below
+    // TODO: cleanup the below.
     if(!ATOMIC_LOAD_BOOL(&pSampleStreamingSession->terminateFlag) && !ATOMIC_LOAD_BOOL(&pSampleConfiguration->appTerminateFlag)) {
         DLOGD("Checking for transceiver");
         if (pSampleStreamingSession->pVideoRtcRtpTransceiver) {
@@ -605,8 +595,6 @@ CleanUp:
     }
     return retStatus;
 }
-
-
 
 STATUS sendProfilingMetrics(PSampleStreamingSession pSampleStreamingSession)
 {
@@ -659,7 +647,6 @@ CleanUp:
     return retStatus;
 }
 
-
 STATUS sendProfilingMetricsTryer(PSampleStreamingSession pSampleStreamingSession)
 {
     DLOGD("sendProfilingMetricsTryer called");
@@ -671,7 +658,7 @@ STATUS sendProfilingMetricsTryer(PSampleStreamingSession pSampleStreamingSession
     pSampleConfiguration = pSampleStreamingSession->pSampleConfiguration;
     CHK(pSampleConfiguration != NULL, STATUS_NULL_ARG);
 
-    // TODO: Add locks for streaming session config
+    // TODO: Consider add mutex lock for streaming session config, maybe use the sessionCoummunalLock mutex.
     while (!ATOMIC_LOAD_BOOL(&pSampleStreamingSession->terminateFlag) && !ATOMIC_LOAD_BOOL(&pSampleConfiguration->appTerminateFlag)) {
         retStatus = sendProfilingMetrics(pSampleStreamingSession);
         if (retStatus == STATUS_WAITING_ON_FIRST_FRAME) {
@@ -713,10 +700,6 @@ STATUS initMetricsTimers(PSampleStreamingSession pSampleStreamingSession)
 CleanUp:
     return retStatus;
 }
-
-
-
-
 
 STATUS createSampleStreamingSession(PSampleConfiguration pSampleConfiguration, PCHAR peerId, BOOL isMaster,
                                     PSampleStreamingSession* ppSampleStreamingSession)

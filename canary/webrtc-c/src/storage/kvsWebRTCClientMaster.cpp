@@ -50,14 +50,12 @@ INT32 main(INT32 argc, CHAR* argv[])
 #ifdef IOT_CORE_ENABLE_CREDENTIALS
     CHK_ERR((pChannelName = getenv(IOT_CORE_THING_NAME)) != NULL, STATUS_INVALID_OPERATION, "AWS_IOT_CORE_THING_NAME must be set");
 #else
-    // Change sample to use Canary env var for channel name rather than command argument.
-    //pChannelName = argc > 1 ? argv[1] : SAMPLE_CHANNEL_NAME;
     pChannelName = (PCHAR) canaryConfig.channelName.value.c_str();
-
 #endif
 
     CHK_STATUS(createSampleConfiguration(pChannelName, SIGNALING_CHANNEL_ROLE_TYPE_MASTER, TRUE, TRUE, logLevel, &pSampleConfiguration));
 
+    // TODO: can remove this log once testing is complete
     DLOGD("pSampleConfiguration address after creation: %d", pSampleConfiguration);
 
     // Set the audio and video handlers
@@ -65,11 +63,10 @@ INT32 main(INT32 argc, CHAR* argv[])
     pSampleConfiguration->videoSource = sendVideoPackets;
     pSampleConfiguration->receiveAudioVideoSource = sampleReceiveAudioVideoFrame;
 
-    // Force sample to use storage mode...
-    //if (argc > 2 && STRNCMP(argv[2], "1", 2) == 0) {
-        pSampleConfiguration->channelInfo.useMediaStorage = TRUE;
-        pSampleConfiguration->storageDisconnectedTime = 0;
-    //}
+    // Force sample to use storage mode.
+    pSampleConfiguration->channelInfo.useMediaStorage = TRUE;
+
+    pSampleConfiguration->storageDisconnectedTime = 0;
 
 
 #ifdef ENABLE_DATA_CHANNEL
@@ -79,7 +76,6 @@ INT32 main(INT32 argc, CHAR* argv[])
     DLOGI("[KVS Master] Finished setting handlers");
 
     // Check if the samples are present
-
     DLOGI("[KVS Master] Checking sample video frame availability....");
     CHK_STATUS(readFrameFromDisk(NULL, &frameSize, "./assets/h264SampleFrames/frame-0001.h264"));
     DLOGI("[KVS Master] Checked sample video frame availability....available");
@@ -172,14 +168,8 @@ CleanUp:
     return retStatus;
 }
 
-// TODO: Remove the unused param
-PVOID writeFirstFrameSentTimeToFile(PSampleConfiguration pSampleConfiguration){
-    // Save first-frame-sent time to file for consumer-end access.
-
-    // Below is for using channel name as file name, decided it's unecessary
-    //CHAR fileNameBuffer[MAX_CHANNEL_NAME_LEN + 7];
-    //SNPRINTF(fileNameBuffer, SIZEOF(fileNameBuffer) / SIZEOF(CHAR), "../%s.txt", pSampleConfiguration->channelInfo.pChannelName);
-
+// Save first-frame-sent time to file for consumer-end access.
+PVOID writeFirstFrameSentTimeToFile(){
     DLOGI("Opening toConsumer file");
     FILE *toConsumer = FOPEN("../toConsumer.txt", "w");
     if (toConsumer == NULL)
@@ -199,7 +189,7 @@ VOID calculateDisconnectToFrameSentTime(PSampleConfiguration pSampleConfiguratio
         DOUBLE storageDisconnectToFrameSentTime = (DOUBLE) (GETTIME() - disconnectTime) / HUNDREDS_OF_NANOS_IN_A_MILLISECOND;
         Canary::Cloudwatch::getInstance().monitoring.pushStorageDisconnectToFrameSentTime(storageDisconnectToFrameSentTime,
                                                                         Aws::CloudWatch::Model::StandardUnit::Milliseconds);
-        DLOGI("Setting storageDisconnectedTime member to zero");
+        DLOGI("Setting storageDisconnectedTime to zero");
         pSampleConfiguration->storageDisconnectedTime = 0;
     } else {
         DLOGI("Not sending storageDisconnectToFrameSentTime metric, storageDisconnectedTime is zero (not set)");
@@ -249,17 +239,13 @@ PVOID sendVideoPackets(PVOID args)
         frame.presentationTs += SAMPLE_VIDEO_FRAME_DURATION;
         MUTEX_LOCK(pSampleConfiguration->streamingSessionListReadLock);
 
-        // TODO: make the below captured metrics on a per session basis rather than per configuration,
-        //          will requiring passing session pointer to metric functions and using session structs rather than
-        //          config pointers and structs. This will make it safer, eliminate chance of metrics being overlapped
-        //          between sessions - although there should only ever be one session at a time for canary.
         for (i = 0; i < pSampleConfiguration->streamingSessionCount; ++i) {
 
             handleWriteFrameMetricIncrementation(pSampleConfiguration->sampleStreamingSessionList[i], frame.size);
 
             status = writeFrame(pSampleConfiguration->sampleStreamingSessionList[i]->pVideoRtcRtpTransceiver, &frame);
             if (pSampleConfiguration->sampleStreamingSessionList[i]->firstFrame && status == STATUS_SUCCESS) {
-                writeFirstFrameSentTimeToFile(pSampleConfiguration);
+                writeFirstFrameSentTimeToFile();
                 PROFILE_WITH_START_TIME(pSampleConfiguration->sampleStreamingSessionList[i]->offerReceiveTime, "Time to first frame");
                 
                 DOUBLE timeToFirstFrame = (DOUBLE) (GETTIME() - pSampleConfiguration->offerReceiveTimestamp) / HUNDREDS_OF_NANOS_IN_A_MILLISECOND;
@@ -336,7 +322,7 @@ PVOID sendAudioPackets(PVOID args)
                 if (status != STATUS_SUCCESS) {
                     DLOGV("writeFrame() failed with 0x%08x", status);
                 } else if (pSampleConfiguration->sampleStreamingSessionList[i]->firstFrame && status == STATUS_SUCCESS) {
-                    writeFirstFrameSentTimeToFile(pSampleConfiguration);
+                    writeFirstFrameSentTimeToFile();
                     PROFILE_WITH_START_TIME(pSampleConfiguration->sampleStreamingSessionList[i]->offerReceiveTime, "Time to first frame");
 
                     DOUBLE timeToFirstFrame = (DOUBLE) (GETTIME() - pSampleConfiguration->offerReceiveTimestamp) / HUNDREDS_OF_NANOS_IN_A_MILLISECOND;
