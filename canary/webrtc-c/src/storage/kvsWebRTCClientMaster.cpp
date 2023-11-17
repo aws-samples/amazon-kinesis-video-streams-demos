@@ -363,4 +363,3 @@ CleanUp:
 
     return (PVOID) (ULONG_PTR) retStatus;
 }
-
