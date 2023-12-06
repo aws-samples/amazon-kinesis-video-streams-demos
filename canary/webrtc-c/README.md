@@ -109,6 +109,13 @@ the granular access to these metrics.
 | Peer      | ICEHolePunchingDelay           | Milliseconds  | -          | -                   | Measures time taken from start of connectivity checks to when the candidate pair is nominated and peer connection established                                                  |
 | Total     | TimeToFirstFrame               | Milliseconds  | -          | -                   | Measures time taken from offer to sending out first frame                                                                                                                      |
 
+### Profiling dashboard
+To generate the dashboard:
+- Select the `Upload a template file` option in AWS cloudformation console and upload the file from `templates/cfd_profiling_template.yaml` directory 
+- Under parameters, provide the title you would like for the dashboard and profilingId. ProfilingId is the name of the dimension you want to track. In case of this package, the aggregated dimension `WebrtcProfiling` can be used
+- Go through the steps and create the stack. 
+- Check AWS cloudwatch console for the generated dashboard
+
 ## Jenkins
 
 ### Prerequisites
