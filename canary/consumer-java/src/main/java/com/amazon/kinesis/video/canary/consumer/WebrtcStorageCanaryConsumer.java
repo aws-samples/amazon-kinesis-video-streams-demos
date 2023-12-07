@@ -265,9 +265,9 @@ private static void getMediaTimeToFirstFragment() {
                         calculateFragmentContinuityMetric(fragmentList);
                     }
                 };
-                // TODO: the initial delay can be tweaked now that master-end latencies have been reduced
-                final long intervalInitialDelay = 60000;
-                final long intervalDelay = 16000;
+                // TODO: the initial delay can be tweaked now that master-end latencies have been reduced... trying with it reduced from 60s to 30s
+                final long intervalInitialDelay = 30000;
+                final long intervalDelay = 20000; // 16s inerval was causing gaps in continuity, changing to 20s (2x the max fragment duration coming from media server)
                 // NOTE: Metric publishing will NOT begin if canaryRunTime is < intervalInitialDelay
                 intervalMetricsTimer.scheduleAtFixedRate(intervalMetricsTask, intervalInitialDelay, intervalDelay); // initial delay of 'intervalInitialDelay' ms at an interval of 'intervalDelay' ms
                 Thread.sleep(canaryRunTime * 1000);
