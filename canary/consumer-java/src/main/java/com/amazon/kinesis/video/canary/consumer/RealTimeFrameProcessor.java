@@ -15,7 +15,6 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.Optional;
 
-
 public class RealTimeFrameProcessor extends WebrtcStorageCanaryConsumer implements FrameVisitor.FrameProcessor {
 
     boolean isFirstFrame = false;
@@ -28,39 +27,40 @@ public class RealTimeFrameProcessor extends WebrtcStorageCanaryConsumer implemen
     }
 
     @Override
-    public void process(Frame frame, MkvTrackMetadata trackMetadata, Optional<FragmentMetadata> fragmentMetadata, Optional<FragmentMetadataVisitor.MkvTagProcessor> tagProcessor) throws FrameProcessException {
+    public void process(Frame frame, MkvTrackMetadata trackMetadata, Optional<FragmentMetadata> fragmentMetadata,
+            Optional<FragmentMetadataVisitor.MkvTagProcessor> tagProcessor) throws FrameProcessException {
         if (!isFirstFrame) {
-            try
-            {
+            try {
                 long currentTime = System.currentTimeMillis();
                 long canaryStartTime = super.canaryStartTime.getTime();
 
                 String filePath = "../webrtc-c/toConsumer.txt";
                 final String frameSentTimeStr = FileUtils.readFileToString(new File(filePath)).trim();
                 long frameSentTime = Long.parseLong(frameSentTimeStr);
-                // Check for a late consumer end start that may add to the measured FirstFrameSentToFirstFrameConsumed time
-                if (canaryStartTime > frameSentTime){
-                    // Consumer started after master sent out first frame, not pushing FirstFrameSentToFirstFrameConsumed metric
+                // Check for a late consumer end start that may add to the measured
+                // FirstFrameSentToFirstFrameConsumed time
+                if (canaryStartTime > frameSentTime) {
+                    // Consumer started after master sent out first frame, not pushing
+                    // FirstFrameSentToFirstFrameConsumed metric
                 } else {
                     long rtpToFirstFragment = currentTime - frameSentTime;
-                    super.publishMetricToCW("FirstFrameSentToFirstFrameConsumed", rtpToFirstFragment, StandardUnit.Milliseconds);
+                    super.publishMetricToCW("FirstFrameSentToFirstFrameConsumed", rtpToFirstFragment,
+                            StandardUnit.Milliseconds);
                 }
 
                 long timeToFirstFragment = currentTime - canaryStartTime;
-                super.publishMetricToCW("TotalTimeToFirstFrameConsumed", timeToFirstFragment, StandardUnit.Milliseconds);
-            }
-            catch (FileNotFoundException ex)
-            {
-                // Master-end timestamp file not found, reduce frequency of runs by increasing CANARY_DURATION_IN_SECONDS
-            }
-            catch(IOException ioEx)
-            {
+                super.publishMetricToCW("TotalTimeToFirstFrameConsumed", timeToFirstFragment,
+                        StandardUnit.Milliseconds);
+            } catch (FileNotFoundException ex) {
+                // Master-end timestamp file not found, try reducing the frequency of runs by
+                // increasing CANARY_DURATION_IN_SECONDS
+            } catch (IOException ioEx) {
                 // IO Exception
             }
             isFirstFrame = true;
             System.exit(0);
         } else {
-            //Non first frame. Skipping...
+            // Non first frame. Skipping...
         }
 
     }

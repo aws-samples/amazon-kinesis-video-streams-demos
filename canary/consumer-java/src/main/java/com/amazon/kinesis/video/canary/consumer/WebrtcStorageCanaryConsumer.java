@@ -3,23 +3,16 @@ package com.amazon.kinesis.video.canary.consumer;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.FutureTask;
-import java.util.concurrent.TimeUnit;
-import java.lang.Exception;
 import java.util.Date;
-import java.text.MessageFormat;
 import java.util.List;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.ArrayList;
-import java.io.InputStream;
-
-import java.util.Scanner;
-import java.io.FileReader;
-import java.io.File; // TODO: remove, just for testing
-import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.Future;
+import java.lang.Exception;
+import java.text.MessageFormat;
 
 import com.amazonaws.auth.EnvironmentVariableCredentialsProvider;
-import com.amazonaws.auth.SystemPropertiesCredentialsProvider;
 import com.amazonaws.regions.Regions;
 import com.amazonaws.services.cloudwatch.AmazonCloudWatch;
 import com.amazonaws.services.cloudwatch.AmazonCloudWatchClientBuilder;
@@ -28,41 +21,28 @@ import com.amazonaws.services.kinesisvideo.AmazonKinesisVideoClientBuilder;
 import com.amazonaws.services.kinesisvideo.model.APIName;
 import com.amazonaws.services.kinesisvideo.model.GetDataEndpointRequest;
 import com.amazonaws.services.kinesisvideo.model.TimestampRange;
-
-import java.util.concurrent.Future;
-
 import com.amazonaws.services.kinesisvideo.model.FragmentSelector;
 import com.amazonaws.services.cloudwatch.model.Dimension;
 import com.amazonaws.services.cloudwatch.model.MetricDatum;
 import com.amazonaws.services.cloudwatch.model.PutMetricDataRequest;
 import com.amazonaws.services.cloudwatch.model.StandardUnit;
-import com.amazonaws.client.builder.AwsClientBuilder;
-import com.amazonaws.services.kinesisvideo.AmazonKinesisVideoMedia;
-import com.amazonaws.services.kinesisvideo.AmazonKinesisVideoMediaClientBuilder;
-import com.amazonaws.services.kinesisvideo.model.GetMediaResult;
 import com.amazonaws.services.kinesisvideo.model.StartSelector;
 import com.amazonaws.services.kinesisvideo.model.StartSelectorType;
-import com.amazonaws.services.kinesisvideo.model.GetMediaRequest;
 import com.amazonaws.kinesisvideo.parser.utilities.FrameVisitor;
 import com.amazonaws.kinesisvideo.parser.examples.GetMediaWorker;
-
-import com.amazonaws.SDKGlobalConfiguration;
-
 
 import lombok.extern.log4j.Log4j2;
 
 /*
- * Canary for WebRTC with Storage Through Media Server
+ * Canary for WebRTC with Storage thro Media Server
  * 
- * For longrun-configured jobs, this Canary will emit FragmentContinuity metrics by continuously
+ * For longRun-configured jobs, this Canary will emit FragmentContinuity metrics by continuously
  * checking for any newly ingested fragments for the given stream. The fragment list is checked
- * for new fragments every "max-fragment-duration + 1 sec." The max-fragment-duration is determined
- * by Media Server.
+ * for new fragments every "fragmentDuration * 2" The fragmentDuration is set by the encoder in
+ * configuration in Media Server.
  * 
  * For periodic-configured jobs, this Canary will emit TimeToFirstFragment metrics by continuously
- * checking for consumable media from the specified stream via GetMedia calls. It takes ~1 sec for
- * InputStream.read() to verify that a stream is empty, so the resolution of this metric is approx
- * 1 sec.
+ * checking for consumable media from the specified stream via GetMedia calls.
  */
 
 @Log4j2
@@ -78,14 +58,14 @@ public class WebrtcStorageCanaryConsumer {
     private static void calculateFragmentContinuityMetric(CanaryFragmentList fragmentList) {
         try {
             final GetDataEndpointRequest dataEndpointRequest = new GetDataEndpointRequest()
-                .withAPIName(APIName.LIST_FRAGMENTS).withStreamName(streamName);
-            final String listFragmentsEndpoint = amazonKinesisVideo.getDataEndpoint(dataEndpointRequest).getDataEndpoint();
+                    .withAPIName(APIName.LIST_FRAGMENTS).withStreamName(streamName);
+            final String listFragmentsEndpoint = amazonKinesisVideo.getDataEndpoint(dataEndpointRequest)
+                    .getDataEndpoint();
 
             TimestampRange timestampRange = new TimestampRange();
             timestampRange.setStartTimestamp(canaryStartTime);
             timestampRange.setEndTimestamp(new Date());
 
-            // TODO: change this to be PRODUCER_TS instead...
             FragmentSelector fragmentSelector = new FragmentSelector();
             fragmentSelector.setFragmentSelectorType("SERVER_TIMESTAMP");
             fragmentSelector.setTimestampRange(timestampRange);
@@ -93,16 +73,16 @@ public class WebrtcStorageCanaryConsumer {
             Boolean newFragmentReceived = false;
 
             final FutureTask<List<CanaryFragment>> futureTask = new FutureTask<>(
-                new CanaryListFragmentWorker(streamName, credentialsProvider, listFragmentsEndpoint, Regions.fromName(region), fragmentSelector)
-            );
+                    new CanaryListFragmentWorker(streamName, credentialsProvider, listFragmentsEndpoint,
+                            Regions.fromName(region), fragmentSelector));
             Thread thread = new Thread(futureTask);
             thread.start();
-            List<CanaryFragment> newFragmentList = futureTask.get();
 
+            List<CanaryFragment> newFragmentList = futureTask.get();
             if (newFragmentList.size() > fragmentList.getFragmentList().size()) {
                 newFragmentReceived = true;
             }
-            log.info("New fragment received: {}", newFragmentReceived);
+            
             fragmentList.setFragmentList(newFragmentList);
 
             publishMetricToCW("FragmentReceived", newFragmentReceived ? 1.0 : 0.0, StandardUnit.None);
@@ -111,11 +91,11 @@ public class WebrtcStorageCanaryConsumer {
         }
     }
 
-    // TODO: eventually shorten name as there will only be a getMedia version anyway, so remove "getMedia" from name
-private static void getMediaTimeToFirstFragment() {
+    private static void calculateTimeToFirstFragment() {
         try {
-            final StartSelector startSelector = new StartSelector().withStartSelectorType(StartSelectorType.PRODUCER_TIMESTAMP).withStartTimestamp(canaryStartTime);
-        
+            final StartSelector startSelector = new StartSelector()
+                    .withStartSelectorType(StartSelectorType.PRODUCER_TIMESTAMP).withStartTimestamp(canaryStartTime);
+
             final long currentTime = new Date().getTime();
             double timeToFirstFragment = Double.MAX_VALUE;
 
@@ -130,72 +110,18 @@ private static void getMediaTimeToFirstFragment() {
                     startSelector,
                     amazonKinesisVideo,
                     frameVisitor);
-                    
+
             final Future<?> task = executorService.submit(getMediaWorker);
             task.get();
-    
+
         } catch (Exception e) {
             log.error(e);
         }
     }
 
-    // NOTE: unused
-    // TODO: remove this if not going to use...
-    private static void calculateTimeToFirstFragment(Timer intervalMetricsTimer) {
-        try {
-            double timeToFirstFragment = Double.MAX_VALUE;
-
-            final GetDataEndpointRequest dataEndpointRequest = new GetDataEndpointRequest()
-                .withAPIName(APIName.LIST_FRAGMENTS).withStreamName(streamName);
-            final String listFragmentsEndpoint = amazonKinesisVideo.getDataEndpoint(dataEndpointRequest).getDataEndpoint();
-        
-            // TODO: make the below two blocks of code into a 
-            // getFragmentSelector() function, reuse in the other metric
-
-            // Time range for listFragments request
-            TimestampRange timestampRange = new TimestampRange();
-            timestampRange.setStartTimestamp(canaryStartTime);
-            timestampRange.setEndTimestamp(new Date());
-
-            // Configures listFragments request
-            FragmentSelector fragmentSelector = new FragmentSelector();
-            fragmentSelector.setFragmentSelectorType("PRODUCER_TIMESTAMP");
-            fragmentSelector.setTimestampRange(timestampRange);
-
-            long currentTime = new Date().getTime();
-
-            final FutureTask<List<CanaryFragment>> futureTask = new FutureTask<>(
-                new CanaryListFragmentWorker(streamName, credentialsProvider, listFragmentsEndpoint, Regions.fromName(region), fragmentSelector)
-            );
-            Thread thread = new Thread(futureTask);
-            thread.start();
-            List<CanaryFragment> fragmentList = futureTask.get();
-
-            if (fragmentList.size() > 0) {
-                //System.out.println(fragmentList.size());
-
-                String filePath = "../webrtc-c/" + streamName + ".txt";
-                Scanner scanner = new Scanner(new FileReader(filePath));
-                long rtpSendTime = Long.parseLong(scanner.next());
-                scanner.close();
-
-                timeToFirstFragment = fragmentList.get(0).getFragment().getServerTimestamp().getTime() - rtpSendTime;
-                publishMetricToCW("TimeToFirstFragment1", timeToFirstFragment, StandardUnit.Milliseconds);
-                timeToFirstFragment = fragmentList.get(0).getFragment().getServerTimestamp().getTime() - fragmentList.get(0).getFragment().getProducerTimestamp().getTime();
-                publishMetricToCW("KVSSinkToInletLatency", timeToFirstFragment, StandardUnit.Milliseconds);
-                intervalMetricsTimer.cancel();
-            }
-
-        } catch (Exception e) {
-            log.error(e);
-        }
-           
-    }
-    
-    
     protected static void publishMetricToCW(String metricName, double value, StandardUnit cwUnit) {
         try {
-            System.out.println(MessageFormat.format("Emitting the following metric: {0} - {1}", metricName, value));
+            log.info(MessageFormat.format("Emitting the following metric: {0} - {1}", metricName, value));
             final Dimension dimensionPerStream = new Dimension()
                     .withName("StorageWebRTCSDKCanaryStreamName")
                     .withValue(streamName);
@@ -222,22 +148,18 @@ private static void getMediaTimeToFirstFragment() {
                     .withMetricData(datumList);
             cwClient.putMetricData(request);
         } catch (Exception e) {
-            System.out.println(e);
             log.error(e);
         }
     }
 
     public static void main(final String[] args) throws Exception {
-        //System.setProperty(SDKGlobalConfiguration.DISABLE_CERT_CHECKING_SYSTEM_PROPERTY, "true");
-
-        System.out.println("CONSUMER CANARY START TIME: " + new Date().getTime());
 
         // Import configurable parameters.
         final Integer canaryRunTime = Integer.parseInt(System.getenv("CANARY_DURATION_IN_SECONDS"));
         streamName = System.getenv("CANARY_STREAM_NAME");
         canaryLabel = System.getenv("CANARY_LABEL");
-        region = "us-west-2"; // TODO: remove this hardcode
-        
+        region = System.getenv("AWS_DEFAULT_REGION");
+
         log.info("Stream name: {}", streamName);
 
         canaryStartTime = new Date();
@@ -248,15 +170,14 @@ private static void getMediaTimeToFirstFragment() {
                 .withCredentials(credentialsProvider)
                 .build();
         cwClient = AmazonCloudWatchClientBuilder.standard()
-                    .withRegion(region)
-                    .withCredentials(credentialsProvider)
-                    .build();
-        
+                .withRegion(region)
+                .withCredentials(credentialsProvider)
+                .build();
 
         Timer intervalMetricsTimer = new Timer("IntervalMetricsTimer");
         TimerTask intervalMetricsTask;
-        // TODO: consider changing these labels to be "StorageWebrtc...", but might be not worth it if they are tied to dashboard terminology
-        switch (canaryLabel){
+
+        switch (canaryLabel) {
             case "WebrtcLongRunning": {
                 final CanaryFragmentList fragmentList = new CanaryFragmentList();
                 intervalMetricsTask = new TimerTask() {
@@ -265,28 +186,30 @@ private static void getMediaTimeToFirstFragment() {
                         calculateFragmentContinuityMetric(fragmentList);
                     }
                 };
-                // TODO: the initial delay can be tweaked now that master-end latencies have been reduced... trying with it reduced from 60s to 30s
+
+                // Initial delay of 30s to allow for ListFragment response to be populated
                 final long intervalInitialDelay = 30000;
-                final long intervalDelay = 20000; // 16s inerval was causing gaps in continuity, changing to 20s (2x the max fragment duration coming from media server)
+                final long intervalDelay = 20000; // NOTE: 16s interval was causing gaps in continuity, changing to 20s (2x the
+                                                  // typical fragment duration coming from media server)
+
                 // NOTE: Metric publishing will NOT begin if canaryRunTime is < intervalInitialDelay
-                intervalMetricsTimer.scheduleAtFixedRate(intervalMetricsTask, intervalInitialDelay, intervalDelay); // initial delay of 'intervalInitialDelay' ms at an interval of 'intervalDelay' ms
+                intervalMetricsTimer.scheduleAtFixedRate(intervalMetricsTask, intervalInitialDelay, intervalDelay);
                 Thread.sleep(canaryRunTime * 1000);
                 intervalMetricsTimer.cancel();
                 break;
             }
             case "WebrtcPeriodic": {
-                while((System.currentTimeMillis() - canaryStartTime.getTime()) < canaryRunTime*1000) {
-                    getMediaTimeToFirstFragment();
+                while ((System.currentTimeMillis() - canaryStartTime.getTime()) < canaryRunTime * 1000) {
+                    calculateTimeToFirstFragment();
                 }
                 System.exit(0);
                 break;
             }
             default: {
-                log.error("Env var CANARY_LABEL: {} must be set to either WebrtcLongRunning or WebrtcPeriodic", canaryLabel);
+                log.error("Env var CANARY_LABEL: {} must be set to either WebrtcLongRunning or WebrtcPeriodic",
+                        canaryLabel);
                 throw new Exception("CANARY_LABEL must be set to either WebrtcLongRunning or WebrtcPeriodic");
             }
         }
-        
-        // // TODO: consider not running this sleep for the periodic case if it only is measuring startup/timetofirst metrics (can do this now that the 5min cooldown is fixed)
     }
 }
