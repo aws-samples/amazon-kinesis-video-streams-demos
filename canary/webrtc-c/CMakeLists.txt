@@ -65,7 +65,7 @@ add_library(
   src/CloudwatchMonitoring.cpp
   src/Cloudwatch.cpp
   src/Peer.cpp
-  src/Storage/Common.cpp)
+  src/media-server-storage/Common.cpp)
 target_link_libraries(
   kvsWebrtcCanary
   kvsWebrtcClient
@@ -91,7 +91,7 @@ target_link_libraries(
 
 add_executable(
   kvsWebrtcStorageSample
-  src/Storage/kvsWebRTCClientMaster.cpp)
+  src/media-server-storage/kvsWebRTCClientMaster.cpp)
 target_link_libraries(
   kvsWebrtcStorageSample
   kvsWebrtcCanary)
