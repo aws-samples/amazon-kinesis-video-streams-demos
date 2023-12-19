@@ -6,29 +6,14 @@ import com.amazonaws.kinesisvideo.parser.utilities.FragmentMetadata;
 import com.amazonaws.kinesisvideo.parser.utilities.FragmentMetadataVisitor;
 import com.amazonaws.kinesisvideo.parser.utilities.FrameVisitor;
 import com.amazonaws.kinesisvideo.parser.utilities.MkvTrackMetadata;
-import com.amazonaws.services.cloudwatch.AmazonCloudWatchAsync;
-import com.amazonaws.services.cloudwatch.model.Dimension;
-import com.amazonaws.services.cloudwatch.model.MetricDatum;
-import com.amazonaws.services.cloudwatch.model.PutMetricDataRequest;
 import com.amazonaws.services.cloudwatch.model.StandardUnit;
-import com.google.common.primitives.Ints;
-import com.google.common.primitives.Longs;
-
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Optional;
-import java.util.zip.CRC32;
 
 import org.apache.commons.io.FileUtils;
 
-import java.util.Date;
-
-import java.util.Scanner;
-import java.io.FileReader;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.util.Optional;
 
 
 public class RealTimeFrameProcessor extends WebrtcStorageCanaryConsumer implements FrameVisitor.FrameProcessor {
@@ -44,11 +29,7 @@ public class RealTimeFrameProcessor extends WebrtcStorageCanaryConsumer implemen
 
     @Override
     public void process(Frame frame, MkvTrackMetadata trackMetadata, Optional<FragmentMetadata> fragmentMetadata, Optional<FragmentMetadataVisitor.MkvTagProcessor> tagProcessor) throws FrameProcessException {
-        System.out.println("RealTimeFrameProcessor invoked for frame" + frame);
         if (!isFirstFrame) {
-
-            System.out.println("First Frame invoked for frame" + frame);
-
             try
             {
                 long currentTime = System.currentTimeMillis();
@@ -57,9 +38,9 @@ public class RealTimeFrameProcessor extends WebrtcStorageCanaryConsumer implemen
                 String filePath = "../webrtc-c/toConsumer.txt";
                 final String frameSentTimeStr = FileUtils.readFileToString(new File(filePath)).trim();
                 long frameSentTime = Long.parseLong(frameSentTimeStr);
-                // Check for a late consumer end start that may add to the observed FirstFrameSentToFirstFrameConsumed time
+                // Check for a late consumer end start that may add to the measured FirstFrameSentToFirstFrameConsumed time
                 if (canaryStartTime > frameSentTime){
-                    System.out.println("Consumer started after master sent out first frame, not pushing FirstFrameSentToFirstFrameConsumed metric.");
+                    // Consumer started after master sent out first frame, not pushing FirstFrameSentToFirstFrameConsumed metric
                 } else {
                     long rtpToFirstFragment = currentTime - frameSentTime;
                     super.publishMetricToCW("FirstFrameSentToFirstFrameConsumed", rtpToFirstFragment, StandardUnit.Milliseconds);
@@ -70,16 +51,16 @@ public class RealTimeFrameProcessor extends WebrtcStorageCanaryConsumer implemen
             }
             catch (FileNotFoundException ex)
             {
-                System.out.println("Master-end timestamp file not found, reduce frequency of runs by increasing CANARY_DURATION_IN_SECONDS");
+                // Master-end timestamp file not found, reduce frequency of runs by increasing CANARY_DURATION_IN_SECONDS
             }
             catch(IOException ioEx)
             {
-                System.out.println("IO Exception!");
+                // IO Exception
             }
             isFirstFrame = true;
             System.exit(0);
         } else {
-            System.out.println("Non first frame. Skipping...");
+            //Non first frame. Skipping...
         }
 
     }
