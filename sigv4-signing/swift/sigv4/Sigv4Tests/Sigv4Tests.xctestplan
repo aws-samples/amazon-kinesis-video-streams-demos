@@ -1,0 +1,24 @@
+{
+  "configurations" : [
+    {
+      "id" : "FDBAD029-CC6E-49D6-8F92-0F5AED95266B",
+      "name" : "Configuration 1",
+      "options" : {
+
+      }
+    }
+  ],
+  "defaultOptions" : {
+    "testTimeoutsEnabled" : true
+  },
+  "testTargets" : [
+    {
+      "target" : {
+        "containerPath" : "container:sigv4.xcodeproj",
+        "identifier" : "8EFDD97D2B17CE9600562782",
+        "name" : "Sigv4UnitTests"
+      }
+    }
+  ],
+  "version" : 1
+}

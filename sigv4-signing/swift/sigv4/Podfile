@@ -1,0 +1,12 @@
+target 'Sigv4' do
+  pod 'Starscream', '~> 4.0.6'
+
+  target 'Sigv4CLI' do  
+    inherit! :search_paths
+  end
+
+  target 'Sigv4Tests' do
+    inherit! :search_paths
+  end
+end
+
