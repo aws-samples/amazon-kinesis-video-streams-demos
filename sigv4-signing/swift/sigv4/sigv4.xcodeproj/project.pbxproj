@@ -77,7 +77,7 @@
 		8EFDD9592B17CCEE00562782 /* sigv4Framework.docc */ = {isa = PBXFileReference; lastKnownFileType = folder.documentationcatalog; path = sigv4Framework.docc; sourceTree = "<group>"; };
 		8EFDD9732B17CDF000562782 /* Sigv4CLI */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = Sigv4CLI; sourceTree = BUILT_PRODUCTS_DIR; };
 		8EFDD9752B17CDF000562782 /* main.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = main.swift; sourceTree = "<group>"; };
-		8EFDD97E2B17CE9600562782 /* Sigv4UnitTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = Sigv4UnitTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		8EFDD97E2B17CE9600562782 /* Sigv4Tests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = Sigv4Tests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		8EFDD9802B17CE9600562782 /* Sigv4Tests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sigv4Tests.swift; sourceTree = "<group>"; };
 		8EFDD9942B17D02800562782 /* libStarscream.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; path = libStarscream.a; sourceTree = BUILT_PRODUCTS_DIR; };
 		8EFDD9972B17D0FC00562782 /* libStarscream.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; path = libStarscream.a; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -163,7 +163,7 @@
 			children = (
 				8EFDD9562B17CCEE00562782 /* Sigv4.framework */,
 				8EFDD9732B17CDF000562782 /* Sigv4CLI */,
-				8EFDD97E2B17CE9600562782 /* Sigv4UnitTests.xctest */,
+				8EFDD97E2B17CE9600562782 /* Sigv4Tests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -265,9 +265,9 @@
 			productReference = 8EFDD9732B17CDF000562782 /* Sigv4CLI */;
 			productType = "com.apple.product-type.tool";
 		};
-		8EFDD97D2B17CE9600562782 /* Sigv4UnitTests */ = {
+		8EFDD97D2B17CE9600562782 /* Sigv4Tests */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 8EFDD9852B17CE9600562782 /* Build configuration list for PBXNativeTarget "Sigv4UnitTests" */;
+			buildConfigurationList = 8EFDD9852B17CE9600562782 /* Build configuration list for PBXNativeTarget "Sigv4Tests" */;
 			buildPhases = (
 				15AD3105406B56A54631D8B9 /* [CP] Check Pods Manifest.lock */,
 				8EFDD97A2B17CE9600562782 /* Sources */,
@@ -279,9 +279,9 @@
 			dependencies = (
 				8EFDD9842B17CE9600562782 /* PBXTargetDependency */,
 			);
-			name = Sigv4UnitTests;
+			name = Sigv4Tests;
 			productName = Sigv4Tests;
-			productReference = 8EFDD97E2B17CE9600562782 /* Sigv4UnitTests.xctest */;
+			productReference = 8EFDD97E2B17CE9600562782 /* Sigv4Tests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
 		};
 /* End PBXNativeTarget section */
@@ -320,7 +320,7 @@
 			targets = (
 				8EFDD9552B17CCEE00562782 /* Sigv4 */,
 				8EFDD9722B17CDF000562782 /* Sigv4CLI */,
-				8EFDD97D2B17CE9600562782 /* Sigv4UnitTests */,
+				8EFDD97D2B17CE9600562782 /* Sigv4Tests */,
 			);
 		};
 /* End PBXProject section */
@@ -722,7 +722,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		8EFDD9852B17CE9600562782 /* Build configuration list for PBXNativeTarget "Sigv4UnitTests" */ = {
+		8EFDD9852B17CE9600562782 /* Build configuration list for PBXNativeTarget "Sigv4Tests" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				8EFDD9862B17CE9600562782 /* Debug */,

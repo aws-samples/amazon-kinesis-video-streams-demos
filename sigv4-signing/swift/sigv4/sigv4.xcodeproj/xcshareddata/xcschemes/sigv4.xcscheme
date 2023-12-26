@@ -43,8 +43,8 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "8EFDD97D2B17CE9600562782"
-               BuildableName = "Sigv4UnitTests.xctest"
-               BlueprintName = "Sigv4UnitTests"
+               BuildableName = "Sigv4Tests.xctest"
+               BlueprintName = "Sigv4Tests"
                ReferencedContainer = "container:sigv4.xcodeproj">
             </BuildableReference>
          </TestableReference>
