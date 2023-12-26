@@ -29,11 +29,8 @@
       shouldUseLaunchSchemeArgsEnv = "YES">
       <TestPlans>
          <TestPlanReference
-            reference = "container:../Sigv4.xctestplan"
+            reference = "container:Sigv4Tests/Sigv4Tests.xctestplan"
             default = "YES">
-         </TestPlanReference>
-         <TestPlanReference
-            reference = "container:Sigv4Tests/Sigv4Tests.xctestplan">
          </TestPlanReference>
       </TestPlans>
       <Testables>
