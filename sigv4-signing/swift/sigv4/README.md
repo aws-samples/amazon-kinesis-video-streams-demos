@@ -1,4 +1,4 @@
-# Sigv4 Signer Samples - Swift
+# SigV4 Signer Samples - Swift
 
 ## Setup
 
@@ -36,15 +36,15 @@ pod install
 
 ## Project Structure
 
-This project comes in 3 different parts:
+This sample is designed in a way that the customer application can be integrated using the SigV4 signer logic in a Swift (iOS) application as a reference. There are 3 different parts included:
 
 ### Sigv4 Signer Framework
 
-The [signer framework](./Sigv4Signer) contains the logic for signing the Secure WebSocket (WSS) URL with the provided AWS Credentials using the SigV4 algorithm to connect to Amazon Kinesis Video Streams WebRTC Signaling.
+The [signer framework](./Sigv4Signer) contains the logic for signing the Secure WebSocket (WSS) URL with the provided AWS Credentials using the SigV4 algorithm to connect to Amazon Kinesis Video Streams WebRTC Signaling [as Master](https://docs.aws.amazon.com/kinesisvideostreams-webrtc-dg/latest/devguide/kvswebrtc-websocket-apis-2.html) or [as Viewer](https://docs.aws.amazon.com/kinesisvideostreams-webrtc-dg/latest/devguide/kvswebrtc-websocket-apis-1.html).
 
 ### Sigv4 CLI Application
 
-This is the sample application demonstrating how to use the SigV4 Signer framework. It contains placeholders for where and what to input so that the WebSocket URL is generated correctly. Refer to the [main README](../../README.md) for more details on the variables. You can use either short-term or long-term credentials in this sample. To run the sample, press the Run button at the top-left of the XCode UI.
+This is the sample application demonstrating how to use the SigV4 Signer framework. It contains placeholders for where and what to input so that the WebSocket URL is generated correctly. Refer to the [main README](../../README.md) for more details on the variables. You can use either short-term or long-term AWS credentials. To run the sample, press the Run button at the top-left of the XCode UI.
 
 ### Unit Tests
 
