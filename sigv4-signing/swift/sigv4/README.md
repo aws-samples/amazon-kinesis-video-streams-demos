@@ -44,7 +44,7 @@ The [signer framework](./Sigv4Signer) contains the logic for signing the Secure 
 
 ### Sigv4 CLI Application
 
-This is the sample application demonstrating how to use the SigV4 Signer framework. It contains placeholders for where and what to input so that the WebSocket URL is generated correctly. Refer to the [main README](../../README.md) for more details on the variables. You can use either short-term or long-term AWS credentials. To run the sample, press the Run button at the top-left of the XCode UI.
+This is the sample application demonstrating how to use the SigV4 Signer framework. It contains placeholders for where and what to input so that the WebSocket URL is generated correctly. Refer to the [main README](../../README.md) for more details on the variables. You can use either short-term or long-term AWS credentials. To run the sample, press the Run button at the top-left of the XCode UI. It signs the URL, connects to it using the [StarScream WebSocket Library](https://cocoapods.org/pods/Starscream), and sends a Ping frame. We expect to receive a pong frame in return.
 
 ### Unit Tests
 
