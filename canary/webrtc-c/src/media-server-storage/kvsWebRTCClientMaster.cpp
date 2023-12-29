@@ -175,7 +175,7 @@ CleanUp:
 PVOID writeFirstFrameSentTimeToFile(){
     DLOGI("[Canary] Opening firstFrameSentTimeStamp.txt");
     FILE *firstFrameSentTimeStamp = FOPEN("../firstFrameSentTimeStamp.txt", "w");
-    if (toConfirstFrameSentTimeStampsumer == NULL)
+    if (firstFrameSentTimeStamp == NULL)
     {
         printf("[Canary] Error opening firstFrameSentTimeStamp.txt\n");
         exit(1);
