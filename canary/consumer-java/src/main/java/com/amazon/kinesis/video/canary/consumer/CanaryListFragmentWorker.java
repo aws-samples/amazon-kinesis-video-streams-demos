@@ -23,19 +23,19 @@ import lombok.extern.log4j.Log4j2;
 
 @Log4j2
 public class CanaryListFragmentWorker implements Callable {
-    private final FragmentSelector fragmentSelector;
-    private final AmazonKinesisVideoArchivedMedia amazonKinesisVideoArchivedMedia;
-    private final long fragmentsPerRequest = 100;
-    protected final String streamName;
+    private final FragmentSelector mFragmentSelector;
+    private final AmazonKinesisVideoArchivedMedia mAmazonKinesisVideoArchivedMedia;
+    private final long mFragmentsPerRequest = 100;
+    private final String mStreamName;
 
     public CanaryListFragmentWorker(final String streamName,
                                     final AWSCredentialsProvider credentialsProvider, final String endPoint,
                                     final Regions region,
                                     final FragmentSelector fragmentSelector) {
-        this.streamName = streamName;
-        this.fragmentSelector = fragmentSelector;
+        this.mStreamName = streamName;
+        this.mFragmentSelector = fragmentSelector;
         
-        amazonKinesisVideoArchivedMedia = AmazonKinesisVideoArchivedMediaClient
+        this.mAmazonKinesisVideoArchivedMedia = AmazonKinesisVideoArchivedMediaClient
                 .builder()
                 .withCredentials(credentialsProvider)
                 .withEndpointConfiguration(new AwsClientBuilder.EndpointConfiguration(endPoint, region.getName()))
@@ -55,20 +55,23 @@ public class CanaryListFragmentWorker implements Callable {
                 streamName, credentialsProvider, endpoint, region, fragmentSelector);
     }
 
+    private void close() {
+        this.mAmazonKinesisVideoArchivedMedia.shutdown();
+    }
+
     @Override
     public List<CanaryFragment> call() {
         List<CanaryFragment> fragments = new ArrayList<>();
         try {
-            log.info("Start CanaryListFragment worker on stream {}", streamName);
+            log.info("Start CanaryListFragment worker on stream {}", this.mStreamName);
             
             ListFragmentsRequest request = new ListFragmentsRequest()
-                    .withStreamName(streamName).withFragmentSelector(fragmentSelector).withMaxResults(fragmentsPerRequest);
+                    .withStreamName(this.mStreamName).withFragmentSelector(this.mFragmentSelector).withMaxResults(this.mFragmentsPerRequest);
 
-            ListFragmentsResult result = amazonKinesisVideoArchivedMedia.listFragments(request);
+            ListFragmentsResult result = this.mAmazonKinesisVideoArchivedMedia.listFragments(request);
             
-
             log.info("List Fragments called on stream {} response {} request ID {}",
-                    streamName,
+                    this.mStreamName,
                     result.getSdkHttpMetadata().getHttpStatusCode(),
                     result.getSdkResponseMetadata().getRequestId());
 
@@ -97,10 +100,12 @@ public class CanaryListFragmentWorker implements Callable {
                 log.info("Retrieved fragment number {} ", cf.getFragment().getFragmentNumber());
             }
         } catch (Exception e) {
-            log.error("Failure in CanaryListFragmentWorker for streamName {} {}", streamName, e.toString());
+            System.out.println("Failure in CanaryListFragmentWorker for streamName " + e);
+            log.error("Failure in CanaryListFragmentWorker for streamName {} {}", this.mStreamName, e);
             throw e;
         } finally {
-                        log.info("Retrieved {} Fragments and exiting CanaryListFragmentWorker for stream {}", fragments.size(), streamName);
+            log.info("Retrieved {} Fragments and exiting CanaryListFragmentWorker for stream {}", fragments.size(), this.mStreamName);
+            this.close();
             return fragments;
         }
     }
