@@ -83,8 +83,8 @@ public class CanaryListFragmentWorker implements Callable {
             /* If result is truncated, keep making requests until nextToken is empty */
             while (nextToken != null) {
                 request = new ListFragmentsRequest()
-                        .withStreamName(streamName).withNextToken(nextToken);
-                result = amazonKinesisVideoArchivedMedia.listFragments(request);
+                        .withStreamName(this.mStreamName).withNextToken(nextToken);
+                result = this.mAmazonKinesisVideoArchivedMedia.listFragments(request);
 
                 for (Fragment f : result.getFragments()) {
                     fragments.add(new CanaryFragment(f));
