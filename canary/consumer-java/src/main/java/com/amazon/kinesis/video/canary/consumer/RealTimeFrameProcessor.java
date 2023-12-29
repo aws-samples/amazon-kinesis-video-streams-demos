@@ -15,9 +15,12 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.Optional;
 
+import lombok.extern.log4j.Log4j2;
+
+@Log4j2
 public class RealTimeFrameProcessor extends WebrtcStorageCanaryConsumer implements FrameVisitor.FrameProcessor {
 
-    boolean isFirstFrame = false;
+    private boolean isFirstFrame = false;
 
     public static RealTimeFrameProcessor create() {
         return new RealTimeFrameProcessor();
@@ -34,13 +37,14 @@ public class RealTimeFrameProcessor extends WebrtcStorageCanaryConsumer implemen
                 long currentTime = System.currentTimeMillis();
                 long canaryStartTime = super.canaryStartTime.getTime();
 
-                String filePath = "../webrtc-c/toConsumer.txt";
+                String filePath = "../webrtc-c/firstFrameSentTimeStamp.txt";
                 final String frameSentTimeStr = FileUtils.readFileToString(new File(filePath)).trim();
                 long frameSentTime = Long.parseLong(frameSentTimeStr);
+
                 // Check for a late consumer end start that may add to the measured
                 // FirstFrameSentToFirstFrameConsumed time
                 if (canaryStartTime > frameSentTime) {
-                    // Consumer started after master sent out first frame, not pushing
+                    // Consumer started after master sent out first frame, not pushing the
                     // FirstFrameSentToFirstFrameConsumed metric
                 } else {
                     long rtpToFirstFragment = currentTime - frameSentTime;
@@ -52,10 +56,10 @@ public class RealTimeFrameProcessor extends WebrtcStorageCanaryConsumer implemen
                 super.publishMetricToCW("TotalTimeToFirstFrameConsumed", timeToFirstFragment,
                         StandardUnit.Milliseconds);
             } catch (FileNotFoundException ex) {
-                // Master-end timestamp file not found, try reducing the frequency of runs by
-                // increasing CANARY_DURATION_IN_SECONDS
+                log.error("Master-end timestamp file not found, try reducing the frequency of runs by increasing CANARY_DURATION_IN_SECONDS", ex);
+
             } catch (IOException ioEx) {
-                // IO Exception
+                log.error(ioEx);
             }
             isFirstFrame = true;
             System.exit(0);

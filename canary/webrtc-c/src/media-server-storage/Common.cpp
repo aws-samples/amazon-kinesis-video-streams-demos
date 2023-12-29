@@ -1324,7 +1324,7 @@ STATUS freeSampleConfiguration(PSampleConfiguration* ppSampleConfiguration)
     StackQueueIterator iterator;
     BOOL locked = FALSE;
 
-    std::string filePath = "../toConsumer.txt";
+    std::string filePath = "../firstFrameSentTimeStamp.txt";
 
     CHK(ppSampleConfiguration != NULL, STATUS_NULL_ARG);
     pSampleConfiguration = *ppSampleConfiguration;

@@ -35,7 +35,7 @@ INT32 main(INT32 argc, CHAR* argv[])
 
 
     t1 = GETTIME() / HUNDREDS_OF_NANOS_IN_A_MILLISECOND;
-    std::string filePath = "../toConsumer.txt";
+    std::string filePath = "../firstFrameSentTimeStamp.txt";
     remove(filePath.c_str());
 
     std::thread canaryDurationThread;
@@ -173,15 +173,15 @@ CleanUp:
 
 // Save first-frame-sent time to file for consumer-end access.
 PVOID writeFirstFrameSentTimeToFile(){
-    DLOGI("[Canary] Opening toConsumer.txt");
-    FILE *toConsumer = FOPEN("../toConsumer.txt", "w");
-    if (toConsumer == NULL)
+    DLOGI("[Canary] Opening firstFrameSentTimeStamp.txt");
+    FILE *firstFrameSentTimeStamp = FOPEN("../firstFrameSentTimeStamp.txt", "w");
+    if (toConfirstFrameSentTimeStampsumer == NULL)
     {
-        printf("[Canary] Error opening toConsumer.txt\n");
+        printf("[Canary] Error opening firstFrameSentTimeStamp.txt\n");
         exit(1);
     }
-    fprintf(toConsumer, "%lli\n", GETTIME() / HUNDREDS_OF_NANOS_IN_A_MILLISECOND);
-    FCLOSE(toConsumer);
+    fprintf(firstFrameSentTimeStamp, "%lli\n", GETTIME() / HUNDREDS_OF_NANOS_IN_A_MILLISECOND);
+    FCLOSE(firstFrameSentTimeStamp);
 }
 
 VOID calculateDisconnectToFrameSentTime(PSampleConfiguration pSampleConfiguration)
