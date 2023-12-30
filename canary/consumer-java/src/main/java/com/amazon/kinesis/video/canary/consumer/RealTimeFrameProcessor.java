@@ -64,7 +64,7 @@ public class RealTimeFrameProcessor extends WebrtcStorageCanaryConsumer implemen
             isFirstFrame = true;
             System.exit(0);
         } else {
-            // Non first frame. Skipping...
+            log.info("Non first frame. Skipping...");
         }
 
     }

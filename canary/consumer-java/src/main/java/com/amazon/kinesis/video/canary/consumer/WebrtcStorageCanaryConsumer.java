@@ -47,10 +47,12 @@ import lombok.extern.log4j.Log4j2;
 
 @Log4j2
 public class WebrtcStorageCanaryConsumer {
-    protected static Date canaryStartTime;
-    protected static String streamName;
-    private static String canaryLabel;
-    private static String region;
+    protected static final Date canaryStartTime = new Date();
+    protected static final String streamName = System.getenv("CANARY_STREAM_NAME"); 
+    
+    private static final String canaryLabel = System.getenv("CANARY_LABEL");
+    private static final String region = System.getenv("AWS_DEFAULT_REGION");
+
     private static EnvironmentVariableCredentialsProvider credentialsProvider;
     private static AmazonKinesisVideo amazonKinesisVideo;
     private static AmazonCloudWatch cwClient;
@@ -87,7 +89,7 @@ public class WebrtcStorageCanaryConsumer {
 
             publishMetricToCW("FragmentReceived", newFragmentReceived ? 1.0 : 0.0, StandardUnit.None);
         } catch (Exception e) {
-            log.error(e);
+            log.error("Failed while calculating continuity metric, {}", e);
         }
     }
 
@@ -160,13 +162,8 @@ public class WebrtcStorageCanaryConsumer {
 
         // Import configurable parameters.
         final Integer canaryRunTime = Integer.parseInt(System.getenv("CANARY_DURATION_IN_SECONDS"));
-        streamName = System.getenv("CANARY_STREAM_NAME");
-        canaryLabel = System.getenv("CANARY_LABEL");
-        region = System.getenv("AWS_DEFAULT_REGION");
 
         log.info("Stream name: {}", streamName);
-
-        canaryStartTime = new Date();
 
         credentialsProvider = new EnvironmentVariableCredentialsProvider();
         amazonKinesisVideo = AmazonKinesisVideoClientBuilder.standard()
@@ -192,6 +189,7 @@ public class WebrtcStorageCanaryConsumer {
                 };
 
                 // Initial delay of 30s to allow for ListFragment response to be populated
+                // TODO: revert back to 3000 after done testing
                 final long intervalInitialDelay = 1000;
                 final long intervalDelay = 20000; // NOTE: 16s interval was causing gaps in continuity, changing to 20s (2x the
                                                   // typical fragment duration coming from media server)
