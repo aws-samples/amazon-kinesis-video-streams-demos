@@ -47,25 +47,25 @@ import lombok.extern.log4j.Log4j2;
 
 @Log4j2
 public class WebrtcStorageCanaryConsumer {
-    protected static final Date canaryStartTime = new Date();
-    protected static final String streamName = System.getenv("CANARY_STREAM_NAME"); 
-    
-    private static final String canaryLabel = System.getenv("CANARY_LABEL");
-    private static final String region = System.getenv("AWS_DEFAULT_REGION");
+    protected static final Date mCanaryStartTime = new Date();
+    protected static final String mStreamName = System.getenv("CANARY_STREAM_NAME"); 
 
-    private static EnvironmentVariableCredentialsProvider credentialsProvider;
-    private static AmazonKinesisVideo amazonKinesisVideo;
-    private static AmazonCloudWatch cwClient;
+    private static final String mCanaryLabel = System.getenv("CANARY_LABEL");
+    private static final String mRegion = System.getenv("AWS_DEFAULT_REGION");
+
+    private static EnvironmentVariableCredentialsProvider mCredentialsProvider;
+    private static AmazonKinesisVideo mAmazonKinesisVideo;
+    private static AmazonCloudWatch mCwClient;
 
     private static void calculateFragmentContinuityMetric(CanaryFragmentList fragmentList) {
         try {
             final GetDataEndpointRequest dataEndpointRequest = new GetDataEndpointRequest()
-                    .withAPIName(APIName.LIST_FRAGMENTS).withStreamName(streamName);
-            final String listFragmentsEndpoint = amazonKinesisVideo.getDataEndpoint(dataEndpointRequest)
+                    .withAPIName(APIName.LIST_FRAGMENTS).withStreamName(mStreamName);
+            final String listFragmentsEndpoint = mAmazonKinesisVideo.getDataEndpoint(dataEndpointRequest)
                     .getDataEndpoint();
 
             TimestampRange timestampRange = new TimestampRange();
-            timestampRange.setStartTimestamp(canaryStartTime);
+            timestampRange.setStartTimestamp(mCanaryStartTime);
             timestampRange.setEndTimestamp(new Date());
 
             FragmentSelector fragmentSelector = new FragmentSelector();
@@ -75,8 +75,8 @@ public class WebrtcStorageCanaryConsumer {
             Boolean newFragmentReceived = false;
 
             final FutureTask<List<CanaryFragment>> futureTask = new FutureTask<>(
-                    new CanaryListFragmentWorker(streamName, credentialsProvider, listFragmentsEndpoint,
-                            Regions.fromName(region), fragmentSelector));
+                    new CanaryListFragmentWorker(mStreamName, mCredentialsProvider, listFragmentsEndpoint,
+                            Regions.fromName(mRegion), fragmentSelector));
             Thread thread = new Thread(futureTask);
             thread.start();
 
@@ -97,7 +97,7 @@ public class WebrtcStorageCanaryConsumer {
         try {
             System.out.println("Spawning new frameProcessor");
             final StartSelector startSelector = new StartSelector()
-                    .withStartSelectorType(StartSelectorType.PRODUCER_TIMESTAMP).withStartTimestamp(canaryStartTime);
+                    .withStartSelectorType(StartSelectorType.PRODUCER_TIMESTAMP).withStartTimestamp(mCanaryStartTime);
 
             final long currentTime = new Date().getTime();
             double timeToFirstFragment = Double.MAX_VALUE;
@@ -107,33 +107,34 @@ public class WebrtcStorageCanaryConsumer {
 
             final ExecutorService executorService = Executors.newSingleThreadExecutor();
             final GetMediaWorker getMediaWorker = GetMediaWorker.create(
-                    Regions.fromName(region),
-                    credentialsProvider,
-                    streamName,
+                    Regions.fromName(mRegion),
+                    mCredentialsProvider,
+                    mStreamName,
                     startSelector,
-                    amazonKinesisVideo,
+                    mAmazonKinesisVideo,
                     frameVisitor);
 
             final Future<?> task = executorService.submit(getMediaWorker);
             task.get();
+            executorService.shutdown();
             System.out.println("getMediaWorker returned");
 
 
         } catch (Exception e) {
-            log.error(e);
+            log.error("Failed while calculating time to first fragment, {}", e);
         }
     }
 
     protected static void publishMetricToCW(String metricName, double value, StandardUnit cwUnit) {
         try {
             System.out.println(MessageFormat.format("Emitting the following metric: {0} - {1}", metricName, value));
-            log.info(MessageFormat.format("Emitting the following metric: {0} - {1}", metricName, value));
+            log.info("Emitting the following metric: {} - {}", metricName, value);
             final Dimension dimensionPerStream = new Dimension()
                     .withName("StorageWebRTCSDKCanaryStreamName")
-                    .withValue(streamName);
+                    .withValue(mStreamName);
             final Dimension aggregatedDimension = new Dimension()
                     .withName("StorageWebRTCSDKCanaryLabel")
-                    .withValue(canaryLabel);
+                    .withValue(mCanaryLabel);
             List<MetricDatum> datumList = new ArrayList<>();
 
             MetricDatum datum = new MetricDatum()
@@ -152,36 +153,33 @@ public class WebrtcStorageCanaryConsumer {
             PutMetricDataRequest request = new PutMetricDataRequest()
                     .withNamespace("KinesisVideoSDKCanary")
                     .withMetricData(datumList);
-            cwClient.putMetricData(request);
+            mCwClient.putMetricData(request);
         } catch (Exception e) {
-            log.error(e);
+            log.error("Failed while while publishing metric to CW, {}", e);
         }
     }
 
     public static void main(final String[] args) throws Exception {
-
-        // Import configurable parameters.
         final Integer canaryRunTime = Integer.parseInt(System.getenv("CANARY_DURATION_IN_SECONDS"));
 
-        log.info("Stream name: {}", streamName);
+        log.info("Stream name: {}", mStreamName);
 
-        credentialsProvider = new EnvironmentVariableCredentialsProvider();
-        amazonKinesisVideo = AmazonKinesisVideoClientBuilder.standard()
-                .withRegion(region)
-                .withCredentials(credentialsProvider)
+        mCredentialsProvider = new EnvironmentVariableCredentialsProvider();
+        mAmazonKinesisVideo = AmazonKinesisVideoClientBuilder.standard()
+                .withRegion(mRegion)
+                .withCredentials(mCredentialsProvider)
                 .build();
-        cwClient = AmazonCloudWatchClientBuilder.standard()
-                .withRegion(region)
-                .withCredentials(credentialsProvider)
+        mCwClient = AmazonCloudWatchClientBuilder.standard()
+                .withRegion(mRegion)
+                .withCredentials(mCredentialsProvider)
                 .build();
 
-        Timer intervalMetricsTimer = new Timer("IntervalMetricsTimer");
-        TimerTask intervalMetricsTask;
-
-        switch (canaryLabel) {
+        switch (mCanaryLabel) {
             case "WebrtcLongRunning": {
                 final CanaryFragmentList fragmentList = new CanaryFragmentList();
-                intervalMetricsTask = new TimerTask() {
+
+                Timer intervalMetricsTimer = new Timer("IntervalMetricsTimer");
+                TimerTask intervalMetricsTask = new TimerTask() {
                     @Override
                     public void run() {
                         calculateFragmentContinuityMetric(fragmentList);
@@ -201,15 +199,14 @@ public class WebrtcStorageCanaryConsumer {
                 break;
             }
             case "WebrtcPeriodic": {
-                while ((System.currentTimeMillis() - canaryStartTime.getTime()) < canaryRunTime * 1000) {
+                while ((System.currentTimeMillis() - mCanaryStartTime.getTime()) < canaryRunTime * 1000) {
                     calculateTimeToFirstFragment();
                 }
-                System.exit(0);
                 break;
             }
             default: {
                 log.error("Env var CANARY_LABEL: {} must be set to either WebrtcLongRunning or WebrtcPeriodic",
-                        canaryLabel);
+                        mCanaryLabel);
                 throw new Exception("CANARY_LABEL must be set to either WebrtcLongRunning or WebrtcPeriodic");
             }
         }
