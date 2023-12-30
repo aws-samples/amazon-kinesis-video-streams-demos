@@ -172,7 +172,7 @@ CleanUp:
 }
 
 // Save first-frame-sent time to file for consumer-end access.
-PVOID writeFirstFrameSentTimeToFile(){
+VOID writeFirstFrameSentTimeToFile(){
     DLOGI("[Canary] Writing to firstFrameSentTimeStamp.txt file");
     UINT64 currentTimeMilliS =  GETTIME() / HUNDREDS_OF_NANOS_IN_A_MILLISECOND;
     CHAR cuurrentTimeChars[MAX_UINT64_DIGIT_COUNT + 1]; // +1 accounts for null terminator
