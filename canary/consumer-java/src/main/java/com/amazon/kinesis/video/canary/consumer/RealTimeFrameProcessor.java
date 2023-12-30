@@ -37,6 +37,7 @@ public class RealTimeFrameProcessor extends WebrtcStorageCanaryConsumer implemen
                 long currentTime = System.currentTimeMillis();
                 long canaryStartTime = super.mCanaryStartTime.getTime();
 
+                // TODO: Add this to contants file for now
                 String filePath = "../webrtc-c/firstFrameSentTimeStamp.txt";
                 final String frameSentTimeStr = FileUtils.readFileToString(new File(filePath)).trim();
                 long frameSentTime = Long.parseLong(frameSentTimeStr);

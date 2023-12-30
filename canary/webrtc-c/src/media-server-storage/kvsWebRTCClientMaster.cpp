@@ -35,8 +35,7 @@ INT32 main(INT32 argc, CHAR* argv[])
 
 
     t1 = GETTIME() / HUNDREDS_OF_NANOS_IN_A_MILLISECOND;
-    std::string filePath = "../firstFrameSentTimeStamp.txt";
-    remove(filePath.c_str());
+    remove(STORAGE_CANARY_FIRST_FRAME_TS_PATH);
 
     std::thread canaryDurationThread;
 
@@ -173,11 +172,11 @@ CleanUp:
 
 // Save first-frame-sent time to file for consumer-end access.
 VOID writeFirstFrameSentTimeToFile(){
-    DLOGI("[Canary] Writing to firstFrameSentTimeStamp.txt file");
+    DLOGI("[Canary] Writing to {} file", STORAGE_CANARY_FIRST_FRAME_TS_PATH);
     UINT64 currentTimeMilliS =  GETTIME() / HUNDREDS_OF_NANOS_IN_A_MILLISECOND;
     CHAR cuurrentTimeChars[MAX_UINT64_DIGIT_COUNT + 1]; // +1 accounts for null terminator
     UINT64 writeSize = SPRINTF(cuurrentTimeChars, "%lu", currentTimeMilliS);
-    writeFile((PCHAR) "../firstFrameSentTimeStamp.txt", false, false, static_cast<PBYTE>(static_cast<PVOID>(cuurrentTimeChars)), writeSize);
+    writeFile((PCHAR) STORAGE_CANARY_FIRST_FRAME_TS_PATH, false, false, static_cast<PBYTE>(static_cast<PVOID>(cuurrentTimeChars)), writeSize);
 }
 
 VOID calculateDisconnectToFrameSentTime(PSampleConfiguration pSampleConfiguration)

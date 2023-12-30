@@ -98,6 +98,7 @@
 #define KVS_METRICS_INVOCATION_PERIOD        (5 * HUNDREDS_OF_NANOS_IN_A_SECOND)
 #define CANARY_METADATA_SIZE                 (SIZEOF(UINT64) + SIZEOF(UINT32) + SIZEOF(UINT32))
 
+#define STORAGE_CANARY_FIRST_FRAME_TS_PATH      "../firstFrameSentTimeStamp.txt"
 
 #define MAX_CALL_RETRY_COUNT                 10
 
