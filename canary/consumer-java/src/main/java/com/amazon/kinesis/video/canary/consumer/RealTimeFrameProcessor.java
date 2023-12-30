@@ -56,13 +56,14 @@ public class RealTimeFrameProcessor extends WebrtcStorageCanaryConsumer implemen
                 super.publishMetricToCW("TotalTimeToFirstFrameConsumed", timeToFirstFragment,
                         StandardUnit.Milliseconds);
             } catch (FileNotFoundException ex) {
-                log.error("Master-end timestamp file not found, try reducing the frequency of runs by increasing CANARY_DURATION_IN_SECONDS", ex);
+                log.error("Master-end timestamp file not found, try reducing the frequency of runs by increasing CANARY_DURATION_IN_SECONDS: " + ex);
 
             } catch (IOException ioEx) {
-                log.error(ioEx);
+                log.error("IO Exception: " + ioEx);
+            } finally {
+                isFirstFrame = true;
+                System.exit(0);
             }
-            isFirstFrame = true;
-            System.exit(0);
         } else {
             log.info("Non first frame. Skipping...");
         }

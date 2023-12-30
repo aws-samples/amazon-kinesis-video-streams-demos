@@ -213,8 +213,6 @@ VOID CloudwatchMonitoring::pushJoinSessionTime(UINT64 joinSessionTime, Aws::Clou
     this->push(datum);
 }
 
-
-
 VOID CloudwatchMonitoring::pushSignalingInitDelay(UINT64 delay, Aws::CloudWatch::Model::StandardUnit unit)
 {
     MetricDatum datum;
@@ -332,7 +330,9 @@ VOID CloudwatchMonitoring::pushKvsIceAgentMetrics(PKvsIceAgentMetrics pKvsIceAge
 VOID CloudwatchMonitoring::pushSignalingClientMetrics(PSignalingClientMetrics pSignalingClientMetrics)
 {
     MetricDatum offerToAnswerDatum, getTokenDatum, describeDatum, createDatum, endpointDatum,
-                iceConfigDatum, connectDatum ,createClientDatum, fetchDatum, connectClientDatum;
+                iceConfigDatum, connectDatum ,createClientDatum, fetchDatum, connectClientDatum, joinSessionToOfferDatum;
+
+    UINT64 joinSessionToOffer, joinSessionCallTime;
 
     offerToAnswerDatum.SetMetricName("OfferToAnswerTime");
     offerToAnswerDatum.SetValue(pSignalingClientMetrics->signalingClientStats.offerToAnswerTime);
@@ -384,19 +384,18 @@ VOID CloudwatchMonitoring::pushSignalingClientMetrics(PSignalingClientMetrics pS
     connectClientDatum.SetUnit(Aws::CloudWatch::Model::StandardUnit::Milliseconds);
     this->push(connectClientDatum);
 
-    // TODO: clean the below up. Add zero check for JS to offer metric too?
     if(this->isStorage) {
-        UINT64 joinSessionToOffer = pSignalingClientMetrics->signalingClientStats.joinSessionToOfferRecvTime;
-        MetricDatum joinSessionToOfferDatum;
-        joinSessionToOfferDatum.SetMetricName("JoinSessionToOfferReceived");
-        joinSessionToOfferDatum.SetValue(joinSessionToOffer / HUNDREDS_OF_NANOS_IN_A_MILLISECOND);
-        joinSessionToOfferDatum.SetUnit(Aws::CloudWatch::Model::StandardUnit::Milliseconds);
-        this->push(joinSessionToOfferDatum);
-        
-        UINT64 joinSessionCallTime = (pSignalingClientMetrics->signalingClientStats.joinSessionCallTime);
-        if(joinSessionCallTime != 0){
-            Canary::Cloudwatch::getInstance().monitoring.pushJoinSessionTime(joinSessionCallTime,
-                                                                                Aws::CloudWatch::Model::StandardUnit::Milliseconds);
+        joinSessionToOffer = pSignalingClientMetrics->signalingClientStats.joinSessionToOfferRecvTime;
+        if (joinSessionToOffer > 0) {
+            joinSessionToOfferDatum.SetMetricName("JoinSessionToOfferReceived");
+            joinSessionToOfferDatum.SetValue(joinSessionToOffer / HUNDREDS_OF_NANOS_IN_A_MILLISECOND);
+            joinSessionToOfferDatum.SetUnit(Aws::CloudWatch::Model::StandardUnit::Milliseconds);
+            this->push(joinSessionToOfferDatum);
+        }
+
+        joinSessionCallTime = (pSignalingClientMetrics->signalingClientStats.joinSessionCallTime);
+        if (joinSessionToOffer > 0) {
+            this->pushJoinSessionTime(joinSessionCallTime, Aws::CloudWatch::Model::StandardUnit::Milliseconds);
         }
     }
 }

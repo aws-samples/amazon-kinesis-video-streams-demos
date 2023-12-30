@@ -625,9 +625,9 @@ CleanUp:
     return retStatus;
 }
 
-STATUS sendProfilingMetricsTryer(PSampleStreamingSession pSampleStreamingSession)
+STATUS sendProfilingMetricsThread(PSampleStreamingSession pSampleStreamingSession)
 {
-    DLOGD("[Canary] sendProfilingMetricsTryer(...) invoked");
+    DLOGD("[Canary] sendProfilingMetricsThread(...) invoked");
     STATUS retStatus = STATUS_SUCCESS;
     PSampleConfiguration pSampleConfiguration;
     BOOL done = FALSE;
@@ -663,7 +663,7 @@ STATUS initMetricsTimers(PSampleStreamingSession pSampleStreamingSession)
     pSampleConfiguration = pSampleStreamingSession->pSampleConfiguration;
     CHK(pSampleConfiguration != NULL, STATUS_NULL_ARG);
 
-    pSampleStreamingSession->pushProfilingThread = std::thread(sendProfilingMetricsTryer, pSampleStreamingSession);
+    pSampleStreamingSession->pushProfilingThread = std::thread(sendProfilingMetricsThread, pSampleStreamingSession);
     pSampleStreamingSession->pushProfilingThread.detach();
 
     CHK_STATUS(timerQueueAddTimer(pSampleConfiguration->timerQueueHandle, METRICS_INVOCATION_PERIOD, METRICS_INVOCATION_PERIOD, canaryRtpOutboundStats, (UINT64) pSampleStreamingSession,

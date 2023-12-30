@@ -100,7 +100,6 @@ public class CanaryListFragmentWorker implements Callable {
                 log.info("Retrieved fragment number {} ", cf.getFragment().getFragmentNumber());
             }
         } catch (Exception e) {
-            System.out.println("Failure in CanaryListFragmentWorker for streamName " + e);
             log.error("Failure in CanaryListFragmentWorker for streamName {} {}", this.mStreamName, e);
             throw e;
         } finally {

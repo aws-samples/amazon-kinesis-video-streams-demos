@@ -4,7 +4,7 @@
 
 extern PSampleConfiguration gSampleConfiguration;
 
-VOID shceduleShutdown(UINT64 duration, PSampleConfiguration pSampleConfiguration)
+VOID scheduleShutdown(UINT64 duration, PSampleConfiguration pSampleConfiguration)
 {
     THREAD_SLEEP(duration);
     DLOGD("[Canary] Terminating canary due to duration reached");
@@ -96,7 +96,7 @@ INT32 main(INT32 argc, CHAR* argv[])
 
     if(canaryConfig.duration.value != 0) {
         DLOGD("[Canary] Scheduling canary duration for %lu seconds", canaryConfig.duration.value / HUNDREDS_OF_NANOS_IN_A_SECOND);
-        canaryDurationThread = std::thread(shceduleShutdown, canaryConfig.duration.value, pSampleConfiguration);
+        canaryDurationThread = std::thread(scheduleShutdown, canaryConfig.duration.value, pSampleConfiguration);
         canaryDurationThread.detach();
     }
 
@@ -173,15 +173,11 @@ CleanUp:
 
 // Save first-frame-sent time to file for consumer-end access.
 PVOID writeFirstFrameSentTimeToFile(){
-    DLOGI("[Canary] Opening firstFrameSentTimeStamp.txt");
-    FILE *firstFrameSentTimeStamp = FOPEN("../firstFrameSentTimeStamp.txt", "w");
-    if (firstFrameSentTimeStamp == NULL)
-    {
-        printf("[Canary] Error opening firstFrameSentTimeStamp.txt\n");
-        exit(1);
-    }
-    fprintf(firstFrameSentTimeStamp, "%lli\n", GETTIME() / HUNDREDS_OF_NANOS_IN_A_MILLISECOND);
-    FCLOSE(firstFrameSentTimeStamp);
+    DLOGI("[Canary] Writing to firstFrameSentTimeStamp.txt file");
+    UINT64 currentTimeMilliS =  GETTIME() / HUNDREDS_OF_NANOS_IN_A_MILLISECOND;
+    CHAR cuurrentTimeChars[MAX_UINT64_DIGIT_COUNT + 1]; // +1 accounts for null terminator
+    UINT64 writeSize = SPRINTF(cuurrentTimeChars, "%lu", currentTimeMilliS);
+    writeFile((PCHAR) "../firstFrameSentTimeStamp.txt", false, false, static_cast<PBYTE>(static_cast<PVOID>(cuurrentTimeChars)), writeSize);
 }
 
 VOID calculateDisconnectToFrameSentTime(PSampleConfiguration pSampleConfiguration)

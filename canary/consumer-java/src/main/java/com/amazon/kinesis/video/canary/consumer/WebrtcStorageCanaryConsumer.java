@@ -95,7 +95,6 @@ public class WebrtcStorageCanaryConsumer {
 
     private static void calculateTimeToFirstFragment() {
         try {
-            System.out.println("Spawning new frameProcessor");
             final StartSelector startSelector = new StartSelector()
                     .withStartSelectorType(StartSelectorType.PRODUCER_TIMESTAMP).withStartTimestamp(mCanaryStartTime);
 
@@ -117,8 +116,6 @@ public class WebrtcStorageCanaryConsumer {
             final Future<?> task = executorService.submit(getMediaWorker);
             task.get();
             executorService.shutdown();
-            System.out.println("getMediaWorker returned");
-
 
         } catch (Exception e) {
             log.error("Failed while calculating time to first fragment, {}", e);
@@ -127,7 +124,6 @@ public class WebrtcStorageCanaryConsumer {
 
     protected static void publishMetricToCW(String metricName, double value, StandardUnit cwUnit) {
         try {
-            System.out.println(MessageFormat.format("Emitting the following metric: {0} - {1}", metricName, value));
             log.info("Emitting the following metric: {} - {}", metricName, value);
             final Dimension dimensionPerStream = new Dimension()
                     .withName("StorageWebRTCSDKCanaryStreamName")
@@ -187,8 +183,7 @@ public class WebrtcStorageCanaryConsumer {
                 };
 
                 // Initial delay of 30s to allow for ListFragment response to be populated
-                // TODO: revert back to 3000 after done testing
-                final long intervalInitialDelay = 1000;
+                final long intervalInitialDelay = 30000;
                 final long intervalDelay = 20000; // NOTE: 16s interval was causing gaps in continuity, changing to 20s (2x the
                                                   // typical fragment duration coming from media server)
 
@@ -199,6 +194,9 @@ public class WebrtcStorageCanaryConsumer {
                 break;
             }
             case "WebrtcPeriodic": {
+                // Continuously attempt getMedia() calls until footage is available.
+                // GetMedia() will return after ~3 sec if no footage is available. Once footage is available,
+                // it will continue to visit frames as long as there is footage available.
                 while ((System.currentTimeMillis() - mCanaryStartTime.getTime()) < canaryRunTime * 1000) {
                     calculateTimeToFirstFragment();
                 }
