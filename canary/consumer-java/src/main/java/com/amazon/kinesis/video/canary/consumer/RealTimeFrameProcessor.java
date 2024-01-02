@@ -45,8 +45,7 @@ public class RealTimeFrameProcessor extends WebrtcStorageCanaryConsumer implemen
                 // Check for a late consumer end start that may add to the measured
                 // FirstFrameSentToFirstFrameConsumed time
                 if (canaryStartTime > frameSentTime) {
-                    // Consumer started after master sent out first frame, not pushing the
-                    // FirstFrameSentToFirstFrameConsumed metric
+                    log.info("Consumer started after master sent out first frame, not pushing the FirstFrameSentToFirstFrameConsumed metric.");
                 } else {
                     long rtpToFirstFragment = currentTime - frameSentTime;
                     super.publishMetricToCW("FirstFrameSentToFirstFrameConsumed", rtpToFirstFragment,
