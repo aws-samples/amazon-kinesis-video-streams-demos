@@ -12,7 +12,7 @@ import com.amazonaws.services.kinesisvideo.model.Fragment;
  */
 
 public class CanaryFragment{
-    private Fragment mFragment;
+    private final Fragment mFragment;
 
     
     public CanaryFragment(Fragment fragment) {

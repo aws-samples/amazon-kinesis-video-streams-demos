@@ -330,7 +330,7 @@ VOID CloudwatchMonitoring::pushKvsIceAgentMetrics(PKvsIceAgentMetrics pKvsIceAge
 VOID CloudwatchMonitoring::pushSignalingClientMetrics(PSignalingClientMetrics pSignalingClientMetrics)
 {
     MetricDatum offerToAnswerDatum, getTokenDatum, describeDatum, createDatum, endpointDatum,
-                iceConfigDatum, connectDatum ,createClientDatum, fetchDatum, connectClientDatum, joinSessionToOfferDatum;
+                iceConfigDatum, connectDatum, createClientDatum, fetchDatum, connectClientDatum, joinSessionToOfferDatum;
 
     UINT64 joinSessionToOffer, joinSessionCallTime;
 
@@ -384,7 +384,7 @@ VOID CloudwatchMonitoring::pushSignalingClientMetrics(PSignalingClientMetrics pS
     connectClientDatum.SetUnit(Aws::CloudWatch::Model::StandardUnit::Milliseconds);
     this->push(connectClientDatum);
 
-    if(this->isStorage) {
+    if (this->isStorage) {
         joinSessionToOffer = pSignalingClientMetrics->signalingClientStats.joinSessionToOfferRecvTime;
         if (joinSessionToOffer > 0) {
             joinSessionToOfferDatum.SetMetricName("JoinSessionToOfferReceived");
