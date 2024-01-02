@@ -330,7 +330,7 @@ VOID CloudwatchMonitoring::pushKvsIceAgentMetrics(PKvsIceAgentMetrics pKvsIceAge
 VOID CloudwatchMonitoring::pushSignalingClientMetrics(PSignalingClientMetrics pSignalingClientMetrics)
 {
     MetricDatum offerToAnswerDatum, getTokenDatum, describeDatum, createDatum, endpointDatum,
-                iceConfigDatum, connectDatum ,createClientDatum, fetchDatum, connectClientDatum, joinSessionToOfferDatum;
+                iceConfigDatum, connectDatum, createClientDatum, fetchDatum, connectClientDatum, joinSessionToOfferDatum;
 
     UINT64 joinSessionToOffer, joinSessionCallTime;
 
