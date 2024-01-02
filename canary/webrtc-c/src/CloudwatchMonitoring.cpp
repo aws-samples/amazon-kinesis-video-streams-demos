@@ -384,7 +384,7 @@ VOID CloudwatchMonitoring::pushSignalingClientMetrics(PSignalingClientMetrics pS
     connectClientDatum.SetUnit(Aws::CloudWatch::Model::StandardUnit::Milliseconds);
     this->push(connectClientDatum);
 
-    if(this->isStorage) {
+    if (this->isStorage) {
         joinSessionToOffer = pSignalingClientMetrics->signalingClientStats.joinSessionToOfferRecvTime;
         if (joinSessionToOffer > 0) {
             joinSessionToOfferDatum.SetMetricName("JoinSessionToOfferReceived");
