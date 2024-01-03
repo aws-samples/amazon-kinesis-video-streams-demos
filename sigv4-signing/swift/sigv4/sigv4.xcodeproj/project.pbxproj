@@ -1,0 +1,737 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 56;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		09083FC88B1F7BA58333756B /* libPods-Sigv4.a in Frameworks */ = {isa = PBXBuildFile; fileRef = B15D2B55CF19615BAEEEC59D /* libPods-Sigv4.a */; };
+		0ED46C3EE032426D68F087FD /* libPods-Sigv4CLI.a in Frameworks */ = {isa = PBXBuildFile; fileRef = CC46268F55EF8EABBA926347 /* libPods-Sigv4CLI.a */; };
+		6B6698608B3FC114B52F0E19 /* libPods-Sigv4Tests.a in Frameworks */ = {isa = PBXBuildFile; fileRef = AA1589830B263ABE14263276 /* libPods-Sigv4Tests.a */; };
+		8EFDD95A2B17CCEE00562782 /* sigv4Framework.docc in Sources */ = {isa = PBXBuildFile; fileRef = 8EFDD9592B17CCEE00562782 /* sigv4Framework.docc */; };
+		8EFDD9662B17CCEE00562782 /* sigv4Framework.h in Headers */ = {isa = PBXBuildFile; fileRef = 8EFDD9582B17CCEE00562782 /* sigv4Framework.h */; settings = {ATTRIBUTES = (Public, ); }; };
+		8EFDD96D2B17CD1200562782 /* Signer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8E0942CC2B17A3BA00AD2F20 /* Signer.swift */; };
+		8EFDD9762B17CDF000562782 /* main.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8EFDD9752B17CDF000562782 /* main.swift */; };
+		8EFDD9812B17CE9600562782 /* Sigv4Tests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8EFDD9802B17CE9600562782 /* Sigv4Tests.swift */; };
+		8EFDD9822B17CE9600562782 /* Sigv4.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 8EFDD9562B17CCEE00562782 /* Sigv4.framework */; };
+		8EFDD98E2B17D02100562782 /* Sigv4.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 8EFDD9562B17CCEE00562782 /* Sigv4.framework */; };
+		8EFDD98F2B17D02100562782 /* Sigv4.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 8EFDD9562B17CCEE00562782 /* Sigv4.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
+		8EFDD99B2B18054C00562782 /* SignerConstants.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8EFDD99A2B18054C00562782 /* SignerConstants.swift */; };
+		A5591C5BC5BF23B4D81FEDF9 /* (null) in Frameworks */ = {isa = PBXBuildFile; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		8EFDD9832B17CE9600562782 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 8E17A51F2B1724160096E2BF /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 8EFDD9552B17CCEE00562782;
+			remoteInfo = Sigv4;
+		};
+		8EFDD9902B17D02100562782 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 8E17A51F2B1724160096E2BF /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 8EFDD9552B17CCEE00562782;
+			remoteInfo = Sigv4;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		8EFDD9712B17CDF000562782 /* CopyFiles */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = /usr/share/man/man1/;
+			dstSubfolderSpec = 0;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 1;
+		};
+		8EFDD9932B17D02100562782 /* Embed Frameworks */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 10;
+			files = (
+				8EFDD98F2B17D02100562782 /* Sigv4.framework in Embed Frameworks */,
+			);
+			name = "Embed Frameworks";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
+/* Begin PBXFileReference section */
+		485383BAAC1268DF4FE065DB /* libPods-unittests.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-unittests.a"; sourceTree = BUILT_PRODUCTS_DIR; };
+		56448EF0EA7CA04F0630BC43 /* Pods-Sigv4.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Sigv4.debug.xcconfig"; path = "Target Support Files/Pods-Sigv4/Pods-Sigv4.debug.xcconfig"; sourceTree = "<group>"; };
+		60DD5F2B9CF52110BF8E518F /* Pods-Sigv4CLI.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Sigv4CLI.release.xcconfig"; path = "Target Support Files/Pods-Sigv4CLI/Pods-Sigv4CLI.release.xcconfig"; sourceTree = "<group>"; };
+		6A62C2C53408BB73ECF2A56E /* Pods-sigv4.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-sigv4.release.xcconfig"; path = "Target Support Files/Pods-sigv4/Pods-sigv4.release.xcconfig"; sourceTree = "<group>"; };
+		72F853B4DAF9BA6E325ABC77 /* Pods-unittests.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-unittests.debug.xcconfig"; path = "Target Support Files/Pods-unittests/Pods-unittests.debug.xcconfig"; sourceTree = "<group>"; };
+		7AE43BCB2953B1E772443EE1 /* Pods-Sigv4Tests.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Sigv4Tests.release.xcconfig"; path = "Target Support Files/Pods-Sigv4Tests/Pods-Sigv4Tests.release.xcconfig"; sourceTree = "<group>"; };
+		8E0942CC2B17A3BA00AD2F20 /* Signer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Signer.swift; sourceTree = "<group>"; };
+		8E0942E62B17CC3300AD2F20 /* libStarscream.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; path = libStarscream.a; sourceTree = BUILT_PRODUCTS_DIR; };
+		8EB27C612B3B777A00D283FB /* Sigv4Tests.xctestplan */ = {isa = PBXFileReference; lastKnownFileType = text; path = Sigv4Tests.xctestplan; sourceTree = "<group>"; };
+		8EFDD9562B17CCEE00562782 /* Sigv4.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Sigv4.framework; sourceTree = BUILT_PRODUCTS_DIR; };
+		8EFDD9582B17CCEE00562782 /* sigv4Framework.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = sigv4Framework.h; sourceTree = "<group>"; };
+		8EFDD9592B17CCEE00562782 /* sigv4Framework.docc */ = {isa = PBXFileReference; lastKnownFileType = folder.documentationcatalog; path = sigv4Framework.docc; sourceTree = "<group>"; };
+		8EFDD9732B17CDF000562782 /* Sigv4CLI */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = Sigv4CLI; sourceTree = BUILT_PRODUCTS_DIR; };
+		8EFDD9752B17CDF000562782 /* main.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = main.swift; sourceTree = "<group>"; };
+		8EFDD97E2B17CE9600562782 /* Sigv4Tests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = Sigv4Tests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		8EFDD9802B17CE9600562782 /* Sigv4Tests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sigv4Tests.swift; sourceTree = "<group>"; };
+		8EFDD9942B17D02800562782 /* libStarscream.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; path = libStarscream.a; sourceTree = BUILT_PRODUCTS_DIR; };
+		8EFDD9972B17D0FC00562782 /* libStarscream.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; path = libStarscream.a; sourceTree = BUILT_PRODUCTS_DIR; };
+		8EFDD99A2B18054C00562782 /* SignerConstants.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SignerConstants.swift; sourceTree = "<group>"; };
+		8F03DFB8782B68BF6D1D42BB /* libPods-sigv4.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-sigv4.a"; sourceTree = BUILT_PRODUCTS_DIR; };
+		94025248DC396456A363D6F6 /* Pods-sigv4UnitTests.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-sigv4UnitTests.release.xcconfig"; path = "Target Support Files/Pods-sigv4UnitTests/Pods-sigv4UnitTests.release.xcconfig"; sourceTree = "<group>"; };
+		AA1589830B263ABE14263276 /* libPods-Sigv4Tests.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-Sigv4Tests.a"; sourceTree = BUILT_PRODUCTS_DIR; };
+		ADA507827CE490E9267B6B1B /* Pods-Sigv4Tests.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Sigv4Tests.debug.xcconfig"; path = "Target Support Files/Pods-Sigv4Tests/Pods-Sigv4Tests.debug.xcconfig"; sourceTree = "<group>"; };
+		B15D2B55CF19615BAEEEC59D /* libPods-Sigv4.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-Sigv4.a"; sourceTree = BUILT_PRODUCTS_DIR; };
+		B54FE814A42E26140AE263AC /* Pods-sigv4UnitTests.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-sigv4UnitTests.debug.xcconfig"; path = "Target Support Files/Pods-sigv4UnitTests/Pods-sigv4UnitTests.debug.xcconfig"; sourceTree = "<group>"; };
+		BB5107278BA7A82F6032C4EB /* Pods-unittests.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-unittests.release.xcconfig"; path = "Target Support Files/Pods-unittests/Pods-unittests.release.xcconfig"; sourceTree = "<group>"; };
+		C21B8E5BFF9F9107BE793EF8 /* Pods-sigv4.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-sigv4.debug.xcconfig"; path = "Target Support Files/Pods-sigv4/Pods-sigv4.debug.xcconfig"; sourceTree = "<group>"; };
+		CC46268F55EF8EABBA926347 /* libPods-Sigv4CLI.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-Sigv4CLI.a"; sourceTree = BUILT_PRODUCTS_DIR; };
+		E8DC43FB2D578380D0A43B0C /* Pods-Sigv4.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Sigv4.release.xcconfig"; path = "Target Support Files/Pods-Sigv4/Pods-Sigv4.release.xcconfig"; sourceTree = "<group>"; };
+		EF3BE3B69FEA4F26D6972487 /* libPods-sigv4UnitTests.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-sigv4UnitTests.a"; sourceTree = BUILT_PRODUCTS_DIR; };
+		F996422850E239BDAEA7DA3D /* Pods-Sigv4CLI.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Sigv4CLI.debug.xcconfig"; path = "Target Support Files/Pods-Sigv4CLI/Pods-Sigv4CLI.debug.xcconfig"; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		8EFDD9532B17CCEE00562782 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A5591C5BC5BF23B4D81FEDF9 /* (null) in Frameworks */,
+				09083FC88B1F7BA58333756B /* libPods-Sigv4.a in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		8EFDD9702B17CDF000562782 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				8EFDD98E2B17D02100562782 /* Sigv4.framework in Frameworks */,
+				0ED46C3EE032426D68F087FD /* libPods-Sigv4CLI.a in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		8EFDD97B2B17CE9600562782 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				8EFDD9822B17CE9600562782 /* Sigv4.framework in Frameworks */,
+				6B6698608B3FC114B52F0E19 /* libPods-Sigv4Tests.a in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		8625C9759CB23C8FDE4373F2 /* Pods */ = {
+			isa = PBXGroup;
+			children = (
+				C21B8E5BFF9F9107BE793EF8 /* Pods-sigv4.debug.xcconfig */,
+				6A62C2C53408BB73ECF2A56E /* Pods-sigv4.release.xcconfig */,
+				72F853B4DAF9BA6E325ABC77 /* Pods-unittests.debug.xcconfig */,
+				BB5107278BA7A82F6032C4EB /* Pods-unittests.release.xcconfig */,
+				B54FE814A42E26140AE263AC /* Pods-sigv4UnitTests.debug.xcconfig */,
+				94025248DC396456A363D6F6 /* Pods-sigv4UnitTests.release.xcconfig */,
+				56448EF0EA7CA04F0630BC43 /* Pods-Sigv4.debug.xcconfig */,
+				E8DC43FB2D578380D0A43B0C /* Pods-Sigv4.release.xcconfig */,
+				ADA507827CE490E9267B6B1B /* Pods-Sigv4Tests.debug.xcconfig */,
+				7AE43BCB2953B1E772443EE1 /* Pods-Sigv4Tests.release.xcconfig */,
+				F996422850E239BDAEA7DA3D /* Pods-Sigv4CLI.debug.xcconfig */,
+				60DD5F2B9CF52110BF8E518F /* Pods-Sigv4CLI.release.xcconfig */,
+			);
+			path = Pods;
+			sourceTree = "<group>";
+		};
+		8E17A51E2B1724160096E2BF = {
+			isa = PBXGroup;
+			children = (
+				8EFDD9572B17CCEE00562782 /* Sigv4Signer */,
+				8EFDD9742B17CDF000562782 /* Sigv4CLI */,
+				8EFDD97F2B17CE9600562782 /* Sigv4Tests */,
+				8E17A5282B1724160096E2BF /* Products */,
+				8625C9759CB23C8FDE4373F2 /* Pods */,
+				93C129FDF6A6D6427F632239 /* Frameworks */,
+			);
+			sourceTree = "<group>";
+		};
+		8E17A5282B1724160096E2BF /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				8EFDD9562B17CCEE00562782 /* Sigv4.framework */,
+				8EFDD9732B17CDF000562782 /* Sigv4CLI */,
+				8EFDD97E2B17CE9600562782 /* Sigv4Tests.xctest */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		8EFDD9572B17CCEE00562782 /* Sigv4Signer */ = {
+			isa = PBXGroup;
+			children = (
+				8E0942CC2B17A3BA00AD2F20 /* Signer.swift */,
+				8EFDD9582B17CCEE00562782 /* sigv4Framework.h */,
+				8EFDD9592B17CCEE00562782 /* sigv4Framework.docc */,
+				8EFDD99A2B18054C00562782 /* SignerConstants.swift */,
+			);
+			path = Sigv4Signer;
+			sourceTree = "<group>";
+		};
+		8EFDD9742B17CDF000562782 /* Sigv4CLI */ = {
+			isa = PBXGroup;
+			children = (
+				8EFDD9752B17CDF000562782 /* main.swift */,
+			);
+			path = Sigv4CLI;
+			sourceTree = "<group>";
+		};
+		8EFDD97F2B17CE9600562782 /* Sigv4Tests */ = {
+			isa = PBXGroup;
+			children = (
+				8EFDD9802B17CE9600562782 /* Sigv4Tests.swift */,
+				8EB27C612B3B777A00D283FB /* Sigv4Tests.xctestplan */,
+			);
+			path = Sigv4Tests;
+			sourceTree = "<group>";
+		};
+		93C129FDF6A6D6427F632239 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				8EFDD9972B17D0FC00562782 /* libStarscream.a */,
+				8EFDD9942B17D02800562782 /* libStarscream.a */,
+				8E0942E62B17CC3300AD2F20 /* libStarscream.a */,
+				8F03DFB8782B68BF6D1D42BB /* libPods-sigv4.a */,
+				485383BAAC1268DF4FE065DB /* libPods-unittests.a */,
+				EF3BE3B69FEA4F26D6972487 /* libPods-sigv4UnitTests.a */,
+				B15D2B55CF19615BAEEEC59D /* libPods-Sigv4.a */,
+				AA1589830B263ABE14263276 /* libPods-Sigv4Tests.a */,
+				CC46268F55EF8EABBA926347 /* libPods-Sigv4CLI.a */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXHeadersBuildPhase section */
+		8EFDD9512B17CCEE00562782 /* Headers */ = {
+			isa = PBXHeadersBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				8EFDD9662B17CCEE00562782 /* sigv4Framework.h in Headers */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXHeadersBuildPhase section */
+
+/* Begin PBXNativeTarget section */
+		8EFDD9552B17CCEE00562782 /* Sigv4 */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 8EFDD9672B17CCEE00562782 /* Build configuration list for PBXNativeTarget "Sigv4" */;
+			buildPhases = (
+				6F1AD27F9BC5FF1517E632B9 /* [CP] Check Pods Manifest.lock */,
+				8EFDD9512B17CCEE00562782 /* Headers */,
+				8EFDD9522B17CCEE00562782 /* Sources */,
+				8EFDD9532B17CCEE00562782 /* Frameworks */,
+				8EFDD9542B17CCEE00562782 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = Sigv4;
+			productName = sigv4Framework;
+			productReference = 8EFDD9562B17CCEE00562782 /* Sigv4.framework */;
+			productType = "com.apple.product-type.framework";
+		};
+		8EFDD9722B17CDF000562782 /* Sigv4CLI */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 8EFDD9772B17CDF000562782 /* Build configuration list for PBXNativeTarget "Sigv4CLI" */;
+			buildPhases = (
+				C25375CD1519A476DDA50228 /* [CP] Check Pods Manifest.lock */,
+				8EFDD96F2B17CDF000562782 /* Sources */,
+				8EFDD9702B17CDF000562782 /* Frameworks */,
+				8EFDD9712B17CDF000562782 /* CopyFiles */,
+				8EFDD9932B17D02100562782 /* Embed Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				8EFDD9912B17D02100562782 /* PBXTargetDependency */,
+			);
+			name = Sigv4CLI;
+			productName = sigv4CLI;
+			productReference = 8EFDD9732B17CDF000562782 /* Sigv4CLI */;
+			productType = "com.apple.product-type.tool";
+		};
+		8EFDD97D2B17CE9600562782 /* Sigv4Tests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 8EFDD9852B17CE9600562782 /* Build configuration list for PBXNativeTarget "Sigv4Tests" */;
+			buildPhases = (
+				15AD3105406B56A54631D8B9 /* [CP] Check Pods Manifest.lock */,
+				8EFDD97A2B17CE9600562782 /* Sources */,
+				8EFDD97B2B17CE9600562782 /* Frameworks */,
+				8EFDD97C2B17CE9600562782 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				8EFDD9842B17CE9600562782 /* PBXTargetDependency */,
+			);
+			name = Sigv4Tests;
+			productName = Sigv4Tests;
+			productReference = 8EFDD97E2B17CE9600562782 /* Sigv4Tests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		8E17A51F2B1724160096E2BF /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 1500;
+				LastUpgradeCheck = 1500;
+				TargetAttributes = {
+					8EFDD9552B17CCEE00562782 = {
+						CreatedOnToolsVersion = 15.0;
+					};
+					8EFDD9722B17CDF000562782 = {
+						CreatedOnToolsVersion = 15.0;
+					};
+					8EFDD97D2B17CE9600562782 = {
+						CreatedOnToolsVersion = 15.0;
+					};
+				};
+			};
+			buildConfigurationList = 8E17A5222B1724160096E2BF /* Build configuration list for PBXProject "sigv4" */;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = 8E17A51E2B1724160096E2BF;
+			productRefGroup = 8E17A5282B1724160096E2BF /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				8EFDD9552B17CCEE00562782 /* Sigv4 */,
+				8EFDD9722B17CDF000562782 /* Sigv4CLI */,
+				8EFDD97D2B17CE9600562782 /* Sigv4Tests */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		8EFDD9542B17CCEE00562782 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		8EFDD97C2B17CE9600562782 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		15AD3105406B56A54631D8B9 /* [CP] Check Pods Manifest.lock */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+				"${PODS_PODFILE_DIR_PATH}/Podfile.lock",
+				"${PODS_ROOT}/Manifest.lock",
+			);
+			name = "[CP] Check Pods Manifest.lock";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+				"$(DERIVED_FILE_DIR)/Pods-Sigv4Tests-checkManifestLockResult.txt",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "diff \"${PODS_PODFILE_DIR_PATH}/Podfile.lock\" \"${PODS_ROOT}/Manifest.lock\" > /dev/null\nif [ $? != 0 ] ; then\n    # print error to STDERR\n    echo \"error: The sandbox is not in sync with the Podfile.lock. Run 'pod install' or update your CocoaPods installation.\" >&2\n    exit 1\nfi\n# This output is used by Xcode 'outputs' to avoid re-running this script phase.\necho \"SUCCESS\" > \"${SCRIPT_OUTPUT_FILE_0}\"\n";
+			showEnvVarsInLog = 0;
+		};
+		6F1AD27F9BC5FF1517E632B9 /* [CP] Check Pods Manifest.lock */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+				"${PODS_PODFILE_DIR_PATH}/Podfile.lock",
+				"${PODS_ROOT}/Manifest.lock",
+			);
+			name = "[CP] Check Pods Manifest.lock";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+				"$(DERIVED_FILE_DIR)/Pods-Sigv4-checkManifestLockResult.txt",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "diff \"${PODS_PODFILE_DIR_PATH}/Podfile.lock\" \"${PODS_ROOT}/Manifest.lock\" > /dev/null\nif [ $? != 0 ] ; then\n    # print error to STDERR\n    echo \"error: The sandbox is not in sync with the Podfile.lock. Run 'pod install' or update your CocoaPods installation.\" >&2\n    exit 1\nfi\n# This output is used by Xcode 'outputs' to avoid re-running this script phase.\necho \"SUCCESS\" > \"${SCRIPT_OUTPUT_FILE_0}\"\n";
+			showEnvVarsInLog = 0;
+		};
+		C25375CD1519A476DDA50228 /* [CP] Check Pods Manifest.lock */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+				"${PODS_PODFILE_DIR_PATH}/Podfile.lock",
+				"${PODS_ROOT}/Manifest.lock",
+			);
+			name = "[CP] Check Pods Manifest.lock";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+				"$(DERIVED_FILE_DIR)/Pods-Sigv4CLI-checkManifestLockResult.txt",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "diff \"${PODS_PODFILE_DIR_PATH}/Podfile.lock\" \"${PODS_ROOT}/Manifest.lock\" > /dev/null\nif [ $? != 0 ] ; then\n    # print error to STDERR\n    echo \"error: The sandbox is not in sync with the Podfile.lock. Run 'pod install' or update your CocoaPods installation.\" >&2\n    exit 1\nfi\n# This output is used by Xcode 'outputs' to avoid re-running this script phase.\necho \"SUCCESS\" > \"${SCRIPT_OUTPUT_FILE_0}\"\n";
+			showEnvVarsInLog = 0;
+		};
+/* End PBXShellScriptBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		8EFDD9522B17CCEE00562782 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				8EFDD95A2B17CCEE00562782 /* sigv4Framework.docc in Sources */,
+				8EFDD99B2B18054C00562782 /* SignerConstants.swift in Sources */,
+				8EFDD96D2B17CD1200562782 /* Signer.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		8EFDD96F2B17CDF000562782 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				8EFDD9762B17CDF000562782 /* main.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		8EFDD97A2B17CE9600562782 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				8EFDD9812B17CE9600562782 /* Sigv4Tests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		8EFDD9842B17CE9600562782 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 8EFDD9552B17CCEE00562782 /* Sigv4 */;
+			targetProxy = 8EFDD9832B17CE9600562782 /* PBXContainerItemProxy */;
+		};
+		8EFDD9912B17D02100562782 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 8EFDD9552B17CCEE00562782 /* Sigv4 */;
+			targetProxy = 8EFDD9902B17D02100562782 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		8E17A52C2B1724160096E2BF /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEAD_CODE_STRIPPING = YES;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MACOSX_DEPLOYMENT_TARGET = 13.5;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = macosx;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+			};
+			name = Debug;
+		};
+		8E17A52D2B1724160096E2BF /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEAD_CODE_STRIPPING = YES;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MACOSX_DEPLOYMENT_TARGET = 13.5;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				SDKROOT = macosx;
+				SWIFT_COMPILATION_MODE = wholemodule;
+			};
+			name = Release;
+		};
+		8EFDD9682B17CCEE00562782 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 56448EF0EA7CA04F0630BC43 /* Pods-Sigv4.debug.xcconfig */;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				DEFINES_MODULE = YES;
+				DYLIB_COMPATIBILITY_VERSION = 1;
+				DYLIB_CURRENT_VERSION = 1;
+				DYLIB_INSTALL_NAME_BASE = "@rpath";
+				ENABLE_MODULE_VERIFIER = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Frameworks";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@loader_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				MODULE_VERIFIER_SUPPORTED_LANGUAGES = "objective-c objective-c++";
+				MODULE_VERIFIER_SUPPORTED_LANGUAGE_STANDARDS = "gnu17 gnu++20";
+				PRODUCT_BUNDLE_IDENTIFIER = com.amazonaws.kinesisvideo.sigv4Framework;
+				PRODUCT_NAME = "$(TARGET_NAME:c99extidentifier)";
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				VERSIONING_SYSTEM = "apple-generic";
+				VERSION_INFO_PREFIX = "";
+			};
+			name = Debug;
+		};
+		8EFDD9692B17CCEE00562782 /* Release */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = E8DC43FB2D578380D0A43B0C /* Pods-Sigv4.release.xcconfig */;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				DEFINES_MODULE = YES;
+				DYLIB_COMPATIBILITY_VERSION = 1;
+				DYLIB_CURRENT_VERSION = 1;
+				DYLIB_INSTALL_NAME_BASE = "@rpath";
+				ENABLE_MODULE_VERIFIER = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Frameworks";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@loader_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				MODULE_VERIFIER_SUPPORTED_LANGUAGES = "objective-c objective-c++";
+				MODULE_VERIFIER_SUPPORTED_LANGUAGE_STANDARDS = "gnu17 gnu++20";
+				PRODUCT_BUNDLE_IDENTIFIER = com.amazonaws.kinesisvideo.sigv4Framework;
+				PRODUCT_NAME = "$(TARGET_NAME:c99extidentifier)";
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				VERSIONING_SYSTEM = "apple-generic";
+				VERSION_INFO_PREFIX = "";
+			};
+			name = Release;
+		};
+		8EFDD9782B17CDF000562782 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = F996422850E239BDAEA7DA3D /* Pods-Sigv4CLI.debug.xcconfig */;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		8EFDD9792B17CDF000562782 /* Release */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 60DD5F2B9CF52110BF8E518F /* Pods-Sigv4CLI.release.xcconfig */;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+		8EFDD9862B17CE9600562782 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = ADA507827CE490E9267B6B1B /* Pods-Sigv4Tests.debug.xcconfig */;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 13.5;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.amazonaws.kinesisvideo.Sigv4Tests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		8EFDD9872B17CE9600562782 /* Release */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 7AE43BCB2953B1E772443EE1 /* Pods-Sigv4Tests.release.xcconfig */;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 13.5;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.amazonaws.kinesisvideo.Sigv4Tests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		8E17A5222B1724160096E2BF /* Build configuration list for PBXProject "sigv4" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				8E17A52C2B1724160096E2BF /* Debug */,
+				8E17A52D2B1724160096E2BF /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		8EFDD9672B17CCEE00562782 /* Build configuration list for PBXNativeTarget "Sigv4" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				8EFDD9682B17CCEE00562782 /* Debug */,
+				8EFDD9692B17CCEE00562782 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		8EFDD9772B17CDF000562782 /* Build configuration list for PBXNativeTarget "Sigv4CLI" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				8EFDD9782B17CDF000562782 /* Debug */,
+				8EFDD9792B17CDF000562782 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		8EFDD9852B17CE9600562782 /* Build configuration list for PBXNativeTarget "Sigv4Tests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				8EFDD9862B17CE9600562782 /* Debug */,
+				8EFDD9872B17CE9600562782 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = 8E17A51F2B1724160096E2BF /* Project object */;
+}
