@@ -62,6 +62,7 @@ public class RealTimeFrameProcessor extends WebrtcStorageCanaryConsumer implemen
                 log.error("IO Exception: " + ioEx);
             } finally {
                 isFirstFrame = true;
+                super.shutdownCanaryResources();
                 System.exit(0);
             }
         } else {

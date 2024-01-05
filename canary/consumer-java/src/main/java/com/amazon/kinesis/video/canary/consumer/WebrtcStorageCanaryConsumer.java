@@ -127,6 +127,7 @@ public class WebrtcStorageCanaryConsumer {
 
     protected static void publishMetricToCW(String metricName, double value, StandardUnit cwUnit) {
         try {
+            System.out.println("Emitting the following metric: " + metricName + ",  " + value);
             log.info("Emitting the following metric: {} - {}", metricName, value);
             final Dimension dimensionPerStream = new Dimension()
                     .withName("StorageWebRTCSDKCanaryStreamName")
@@ -156,6 +157,11 @@ public class WebrtcStorageCanaryConsumer {
         } catch (Exception e) {
             log.error("Failed while while publishing metric to CW, {}", e);
         }
+    }
+
+    protected static void shutdownCanaryResources() {
+        mCwClient.shutdown();
+        mAmazonKinesisVideo.shutdown();
     }
 
     public static void main(final String[] args) throws Exception {
@@ -194,6 +200,7 @@ public class WebrtcStorageCanaryConsumer {
                 intervalMetricsTimer.scheduleAtFixedRate(intervalMetricsTask, intervalInitialDelay, intervalDelay);
                 Thread.sleep(canaryRunTime * 1000);
                 intervalMetricsTimer.cancel();
+                shutdownCanaryResources();
                 break;
             }
             case "WebrtcPeriodic": {

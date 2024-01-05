@@ -99,13 +99,13 @@ public class CanaryListFragmentWorker implements Callable {
             for (CanaryFragment cf : fragments) {
                 log.info("Retrieved fragment number {} ", cf.getFragment().getFragmentNumber());
             }
+            log.info("Retrieved {} Fragments and exiting CanaryListFragmentWorker for stream {}", fragments.size(), this.mStreamName);
+            return fragments;
         } catch (Exception e) {
             log.error("Failure in CanaryListFragmentWorker for streamName {} {}", this.mStreamName, e);
             throw e;
         } finally {
-            log.info("Retrieved {} Fragments and exiting CanaryListFragmentWorker for stream {}", fragments.size(), this.mStreamName);
             this.close();
-            return fragments;
         }
     }
 }

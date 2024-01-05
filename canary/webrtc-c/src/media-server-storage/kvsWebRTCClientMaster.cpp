@@ -4,18 +4,6 @@
 
 extern PSampleConfiguration gSampleConfiguration;
 
-VOID scheduleShutdown(UINT64 duration, PSampleConfiguration pSampleConfiguration)
-{
-    THREAD_SLEEP(duration);
-    DLOGD("[Canary] Terminating canary due to duration reached");
-    if (gSampleConfiguration != NULL) {
-        ATOMIC_STORE_BOOL(&pSampleConfiguration->interrupted, TRUE);
-        CVAR_BROADCAST(gSampleConfiguration->cvar);
-    } else {
-        DLOGE("[Canary] Error terminating canary: gSampleConfiguration is null");
-    }
-}
-
 INT32 main(INT32 argc, CHAR* argv[])
 {
     STATUS retStatus = STATUS_SUCCESS;
@@ -94,9 +82,7 @@ INT32 main(INT32 argc, CHAR* argv[])
     DLOGI("[KVS Master] Channel %s set up done ", pChannelName);
 
     if(canaryConfig.duration.value != 0) {
-        DLOGD("[Canary] Scheduling canary duration for %lu seconds", canaryConfig.duration.value / HUNDREDS_OF_NANOS_IN_A_SECOND);
-        canaryDurationThread = std::thread(scheduleShutdown, canaryConfig.duration.value, pSampleConfiguration);
-        canaryDurationThread.detach();
+        pSampleConfiguration->sampleDuration = canaryConfig.duration.value;
     }
 
     // Checking for termination
