@@ -139,6 +139,7 @@ typedef struct {
     std::atomic<UINT64> storageDisconnectedTime;
     UINT64 offerReceiveTimestamp;
     UINT64 sampleDuration;
+    PCHAR fristFrameSentTSFileName;
 
     UINT32 pregenerateCertTimerId;
     PStackQueue pregeneratedCertificates; // Max MAX_RTCCONFIGURATION_CERTIFICATES certificates

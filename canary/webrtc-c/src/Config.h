@@ -49,6 +49,7 @@ class Config {
     Value<UINT64> frameRate;
 
     Value<std::string> caCertPath;
+    Value<std::string> storageFristFrameSentTSFileName;
 
     BYTE iotEndpoint[MAX_CONFIG_JSON_FILE_SIZE];
 

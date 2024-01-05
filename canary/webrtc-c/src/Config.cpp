@@ -224,6 +224,10 @@ STATUS Config::initWithEnvVars()
     CHK_STATUS(optenvUint64(CANARY_BIT_RATE_ENV_VAR, &bitRate, CANARY_DEFAULT_BITRATE));
     CHK_STATUS(optenvUint64(CANARY_FRAME_RATE_ENV_VAR, &frameRate, CANARY_DEFAULT_FRAMERATE));
 
+    if (this->isStorage) {
+        CHK_STATUS(optenv(STORAGE_CANARY_FIRST_FRAME_TS_FILE_NAME_ENV_VAR, &storageFristFrameSentTSFileName, "defaultFileName.txt"));
+    }
+
 CleanUp:
 
     return retStatus;
@@ -263,6 +267,11 @@ VOID Config::print()
               this->iotCoreCert.value.c_str(),
               this->iotCorePrivateKey.value.c_str(),
               this->iotCoreRoleAlias.value.c_str());
+    }
+    if(this->isStorage) {
+        DLOGD("\n\n\tFirstFrameSentTSFileName : %s\n",
+               this->storageFristFrameSentTSFileName.value.c_str()
+        );
     }
 }
 
