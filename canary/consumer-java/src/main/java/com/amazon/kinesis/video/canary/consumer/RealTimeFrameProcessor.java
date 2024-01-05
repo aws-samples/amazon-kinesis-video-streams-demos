@@ -34,13 +34,15 @@ public class RealTimeFrameProcessor extends WebrtcStorageCanaryConsumer implemen
             Optional<FragmentMetadataVisitor.MkvTagProcessor> tagProcessor) throws FrameProcessException {
         if (!isFirstFrame) {
             try {
-                long currentTime = System.currentTimeMillis();
-                long canaryStartTime = super.mCanaryStartTime.getTime();
+                final long currentTime = System.currentTimeMillis();
+                final long canaryStartTime = super.mCanaryStartTime.getTime();
 
-                // TODO: Add this to contants file for now
-                String filePath = "../webrtc-c/firstFrameSentTimeStamp.txt";
+                final String filePath = StorageWebRTCConstants.FIRST_FRAME_TS_FILE_PATH + super.firstFrameSentTSFile;
                 final String frameSentTimeStr = FileUtils.readFileToString(new File(filePath)).trim();
-                long frameSentTime = Long.parseLong(frameSentTimeStr);
+                final long frameSentTime = Long.parseLong(frameSentTimeStr);
+
+                // Delete the firstFrameSentTS file in case WebRTC-end fails to.
+                new File(filePath).delete();
 
                 // Check for a late consumer end start that may add to the measured
                 // FirstFrameSentToFirstFrameConsumed time

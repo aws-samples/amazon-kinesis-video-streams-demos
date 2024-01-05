@@ -50,6 +50,7 @@ import lombok.extern.log4j.Log4j2;
 public class WebrtcStorageCanaryConsumer {
     protected static final Date mCanaryStartTime = new Date();
     protected static final String mStreamName = System.getenv("CANARY_STREAM_NAME"); 
+    protected static final String firstFrameSentTSFile = System.getenv().getOrDefault(StorageWebRTCConstants.FIRST_FRAME_TS_FILE_ENV_VAR, StorageWebRTCConstants.DEFAULT_FIRST_FRAME_TS_FILE);
 
     private static final String mCanaryLabel = System.getenv("CANARY_LABEL");
     private static final String mRegion = System.getenv("AWS_DEFAULT_REGION");

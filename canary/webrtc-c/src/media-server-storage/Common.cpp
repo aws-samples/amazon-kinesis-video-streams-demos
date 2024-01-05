@@ -1342,14 +1342,12 @@ STATUS freeSampleConfiguration(PSampleConfiguration* ppSampleConfiguration)
     StackQueueIterator iterator;
     BOOL locked = FALSE;
 
-    std::string filePath = "../firstFrameSentTimeStamp.txt";
-
     CHK(ppSampleConfiguration != NULL, STATUS_NULL_ARG);
     pSampleConfiguration = *ppSampleConfiguration;
 
     CHK(pSampleConfiguration != NULL, retStatus);
 
-    remove(filePath.c_str());
+    remove(pSampleConfiguration->fristFrameSentTSFileName);
 
     if (IS_VALID_TIMER_QUEUE_HANDLE(pSampleConfiguration->timerQueueHandle)) {
         if (pSampleConfiguration->iceCandidatePairStatsTimerId != MAX_UINT32) {
