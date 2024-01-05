@@ -225,7 +225,7 @@ STATUS Config::initWithEnvVars()
     CHK_STATUS(optenvUint64(CANARY_FRAME_RATE_ENV_VAR, &frameRate, CANARY_DEFAULT_FRAMERATE));
 
     if (this->isStorage) {
-        CHK_STATUS(optenv(STORAGE_CANARY_FIRST_FRAME_TS_FILE_NAME_ENV_VAR, &storageFristFrameSentTSFileName, "defaultFileName.txt"));
+        CHK_STATUS(optenv(STORAGE_CANARY_FIRST_FRAME_TS_FILE_NAME_ENV_VAR, &storageFristFrameSentTSFileName, STORAGE_CANARY_DEFAULT_FIRST_FRAME_TS_FILE_NAME));
     }
 
 CleanUp:

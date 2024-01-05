@@ -74,10 +74,12 @@
 #define IOT_CORE_THING_NAME_ENV_VAR                      "AWS_IOT_CORE_THING_NAME"
 #define STORAGE_CANARY_FIRST_FRAME_TS_FILE_NAME_ENV_VAR  "STORAGE_CANARY_FIRST_FRAME_TS_FILE_NAME"
 
-#define CANARY_DEFAULT_LABEL          "ScaryTestLabel"
-#define CANARY_DEFAULT_CHANNEL_NAME   "ScaryTestStream"
-#define CANARY_DEFAULT_CLIENT_ID      "DefaultClientId"
-#define CANARY_DEFAULT_LOG_GROUP_NAME "DefaultLogGroupName"
+#define CANARY_DEFAULT_LABEL                            "ScaryTestLabel"
+#define CANARY_DEFAULT_CHANNEL_NAME                     "ScaryTestStream"
+#define CANARY_DEFAULT_CLIENT_ID                        "DefaultClientId"
+#define CANARY_DEFAULT_LOG_GROUP_NAME                   "DefaultLogGroupName"
+#define CANARY_DEFAULT_LOG_GROUP_NAME                   "DefaultLogGroupName"
+#define STORAGE_CANARY_DEFAULT_FIRST_FRAME_TS_FILE_NAME "DefaultFileName"
 
 // Signaling Canary error definitions
 #define STATUS_SIGNALING_CANARY_BASE                    0x73000000
