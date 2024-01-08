@@ -100,7 +100,9 @@ STATUS run(Canary::PConfig pConfig)
 
     CHK_STATUS(timerQueueCreate(&timerQueueHandle));
     if (pConfig->duration.value != 0) {
+        DLOGD("[DEBUG] Creating terminate timer.");
         auto terminate = [](UINT32 timerId, UINT64 currentTime, UINT64 customData) -> STATUS {
+            DLOGD("[DEBUG] terminate() invoked.");
             UNUSED_PARAM(timerId);
             UNUSED_PARAM(currentTime);
             UNUSED_PARAM(customData);
@@ -306,6 +308,10 @@ VOID sendCustomFrames(Canary::PPeer pPeer, MEDIA_STREAM_TRACK_KIND kind, UINT64 
         THREAD_SLEEP(HUNDREDS_OF_NANOS_IN_A_SECOND / frameRate);
         frame.presentationTs = GETTIME();
     }
+    
+    auto threadType = kind == MEDIA_STREAM_TRACK_KIND_VIDEO ? "video" : "audio";
+    DLOGD("[DUBUG] %s thread observed terminated as true", kind);
+    
 CleanUp:
 
     SAFE_MEMFREE(frame.frameData);
