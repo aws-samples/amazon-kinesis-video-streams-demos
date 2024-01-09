@@ -31,6 +31,7 @@ import com.amazonaws.services.kinesisvideo.model.StartSelectorType;
 import com.amazonaws.kinesisvideo.parser.utilities.FrameVisitor;
 import com.amazonaws.kinesisvideo.parser.examples.GetMediaWorker;
 import com.amazonaws.services.kinesisvideo.model.FragmentSelectorType;
+import com.amazonaws.services.kinesisvideo.model.Fragment;
 
 import lombok.extern.log4j.Log4j2;
 
@@ -76,13 +77,13 @@ public class WebrtcStorageCanaryConsumer {
 
             Boolean newFragmentReceived = false;
 
-            final FutureTask<List<CanaryFragment>> futureTask = new FutureTask<>(
+            final FutureTask<List<Fragment>> futureTask = new FutureTask<>(
                     new CanaryListFragmentWorker(mStreamName, mCredentialsProvider, listFragmentsEndpoint,
                             Regions.fromName(mRegion), fragmentSelector));
             Thread thread = new Thread(futureTask);
             thread.start();
 
-            List<CanaryFragment> newFragmentList = futureTask.get();    
+            List<Fragment> newFragmentList = futureTask.get();    
             // NOTE: The below newFragmentReceived logic assumes that fragments are not expiring, so
             //          stream retention must be greater than canary run duration.
             if (newFragmentList.size() > fragmentList.getFragmentList().size()) {

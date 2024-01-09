@@ -92,10 +92,6 @@ public class CanaryListFragmentWorker implements Callable {
                 nextToken = result.getNextToken();
             }
 
-            // Fragments in the return of a listFragments call are in no particular order,
-            // so let's sort them by ascending fragment number
-            fragments.sort(Comparator.comparing(CanaryFragment::getFragmentNumberInt));
-
             for (CanaryFragment cf : fragments) {
                 log.info("Retrieved fragment number {} ", cf.getFragment().getFragmentNumber());
             }
