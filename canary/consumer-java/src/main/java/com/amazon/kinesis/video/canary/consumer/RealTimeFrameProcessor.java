@@ -37,17 +37,18 @@ public class RealTimeFrameProcessor extends WebrtcStorageCanaryConsumer implemen
                 final long currentTime = System.currentTimeMillis();
                 final long canaryStartTime = super.mCanaryStartTime.getTime();
 
-                final String filePath = StorageWebRTCConstants.FIRST_FRAME_TS_FILE_PATH + super.firstFrameSentTSFile;
+                final String filePath = CanaryConstants.FIRST_FRAME_TS_FILE_PATH + super.firstFrameSentTSFile;
                 final String frameSentTimeStr = FileUtils.readFileToString(new File(filePath)).trim();
                 final long frameSentTime = Long.parseLong(frameSentTimeStr);
 
-                // Delete the firstFrameSentTS file in case WebRTC-end fails to.
+                // Delete the firstFrameSentTS file in case WebRTC-end fails to do so.
                 new File(filePath).delete();
 
-                // Check for a late consumer end start that may add to the measured
-                // FirstFrameSentToFirstFrameConsumed time
+                // Check for a late consumer end start that would falsely reduce the measured
+                // FirstFrameSentToFirstFrameConsumed time.
                 if (canaryStartTime > frameSentTime) {
-                    log.info("Consumer started after master sent out first frame, not pushing the FirstFrameSentToFirstFrameConsumed metric.");
+                    log.info(
+                            "Consumer started after master sent out first frame, not pushing the FirstFrameSentToFirstFrameConsumed metric.");
                 } else {
                     long rtpToFirstFragment = currentTime - frameSentTime;
                     super.publishMetricToCW("FirstFrameSentToFirstFrameConsumed", rtpToFirstFragment,
@@ -58,8 +59,9 @@ public class RealTimeFrameProcessor extends WebrtcStorageCanaryConsumer implemen
                 super.publishMetricToCW("TotalTimeToFirstFrameConsumed", timeToFirstFragment,
                         StandardUnit.Milliseconds);
             } catch (FileNotFoundException ex) {
-                log.error("Master-end timestamp file not found, try reducing the frequency of runs by increasing CANARY_DURATION_IN_SECONDS: " + ex);
-
+                log.error(
+                        "Master-end timestamp file not found, try reducing the frequency of runs by increasing CANARY_DURATION_IN_SECONDS: "
+                                + ex);
             } catch (IOException ioEx) {
                 log.error("IO Exception: " + ioEx);
             } finally {

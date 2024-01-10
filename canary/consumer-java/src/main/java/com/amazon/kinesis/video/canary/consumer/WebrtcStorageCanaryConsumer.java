@@ -41,20 +41,21 @@ import lombok.extern.log4j.Log4j2;
  * For longRun-configured jobs, this Canary will emit FragmentContinuity metrics by continuously
  * checking for any newly ingested fragments for the given stream. The fragment list is checked
  * for new fragments every "fragmentDuration * 2" The fragmentDuration is set by the encoder in
- * configuration in Media Server.
+ * the WebRTC Storage Media Server.
  * 
- * For periodic-configured jobs, this Canary will emit TimeToFirstFragment metrics by continuously
- * checking for consumable media from the specified stream via GetMedia calls.
+ * For periodic-configured jobs, this Canary will emit time to first frame consumed metrics by
+ * continuously checking for consumable media from the specified stream via GetMedia calls.
  */
 
 @Log4j2
 public class WebrtcStorageCanaryConsumer {
     protected static final Date mCanaryStartTime = new Date();
-    protected static final String mStreamName = System.getenv("CANARY_STREAM_NAME"); 
-    protected static final String firstFrameSentTSFile = System.getenv().getOrDefault(StorageWebRTCConstants.FIRST_FRAME_TS_FILE_ENV_VAR, StorageWebRTCConstants.DEFAULT_FIRST_FRAME_TS_FILE);
+    protected static final String mStreamName = System.getenv(CanaryConstants.CANARY_STREAM_NAME_ENV_VAR);
+    protected static final String firstFrameSentTSFile = System.getenv()
+            .getOrDefault(CanaryConstants.FIRST_FRAME_TS_FILE_ENV_VAR, CanaryConstants.DEFAULT_FIRST_FRAME_TS_FILE);
 
-    private static final String mCanaryLabel = System.getenv("CANARY_LABEL");
-    private static final String mRegion = System.getenv("AWS_DEFAULT_REGION");
+    private static final String mCanaryLabel = System.getenv(CanaryConstants.CANARY_LABEL_ENV_VAR);
+    private static final String mRegion = System.getenv(CanaryConstants.AWS_DEFAULT_REGION_ENV_VAR);
 
     private static EnvironmentVariableCredentialsProvider mCredentialsProvider;
     private static AmazonKinesisVideo mAmazonKinesisVideo;
@@ -83,13 +84,14 @@ public class WebrtcStorageCanaryConsumer {
             Thread thread = new Thread(futureTask);
             thread.start();
 
-            List<Fragment> newFragmentList = futureTask.get();    
-            // NOTE: The below newFragmentReceived logic assumes that fragments are not expiring, so
-            //          stream retention must be greater than canary run duration.
+            List<Fragment> newFragmentList = futureTask.get();
+            // NOTE: The below newFragmentReceived logic assumes that fragments are not
+            // expiring, so
+            // stream retention must be greater than canary run duration.
             if (newFragmentList.size() > fragmentList.getFragmentList().size()) {
                 newFragmentReceived = true;
             }
-            
+
             fragmentList.setFragmentList(newFragmentList);
 
             publishMetricToCW("FragmentReceived", newFragmentReceived ? 1.0 : 0.0, StandardUnit.None);
@@ -129,13 +131,14 @@ public class WebrtcStorageCanaryConsumer {
 
     protected static void publishMetricToCW(String metricName, double value, StandardUnit cwUnit) {
         try {
+            // TODO: Remove once done testing all CR changes.
             System.out.println("Emitting the following metric: " + metricName + ",  " + value);
             log.info("Emitting the following metric: {} - {}", metricName, value);
             final Dimension dimensionPerStream = new Dimension()
-                    .withName("StorageWebRTCSDKCanaryStreamName")
+                    .withName(CanaryConstants.CW_DIMENSION_INDIVIDUAL)
                     .withValue(mStreamName);
             final Dimension aggregatedDimension = new Dimension()
-                    .withName("StorageWebRTCSDKCanaryLabel")
+                    .withName(CanaryConstants.CW_DIMENSION_AGGREGATE)
                     .withValue(mCanaryLabel);
             List<MetricDatum> datumList = new ArrayList<>();
 
@@ -182,10 +185,32 @@ public class WebrtcStorageCanaryConsumer {
                 .build();
 
         switch (mCanaryLabel) {
-            case "WebrtcLongRunning": {
+            case CanaryConstants.PERIODIC_LABEL: {
+                // Continuously attempt getMedia() calls until footage is available.
+                // GetMedia() will return after ~3 sec if no footage is available. Once footage
+                // is available,
+                // it will continue to visit frames as long as there is footage available.
+                while ((System.currentTimeMillis() - mCanaryStartTime.getTime()) < canaryRunTime
+                        * CanaryConstants.MILLISECONDS_IN_A_SECOND) {
+                    calculateTimeToFirstFragment();
+                }
+                break;
+            }
+            // Non-periodic cases.
+            default: {
+                // Handle if incorrect label.
+                if (!mCanaryLabel.equals(CanaryConstants.EXTENDED_LABEL) &&
+                        !mCanaryLabel.equals(CanaryConstants.SINGLE_RECONNECT_LABEL) &&
+                        !mCanaryLabel.equals(CanaryConstants.SUB_RECONNECT_LABEL)) {
+                    log.error("Env var CANARY_LABEL: {} must be set to either {}, {}, {}, or {}.",
+                            mCanaryLabel, CanaryConstants.PERIODIC_LABEL, CanaryConstants.EXTENDED_LABEL,
+                            CanaryConstants.SINGLE_RECONNECT_LABEL, CanaryConstants.SUB_RECONNECT_LABEL);
+                    throw new Exception("Improper canary label " + mCanaryLabel + " assigned to "
+                            + CanaryConstants.CANARY_LABEL_ENV_VAR + " env var.");
+                }
                 final CanaryFragmentList fragmentList = new CanaryFragmentList();
 
-                Timer intervalMetricsTimer = new Timer("IntervalMetricsTimer");
+                Timer intervalMetricsTimer = new Timer(CanaryConstants.INTERVAL_METRICS_TIMER_NAME);
                 TimerTask intervalMetricsTask = new TimerTask() {
                     @Override
                     public void run() {
@@ -193,31 +218,14 @@ public class WebrtcStorageCanaryConsumer {
                     }
                 };
 
-                // Initial delay of 30s to allow for ListFragment response to be populated
-                final long intervalInitialDelay = 30000;
-                final long intervalDelay = 20000; // NOTE: 16s interval was causing gaps in continuity, changing to 20s (2x the
-                                                  // typical fragment duration coming from media server)
-
-                // NOTE: Metric publishing will NOT begin if canaryRunTime is < intervalInitialDelay
-                intervalMetricsTimer.scheduleAtFixedRate(intervalMetricsTask, intervalInitialDelay, intervalDelay);
-                Thread.sleep(canaryRunTime * 1000);
+                // NOTE: Metric publishing will NOT begin if canaryRunTime is <
+                // intervalInitialDelay
+                intervalMetricsTimer.scheduleAtFixedRate(intervalMetricsTask,
+                        CanaryConstants.LIST_FRAGMENTS_INITIAL_DELAY, CanaryConstants.LIST_FRAGMENTS_INTERVAL);
+                Thread.sleep(canaryRunTime * CanaryConstants.MILLISECONDS_IN_A_SECOND);
                 intervalMetricsTimer.cancel();
                 shutdownCanaryResources();
                 break;
-            }
-            case "WebrtcPeriodic": {
-                // Continuously attempt getMedia() calls until footage is available.
-                // GetMedia() will return after ~3 sec if no footage is available. Once footage is available,
-                // it will continue to visit frames as long as there is footage available.
-                while ((System.currentTimeMillis() - mCanaryStartTime.getTime()) < canaryRunTime * 1000) {
-                    calculateTimeToFirstFragment();
-                }
-                break;
-            }
-            default: {
-                log.error("Env var CANARY_LABEL: {} must be set to either WebrtcLongRunning or WebrtcPeriodic",
-                        mCanaryLabel);
-                throw new Exception("CANARY_LABEL must be set to either WebrtcLongRunning or WebrtcPeriodic");
             }
         }
     }
