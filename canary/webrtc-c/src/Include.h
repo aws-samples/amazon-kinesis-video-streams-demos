@@ -81,6 +81,11 @@
 #define CANARY_DEFAULT_LOG_GROUP_NAME              "DefaultLogGroupName"
 #define STORAGE_CANARY_DEFAULT_FIRST_FRAME_TS_FILE "DefaultFirstFrameSentTSFileName.txt"
 
+#define INDIVIDUAL_STORAGE_CW_DIMENSION "StorageWebRTCSDKCanaryChannelName"
+#define INDIVIDUAL_CW_DIMENSION         "WebRTCSDKCanaryChannelName"
+#define AGGREGATE_STORAGE_CW_DIMENSION  "StorageWebRTCSDKCanaryLabel"
+#define AGGREGATE_CW_DIMENSION          "WebRTCSDKCanaryLabel"
+
 // Signaling Canary error definitions
 #define STATUS_SIGNALING_CANARY_BASE                    0x73000000
 #define STATUS_SIGNALING_CANARY_UNEXPECTED_MESSAGE      STATUS_SIGNALING_CANARY_BASE + 0x00000001

@@ -11,10 +11,10 @@ STATUS CloudwatchMonitoring::init()
 {
     STATUS retStatus = STATUS_SUCCESS;
 
-    this->isStorage ? this->channelDimension.SetName("StorageWebRTCSDKCanaryChannelName") : this->channelDimension.SetName("WebRTCSDKCanaryChannelName");
+    this->isStorage ? this->channelDimension.SetName(INDIVIDUAL_STORAGE_CW_DIMENSION) : this->channelDimension.SetName(INDIVIDUAL_CW_DIMENSION);
     this->channelDimension.SetValue(pConfig->channelName.value);
 
-    this->isStorage ? this->labelDimension.SetName("StorageWebRTCSDKCanaryLabel") : this->labelDimension.SetName("WebRTCSDKCanaryLabel");
+    this->isStorage ? this->labelDimension.SetName(AGGREGATE_STORAGE_CW_DIMENSION) : this->labelDimension.SetName(AGGREGATE_CW_DIMENSION);
     this->labelDimension.SetValue(pConfig->label.value);
 
     return retStatus;
