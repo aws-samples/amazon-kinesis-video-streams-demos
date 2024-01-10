@@ -309,8 +309,7 @@ VOID sendCustomFrames(Canary::PPeer pPeer, MEDIA_STREAM_TRACK_KIND kind, UINT64 
         frame.presentationTs = GETTIME();
     }
     
-    auto threadType = kind == MEDIA_STREAM_TRACK_KIND_VIDEO ? "video" : "audio";
-    DLOGD("[DUBUG] %s thread observed terminated as true", kind);
+    DLOGD("[DUBUG] SendCustomFrames thread observed terminated as true", kind);
     
 CleanUp:
 
