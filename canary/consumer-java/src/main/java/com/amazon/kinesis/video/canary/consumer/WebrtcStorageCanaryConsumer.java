@@ -135,8 +135,6 @@ public class WebrtcStorageCanaryConsumer {
 
     protected static void publishMetricToCW(String metricName, double value, StandardUnit cwUnit) {
         try {
-            // TODO: Remove once done testing all CR changes.
-            System.out.println("Emitting the following metric: " + metricName + ",  " + value);
             log.info("Emitting the following metric: {} - {}", metricName, value);
             final Dimension dimensionPerStream = new Dimension()
                     .withName(CanaryConstants.CW_DIMENSION_INDIVIDUAL)
