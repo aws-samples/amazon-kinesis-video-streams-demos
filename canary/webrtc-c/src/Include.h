@@ -79,7 +79,7 @@
 #define CANARY_DEFAULT_CLIENT_ID                   "DefaultClientId"
 #define CANARY_DEFAULT_LOG_GROUP_NAME              "DefaultLogGroupName"
 #define CANARY_DEFAULT_LOG_GROUP_NAME              "DefaultLogGroupName"
-#define FIRST_FRAME_TS_FILE_PATH                   "../../../"
+#define FIRST_FRAME_TS_FILE_PATH                   "../"
 #define STORAGE_CANARY_DEFAULT_FIRST_FRAME_TS_FILE "DefaultFirstFrameSentTSFileName.txt"
 
 #define INDIVIDUAL_STORAGE_CW_DIMENSION "StorageWebRTCSDKCanaryChannelName"

@@ -26,7 +26,7 @@ public final class CanaryConstants {
     public static final String CW_DIMENSION_INDIVIDUAL = "StorageWebRTCSDKCanaryStreamName";
     public static final String CW_DIMENSION_AGGREGATE = "StorageWebRTCSDKCanaryLabel";
 
-    public static final String FIRST_FRAME_TS_FILE_PATH = "../../";
+    public static final String FIRST_FRAME_TS_FILE_PATH = "../webrtc-c/";
     public static final String DEFAULT_FIRST_FRAME_TS_FILE = "DefaultFirstFrameSentTSFileName.txt";
 
     public static final String CANARY_STREAM_NAME_ENV_VAR = "CANARY_STREAM_NAME";
