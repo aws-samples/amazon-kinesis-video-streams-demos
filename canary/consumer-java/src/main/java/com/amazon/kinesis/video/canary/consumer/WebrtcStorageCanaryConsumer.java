@@ -109,9 +109,6 @@ public class WebrtcStorageCanaryConsumer {
             final StartSelector startSelector = new StartSelector()
                     .withStartSelectorType(StartSelectorType.PRODUCER_TIMESTAMP).withStartTimestamp(mCanaryStartTime);
 
-            final long currentTime = new Date().getTime();
-            double timeToFirstFragment = Double.MAX_VALUE;
-
             RealTimeFrameProcessor realTimeFrameProcessor = RealTimeFrameProcessor.create();
             final FrameVisitor frameVisitor = FrameVisitor.create(realTimeFrameProcessor);
 
