@@ -140,6 +140,7 @@ typedef struct {
     UINT64 offerReceiveTimestamp;
     UINT64 sampleDuration;
     PCHAR fristFrameSentTSFileName;
+    UINT64 startTime;
 
     UINT32 pregenerateCertTimerId;
     PStackQueue pregeneratedCertificates; // Max MAX_RTCCONFIGURATION_CERTIFICATES certificates

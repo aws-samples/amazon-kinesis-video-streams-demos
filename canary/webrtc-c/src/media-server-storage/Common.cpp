@@ -61,18 +61,6 @@ VOID onDataChannel(UINT64 customData, PRtcDataChannel pRtcDataChannel)
 
 /******************************* CANARY FUNCTIONS *******************************/
 
-VOID scheduleShutdown(UINT64 duration, PSampleConfiguration pSampleConfiguration)
-{
-    THREAD_SLEEP(duration);
-    DLOGD("[Canary] Terminating canary due to duration reached");
-    if (gSampleConfiguration != NULL) {
-        ATOMIC_STORE_BOOL(&pSampleConfiguration->interrupted, TRUE);
-        CVAR_BROADCAST(gSampleConfiguration->cvar);
-    } else {
-        DLOGE("[Canary] Error terminating canary: gSampleConfiguration is null");
-    }
-}
-
 STATUS populateOutgoingRtpMetricsContext(PSampleStreamingSession pSampleStreamingSession)
 {
     DLOGD("[Canary] populateOutgoingRtpMetricsContext(...) invoked");
@@ -1098,6 +1086,8 @@ STATUS createSampleConfiguration(PCHAR channelName, SIGNALING_CHANNEL_ROLE_TYPE 
 
     pSampleConfiguration->iceUriCount = 0;
 
+    pSampleConfiguration->startTime = GETTIME();
+
     CHK_STATUS(stackQueueCreate(&pSampleConfiguration->pPendingSignalingMessageForRemoteClient));
     CHK_STATUS(hashTableCreateWithParams(SAMPLE_HASH_TABLE_BUCKET_COUNT, SAMPLE_HASH_TABLE_BUCKET_LENGTH,
                                          &pSampleConfiguration->pRtcPeerConnectionForRemoteClient));
@@ -1347,7 +1337,7 @@ STATUS freeSampleConfiguration(PSampleConfiguration* ppSampleConfiguration)
 
     CHK(pSampleConfiguration != NULL, retStatus);
 
-    remove(pSampleConfiguration->fristFrameSentTSFileName);
+    remove((PCHAR)(std::string(FIRST_FRAME_TS_FILE_PATH) + pSampleConfiguration->fristFrameSentTSFileName).c_str());
 
     if (IS_VALID_TIMER_QUEUE_HANDLE(pSampleConfiguration->timerQueueHandle)) {
         if (pSampleConfiguration->iceCandidatePairStatsTimerId != MAX_UINT32) {
@@ -1471,16 +1461,20 @@ STATUS sessionCleanupWait(PSampleConfiguration pSampleConfiguration)
 
     CHK(pSampleConfiguration != NULL, STATUS_NULL_ARG);
 
-    if(pSampleConfiguration->sampleDuration != 0) {
-        DLOGD("[Canary] Scheduling canary duration for %lu seconds", pSampleConfiguration->sampleDuration / HUNDREDS_OF_NANOS_IN_A_SECOND);
-        canaryDurationThread = std::thread(scheduleShutdown, pSampleConfiguration->sampleDuration, pSampleConfiguration);
-        canaryDurationThread.detach();
-    }
-
     while (!ATOMIC_LOAD_BOOL(&pSampleConfiguration->interrupted)) {
         // Keep the main set of operations interlocked until cvar wait which would atomically unlock
         MUTEX_LOCK(pSampleConfiguration->sampleConfigurationObjLock);
         sampleConfigurationObjLockLocked = TRUE;
+
+        // If canary duration is zero, run endlessly, else run until duration reached.
+        if (pSampleConfiguration->sampleDuration != 0) {
+            if ((GETTIME() - pSampleConfiguration->startTime) > pSampleConfiguration->sampleDuration) {
+                DLOGD("[Canary] Terminating canary due to duration reached");
+                ATOMIC_STORE_BOOL(&pSampleConfiguration->interrupted, TRUE);
+                CVAR_BROADCAST(gSampleConfiguration->cvar);
+            }
+        }
+
 
         // scan and cleanup terminated streaming session
         for (i = 0; i < pSampleConfiguration->streamingSessionCount; ++i) {

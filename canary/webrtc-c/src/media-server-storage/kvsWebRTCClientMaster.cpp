@@ -21,7 +21,6 @@ INT32 main(INT32 argc, CHAR* argv[])
     SET_INSTRUMENTED_ALLOCATORS();
     UINT32 logLevel = setLogLevel();
 
-
     t1 = GETTIME() / HUNDREDS_OF_NANOS_IN_A_MILLISECOND;
     Aws::InitAPI(options);
     canaryConfig.isStorage = true;
@@ -43,7 +42,7 @@ INT32 main(INT32 argc, CHAR* argv[])
     CHK_STATUS(createSampleConfiguration(pChannelName, SIGNALING_CHANNEL_ROLE_TYPE_MASTER, TRUE, TRUE, logLevel, &pSampleConfiguration));
 
     pSampleConfiguration->fristFrameSentTSFileName = &canaryConfig.storageFristFrameSentTSFileName.value[0];
-    remove(pSampleConfiguration->fristFrameSentTSFileName);
+    remove((PCHAR)(std::string(FIRST_FRAME_TS_FILE_PATH) + pSampleConfiguration->fristFrameSentTSFileName).c_str());
     DLOGD("[Canary] Canary init time: %d [ms]", (GETTIME() / HUNDREDS_OF_NANOS_IN_A_MILLISECOND) - t1);
 
     // Set the audio and video handlers
@@ -227,7 +226,7 @@ PVOID sendVideoPackets(PVOID args)
 
             status = writeFrame(pSampleConfiguration->sampleStreamingSessionList[i]->pVideoRtcRtpTransceiver, &frame);
             if (pSampleConfiguration->sampleStreamingSessionList[i]->firstFrame && status == STATUS_SUCCESS) {
-                writeFirstFrameSentTimeToFile(pSampleConfiguration->fristFrameSentTSFileName);
+                writeFirstFrameSentTimeToFile((PCHAR)(std::string(FIRST_FRAME_TS_FILE_PATH) + pSampleConfiguration->fristFrameSentTSFileName).c_str());
                 PROFILE_WITH_START_TIME(pSampleConfiguration->sampleStreamingSessionList[i]->offerReceiveTime, "Time to first frame");
                 
                 DOUBLE timeToFirstFrame = (DOUBLE) (GETTIME() - pSampleConfiguration->offerReceiveTimestamp) / HUNDREDS_OF_NANOS_IN_A_MILLISECOND;
@@ -307,7 +306,7 @@ PVOID sendAudioPackets(PVOID args)
                 if (status != STATUS_SUCCESS) {
                     DLOGV("writeFrame() failed with 0x%08x", status);
                 } else if (pSampleConfiguration->sampleStreamingSessionList[i]->firstFrame && status == STATUS_SUCCESS) {
-                    writeFirstFrameSentTimeToFile(pSampleConfiguration->fristFrameSentTSFileName);
+                    writeFirstFrameSentTimeToFile((PCHAR)(std::string(FIRST_FRAME_TS_FILE_PATH) + pSampleConfiguration->fristFrameSentTSFileName).c_str());
                     PROFILE_WITH_START_TIME(pSampleConfiguration->sampleStreamingSessionList[i]->offerReceiveTime, "Time to first frame");
 
                     DOUBLE timeToFirstFrame = (DOUBLE) (GETTIME() - pSampleConfiguration->offerReceiveTimestamp) / HUNDREDS_OF_NANOS_IN_A_MILLISECOND;
