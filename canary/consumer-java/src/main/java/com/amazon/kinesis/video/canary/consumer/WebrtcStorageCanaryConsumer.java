@@ -78,25 +78,29 @@ public class WebrtcStorageCanaryConsumer {
 
             Boolean newFragmentReceived = false;
 
-            final FutureTask<List<Fragment>> futureTask = new FutureTask<>(
-                    new CanaryListFragmentWorker(mStreamName, mCredentialsProvider, listFragmentsEndpoint,
-                            Regions.fromName(mRegion), fragmentSelector));
-            Thread thread = new Thread(futureTask);
-            thread.start();
+            // Try with resources to utilize AutoClosable implementation of
+            // CanaryListFragmentWorker
+            try (CanaryListFragmentWorker listFragmentWorker = new CanaryListFragmentWorker(mStreamName,
+                    mCredentialsProvider, listFragmentsEndpoint, Regions.fromName(mRegion), fragmentSelector)) {
+                final FutureTask<List<Fragment>> futureTask = new FutureTask<>(listFragmentWorker);
+                Thread thread = new Thread(futureTask);
+                thread.start();
 
-            List<Fragment> newFragmentList = futureTask.get();
-            // NOTE: The below newFragmentReceived logic assumes that fragments are not
-            // expiring, so
-            // stream retention must be greater than canary run duration.
-            if (newFragmentList.size() > fragmentList.getFragmentList().size()) {
-                newFragmentReceived = true;
+                List<Fragment> newFragmentList = futureTask.get();
+                // NOTE: The below newFragmentReceived logic assumes that fragments are not
+                // expiring, so stream retention must be greater than canary run duration.
+                if (newFragmentList.size() > fragmentList.getFragmentList().size()) {
+                    newFragmentReceived = true;
+                }
+
+                fragmentList.setFragmentList(newFragmentList);
+                publishMetricToCW("FragmentReceived", newFragmentReceived ? 1.0 : 0.0, StandardUnit.None);
+
+            } catch (Exception e) {
+                log.error("Failed while calculating continuity metric, {}", e);
             }
-
-            fragmentList.setFragmentList(newFragmentList);
-
-            publishMetricToCW("FragmentReceived", newFragmentReceived ? 1.0 : 0.0, StandardUnit.None);
         } catch (Exception e) {
-            log.error("Failed while calculating continuity metric, {}", e);
+            log.error("Failed while fetching attributes for CanaryListFragmentWorker, {}", e);
         }
     }
 

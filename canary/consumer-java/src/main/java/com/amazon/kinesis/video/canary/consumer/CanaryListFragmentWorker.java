@@ -1,5 +1,6 @@
 package com.amazon.kinesis.video.canary.consumer;
 
+import java.lang.AutoCloseable;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Comparator;
@@ -20,7 +21,7 @@ import lombok.extern.log4j.Log4j2;
  */
 
 @Log4j2
-public class CanaryListFragmentWorker implements Callable {
+public class CanaryListFragmentWorker implements AutoCloseable, Callable {
     private final FragmentSelector mFragmentSelector;
     private final AmazonKinesisVideoArchivedMedia mAmazonKinesisVideoArchivedMedia;
     private final String mStreamName;
@@ -52,7 +53,9 @@ public class CanaryListFragmentWorker implements Callable {
                 streamName, credentialsProvider, endpoint, region, fragmentSelector);
     }
 
-    private void close() {
+    // Public for AutoClosable
+    @Override
+    public void close() throws Exception {
         this.mAmazonKinesisVideoArchivedMedia.shutdown();
     }
 
@@ -96,8 +99,6 @@ public class CanaryListFragmentWorker implements Callable {
         } catch (Exception e) {
             log.error("Failure in CanaryListFragmentWorker for streamName {} {}", this.mStreamName, e);
             throw e;
-        } finally {
-            this.close();
         }
     }
 }
