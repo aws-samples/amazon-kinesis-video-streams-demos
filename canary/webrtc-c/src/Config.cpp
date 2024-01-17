@@ -164,7 +164,7 @@ STATUS Config::initWithEnvVars()
 
     /* This is ignored for master. Master can extract the info from offer. Viewer has to know if peer can trickle or
     * not ahead of time. */
-    CHK_STATUS(optenvBool(CANARY_TRICKLE_ICE_ENV_VAR, &trickleIce, FALSE));
+    CHK_STATUS(optenvBool(CANARY_TRICKLE_ICE_ENV_VAR, &trickleIce, TRUE));
     CHK_STATUS(optenvBool(CANARY_USE_TURN_ENV_VAR, &useTurn, TRUE));
     CHK_STATUS(optenvBool(CANARY_FORCE_TURN_ENV_VAR, &forceTurn, FALSE));
     CHK_STATUS(optenvBool(CANARY_USE_IOT_CREDENTIALS_ENV_VAR, &useIotCredentialProvider, FALSE));
@@ -224,6 +224,10 @@ STATUS Config::initWithEnvVars()
     CHK_STATUS(optenvUint64(CANARY_BIT_RATE_ENV_VAR, &bitRate, CANARY_DEFAULT_BITRATE));
     CHK_STATUS(optenvUint64(CANARY_FRAME_RATE_ENV_VAR, &frameRate, CANARY_DEFAULT_FRAMERATE));
 
+    if (this->isStorage) {
+        CHK_STATUS(optenv(STORAGE_CANARY_FIRST_FRAME_TS_FILE_ENV_VAR, &storageFristFrameSentTSFileName, STORAGE_CANARY_DEFAULT_FIRST_FRAME_TS_FILE));
+    }
+
 CleanUp:
 
     return retStatus;
@@ -247,12 +251,13 @@ VOID Config::print()
           "\tIteration       : %lu seconds\n"
           "\tRun both peers  : %s\n"
           "\tCredential type : %s\n"
+          "\tStorage         : %s\n"
           "\n",
           this->endpoint.value.c_str(), this->region.value.c_str(), this->label.value.c_str(), this->channelName.value.c_str(),
           this->clientId.value.c_str(), this->isMaster.value ? "Master" : "Viewer", this->trickleIce.value ? "True" : "False",
           this->useTurn.value ? "True" : "False", this->logLevel.value, this->logGroupName.value.c_str(), this->logStreamName.value.c_str(),
           this->duration.value / HUNDREDS_OF_NANOS_IN_A_SECOND, this->iterationDuration.value / HUNDREDS_OF_NANOS_IN_A_SECOND,
-          this->runBothPeers.value ? "True" : "False", this->useIotCredentialProvider.value ? "IoT" : "Static");
+          this->runBothPeers.value ? "True" : "False", this->useIotCredentialProvider.value ? "IoT" : "Static", this->isStorage ? "True" : "False");
     if(this->useIotCredentialProvider.value) {
         DLOGD("\tIoT endpoint : %s\n"
               "\tIoT cert filename : %s\n"
@@ -262,6 +267,11 @@ VOID Config::print()
               this->iotCoreCert.value.c_str(),
               this->iotCorePrivateKey.value.c_str(),
               this->iotCoreRoleAlias.value.c_str());
+    }
+    if(this->isStorage) {
+        DLOGD("\n\n\tFirstFrameSentTSFileName : %s\n",
+               this->storageFristFrameSentTSFileName.value.c_str()
+        );
     }
 }
 

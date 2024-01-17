@@ -4,16 +4,17 @@ namespace Canary {
 
 CloudwatchMonitoring::CloudwatchMonitoring(PConfig pConfig, ClientConfiguration* pClientConfig) : pConfig(pConfig), client(*pClientConfig)
 {
+    pConfig->isStorage ? this->isStorage = true : this->isStorage = false;
 }
 
 STATUS CloudwatchMonitoring::init()
 {
     STATUS retStatus = STATUS_SUCCESS;
 
-    this->channelDimension.SetName("WebRTCSDKCanaryChannelName");
+    this->isStorage ? this->channelDimension.SetName(INDIVIDUAL_STORAGE_CW_DIMENSION) : this->channelDimension.SetName(INDIVIDUAL_CW_DIMENSION);
     this->channelDimension.SetValue(pConfig->channelName.value);
 
-    this->labelDimension.SetName("WebRTCSDKCanaryLabel");
+    this->isStorage ? this->labelDimension.SetName(AGGREGATE_STORAGE_CW_DIMENSION) : this->labelDimension.SetName(AGGREGATE_CW_DIMENSION);
     this->labelDimension.SetValue(pConfig->label.value);
 
     return retStatus;
@@ -187,6 +188,31 @@ VOID CloudwatchMonitoring::pushTimeToFirstFrame(UINT64 timeToFirstFrame, Aws::Cl
 
     this->push(datum);
 }
+
+
+
+VOID CloudwatchMonitoring::pushStorageDisconnectToFrameSentTime(UINT64 storageDisconnectToFrameSentTime, Aws::CloudWatch::Model::StandardUnit unit)
+{
+    MetricDatum datum;
+
+    datum.SetMetricName("StorageDisconnectToFrameSentTime");
+    datum.SetValue(storageDisconnectToFrameSentTime);
+    datum.SetUnit(unit);
+
+    this->push(datum);
+}
+
+VOID CloudwatchMonitoring::pushJoinSessionTime(UINT64 joinSessionTime, Aws::CloudWatch::Model::StandardUnit unit)
+{
+    MetricDatum datum;
+
+    datum.SetMetricName("JoinSessionTime");
+    datum.SetValue(joinSessionTime);
+    datum.SetUnit(unit);
+
+    this->push(datum);
+}
+
 VOID CloudwatchMonitoring::pushSignalingInitDelay(UINT64 delay, Aws::CloudWatch::Model::StandardUnit unit)
 {
     MetricDatum datum;
@@ -212,7 +238,7 @@ VOID CloudwatchMonitoring::pushICEHolePunchingDelay(UINT64 delay, Aws::CloudWatc
 VOID CloudwatchMonitoring::pushOutboundRtpStats(Canary::POutgoingRTPMetricsContext pOutboundRtpStats)
 {
     MetricDatum bytesDiscardedPercentageDatum, averageFramesRateDatum, nackRateDatum, retransmissionPercentDatum;
-
+    
     bytesDiscardedPercentageDatum.SetMetricName("PercentageFrameDiscarded");
     bytesDiscardedPercentageDatum.SetValue(pOutboundRtpStats->framesPercentageDiscarded);
     bytesDiscardedPercentageDatum.SetUnit(Aws::CloudWatch::Model::StandardUnit::Percent);
@@ -304,7 +330,9 @@ VOID CloudwatchMonitoring::pushKvsIceAgentMetrics(PKvsIceAgentMetrics pKvsIceAge
 VOID CloudwatchMonitoring::pushSignalingClientMetrics(PSignalingClientMetrics pSignalingClientMetrics)
 {
     MetricDatum offerToAnswerDatum, getTokenDatum, describeDatum, createDatum, endpointDatum,
-                iceConfigDatum, connectDatum ,createClientDatum, fetchDatum, connectClientDatum;
+                iceConfigDatum, connectDatum, createClientDatum, fetchDatum, connectClientDatum, joinSessionToOfferDatum;
+
+    UINT64 joinSessionToOffer, joinSessionCallTime;
 
     offerToAnswerDatum.SetMetricName("OfferToAnswerTime");
     offerToAnswerDatum.SetValue(pSignalingClientMetrics->signalingClientStats.offerToAnswerTime);
@@ -355,6 +383,21 @@ VOID CloudwatchMonitoring::pushSignalingClientMetrics(PSignalingClientMetrics pS
     connectClientDatum.SetValue(pSignalingClientMetrics->signalingClientStats.connectClientTime);
     connectClientDatum.SetUnit(Aws::CloudWatch::Model::StandardUnit::Milliseconds);
     this->push(connectClientDatum);
+
+    if (this->isStorage) {
+        joinSessionToOffer = pSignalingClientMetrics->signalingClientStats.joinSessionToOfferRecvTime;
+        if (joinSessionToOffer > 0) {
+            joinSessionToOfferDatum.SetMetricName("JoinSessionToOfferReceived");
+            joinSessionToOfferDatum.SetValue(joinSessionToOffer / HUNDREDS_OF_NANOS_IN_A_MILLISECOND);
+            joinSessionToOfferDatum.SetUnit(Aws::CloudWatch::Model::StandardUnit::Milliseconds);
+            this->push(joinSessionToOfferDatum);
+        }
+
+        joinSessionCallTime = (pSignalingClientMetrics->signalingClientStats.joinSessionCallTime);
+        if (joinSessionToOffer > 0) {
+            this->pushJoinSessionTime(joinSessionCallTime, Aws::CloudWatch::Model::StandardUnit::Milliseconds);
+        }
+    }
 }
 
 VOID CloudwatchMonitoring::pushInboundRtpStats(Canary::PIncomingRTPMetricsContext pIncomingRtpStats)

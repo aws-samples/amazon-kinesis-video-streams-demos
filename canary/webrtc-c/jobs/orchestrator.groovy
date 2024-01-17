@@ -4,6 +4,12 @@ RUNNER_JOB_NAME_PREFIX = "webrtc-canary-runner"
 PERIODIC_DURATION_IN_SECONDS = 90
 PERIODIC_PROFILING_DURATION_IN_SECONDS = 90
 LONG_RUNNING_DURATION_IN_SECONDS = 0
+
+STORAGE_PERIODIC_DURATION_IN_SECONDS = 300 // 5 min
+STORAGE_SUB_RECONNECT_DURATION_IN_SECONDS = 2700 // 45 min
+STORAGE_SINGLE_RECONNECT_DURATION_IN_SECONDS = 3900 // 65 min
+STORAGE_EXTENDED_DURATION_IN_SECONDS = 43200 // 12 hr
+
 MIN_RETRY_DELAY_IN_SECONDS = 60
 COLD_STARTUP_DELAY_IN_SECONDS = 60 * 60
 GIT_URL = 'https://github.com/aws-samples/amazon-kinesis-video-streams-demos.git'
@@ -233,6 +239,82 @@ pipeline {
                             wait: false
                         )
 
+                        // Storage Periodic.
+                        build(
+                            job: NEXT_AVAILABLE_RUNNER,
+                            parameters: COMMON_PARAMS + [
+                                booleanParam(name: 'IS_SIGNALING', value: false),
+                                booleanParam(name: 'IS_STORAGE', value: true),
+                                booleanParam(name: 'IS_STORAGE_SINGLE_NODE', value: true),
+                                booleanParam(name: 'USE_TURN', value: true),
+                                booleanParam(name: 'TRICKLE_ICE', value: true),
+                                booleanParam(name: 'USE_IOT', value: false),
+                                string(name: 'DURATION_IN_SECONDS', value: STORAGE_PERIODIC_DURATION_IN_SECONDS.toString()),
+                                string(name: 'MASTER_NODE_LABEL', value: "webrtc-storage-master"),
+                                string(name: 'CONSUMER_NODE_LABEL', value: "webrtc-storage-consumer"),
+                                string(name: 'RUNNER_LABEL', value: "WebrtcStoragePeriodic"),
+                                string(name: 'SCENARIO_LABEL', value: "WebrtcStoragePeriodic"),
+                                string(name: 'AWS_DEFAULT_REGION', value: "us-west-2"),
+                            ],
+                            wait: false
+                        )
+
+                        // Storage Sub-Reconnect.
+                        build(
+                            job: NEXT_AVAILABLE_RUNNER,
+                            parameters: COMMON_PARAMS + [
+                                booleanParam(name: 'IS_SIGNALING', value: false),
+                                booleanParam(name: 'IS_STORAGE', value: true),
+                                booleanParam(name: 'USE_TURN', value: true),
+                                booleanParam(name: 'TRICKLE_ICE', value: true),
+                                booleanParam(name: 'USE_IOT', value: false),
+                                string(name: 'DURATION_IN_SECONDS', value: STORAGE_SUB_RECONNECT_DURATION_IN_SECONDS.toString()),
+                                string(name: 'MASTER_NODE_LABEL', value: "webrtc-storage-master"),
+                                string(name: 'CONSUMER_NODE_LABEL', value: "webrtc-storage-consumer"),
+                                string(name: 'RUNNER_LABEL', value: "WebrtcStorageSubReconnect"),
+                                string(name: 'SCENARIO_LABEL', value: "WebrtcStorageSubReconnect"),
+                                string(name: 'AWS_DEFAULT_REGION', value: "us-west-2"),
+                            ],
+                            wait: false
+                        )
+
+                        // Storage Single Reconnect.
+                        build(
+                            job: NEXT_AVAILABLE_RUNNER,
+                            parameters: COMMON_PARAMS + [
+                                booleanParam(name: 'IS_SIGNALING', value: false),
+                                booleanParam(name: 'IS_STORAGE', value: true),
+                                booleanParam(name: 'USE_TURN', value: true),
+                                booleanParam(name: 'TRICKLE_ICE', value: true),
+                                booleanParam(name: 'USE_IOT', value: false),
+                                string(name: 'DURATION_IN_SECONDS', value: STORAGE_SINGLE_RECONNECT_DURATION_IN_SECONDS.toString()),
+                                string(name: 'MASTER_NODE_LABEL', value: "webrtc-storage-master"),
+                                string(name: 'CONSUMER_NODE_LABEL', value: "webrtc-storage-consumer"),
+                                string(name: 'RUNNER_LABEL', value: "WebrtcStorageSingleReconnect"),
+                                string(name: 'SCENARIO_LABEL', value: "WebrtcStorageSingleReconnect"),
+                                string(name: 'AWS_DEFAULT_REGION', value: "us-west-2"),
+                            ],
+                            wait: false
+                        )
+
+                        // Storage Extended.
+                        build(
+                            job: NEXT_AVAILABLE_RUNNER,
+                            parameters: COMMON_PARAMS + [
+                                booleanParam(name: 'IS_SIGNALING', value: false),
+                                booleanParam(name: 'IS_STORAGE', value: true),
+                                booleanParam(name: 'USE_TURN', value: true),
+                                booleanParam(name: 'TRICKLE_ICE', value: true),
+                                booleanParam(name: 'USE_IOT', value: false),
+                                string(name: 'DURATION_IN_SECONDS', value: STORAGE_EXTENDED_DURATION_IN_SECONDS.toString()),
+                                string(name: 'MASTER_NODE_LABEL', value: "webrtc-storage-master"),
+                                string(name: 'CONSUMER_NODE_LABEL', value: "webrtc-storage-consumer"),
+                                string(name: 'RUNNER_LABEL', value: "WebrtcStorageExtended"),
+                                string(name: 'SCENARIO_LABEL', value: "WebrtcStorageExtended"),
+                                string(name: 'AWS_DEFAULT_REGION', value: "us-west-2"),
+                            ],
+                            wait: false
+                        )
                     }
                 }
 

@@ -23,12 +23,16 @@ class CloudwatchMonitoring {
     VOID pushSignalingClientMetrics(PSignalingClientMetrics);
     VOID pushRetryCount(UINT32);
 
+    VOID pushStorageDisconnectToFrameSentTime(UINT64, Aws::CloudWatch::Model::StandardUnit);
+    VOID pushJoinSessionTime(UINT64, Aws::CloudWatch::Model::StandardUnit);
+
   private:
     Dimension channelDimension;
     Dimension labelDimension;
     PConfig pConfig;
     CloudWatchClient client;
     std::atomic<UINT64> pendingMetrics;
+    BOOL isStorage;
 };
 
 } // namespace Canary

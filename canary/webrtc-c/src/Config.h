@@ -26,6 +26,8 @@ class Config {
     Value<BOOL> useIotCredentialProvider;
     Value<BOOL> isProfilingMode;
 
+    BOOL isStorage;
+
     // credentials
     Value<std::string> accessKey;
     Value<std::string> secretKey;
@@ -47,6 +49,7 @@ class Config {
     Value<UINT64> frameRate;
 
     Value<std::string> caCertPath;
+    Value<std::string> storageFristFrameSentTSFileName;
 
     BYTE iotEndpoint[MAX_CONFIG_JSON_FILE_SIZE];
 

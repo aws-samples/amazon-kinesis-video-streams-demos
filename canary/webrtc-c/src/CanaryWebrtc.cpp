@@ -302,7 +302,7 @@ VOID sendCustomFrames(Canary::PPeer pPeer, MEDIA_STREAM_TRACK_KIND kind, UINT64 
 
         // We must update the size to reflect the original data with hex encoded data
         frame.size = hexStrLen + ANNEX_B_NALU_SIZE;
-         pPeer->writeFrame(&frame, kind);
+        pPeer->writeFrame(&frame, kind);
         THREAD_SLEEP(HUNDREDS_OF_NANOS_IN_A_SECOND / frameRate);
         frame.presentationTs = GETTIME();
     }

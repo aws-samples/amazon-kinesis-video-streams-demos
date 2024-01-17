@@ -11,7 +11,7 @@ option(CANARY_USE_MBEDTLS "MBedtls" OFF)
 FetchContent_Declare(
   webrtc
   GIT_REPOSITORY https://github.com/awslabs/amazon-kinesis-video-streams-webrtc-sdk-c
-  GIT_TAG        mbedtls-warning-fix
+  GIT_TAG        master
 )
 
 FetchContent_Declare(
@@ -64,7 +64,8 @@ add_library(
   src/CloudwatchLogs.cpp
   src/CloudwatchMonitoring.cpp
   src/Cloudwatch.cpp
-  src/Peer.cpp)
+  src/Peer.cpp
+  src/media-server-storage/Common.cpp)
 target_link_libraries(
   kvsWebrtcCanary
   kvsWebrtcClient
@@ -86,6 +87,13 @@ add_executable(
   src/CanarySignaling.cpp)
 target_link_libraries(
   kvsWebrtcCanarySignaling
+  kvsWebrtcCanary)
+
+add_executable(
+  kvsWebrtcStorageSample
+  src/media-server-storage/kvsWebRTCClientMaster.cpp)
+target_link_libraries(
+  kvsWebrtcStorageSample
   kvsWebrtcCanary)
 
 file(COPY "${CMAKE_CURRENT_SOURCE_DIR}/assets" DESTINATION .)
