@@ -132,7 +132,7 @@ pipeline {
                                 string(name: 'MASTER_NODE_LABEL', value: "openssl-master"),
                                 string(name: 'VIEWER_NODE_LABEL', value: "openssl-viewer"),
                                 string(name: 'RUNNER_LABEL', value: "WebrtcPeriodicOpenSSL"),
-                                string(name: 'SCENARIO_LABEL', value: "WebrtcPeriodic"),
+                                string(name: 'SCENARIO_LABEL', value: "OpenSSLPeriodic"),
                             ],
                             wait: false
                         )
@@ -164,7 +164,7 @@ pipeline {
                                 string(name: 'MASTER_NODE_LABEL', value: "mbedtls-master"),
                                 string(name: 'VIEWER_NODE_LABEL', value: "mbedtls-viewer"),
                                 string(name: 'RUNNER_LABEL', value: "WebrtcPeriodicStaticMbedTLS"),
-                                string(name: 'SCENARIO_LABEL', value: "WebrtcPeriodic"),
+                                string(name: 'SCENARIO_LABEL', value: "MbedTLSPeriodic"),
                             ],
                             wait: false
                         )
