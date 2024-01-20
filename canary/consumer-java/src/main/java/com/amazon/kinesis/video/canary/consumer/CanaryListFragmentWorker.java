@@ -60,8 +60,8 @@ public class CanaryListFragmentWorker implements AutoCloseable, Callable {
     }
 
     @Override
-    public List<CanaryFragment> call() {
-        List<CanaryFragment> fragments = new ArrayList<>();
+    public List<Fragment> call() {
+        List<Fragment> fragments = new ArrayList<>();
         try {
             log.info("Start CanaryListFragment worker on stream {}", this.mStreamName);
 
@@ -84,14 +84,14 @@ public class CanaryListFragmentWorker implements AutoCloseable, Callable {
                         result.getSdkResponseMetadata().getRequestId());
 
                 for (Fragment f : result.getFragments()) {
-                    fragments.add(new CanaryFragment(f));
+                    fragments.add(f);
                 }
 
                 nextToken = result.getNextToken();
             } while (nextToken != null);
 
-            for (CanaryFragment cf : fragments) {
-                log.info("Retrieved fragment number {} ", cf.getFragment().getFragmentNumber());
+            for (Fragment cf : fragments) {
+                log.info("Retrieved fragment number {} ", cf.getFragmentNumber());
             }
             log.info("Retrieved {} Fragments and exiting CanaryListFragmentWorker for stream {}", fragments.size(),
                     this.mStreamName);
