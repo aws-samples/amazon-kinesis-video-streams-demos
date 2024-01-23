@@ -252,8 +252,8 @@ pipeline {
                                 string(name: 'DURATION_IN_SECONDS', value: STORAGE_PERIODIC_DURATION_IN_SECONDS.toString()),
                                 string(name: 'MASTER_NODE_LABEL', value: "webrtc-storage-master"),
                                 string(name: 'CONSUMER_NODE_LABEL', value: "webrtc-storage-consumer"),
-                                string(name: 'RUNNER_LABEL', value: "WebrtcStoragePeriodic"),
-                                string(name: 'SCENARIO_LABEL', value: "WebrtcStoragePeriodic"),
+                                string(name: 'RUNNER_LABEL', value: "StoragePeriodic"),
+                                string(name: 'SCENARIO_LABEL', value: "StoragePeriodic"),
                                 string(name: 'AWS_DEFAULT_REGION', value: "us-west-2"),
                             ],
                             wait: false
@@ -271,8 +271,8 @@ pipeline {
                                 string(name: 'DURATION_IN_SECONDS', value: STORAGE_SUB_RECONNECT_DURATION_IN_SECONDS.toString()),
                                 string(name: 'MASTER_NODE_LABEL', value: "webrtc-storage-master"),
                                 string(name: 'CONSUMER_NODE_LABEL', value: "webrtc-storage-consumer"),
-                                string(name: 'RUNNER_LABEL', value: "WebrtcStorageSubReconnect"),
-                                string(name: 'SCENARIO_LABEL', value: "WebrtcStorageSubReconnect"),
+                                string(name: 'RUNNER_LABEL', value: "StorageSubReconnect"),
+                                string(name: 'SCENARIO_LABEL', value: "StorageSubReconnect"),
                                 string(name: 'AWS_DEFAULT_REGION', value: "us-west-2"),
                             ],
                             wait: false
@@ -290,8 +290,8 @@ pipeline {
                                 string(name: 'DURATION_IN_SECONDS', value: STORAGE_SINGLE_RECONNECT_DURATION_IN_SECONDS.toString()),
                                 string(name: 'MASTER_NODE_LABEL', value: "webrtc-storage-master"),
                                 string(name: 'CONSUMER_NODE_LABEL', value: "webrtc-storage-consumer"),
-                                string(name: 'RUNNER_LABEL', value: "WebrtcStorageSingleReconnect"),
-                                string(name: 'SCENARIO_LABEL', value: "WebrtcStorageSingleReconnect"),
+                                string(name: 'RUNNER_LABEL', value: "StorageSingleReconnect"),
+                                string(name: 'SCENARIO_LABEL', value: "StorageSingleReconnect"),
                                 string(name: 'AWS_DEFAULT_REGION', value: "us-west-2"),
                             ],
                             wait: false
@@ -309,8 +309,8 @@ pipeline {
                                 string(name: 'DURATION_IN_SECONDS', value: STORAGE_EXTENDED_DURATION_IN_SECONDS.toString()),
                                 string(name: 'MASTER_NODE_LABEL', value: "webrtc-storage-master"),
                                 string(name: 'CONSUMER_NODE_LABEL', value: "webrtc-storage-consumer"),
-                                string(name: 'RUNNER_LABEL', value: "WebrtcStorageExtended"),
-                                string(name: 'SCENARIO_LABEL', value: "WebrtcStorageExtended"),
+                                string(name: 'RUNNER_LABEL', value: "StorageExtended"),
+                                string(name: 'SCENARIO_LABEL', value: "StorageExtended"),
                                 string(name: 'AWS_DEFAULT_REGION', value: "us-west-2"),
                             ],
                             wait: false
