@@ -18,10 +18,10 @@ public final class CanaryConstants {
 
     public static final String INTERVAL_METRICS_TIMER_NAME = "IntervalMetricsTimer";
 
-    public static final String PERIODIC_LABEL = "WebrtcStoragePeriodic"; // Short period, used for time to first frame consumed metrics.
-    public static final String SUB_RECONNECT_LABEL = "WebrtcStorageSubReconnect"; // < 1 Media Server forced reconnect, currently must be 60min.
-    public static final String SINGLE_RECONNECT_LABEL = "WebrtcStorageSingleReconnect"; // 1 Media Server forced reconnect, currently must be 60-120min.
-    public static final String EXTENDED_LABEL = "WebrtcStorageExtended"; // > 1 Media Server forced reconnect, currently must be > 120min.
+    public static final String PERIODIC_LABEL = "StoragePeriodic"; // Short period, used for time to first frame consumed metrics.
+    public static final String SUB_RECONNECT_LABEL = "StorageSubReconnect"; // < 1 Media Server forced reconnect, currently must be 60min.
+    public static final String SINGLE_RECONNECT_LABEL = "StorageSingleReconnect"; // 1 Media Server forced reconnect, currently must be 60-120min.
+    public static final String EXTENDED_LABEL = "StorageExtended"; // > 1 Media Server forced reconnect, currently must be > 120min.
 
     public static final String CW_DIMENSION_INDIVIDUAL = "StorageWebRTCSDKCanaryStreamName";
     public static final String CW_DIMENSION_AGGREGATE = "StorageWebRTCSDKCanaryLabel";
