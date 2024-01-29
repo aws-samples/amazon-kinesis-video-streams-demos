@@ -15,10 +15,10 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.Optional;
 
-import lombok.extern.log4j.Log4j2;
+import org.apache.log4j.Logger;
 
-@Log4j2
 public class RealTimeFrameProcessor extends WebrtcStorageCanaryConsumer implements FrameVisitor.FrameProcessor {
+    static final Logger logger = Logger.getLogger(CanaryListFragmentWorker.class);
 
     private boolean isFirstFrame = false;
 
@@ -47,7 +47,7 @@ public class RealTimeFrameProcessor extends WebrtcStorageCanaryConsumer implemen
                 // Check for a late consumer end start that would falsely reduce the measured
                 // FirstFrameSentToFirstFrameConsumed time.
                 if (canaryStartTime > frameSentTime) {
-                    log.info(
+                    logger.info(
                             "Consumer started after master sent out first frame, not pushing the FirstFrameSentToFirstFrameConsumed metric.");
                 } else {
                     long rtpToFirstFragment = currentTime - frameSentTime;
@@ -59,18 +59,18 @@ public class RealTimeFrameProcessor extends WebrtcStorageCanaryConsumer implemen
                 super.publishMetricToCW("TotalTimeToFirstFrameConsumed", timeToFirstFragment,
                         StandardUnit.Milliseconds);
             } catch (FileNotFoundException ex) {
-                log.error(
+                logger.error(
                         "Master-end timestamp file not found, try reducing the frequency of runs by increasing CANARY_DURATION_IN_SECONDS: "
                                 + ex);
             } catch (IOException ioEx) {
-                log.error("IO Exception: " + ioEx);
+                logger.error("IO Exception: " + ioEx);
             } finally {
                 isFirstFrame = true;
                 super.shutdownCanaryResources();
                 System.exit(0);
             }
         } else {
-            log.info("Non first frame. Skipping...");
+            logger.info("Non first frame. Skipping...");
         }
 
     }
