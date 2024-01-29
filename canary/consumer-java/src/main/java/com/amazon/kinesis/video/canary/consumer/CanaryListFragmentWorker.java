@@ -13,15 +13,16 @@ import com.amazonaws.services.kinesisvideo.AmazonKinesisVideoArchivedMedia;
 import com.amazonaws.services.kinesisvideo.AmazonKinesisVideoArchivedMediaClient;
 import com.amazonaws.services.kinesisvideo.model.*;
 
-import lombok.extern.log4j.Log4j2;
+import org.apache.log4j.Logger;
 
 /*
     This is a modified version of the ListFragmentWorker example found here:
     https://github.com/aws/amazon-kinesis-video-streams-parser-library/blob/0056da083402a96cffcdfd8bca9433dd25eb7470/src/main/java/com/amazonaws/kinesisvideo/parser/examples/ListFragmentWorker.java#L7
  */
 
-@Log4j2
 public class CanaryListFragmentWorker implements AutoCloseable, Callable {
+    static final Logger logger = Logger.getLogger(CanaryListFragmentWorker.class);
+
     private final FragmentSelector mFragmentSelector;
     private final AmazonKinesisVideoArchivedMedia mAmazonKinesisVideoArchivedMedia;
     private final String mStreamName;
@@ -63,7 +64,7 @@ public class CanaryListFragmentWorker implements AutoCloseable, Callable {
     public List<Fragment> call() {
         List<Fragment> fragments = new ArrayList<>();
         try {
-            log.info("Start CanaryListFragment worker on stream {}", this.mStreamName);
+            logger.info("Start CanaryListFragment worker on stream " + this.mStreamName);
 
             ListFragmentsRequest request;
             ListFragmentsResult result;
@@ -78,10 +79,9 @@ public class CanaryListFragmentWorker implements AutoCloseable, Callable {
                         .withNextToken(nextToken);
                 result = this.mAmazonKinesisVideoArchivedMedia.listFragments(request);
 
-                log.info("List Fragments called on stream {} response {} request ID {}",
-                        this.mStreamName,
-                        result.getSdkHttpMetadata().getHttpStatusCode(),
-                        result.getSdkResponseMetadata().getRequestId());
+                logger.info("List Fragments called on stream " + this.mStreamName +
+                        " response " + result.getSdkHttpMetadata().getHttpStatusCode() +
+                        " request ID " + result.getSdkResponseMetadata().getRequestId());
 
                 for (Fragment f : result.getFragments()) {
                     fragments.add(f);
@@ -90,14 +90,11 @@ public class CanaryListFragmentWorker implements AutoCloseable, Callable {
                 nextToken = result.getNextToken();
             } while (nextToken != null);
 
-            for (Fragment cf : fragments) {
-                log.info("Retrieved fragment number {} ", cf.getFragmentNumber());
-            }
-            log.info("Retrieved {} Fragments and exiting CanaryListFragmentWorker for stream {}", fragments.size(),
-                    this.mStreamName);
+            logger.info("Retrieved " + fragments.size() + " Fragments and exiting CanaryListFragmentWorker for stream "
+                    + this.mStreamName);
             return fragments;
         } catch (Exception e) {
-            log.error("Failure in CanaryListFragmentWorker for streamName {} {}", this.mStreamName, e);
+            logger.error("Failure in CanaryListFragmentWorker for streamName " + this.mStreamName + " " + e);
             throw e;
         }
     }

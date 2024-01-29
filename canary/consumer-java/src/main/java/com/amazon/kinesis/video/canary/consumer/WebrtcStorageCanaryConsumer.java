@@ -33,7 +33,8 @@ import com.amazonaws.kinesisvideo.parser.examples.GetMediaWorker;
 import com.amazonaws.services.kinesisvideo.model.FragmentSelectorType;
 import com.amazonaws.services.kinesisvideo.model.Fragment;
 
-import lombok.extern.log4j.Log4j2;
+import org.apache.log4j.Logger;
+import org.apache.log4j.BasicConfigurator;
 
 /*
  * Canary for WebRTC with Storage thro Media Server
@@ -47,8 +48,9 @@ import lombok.extern.log4j.Log4j2;
  * continuously checking for consumable media from the specified stream via GetMedia calls.
  */
 
-@Log4j2
 public class WebrtcStorageCanaryConsumer {
+    static final Logger logger = Logger.getLogger(WebrtcStorageCanaryConsumer.class);
+
     protected static final Date mCanaryStartTime = new Date();
     protected static final String mStreamName = System.getenv(CanaryConstants.CANARY_STREAM_NAME_ENV_VAR);
     protected static final String firstFrameSentTSFile = System.getenv()
@@ -97,10 +99,10 @@ public class WebrtcStorageCanaryConsumer {
                 publishMetricToCW("FragmentReceived", newFragmentReceived ? 1.0 : 0.0, StandardUnit.None);
 
             } catch (Exception e) {
-                log.error("Failed while calculating continuity metric, {}", e);
+                logger.error("Failed while calculating continuity metric, " + e);
             }
         } catch (Exception e) {
-            log.error("Failed while fetching attributes for CanaryListFragmentWorker, {}", e);
+            logger.error("Failed while fetching attributes for CanaryListFragmentWorker, " + e);
         }
     }
 
@@ -126,13 +128,13 @@ public class WebrtcStorageCanaryConsumer {
             executorService.shutdown();
 
         } catch (Exception e) {
-            log.error("Failed while calculating time to first fragment, {}", e);
+            logger.error("Failed while calculating time to first fragment, " + e);
         }
     }
 
     protected static void publishMetricToCW(String metricName, double value, StandardUnit cwUnit) {
         try {
-            log.info("Emitting the following metric: {} - {}", metricName, value);
+            logger.info("Emitting the following metric: " + metricName + " - " + value);
             final Dimension dimensionPerStream = new Dimension()
                     .withName(CanaryConstants.CW_DIMENSION_INDIVIDUAL)
                     .withValue(mStreamName);
@@ -159,7 +161,7 @@ public class WebrtcStorageCanaryConsumer {
                     .withMetricData(datumList);
             mCwClient.putMetricData(request);
         } catch (Exception e) {
-            log.error("Failed while while publishing metric to CW, {}", e);
+            logger.error("Failed while while publishing metric to CW, " + e);
         }
     }
 
@@ -169,9 +171,11 @@ public class WebrtcStorageCanaryConsumer {
     }
 
     public static void main(final String[] args) throws Exception {
+        BasicConfigurator.configure();
+
         final Integer canaryRunTime = Integer.parseInt(System.getenv("CANARY_DURATION_IN_SECONDS"));
 
-        log.info("Stream name: {}", mStreamName);
+        logger.info("Stream name: " + mStreamName);
 
         mCredentialsProvider = new EnvironmentVariableCredentialsProvider();
         mAmazonKinesisVideo = AmazonKinesisVideoClientBuilder.standard()
@@ -201,9 +205,9 @@ public class WebrtcStorageCanaryConsumer {
                 if (!mCanaryLabel.equals(CanaryConstants.EXTENDED_LABEL) &&
                         !mCanaryLabel.equals(CanaryConstants.SINGLE_RECONNECT_LABEL) &&
                         !mCanaryLabel.equals(CanaryConstants.SUB_RECONNECT_LABEL)) {
-                    log.error("Env var CANARY_LABEL: {} must be set to either {}, {}, {}, or {}.",
+                    logger.error(String.format("Env var CANARY_LABEL: %s must be set to either %s, %s, %s, or %s.",
                             mCanaryLabel, CanaryConstants.PERIODIC_LABEL, CanaryConstants.EXTENDED_LABEL,
-                            CanaryConstants.SINGLE_RECONNECT_LABEL, CanaryConstants.SUB_RECONNECT_LABEL);
+                            CanaryConstants.SINGLE_RECONNECT_LABEL, CanaryConstants.SUB_RECONNECT_LABEL));
                     throw new Exception("Improper canary label " + mCanaryLabel + " assigned to "
                             + CanaryConstants.CANARY_LABEL_ENV_VAR + " env var.");
                 }
