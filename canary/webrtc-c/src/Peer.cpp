@@ -227,6 +227,7 @@ STATUS Peer::initRtcConfiguration(const Canary::PConfig pConfig)
         pConfiguration->iceTransportPolicy = ICE_TRANSPORT_POLICY_ALL;
     }
 
+    DLOGI("Transport policy set to: %d", pConfiguration->iceTransportPolicy);
     // Set the  STUN server
     if (pConfig->endpoint.value.empty()) {
         SNPRINTF(pConfiguration->iceServers[0].urls, MAX_ICE_CONFIG_URI_LEN, KINESIS_VIDEO_STUN_URL, pConfig->region.value.c_str(), KINESIS_VIDEO_STUN_URL_POSTFIX);
@@ -275,12 +276,12 @@ STATUS Peer::initPeerConnection()
         STATUS retStatus = STATUS_SUCCESS;
         auto pPeer = (PPeer) customData;
         SignalingMessage message;
-
         if (candidateJson == NULL) {
             DLOGD("ice candidate gathering finished");
             pPeer->iceGatheringDone = TRUE;
             pPeer->cvar.notify_all();
         } else if (pPeer->trickleIce) {
+            DLOGI("Sending ICE candidate");
             message.messageType = SIGNALING_MESSAGE_TYPE_ICE_CANDIDATE;
             STRCPY(message.payload, candidateJson);
             CHK_STATUS(pPeer->send(&message));
