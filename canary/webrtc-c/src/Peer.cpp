@@ -212,7 +212,7 @@ STATUS Peer::initRtcConfiguration(const Canary::PConfig pConfig)
     };
 
     STATUS retStatus = STATUS_SUCCESS;
-    UINT32 i, iceConfigCount, uriCount;
+    UINT32 i, j, iceConfigCount, uriCount;
     PIceConfigInfo pIceConfigInfo;
     PRtcConfiguration pConfiguration = &this->rtcConfiguration;
 
@@ -224,7 +224,7 @@ STATUS Peer::initRtcConfiguration(const Canary::PConfig pConfig)
     if (pConfig->forceTurn.value) {
         pConfiguration->iceTransportPolicy = ICE_TRANSPORT_POLICY_RELAY;
     } else {
-        pConfiguration->iceTransportPolicy = ICE_TRANSPORT_POLICY_RELAY;
+        pConfiguration->iceTransportPolicy = ICE_TRANSPORT_POLICY_ALL;
     }
 
     DLOGI("Transport policy set to: %d", pConfiguration->iceTransportPolicy);
@@ -236,13 +236,31 @@ STATUS Peer::initRtcConfiguration(const Canary::PConfig pConfig)
     }
 
     if (pConfig->useTurn.value) {
+        // Set the URIs from the configuration
+        CHK_STATUS(awaitGetIceConfigInfoCount(signalingClientHandle, &iceConfigCount));
+
         /* signalingClientGetIceConfigInfoCount can return more than one turn server. Use only one to optimize
          * candidate gathering latency. But user can also choose to use more than 1 turn server. */
         for (uriCount = 0, i = 0; i < MAX_TURN_SERVERS; i++) {
             CHK_STATUS(signalingClientGetIceConfigInfo(signalingClientHandle, i, &pIceConfigInfo));
-            CHECK(uriCount < MAX_ICE_SERVERS_COUNT);
-            uriCount += pIceConfigInfo->uriCount;
-            CHK_STATUS(addConfigToServerList(&this->pPeerConnection, pIceConfigInfo));
+            for (j = 0; j < pIceConfigInfo->uriCount; j++) {
+                CHECK(uriCount < MAX_ICE_SERVERS_COUNT);
+                /*
+                 * if configuration.iceServers[uriCount + 1].urls is "turn:ip:port?transport=udp" then ICE will try TURN over UDP
+                 * if configuration.iceServers[uriCount + 1].urls is "turn:ip:port?transport=tcp" then ICE will try TURN over TCP/TLS
+                 * if configuration.iceServers[uriCount + 1].urls is "turns:ip:port?transport=udp", it's currently ignored because sdk dont do
+                 * TURN over DTLS yet. if configuration.iceServers[uriCount + 1].urls is "turns:ip:port?transport=tcp" then ICE will try TURN over
+                 * TCP/TLS if configuration.iceServers[uriCount + 1].urls is "turn:ip:port" then ICE will try both TURN over UPD and TCP/TLS
+                 *
+                 * It's recommended to not pass too many TURN iceServers to configuration because it will slow down ice gathering in non-trickle
+                 * mode.
+                 */
+
+                STRNCPY(pConfiguration->iceServers[uriCount + 1].urls, pIceConfigInfo->uris[j], MAX_ICE_CONFIG_URI_LEN);
+                STRNCPY(pConfiguration->iceServers[uriCount + 1].credential, pIceConfigInfo->password, MAX_ICE_CONFIG_CREDENTIAL_LEN);
+                STRNCPY(pConfiguration->iceServers[uriCount + 1].username, pIceConfigInfo->userName, MAX_ICE_CONFIG_USER_NAME_LEN);
+
+                uriCount++;
             }
         }
     }
