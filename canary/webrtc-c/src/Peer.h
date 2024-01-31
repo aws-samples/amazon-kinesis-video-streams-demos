@@ -80,12 +80,15 @@ class Peer {
     std::atomic<BOOL> recorded;
     BOOL initializedSignaling = FALSE;
     std::string peerId;
+    std::string region;
     RtcConfiguration rtcConfiguration;
     PRtcPeerConnection pPeerConnection;
     std::vector<PRtcRtpTransceiver> audioTransceivers;
     std::vector<PRtcRtpTransceiver> videoTransceivers;
     BOOL isMaster;
     BOOL trickleIce;
+    BOOL forceTurn;
+    BOOL useTurn;
     BOOL isProfilingMode;
     UINT64 offerReceiveTimestamp;
     BOOL firstFrame;
@@ -105,7 +108,7 @@ class Peer {
     EndToEndMetricsContext endToEndMetricsContext;
 
     STATUS initSignaling(const Canary::PConfig);
-    STATUS initRtcConfiguration(const Canary::PConfig);
+    STATUS initRtcConfiguration();
     STATUS initPeerConnection();
     STATUS awaitIceGathering(PRtcSessionDescriptionInit);
     STATUS handleSignalingMsg(PReceivedSignalingMessage);

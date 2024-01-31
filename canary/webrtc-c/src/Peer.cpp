@@ -38,6 +38,10 @@ STATUS Peer::init(const Canary::PConfig pConfig, const Callbacks& callbacks)
     this->canaryIncomingRTPMetricsContext.prevFramesDropped = 0;
     this->canaryIncomingRTPMetricsContext.prevTs = GETTIME();
     this->firstFrame = TRUE;
+    this->forceTurn = pConfig->forceTurn.value;
+    this->useTurn = pConfig->useTurn.value;
+    this->region = pConfig->region.value;
+    DLOGI("Region: %s", this->region.c_str());
     this->useIotCredentialProvider = pConfig->useIotCredentialProvider.value;
     if(this->useIotCredentialProvider) {
         CHK_STATUS(createLwsIotCredentialProvider((PCHAR) pConfig->iotEndpoint,
@@ -60,7 +64,6 @@ STATUS Peer::init(const Canary::PConfig pConfig, const Callbacks& callbacks)
     }
 
     CHK_STATUS(initSignaling(pConfig));
-    CHK_STATUS(initRtcConfiguration(pConfig));
 
 CleanUp:
 
@@ -161,6 +164,7 @@ STATUS Peer::initSignaling(const Canary::PConfig pConfig)
             DLOGI("Found peer id: %s", pPeer->peerId.c_str());
             pPeer->foundPeerId = TRUE;
             CHK_STATUS(pPeer->initPeerConnection());
+            pPeer->initRtcConfiguration();
         }
 
         if (pPeer->isMaster && STRCMP(pPeer->peerId.c_str(), pMsg->signalingMessage.peerClientId) != 0) {
@@ -183,36 +187,10 @@ CleanUp:
     return retStatus;
 }
 
-STATUS Peer::initRtcConfiguration(const Canary::PConfig pConfig)
+STATUS Peer::initRtcConfiguration()
 {
-    auto awaitGetIceConfigInfoCount = [](SIGNALING_CLIENT_HANDLE signalingClientHandle, PUINT32 pIceConfigInfoCount) -> STATUS {
-        STATUS retStatus = STATUS_SUCCESS;
-        UINT64 elapsed = 0;
-
-        CHK(IS_VALID_SIGNALING_CLIENT_HANDLE(signalingClientHandle) && pIceConfigInfoCount != NULL, STATUS_NULL_ARG);
-
-        while (TRUE) {
-            // Get the configuration count
-            CHK_STATUS(signalingClientGetIceConfigInfoCount(signalingClientHandle, pIceConfigInfoCount));
-
-            // Return OK if we have some ice configs
-            CHK(*pIceConfigInfoCount == 0, retStatus);
-
-            // Check for timeout
-            CHK_ERR(elapsed <= ASYNC_ICE_CONFIG_INFO_WAIT_TIMEOUT, STATUS_OPERATION_TIMED_OUT,
-                    "Couldn't retrieve ICE configurations in alotted time.");
-
-            THREAD_SLEEP(ICE_CONFIG_INFO_POLL_PERIOD);
-            elapsed += ICE_CONFIG_INFO_POLL_PERIOD;
-        }
-
-    CleanUp:
-
-        return retStatus;
-    };
-
     STATUS retStatus = STATUS_SUCCESS;
-    UINT32 i, j, iceConfigCount, uriCount;
+    UINT32 i, uriCount;
     PIceConfigInfo pIceConfigInfo;
     PRtcConfiguration pConfiguration = &this->rtcConfiguration;
 
@@ -221,7 +199,7 @@ STATUS Peer::initRtcConfiguration(const Canary::PConfig pConfig)
     // Set this to custom callback to enable filtering of interfaces
     pConfiguration->kvsRtcConfiguration.iceSetInterfaceFilterFunc = NULL;
 
-    if (pConfig->forceTurn.value) {
+    if (this->forceTurn) {
         pConfiguration->iceTransportPolicy = ICE_TRANSPORT_POLICY_RELAY;
     } else {
         pConfiguration->iceTransportPolicy = ICE_TRANSPORT_POLICY_ALL;
@@ -229,39 +207,22 @@ STATUS Peer::initRtcConfiguration(const Canary::PConfig pConfig)
 
     DLOGI("Transport policy set to: %d", pConfiguration->iceTransportPolicy);
     // Set the  STUN server
-    if (pConfig->endpoint.value.empty()) {
-        SNPRINTF(pConfiguration->iceServers[0].urls, MAX_ICE_CONFIG_URI_LEN, KINESIS_VIDEO_STUN_URL, pConfig->region.value.c_str(), KINESIS_VIDEO_STUN_URL_POSTFIX);
-    } else {
-        SNPRINTF(pConfiguration->iceServers[0].urls, MAX_ICE_CONFIG_URI_LEN, "stun:stun.%s:443", pConfig->endpoint.value.c_str());
-    }
+//    if (pConfig->endpoint.value.empty()) {
+        SNPRINTF(pConfiguration->iceServers[0].urls, MAX_ICE_CONFIG_URI_LEN, KINESIS_VIDEO_STUN_URL, this->region.c_str(), KINESIS_VIDEO_STUN_URL_POSTFIX);
+        DLOGI("STUN SERVER: %s", pConfiguration->iceServers[0].urls);
+//    } else {
+//        SNPRINTF(pConfiguration->iceServers[0].urls, MAX_ICE_CONFIG_URI_LEN, "stun:stun.%s:443", pConfig->endpoint.value.c_str());
+//    }
 
-    if (pConfig->useTurn.value) {
-        // Set the URIs from the configuration
-        CHK_STATUS(awaitGetIceConfigInfoCount(signalingClientHandle, &iceConfigCount));
+    if (this->useTurn) {
 
         /* signalingClientGetIceConfigInfoCount can return more than one turn server. Use only one to optimize
          * candidate gathering latency. But user can also choose to use more than 1 turn server. */
         for (uriCount = 0, i = 0; i < MAX_TURN_SERVERS; i++) {
             CHK_STATUS(signalingClientGetIceConfigInfo(signalingClientHandle, i, &pIceConfigInfo));
-            for (j = 0; j < pIceConfigInfo->uriCount; j++) {
-                CHECK(uriCount < MAX_ICE_SERVERS_COUNT);
-                /*
-                 * if configuration.iceServers[uriCount + 1].urls is "turn:ip:port?transport=udp" then ICE will try TURN over UDP
-                 * if configuration.iceServers[uriCount + 1].urls is "turn:ip:port?transport=tcp" then ICE will try TURN over TCP/TLS
-                 * if configuration.iceServers[uriCount + 1].urls is "turns:ip:port?transport=udp", it's currently ignored because sdk dont do
-                 * TURN over DTLS yet. if configuration.iceServers[uriCount + 1].urls is "turns:ip:port?transport=tcp" then ICE will try TURN over
-                 * TCP/TLS if configuration.iceServers[uriCount + 1].urls is "turn:ip:port" then ICE will try both TURN over UPD and TCP/TLS
-                 *
-                 * It's recommended to not pass too many TURN iceServers to configuration because it will slow down ice gathering in non-trickle
-                 * mode.
-                 */
-
-                STRNCPY(pConfiguration->iceServers[uriCount + 1].urls, pIceConfigInfo->uris[j], MAX_ICE_CONFIG_URI_LEN);
-                STRNCPY(pConfiguration->iceServers[uriCount + 1].credential, pIceConfigInfo->password, MAX_ICE_CONFIG_CREDENTIAL_LEN);
-                STRNCPY(pConfiguration->iceServers[uriCount + 1].username, pIceConfigInfo->userName, MAX_ICE_CONFIG_USER_NAME_LEN);
-
-                uriCount++;
-            }
+            CHECK(uriCount < MAX_ICE_SERVERS_COUNT);
+            uriCount += pIceConfigInfo->uriCount;
+            CHK_STATUS(addConfigToServerList(&this->pPeerConnection, pIceConfigInfo));
         }
     }
 
