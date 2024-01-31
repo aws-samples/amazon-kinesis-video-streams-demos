@@ -92,6 +92,7 @@ class Peer {
     BOOL useIotCredentialProvider;
     STATUS status;
     SignalingClientInfo clientInfo;
+    PIceConfigInfo pIceConfigInfo;
 
     // metrics
     UINT64 signalingStartTime;

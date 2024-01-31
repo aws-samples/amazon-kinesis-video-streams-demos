@@ -11,7 +11,7 @@ option(CANARY_USE_MBEDTLS "MBedtls" OFF)
 FetchContent_Declare(
   webrtc
   GIT_REPOSITORY https://github.com/awslabs/amazon-kinesis-video-streams-webrtc-sdk-c
-  GIT_TAG        release-1.10.0
+  GIT_TAG        master
 )
 
 FetchContent_Declare(
@@ -44,7 +44,7 @@ if(NOT cloudwatch_POPULATED)
   set(ENABLE_TESTING OFF)
   set(BUILD_ONLY "monitoring;logs")
   set(USE_OPENSSL ON)
-  set(CMAKE_CXX_FLAGS "-Wno-error=deprecated-declarations -Wno-error=stringop-overflow")
+  set(CMAKE_CXX_FLAGS "-Wno-error=deprecated-declarations")
   add_subdirectory(${cloudwatch_SOURCE_DIR} ${cloudwatch_BINARY_DIR} EXCLUDE_FROM_ALL)
 endif()
 
