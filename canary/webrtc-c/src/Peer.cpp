@@ -164,7 +164,6 @@ STATUS Peer::initSignaling(const Canary::PConfig pConfig)
             DLOGI("Found peer id: %s", pPeer->peerId.c_str());
             pPeer->foundPeerId = TRUE;
             CHK_STATUS(pPeer->initPeerConnection());
-            pPeer->initRtcConfiguration();
         }
 
         if (pPeer->isMaster && STRCMP(pPeer->peerId.c_str(), pMsg->signalingMessage.peerClientId) != 0) {
@@ -190,7 +189,7 @@ CleanUp:
 STATUS Peer::initRtcConfiguration()
 {
     STATUS retStatus = STATUS_SUCCESS;
-    UINT32 i, uriCount;
+    UINT32 i, j, iceConfigCount, uriCount;
     PIceConfigInfo pIceConfigInfo;
     PRtcConfiguration pConfiguration = &this->rtcConfiguration;
 
@@ -220,9 +219,25 @@ STATUS Peer::initRtcConfiguration()
          * candidate gathering latency. But user can also choose to use more than 1 turn server. */
         for (uriCount = 0, i = 0; i < MAX_TURN_SERVERS; i++) {
             CHK_STATUS(signalingClientGetIceConfigInfo(signalingClientHandle, i, &pIceConfigInfo));
-            CHECK(uriCount < MAX_ICE_SERVERS_COUNT);
-            uriCount += pIceConfigInfo->uriCount;
-            CHK_STATUS(addConfigToServerList(&this->pPeerConnection, pIceConfigInfo));
+            for (j = 0; j < pIceConfigInfo->uriCount; j++) {
+                CHECK(uriCount < MAX_ICE_SERVERS_COUNT);
+                /*
+                 * if configuration.iceServers[uriCount + 1].urls is "turn:ip:port?transport=udp" then ICE will try TURN over UDP
+                 * if configuration.iceServers[uriCount + 1].urls is "turn:ip:port?transport=tcp" then ICE will try TURN over TCP/TLS
+                 * if configuration.iceServers[uriCount + 1].urls is "turns:ip:port?transport=udp", it's currently ignored because sdk dont do
+                 * TURN over DTLS yet. if configuration.iceServers[uriCount + 1].urls is "turns:ip:port?transport=tcp" then ICE will try TURN over
+                 * TCP/TLS if configuration.iceServers[uriCount + 1].urls is "turn:ip:port" then ICE will try both TURN over UPD and TCP/TLS
+                 *
+                 * It's recommended to not pass too many TURN iceServers to configuration because it will slow down ice gathering in non-trickle
+                 * mode.
+                 */
+
+                STRNCPY(pConfiguration->iceServers[uriCount + 1].urls, pIceConfigInfo->uris[j], MAX_ICE_CONFIG_URI_LEN);
+                STRNCPY(pConfiguration->iceServers[uriCount + 1].credential, pIceConfigInfo->password, MAX_ICE_CONFIG_CREDENTIAL_LEN);
+                STRNCPY(pConfiguration->iceServers[uriCount + 1].username, pIceConfigInfo->userName, MAX_ICE_CONFIG_USER_NAME_LEN);
+
+                uriCount++;
+            }
         }
     }
 
@@ -294,6 +309,7 @@ STATUS Peer::initPeerConnection()
     STATUS retStatus = STATUS_SUCCESS;
     CHK(this->pPeerConnection == NULL, STATUS_INVALID_OPERATION);
     CHK_STATUS(createPeerConnection(&this->rtcConfiguration, &this->pPeerConnection));
+    initRtcConfiguration();
     CHK_STATUS(peerConnectionOnIceCandidate(this->pPeerConnection, (UINT64) this, handleOnIceCandidate));
     CHK_STATUS(peerConnectionOnConnectionStateChange(this->pPeerConnection, (UINT64) this, onConnectionStateChange));
 
