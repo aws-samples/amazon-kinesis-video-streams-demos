@@ -1,0 +1,101 @@
+plugins {
+    id 'com.android.library'
+}
+
+android {
+    namespace 'com.amazonaws.kinesisvideo.webrtc.urlvideocapturer'
+    compileSdk 33
+
+    defaultConfig {
+        minSdk 29
+        targetSdk 33
+        versionCode 1
+        versionName "1.0"
+
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+    }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }
+}
+
+dependencies {
+
+    implementation 'androidx.appcompat:appcompat:1.6.1'
+    implementation 'com.google.android.material:material:1.11.0'
+    testImplementation 'junit:junit:4.13.2'
+    androidTestImplementation 'androidx.test.ext:junit:1.1.5'
+    androidTestImplementation 'androidx.test.espresso:espresso-core:3.5.1'
+
+}
+
+// Check that libwebrtc is present during build
+task checkForLibWebRTC() {
+    doLast {
+        boolean webrtcFound = false
+
+        // Check dependencies by name
+        configurations.implementation.dependencies.forEach(dependency -> {
+            // Check the name of the dependency, and also the name of the group
+            if ((dependency.group && dependency.group.contains("webrtc") || dependency.name.contains("webrtc"))
+                    && !dependency.name.contains("webrtcstorage")) {
+                webrtcFound = true
+            }
+        })
+
+        // Check file dependencies
+        if (!webrtcFound) {
+            fileTree(dir: 'libs', include: ['*.jar', '*.aar']).forEach(file -> {
+                if (file.name.contains("webrtc")) {
+                    webrtcFound = true
+                }
+            })
+        }
+
+        if (!webrtcFound) {
+            throw new RuntimeException(
+                    "Unable to find Google WebRTC. You may include \"implementation 'org.webrtc:google-webrtc:1.0.32006'\" as a dependency if the respective licences are approved for use by your organization."
+            )
+        }
+    }
+}
+
+// Check that libVLC is present during build
+task checkForLibVLC() {
+    doLast {
+        boolean vlcFound = false
+
+        // Check dependencies by name
+        configurations.implementation.dependencies.forEach(dependency -> {
+            // Check the name of the dependency, and also the name of the group
+            if ((dependency.group && dependency.group.contains("libvlc") || dependency.name.contains("libvlc"))) {
+                vlcFound = true
+            }
+        })
+
+        // Check file dependencies
+        if (!vlcFound) {
+            fileTree(dir: 'libs', include: ['*.jar', '*.aar']).forEach(file -> {
+                if (file.name.contains("libvlc")) {
+                    vlcFound = true
+                }
+            })
+        }
+
+        if (!vlcFound) {
+            throw new RuntimeException(
+                    "Unable to find libVLC. You will may include \"implementation 'org.videolan.android:libvlc-all:3.3.13'\" as a dependency if the respective licences are approved for use by your organization."
+            )
+        }
+    }
+}
+
+preBuild.dependsOn checkForLibWebRTC, checkForLibVLC
