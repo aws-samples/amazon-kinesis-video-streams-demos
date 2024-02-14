@@ -31,8 +31,11 @@ To deploy and use this Lambda function using the AWS Management Console:
 13. Leave the configurations unchanged. Choose **Invoke**.
 14. The stream count will be fetched and the run logs will be shown.
 
-What's next?
-15. Set up event triggers to periodically invoke the function to retrieve the total count of Kinesis Video Streams. You can also send the count metrics to CloudWatch for monitoring.
+![lambda_test_screenshot.png](lambda_test_screenshot.png)
+
+### What's next?
+
+15. Set up event triggers to periodically invoke the function to retrieve the total count of Kinesis Video Streams. You can also send the stream count metrics to CloudWatch for monitoring.
 
 ## Dependencies
 
