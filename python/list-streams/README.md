@@ -25,7 +25,7 @@ To deploy and use this Lambda function using the AWS Management Console:
 7. Choose an IAM role for this function. It must have `kinesisvideo:ListStreams` permission. Create one if necessary.
 8. Choose **Create function**.
 9. Switch to the **Configuration** tab and increase the **Timeout**. Adjust the timeout based on your maximum stream count quota.
-10. Switch back to the **Code** tab and paste the contents of `list_streams.py` into the `lambda_function.py` file.
+10. Switch back to the **Code** tab and paste the contents of `list_streams_lambda.py` into the `lambda_function.py` file.
 11. Choose **Deploy**.
 12. Choose **Test**.
 13. Leave the configurations unchanged. Choose **Invoke**.
