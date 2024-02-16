@@ -1,16 +1,18 @@
 # Kinesis Video Streams Counter Lambda Function
 
-This AWS Lambda function fetches the total number of Kinesis Video Streams within a specified AWS region using the AWS SDK for Python (Boto3). It employs a retry mechanism for handling transient errors and provides error handling for potential exceptions.
+This AWS Lambda function Demonstrates how to find the total number of KVS stream resources in any AWS Account using the [`ListStreams`](https://docs.aws.amazon.com/kinesisvideostreams/latest/dg/API_ListStreams.html) API. This helps in monitoring the total streams usage to request limit increases as needed.
 
 ## Functionality
 
 The Lambda function performs the following tasks:
 
 1. Connects to the Kinesis Video Streams service in the specified AWS region.
-2. Retrieves the list of Kinesis Video Streams using the `list_streams` API.
+2. Retrieves the list of Kinesis Video Streams using the [`ListStreams`](https://docs.aws.amazon.com/kinesisvideostreams/latest/dg/API_ListStreams.html) API.
 3. Iterates through the paginated responses to count the total number of streams.
 4. Provides retry logic for transient errors such as throttling or service limits.
 5. Returns the total count of Kinesis Video Streams.
+
+Note: the total count is retrievable within a single Lambda run.
 
 ## Usage
 
@@ -35,7 +37,9 @@ To deploy and use this Lambda function using the AWS Management Console:
 
 ### What's next?
 
-15. Set up event triggers to periodically invoke the function to retrieve the total count of Kinesis Video Streams. You can also send the stream count metrics to CloudWatch for monitoring.
+This stream counter Lambda helps to check the total number of streams periodically.
+
+15. Set up event triggers (e.g. using [Amazon EventBridge](https://docs.aws.amazon.com/eventbridge/latest/userguide/eb-run-lambda-schedule.html)) to periodically invoke this function to retrieve the total count of Kinesis Video Streams. You can then send the stream count metrics to CloudWatch and set up metric alarms for monitoring.
 
 ## Dependencies
 
