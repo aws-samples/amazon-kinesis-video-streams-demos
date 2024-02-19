@@ -12,7 +12,7 @@ The Lambda function performs the following tasks:
 4. Provides retry logic for transient errors such as throttling or service limits.
 5. Returns the total count of Kinesis Video Streams.
 
-Note: the total count is retrievable within a single Lambda run.
+Assumption: The total number of streams should be retrievable by a single Lambda execution.
 
 ## Usage
 
