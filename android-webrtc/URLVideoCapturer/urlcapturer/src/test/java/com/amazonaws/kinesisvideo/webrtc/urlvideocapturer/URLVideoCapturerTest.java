@@ -7,7 +7,7 @@ import static org.junit.Assert.*;
 /**
  * Basic unit testing for URLVideoCapturer.
  */
-public class BasicUnitTest {
+public class URLVideoCapturerTest {
     @Test
     public void instantiation() {
         final String url = "rtsp://user:password@host/path";

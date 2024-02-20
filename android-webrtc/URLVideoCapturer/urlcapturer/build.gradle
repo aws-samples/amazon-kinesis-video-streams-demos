@@ -35,6 +35,7 @@ dependencies {
     androidTestImplementation 'androidx.test.ext:junit:1.1.5'
     androidTestImplementation 'androidx.test.espresso:espresso-core:3.5.1'
 
+    implementation 'org.videolan.android:libvlc-all:3.3.13'
 }
 
 // Check that libwebrtc is present during build
@@ -62,40 +63,13 @@ task checkForLibWebRTC() {
 
         if (!webrtcFound) {
             throw new RuntimeException(
-                    "Unable to find Google WebRTC. You may include \"implementation 'org.webrtc:google-webrtc:1.0.32006'\" as a dependency if the respective licences are approved for use by your organization."
+                    "Unable to find Google WebRTC. You will need to either: (1) Build libwebrtc on " +
+                    "your own following directions here https://webrtc.github.io/webrtc-org/native-code/android/ " +
+                    "to create the AAR, and place it in the app/libs folder so they can be properly referenced in the " +
+                    "build.gradle file or (2) Reference another public repository which vends the android binaries."
             )
         }
     }
 }
 
-// Check that libVLC is present during build
-task checkForLibVLC() {
-    doLast {
-        boolean vlcFound = false
-
-        // Check dependencies by name
-        configurations.implementation.dependencies.forEach(dependency -> {
-            // Check the name of the dependency, and also the name of the group
-            if ((dependency.group && dependency.group.contains("libvlc") || dependency.name.contains("libvlc"))) {
-                vlcFound = true
-            }
-        })
-
-        // Check file dependencies
-        if (!vlcFound) {
-            fileTree(dir: 'libs', include: ['*.jar', '*.aar']).forEach(file -> {
-                if (file.name.contains("libvlc")) {
-                    vlcFound = true
-                }
-            })
-        }
-
-        if (!vlcFound) {
-            throw new RuntimeException(
-                    "Unable to find libVLC. You will may include \"implementation 'org.videolan.android:libvlc-all:3.3.13'\" as a dependency if the respective licences are approved for use by your organization."
-            )
-        }
-    }
-}
-
-preBuild.dependsOn checkForLibWebRTC, checkForLibVLC
+//preBuild.dependsOn checkForLibWebRTC
