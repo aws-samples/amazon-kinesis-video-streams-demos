@@ -72,4 +72,4 @@ task checkForLibWebRTC() {
     }
 }
 
-//preBuild.dependsOn checkForLibWebRTC
+preBuild.dependsOn checkForLibWebRTC
