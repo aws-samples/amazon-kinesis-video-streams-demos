@@ -22,7 +22,7 @@ import java.util.Arrays;
  * frames using an intermediate OpenGL texture. It also uses libVLC(User must add) to playback streams on the texture.
  */
 public class URLVideoCapturer implements VideoCapturer, VideoSink {
-    private String url;
+    private Uri uri;
     private String[] options;
     private String aspectRatio;
     private SurfaceTextureHelper surfaceTextureHelper;
@@ -32,12 +32,16 @@ public class URLVideoCapturer implements VideoCapturer, VideoSink {
     /**
      * Public constructor accepting the stream url and libVLC configuration.
      *
-     * @param url         Media stream url.
+     * @param uri         Media stream uri.
      * @param options     List of options to pass on to libVLC.
      * @param aspectRatio Aspect ratio to configure for libVLC.
      */
-    public URLVideoCapturer(String url, String[] options, String aspectRatio) {
-        this.url = url;
+    public URLVideoCapturer(Uri uri, String[] options, String aspectRatio) {
+        if (uri == null) {
+            throw new IllegalArgumentException("URI is null.");
+        }
+
+        this.uri = uri;
         this.options = options;
         this.aspectRatio = aspectRatio;
     }
@@ -81,7 +85,7 @@ public class URLVideoCapturer implements VideoCapturer, VideoSink {
         surfaceTextureHelper.setTextureSize(width, height);
 
         // Use libVLC to play the stream onto the texture.
-        LibVLC libVlc = new LibVLC(context, new ArrayList<>(Arrays.asList(options)));
+        LibVLC libVlc = options == null ? new LibVLC(context) : new LibVLC(context, new ArrayList<>(Arrays.asList(options)));
 
         MediaPlayer mediaPlayer = new MediaPlayer(libVlc);
         IVLCVout vOut = mediaPlayer.getVLCVout();
@@ -89,9 +93,10 @@ public class URLVideoCapturer implements VideoCapturer, VideoSink {
         vOut.setVideoSurface(surfaceTextureHelper.getSurfaceTexture());
         vOut.attachViews();
 
-        Media videoMedia = new Media(libVlc, Uri.parse(url));
+        Media videoMedia = new Media(libVlc, uri);
         mediaPlayer.setMedia(videoMedia);
-        mediaPlayer.setAspectRatio(aspectRatio);
+        mediaPlayer.setAspectRatio(aspectRatio == null ? "4:3" : aspectRatio);
+
         mediaPlayer.play();
     }
 
