@@ -19,7 +19,7 @@ import java.util.Arrays;
 /**
  * This class implements a WebRTC VideoCapturer for media streams. Similar to how camera capturers work, this
  * class also leverages the SurfaceTextureHelper to do the heavy lifting of grabbing and encoding video
- * frames using an intermediate OpenGL texture. It also uses libVLC(User must add) to playback streams on the texture.
+ * frames using an intermediate OpenGL texture. It also uses libVLC to playback streams on the texture.
  */
 public class URLVideoCapturer implements VideoCapturer, VideoSink {
     private Uri uri;
@@ -95,7 +95,7 @@ public class URLVideoCapturer implements VideoCapturer, VideoSink {
 
         Media videoMedia = new Media(libVlc, uri);
         mediaPlayer.setMedia(videoMedia);
-        mediaPlayer.setAspectRatio(aspectRatio == null ? "4:3" : aspectRatio);
+        mediaPlayer.setAspectRatio(aspectRatio);
 
         mediaPlayer.play();
     }
