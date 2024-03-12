@@ -15,7 +15,7 @@ set(BUILD_DEPENDENCIES OFF CACHE BOOL "Deps in kvs" FORCE)
 FetchContent_Declare(
         producerc
         GIT_REPOSITORY https://github.com/awslabs/amazon-kinesis-video-streams-producer-c.git
-        GIT_TAG        rc
+        GIT_TAG        master
 )
 
 FetchContent_Declare(
