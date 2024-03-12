@@ -185,35 +185,8 @@ CleanUp:
 
 STATUS Peer::initRtcConfiguration(const Canary::PConfig pConfig)
 {
-    auto awaitGetIceConfigInfoCount = [](SIGNALING_CLIENT_HANDLE signalingClientHandle, PUINT32 pIceConfigInfoCount) -> STATUS {
-        STATUS retStatus = STATUS_SUCCESS;
-        UINT64 elapsed = 0;
-
-        CHK(IS_VALID_SIGNALING_CLIENT_HANDLE(signalingClientHandle) && pIceConfigInfoCount != NULL, STATUS_NULL_ARG);
-
-        while (TRUE) {
-            // Get the configuration count
-            CHK_STATUS(signalingClientGetIceConfigInfoCount(signalingClientHandle, pIceConfigInfoCount));
-
-            // Return OK if we have some ice configs
-            CHK(*pIceConfigInfoCount == 0, retStatus);
-
-            // Check for timeout
-            CHK_ERR(elapsed <= ASYNC_ICE_CONFIG_INFO_WAIT_TIMEOUT, STATUS_OPERATION_TIMED_OUT,
-                    "Couldn't retrieve ICE configurations in alotted time.");
-
-            THREAD_SLEEP(ICE_CONFIG_INFO_POLL_PERIOD);
-            elapsed += ICE_CONFIG_INFO_POLL_PERIOD;
-        }
-
-    CleanUp:
-
-        return retStatus;
-    };
-
     STATUS retStatus = STATUS_SUCCESS;
-    UINT32 i, j, iceConfigCount, uriCount;
-    PIceConfigInfo pIceConfigInfo;
+    UINT32 i, iceConfigCount, uriCount;
     PRtcConfiguration pConfiguration = &this->rtcConfiguration;
 
     MEMSET(pConfiguration, 0x00, SIZEOF(RtcConfiguration));
@@ -235,32 +208,13 @@ STATUS Peer::initRtcConfiguration(const Canary::PConfig pConfig)
     }
 
     if (pConfig->useTurn.value) {
-        // Set the URIs from the configuration
-        CHK_STATUS(awaitGetIceConfigInfoCount(signalingClientHandle, &iceConfigCount));
 
         /* signalingClientGetIceConfigInfoCount can return more than one turn server. Use only one to optimize
          * candidate gathering latency. But user can also choose to use more than 1 turn server. */
         for (uriCount = 0, i = 0; i < MAX_TURN_SERVERS; i++) {
             CHK_STATUS(signalingClientGetIceConfigInfo(signalingClientHandle, i, &pIceConfigInfo));
-            for (j = 0; j < pIceConfigInfo->uriCount; j++) {
-                CHECK(uriCount < MAX_ICE_SERVERS_COUNT);
-                /*
-                 * if configuration.iceServers[uriCount + 1].urls is "turn:ip:port?transport=udp" then ICE will try TURN over UDP
-                 * if configuration.iceServers[uriCount + 1].urls is "turn:ip:port?transport=tcp" then ICE will try TURN over TCP/TLS
-                 * if configuration.iceServers[uriCount + 1].urls is "turns:ip:port?transport=udp", it's currently ignored because sdk dont do
-                 * TURN over DTLS yet. if configuration.iceServers[uriCount + 1].urls is "turns:ip:port?transport=tcp" then ICE will try TURN over
-                 * TCP/TLS if configuration.iceServers[uriCount + 1].urls is "turn:ip:port" then ICE will try both TURN over UPD and TCP/TLS
-                 *
-                 * It's recommended to not pass too many TURN iceServers to configuration because it will slow down ice gathering in non-trickle
-                 * mode.
-                 */
-
-                STRNCPY(pConfiguration->iceServers[uriCount + 1].urls, pIceConfigInfo->uris[j], MAX_ICE_CONFIG_URI_LEN);
-                STRNCPY(pConfiguration->iceServers[uriCount + 1].credential, pIceConfigInfo->password, MAX_ICE_CONFIG_CREDENTIAL_LEN);
-                STRNCPY(pConfiguration->iceServers[uriCount + 1].username, pIceConfigInfo->userName, MAX_ICE_CONFIG_USER_NAME_LEN);
-
-                uriCount++;
-            }
+            CHECK(uriCount < MAX_ICE_SERVERS_COUNT);
+            uriCount += pIceConfigInfo->uriCount;
         }
     }
 
@@ -275,12 +229,12 @@ STATUS Peer::initPeerConnection()
         STATUS retStatus = STATUS_SUCCESS;
         auto pPeer = (PPeer) customData;
         SignalingMessage message;
-
         if (candidateJson == NULL) {
             DLOGD("ice candidate gathering finished");
             pPeer->iceGatheringDone = TRUE;
             pPeer->cvar.notify_all();
         } else if (pPeer->trickleIce) {
+            DLOGI("Sending ICE candidate");
             message.messageType = SIGNALING_MESSAGE_TYPE_ICE_CANDIDATE;
             STRCPY(message.payload, candidateJson);
             CHK_STATUS(pPeer->send(&message));
@@ -332,6 +286,7 @@ STATUS Peer::initPeerConnection()
     STATUS retStatus = STATUS_SUCCESS;
     CHK(this->pPeerConnection == NULL, STATUS_INVALID_OPERATION);
     CHK_STATUS(createPeerConnection(&this->rtcConfiguration, &this->pPeerConnection));
+    CHK_STATUS(addConfigToServerList(&this->pPeerConnection, this->pIceConfigInfo));
     CHK_STATUS(peerConnectionOnIceCandidate(this->pPeerConnection, (UINT64) this, handleOnIceCandidate));
     CHK_STATUS(peerConnectionOnConnectionStateChange(this->pPeerConnection, (UINT64) this, onConnectionStateChange));
 
