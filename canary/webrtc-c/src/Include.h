@@ -123,6 +123,7 @@
 
 #include <com/amazonaws/kinesis/video/webrtcclient/Include.h>
 
+
 using namespace Aws::Client;
 using namespace Aws::CloudWatchLogs;
 using namespace Aws::CloudWatchLogs::Model;

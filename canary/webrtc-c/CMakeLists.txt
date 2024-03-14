@@ -5,13 +5,13 @@ set(CMAKE_CXX_STANDARD 11)
 
 include(FetchContent)
 
-option(CANARY_USE_OPENSSL "OPenssl" ON)
+option(CANARY_USE_OPENSSL "Openssl" ON)
 option(CANARY_USE_MBEDTLS "MBedtls" OFF)
 
 FetchContent_Declare(
   webrtc
   GIT_REPOSITORY https://github.com/awslabs/amazon-kinesis-video-streams-webrtc-sdk-c
-  GIT_TAG        master
+  GIT_TAG        refactor-sample
 )
 
 FetchContent_Declare(
@@ -32,7 +32,7 @@ if(NOT webrtc_POPULATED)
     set(USE_OPENSSL OFF CACHE BOOL "Openssl" FORCE)
     set(USE_MBEDTLS ON CACHE BOOL "Openssl" FORCE)
   endif()
-  set(BUILD_SAMPLE OFF)
+  set(BUILD_SAMPLE ON)
   add_subdirectory(${webrtc_SOURCE_DIR} ${webrtc_BINARY_DIR} EXCLUDE_FROM_ALL)
 endif()
 
@@ -56,6 +56,7 @@ include_directories(${cloudwatch_SOURCE_DIR}/aws-cpp-sdk-core/include)
 include_directories(${cloudwatch_SOURCE_DIR}/aws-cpp-sdk-monitoring/include)
 include_directories(${cloudwatch_SOURCE_DIR}/aws-cpp-sdk-logs/include)
 include_directories(${webrtc_SOURCE_DIR}/src/include)
+include_directories("${webrtc_SOURCE_DIR}/samples")
 include_directories(${webrtc_SOURCE_DIR}/open-source/include)
 link_directories(${webrtc_SOURCE_DIR}/open-source/lib)
 add_library(
@@ -68,9 +69,7 @@ add_library(
   src/media-server-storage/Common.cpp)
 target_link_libraries(
   kvsWebrtcCanary
-  kvsWebrtcClient
-  kvsWebrtcSignalingClient
-  kvspicUtils
+  kvsWebrtcClientDemo
   aws-cpp-sdk-core
   aws-cpp-sdk-monitoring
   aws-cpp-sdk-logs)

@@ -1,5 +1,5 @@
 #include "Include.h"
-
+#include <Samples.h>
 STATUS onNewConnection(Canary::PPeer);
 STATUS run(Canary::PConfig);
 VOID runPeer(Canary::PConfig, TIMER_QUEUE_HANDLE, STATUS*);
