@@ -1,3 +1,4 @@
+import argparse
 import os
 import subprocess
 import time
@@ -7,17 +8,7 @@ from datetime import datetime, timedelta, timezone
 import boto3
 import botocore
 
-# https://docs.aws.amazon.com/kinesisvideostreams/latest/dg/API_GetDataEndpoint.html
-RETRYABLE_EXCEPTIONS = ['ClientLimitExceededException', 'InternalFailure']
-MAX_RETRIES = 5
-# https://docs.aws.amazon.com/kinesisvideostreams/latest/dg/API_Operations_Amazon_Kinesis_Video_Streams.html
-KINESIS_VIDEO_SERVICE_NAME = 'kinesisvideo'
-# https://docs.aws.amazon.com/kinesisvideostreams/latest/dg/API_Operations_Amazon_Kinesis_Video_Streams_Archived_Media.html
-KINESIS_VIDEO_ARCHIVED_MEDIA_SERVICE_NAME = 'kinesis-video-archived-media'
-AWS_REGION = 'us-west-2'
-# https://docs.aws.amazon.com/kinesisvideostreams/latest/dg/limits.html
-MAX_REQUESTS_PER_SECOND = 5
-
+from constants import *
 
 def fetch_clip(session: boto3.session, stream_name: str, start_timestamp: datetime, end_timestamp: datetime,
                chunk_size: timedelta, fragment_selector_type: str) -> list[str]:
@@ -238,32 +229,36 @@ def merge_files(input_files: list[str], output_file: str, delete: bool = True) -
             os.remove(file)
 
 
-def main():
+def main(stream_name: str, start_time: str, end_time: str, tz_offset: float, fragment_selector_type: str,
+         chunk_size_minutes: float):
     """
     Fetch media from a specified Kinesis Video stream between specified timestamps and saves it into a file.
 
-    Constants:
-        AWS_REGION (str): The AWS region where the streams are located.
+    Args:
+        stream_name (str): The name of the Kinesis video stream.
+        start_timestamp (str): The start timestamp of the clip, in ISO 8601 format (timezone information is ignored).
+        end_timestamp (str): The end timestamp of the clip, in ISO 8601 format (timezone information is ignored).
+        tz_offset (float): The time zone offset in hours.
+        fragment_selector_type (str): The origin of the timestamps to use (SERVER_TIMESTAMP or PRODUCER_TIMESTAMP).
+        chunk_size_minutes (float): The length of chunks to fetch in minutes.
     """
     # Configure credentials.
     # Refer to https://boto3.amazonaws.com/v1/documentation/api/latest/guide/credentials.html#configuring-credentials
     # for other authentication methods.
-    session = boto3.Session(aws_access_key_id='x',
-                            aws_secret_access_key='x',
-                            region_name=AWS_REGION)
-    stream_name = 'YourStreamName2'
+    session = boto3.Session()
 
     # The chunk size is the size of the clips that we request media using GetClip.
     # For example, if we want to download a 15-minute clip, it will be broken down into length of chunk_size.
     # Configure the chunk size based on the media size and fragment duration of your ingested media to fall
     # within the GetClip limits: https://docs.aws.amazon.com/kinesisvideostreams/latest/dg/limits.html
-    chunk_size = timedelta(minutes=3)
+    chunk_size = timedelta(minutes=chunk_size_minutes)
 
     # Configure timestamps to fetch the media.
-    fragment_selector_type = 'SERVER_TIMESTAMP'
-    pst = timezone(timedelta(hours=-8))  # pst = UTC-8
-    start_timestamp = datetime(2024, 3, 5, 12, 19, 0, tzinfo=pst)
-    end_timestamp = datetime(2024, 3, 5, 12, 26, 0, tzinfo=pst)
+    start_timestamp_utc = datetime.fromisoformat(start_time)
+    end_timestamp_utc = datetime.fromisoformat(end_time)
+    offset = timezone(timedelta(hours=tz_offset))
+    start_timestamp = start_timestamp_utc.replace(tzinfo=offset)
+    end_timestamp = end_timestamp_utc.replace(tzinfo=offset)
 
     # Check that FFMpeg is installed.
     if not check_ffmpeg():
@@ -277,4 +272,27 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    # Create the parser
+    parser = argparse.ArgumentParser(description="Fetch long clips from an Amazon Kinesis video stream.")
+
+    # Add the arguments
+    parser.add_argument("--stream-name", "--stream-name", dest="stream_name", type=str, required=True,
+                        help="Name of the Kinesis video stream to download.")
+    parser.add_argument("--from", "--start", "--start-time", dest="start_time", type=str, required=True,
+                        help="Start time in ISO 8601 format, in your timezone.")
+    parser.add_argument("--to", "--end", "--end-time", dest="end_time", type=str, required=True,
+                        help="End time in ISO 8601 format, in your timezone.")
+    parser.add_argument("--tz-offset", "--tz", "--utc-offset", dest="offset_hours", type=float,
+                        required=False, default=DEFAULT_TIMEZONE_OFFSET_HOURS,
+                        help="Your timezone offset from UTC (in hours). Example: PST is -8. "
+                             f"Default: {DEFAULT_TIMEZONE_OFFSET_HOURS}.")
+    parser.add_argument("--selector-type", dest="selector_type", type=str, required=False,
+                        choices=TIMESTAMP_SELECTOR_CHOICES, default=DEFAULT_TIMESTAMP_SELECTOR_CHOICE,
+                        help=f"The origin of the timestamps to use. Default: {DEFAULT_TIMESTAMP_SELECTOR_CHOICE}.")
+    parser.add_argument("--chunk-size-minutes", dest="chunk_size_minutes", type=float, required=False,
+                        default=DEFAULT_CHUNK_SIZE_MINUTES,
+                        help=f"The chunk size in minutes. Default: {DEFAULT_CHUNK_SIZE_MINUTES}.")
+
+    # Parse the arguments and pass them to main
+    args = parser.parse_args()
+    main(args.stream_name, args.start_time, args.end_time, args.offset_hours, args.selector_type, args.chunk_size_minutes)
