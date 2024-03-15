@@ -54,7 +54,12 @@ class Config {
     BYTE iotEndpoint[MAX_CONFIG_JSON_FILE_SIZE];
 
     VOID print();
-
+    STATUS mustenv(CHAR const* pKey, Config::Value<std::string>* pResult);
+    STATUS optenv(CHAR const* pKey, Config::Value<std::string>* pResult, std::string defaultValue);
+    STATUS optenvBool(CHAR const* pKey, Config::Value<BOOL>* pResult, BOOL defVal);
+    STATUS mustenvUint64(CHAR const* pKey, Config::Value<UINT64>* pResult);
+    STATUS optenvUint64(CHAR const* pKey, Config::Value<UINT64>* pResult, UINT64 defVal);
+    STATUS mustenvBool(CHAR const* pKey, Config::Value<BOOL>* pResult);
   private:
     STATUS initWithJSON(PCHAR);
     STATUS initWithEnvVars();

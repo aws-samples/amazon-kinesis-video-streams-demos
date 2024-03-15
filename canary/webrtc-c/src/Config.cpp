@@ -44,7 +44,7 @@ BOOL strtobool(const CHAR* value)
     return FALSE;
 }
 
-STATUS mustenv(CHAR const* pKey, Config::Value<std::string>* pResult)
+STATUS Config::mustenv(CHAR const* pKey, Config::Value<std::string>* pResult)
 {
     STATUS retStatus = STATUS_SUCCESS;
     const CHAR* value;
@@ -61,7 +61,7 @@ CleanUp:
     return retStatus;
 }
 
-STATUS optenv(CHAR const* pKey, Config::Value<std::string>* pResult, std::string defaultValue)
+STATUS Config::optenv(CHAR const* pKey, Config::Value<std::string>* pResult, std::string defaultValue)
 {
     STATUS retStatus = STATUS_SUCCESS;
     const CHAR* value;
@@ -81,7 +81,7 @@ CleanUp:
     return retStatus;
 }
 
-STATUS mustenvBool(CHAR const* pKey, Config::Value<BOOL>* pResult)
+STATUS Config::mustenvBool(CHAR const* pKey, Config::Value<BOOL>* pResult)
 {
     STATUS retStatus = STATUS_SUCCESS;
     Config::Value<std::string> raw;
@@ -98,7 +98,7 @@ CleanUp:
     return retStatus;
 }
 
-STATUS optenvBool(CHAR const* pKey, Config::Value<BOOL>* pResult, BOOL defVal)
+STATUS Config::optenvBool(CHAR const* pKey, Config::Value<BOOL>* pResult, BOOL defVal)
 {
     STATUS retStatus = STATUS_SUCCESS;
     Config::Value<std::string> raw;
@@ -118,7 +118,7 @@ CleanUp:
     return retStatus;
 }
 
-STATUS mustenvUint64(CHAR const* pKey, Config::Value<UINT64>* pResult)
+STATUS Config::mustenvUint64(CHAR const* pKey, Config::Value<UINT64>* pResult)
 {
     STATUS retStatus = STATUS_SUCCESS;
     Config::Value<std::string> raw;
@@ -135,7 +135,7 @@ CleanUp:
     return retStatus;
 }
 
-STATUS optenvUint64(CHAR const* pKey, Config::Value<UINT64>* pResult, UINT64 defVal)
+STATUS Config::optenvUint64(CHAR const* pKey, Config::Value<UINT64>* pResult, UINT64 defVal)
 {
     STATUS retStatus = STATUS_SUCCESS;
     Config::Value<std::string> raw;

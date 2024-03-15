@@ -18,6 +18,155 @@ VOID handleSignal(INT32 signal)
     terminated = TRUE;
 }
 
+PVOID sampleReceiveAudioVideoFrame(PVOID args)
+{
+    STATUS retStatus = STATUS_SUCCESS;
+    PSampleStreamingSession pSampleStreamingSession = (PSampleStreamingSession) args;
+    CHK_ERR(pSampleStreamingSession != NULL, STATUS_NULL_ARG, "[KVS Master] Streaming session is NULL");
+    CHK_STATUS(transceiverOnFrame(pSampleStreamingSession->pVideoRtcRtpTransceiver, (UINT64) pSampleStreamingSession, sampleVideoFrameHandler));
+    CHK_STATUS(transceiverOnFrame(pSampleStreamingSession->pAudioRtcRtpTransceiver, (UINT64) pSampleStreamingSession, sampleAudioFrameHandler));
+
+    CleanUp:
+
+    return (PVOID) (ULONG_PTR) retStatus;
+}
+
+PVOID sendVideoPackets(PVOID args)
+{
+    STATUS retStatus = STATUS_SUCCESS;
+    PDemoConfiguration pDemoConfiguration = (PDemoConfiguration) args;
+    RtcEncoderStats encoderStats;
+    Frame frame;
+    UINT32 fileIndex = 0, frameSize;
+    CHAR filePath[MAX_PATH_LEN + 1];
+    STATUS status;
+    UINT32 i;
+    UINT64 startTime, lastFrameTime, elapsed;
+    MEMSET(&encoderStats, 0x00, SIZEOF(RtcEncoderStats));
+    CHK_ERR(pDemoConfiguration != NULL, STATUS_NULL_ARG, "[KVS Master] Streaming session is NULL");
+
+    frame.presentationTs = 0;
+    startTime = GETTIME();
+    lastFrameTime = startTime;
+
+    while (!ATOMIC_LOAD_BOOL(&pDemoConfiguration->appTerminateFlag)) {
+        fileIndex = fileIndex % NUMBER_OF_H264_FRAME_FILES + 1;
+        SNPRINTF(filePath, MAX_PATH_LEN, "./assets/h264SampleFrames/frame-%04d.h264", fileIndex);
+
+        CHK_STATUS(readFrameFromDisk(NULL, &frameSize, filePath));
+
+        // Re-alloc if needed
+        if (frameSize > pDemoConfiguration->appMediaCtx.videoBufferSize) {
+            pDemoConfiguration->appMediaCtx.pVideoFrameBuffer = (PBYTE) MEMREALLOC(pDemoConfiguration->appMediaCtx.pVideoFrameBuffer, frameSize);
+            CHK_ERR(pDemoConfiguration->appMediaCtx.pVideoFrameBuffer != NULL, STATUS_NOT_ENOUGH_MEMORY,
+                    "[KVS Master] Failed to allocate video frame buffer");
+            pDemoConfiguration->appMediaCtx.videoBufferSize = frameSize;
+        }
+
+        frame.frameData = pDemoConfiguration->appMediaCtx.pVideoFrameBuffer;
+        frame.size = frameSize;
+
+        CHK_STATUS(readFrameFromDisk(frame.frameData, &frameSize, filePath));
+
+        // based on bitrate of samples/h264SampleFrames/frame-*
+        encoderStats.width = 640;
+        encoderStats.height = 480;
+        encoderStats.targetBitrate = 262000;
+        frame.presentationTs += SAMPLE_VIDEO_FRAME_DURATION;
+        MUTEX_LOCK(pDemoConfiguration->streamingSessionListReadLock);
+        for (i = 0; i < pDemoConfiguration->streamingSessionCount; ++i) {
+            status = writeFrame(pDemoConfiguration->sampleStreamingSessionList[i]->pVideoRtcRtpTransceiver, &frame);
+            if (pDemoConfiguration->sampleStreamingSessionList[i]->firstFrame && status == STATUS_SUCCESS) {
+                PROFILE_WITH_START_TIME(pDemoConfiguration->sampleStreamingSessionList[i]->offerReceiveTime, "Time to first frame");
+                pDemoConfiguration->sampleStreamingSessionList[i]->firstFrame = FALSE;
+            }
+            encoderStats.encodeTimeMsec = 4; // update encode time to an arbitrary number to demonstrate stats update
+            updateEncoderStats(pDemoConfiguration->sampleStreamingSessionList[i]->pVideoRtcRtpTransceiver, &encoderStats);
+            if (status != STATUS_SRTP_NOT_READY_YET) {
+                if (status != STATUS_SUCCESS) {
+                    DLOGV("writeFrame() failed with 0x%08x", status);
+                }
+            } else {
+                // Reset file index to ensure first frame sent upon SRTP ready is a key frame.
+                fileIndex = 0;
+            }
+        }
+        MUTEX_UNLOCK(pDemoConfiguration->streamingSessionListReadLock);
+
+        // Adjust sleep in the case the sleep itself and writeFrame take longer than expected. Since sleep makes sure that the thread
+        // will be paused at least until the given amount, we can assume that there's no too early frame scenario.
+        // Also, it's very unlikely to have a delay greater than SAMPLE_VIDEO_FRAME_DURATION, so the logic assumes that this is always
+        // true for simplicity.
+        elapsed = lastFrameTime - startTime;
+        THREAD_SLEEP(SAMPLE_VIDEO_FRAME_DURATION - elapsed % SAMPLE_VIDEO_FRAME_DURATION);
+        lastFrameTime = GETTIME();
+    }
+
+    CleanUp:
+    DLOGI("[KVS Master] Closing video thread");
+    CHK_LOG_ERR(retStatus);
+
+    return (PVOID) (ULONG_PTR) retStatus;
+}
+
+PVOID sendAudioPackets(PVOID args)
+{
+    STATUS retStatus = STATUS_SUCCESS;
+    PDemoConfiguration pDemoConfiguration = (PDemoConfiguration) args;
+    Frame frame;
+    UINT32 fileIndex = 0, frameSize;
+    CHAR filePath[MAX_PATH_LEN + 1];
+    UINT32 i;
+    STATUS status;
+
+    CHK_ERR(pDemoConfiguration != NULL, STATUS_NULL_ARG, "[KVS Master] Streaming session is NULL");
+    frame.presentationTs = 0;
+
+    while (!ATOMIC_LOAD_BOOL(&pDemoConfiguration->appTerminateFlag)) {
+        fileIndex = fileIndex % NUMBER_OF_OPUS_FRAME_FILES + 1;
+        SNPRINTF(filePath, MAX_PATH_LEN, "./assets/opusSampleFrames/sample-%03d.opus", fileIndex);
+
+        CHK_STATUS(readFrameFromDisk(NULL, &frameSize, filePath));
+
+        // Re-alloc if needed
+        if (frameSize > pDemoConfiguration->appMediaCtx.audioBufferSize) {
+            pDemoConfiguration->appMediaCtx.pAudioFrameBuffer = (UINT8*) MEMREALLOC(pDemoConfiguration->appMediaCtx.pAudioFrameBuffer, frameSize);
+            CHK_ERR(pDemoConfiguration->appMediaCtx.pAudioFrameBuffer != NULL, STATUS_NOT_ENOUGH_MEMORY,
+                    "[KVS Master] Failed to allocate audio frame buffer");
+            pDemoConfiguration->appMediaCtx.audioBufferSize = frameSize;
+        }
+
+        frame.frameData = pDemoConfiguration->appMediaCtx.pAudioFrameBuffer;
+        frame.size = frameSize;
+
+        CHK_STATUS(readFrameFromDisk(frame.frameData, &frameSize, filePath));
+
+        frame.presentationTs += SAMPLE_AUDIO_FRAME_DURATION;
+
+        MUTEX_LOCK(pDemoConfiguration->streamingSessionListReadLock);
+        for (i = 0; i < pDemoConfiguration->streamingSessionCount; ++i) {
+            status = writeFrame(pDemoConfiguration->sampleStreamingSessionList[i]->pAudioRtcRtpTransceiver, &frame);
+            if (status != STATUS_SRTP_NOT_READY_YET) {
+                if (status != STATUS_SUCCESS) {
+                    DLOGV("writeFrame() failed with 0x%08x", status);
+                } else if (pDemoConfiguration->sampleStreamingSessionList[i]->firstFrame && status == STATUS_SUCCESS) {
+                    PROFILE_WITH_START_TIME(pDemoConfiguration->sampleStreamingSessionList[i]->offerReceiveTime, "Time to first frame");
+                    pDemoConfiguration->sampleStreamingSessionList[i]->firstFrame = FALSE;
+                }
+            } else {
+                // Reset file index to stay in sync with video frames.
+                fileIndex = 0;
+            }
+        }
+        MUTEX_UNLOCK(pDemoConfiguration->streamingSessionListReadLock);
+        THREAD_SLEEP(SAMPLE_AUDIO_FRAME_DURATION);
+    }
+
+    CleanUp:
+    DLOGI("[KVS Master] closing audio thread");
+    return (PVOID) (ULONG_PTR) retStatus;
+}
+
 // add frame pts, original frame size, CRC to beginning of buffer after Annex-B format NALu
 VOID addCanaryMetadataToFrameData(PBYTE buffer, PFrame pFrame)
 {
@@ -43,26 +192,102 @@ VOID createCanaryFrameData(PBYTE buffer, PFrame pFrame)
     addCanaryMetadataToFrameData(buffer, pFrame);
 }
 
+STATUS initFromEnvs(UINT64 sampleConfigHandle, SIGNALING_CHANNEL_ROLE_TYPE roleType, INT32 argc, CHAR* argv[]) {
+    STATUS retStatus = STATUS_SUCCESS;
+    PDemoConfiguration pDemoConfiguration = (PDemoConfiguration) sampleConfigHandle;
+    Canary::Config config;
+    Canary::Config::Value<UINT64> logLevel64;
+    std::stringstream defaultLogStreamName;
+    UINT64 fileSize;
+
+    /* This is ignored for master. Master can extract the info from offer. Viewer has to know if peer can trickle or
+    * not ahead of time. */
+    CHK_STATUS(config.optenvBool(CANARY_TRICKLE_ICE_ENV_VAR, &config.trickleIce, TRUE));
+    CHK_STATUS(config.optenvBool(CANARY_USE_TURN_ENV_VAR, &config.useTurn, TRUE));
+    CHK_STATUS(config.optenvBool(CANARY_FORCE_TURN_ENV_VAR, &config.forceTurn, FALSE));
+    CHK_STATUS(config.optenvBool(CANARY_USE_IOT_CREDENTIALS_ENV_VAR, &config.useIotCredentialProvider, FALSE));
+    CHK_STATUS(config.optenvBool(CANARY_RUN_IN_PROFILING_MODE_ENV_VAR, &config.isProfilingMode, FALSE));
+
+    CHK_STATUS(config.optenv(CACERT_PATH_ENV_VAR, &config.caCertPath, KVS_CA_CERT_PATH));
+
+
+    pDemoConfiguration->useIot = config.useIotCredentialProvider.value; // TODO: Handle the envs setting for IoT to match sample
+    CHK_STATUS(config.optenv(CANARY_CHANNEL_NAME_ENV_VAR, &config.channelName, CANARY_DEFAULT_CHANNEL_NAME));
+    CHK_STATUS(config.optenv(SESSION_TOKEN_ENV_VAR, &config.sessionToken, ""));
+    CHK_STATUS(config.optenv(DEFAULT_REGION_ENV_VAR, &config.region, DEFAULT_AWS_REGION));
+
+    CHK_STATUS(config.optenv(CANARY_ENDPOINT_ENV_VAR, &config.endpoint, ""));
+    CHK_STATUS(config.optenv(CANARY_LABEL_ENV_VAR, &config.label, CANARY_DEFAULT_LABEL));
+
+    CHK_STATUS(config.optenv(CANARY_CLIENT_ID_ENV_VAR, &config.clientId, CANARY_DEFAULT_CLIENT_ID));
+    CHK_STATUS(config.optenvBool(CANARY_IS_MASTER_ENV_VAR, &config.isMaster, TRUE));
+    CHK_STATUS(config.optenvBool(CANARY_RUN_BOTH_PEERS_ENV_VAR, &config.runBothPeers, FALSE));
+
+    CHK_STATUS(config.optenv(CANARY_LOG_GROUP_NAME_ENV_VAR, &config.logGroupName, CANARY_DEFAULT_LOG_GROUP_NAME));
+    defaultLogStreamName << config.channelName.value << '-' << (config.isMaster.value ? "master" : "viewer") << '-'
+                         << GETTIME() / HUNDREDS_OF_NANOS_IN_A_MILLISECOND;
+    CHK_STATUS(config.optenv(CANARY_LOG_STREAM_NAME_ENV_VAR, &config.logStreamName, defaultLogStreamName.str()));
+
+    if (!config.duration.initialized) {
+        CHK_STATUS(config.optenvUint64(CANARY_DURATION_IN_SECONDS_ENV_VAR, &config.duration, 0));
+        config.duration.value *= HUNDREDS_OF_NANOS_IN_A_SECOND;
+    }
+
+    // Iteration duration is an optional param
+    if (!config.iterationDuration.initialized) {
+        CHK_STATUS(config.optenvUint64(CANARY_ITERATION_IN_SECONDS_ENV_VAR, &config.iterationDuration, CANARY_DEFAULT_ITERATION_DURATION_IN_SECONDS));
+        config.iterationDuration.value *= HUNDREDS_OF_NANOS_IN_A_SECOND;
+    }
+
+    CHK_STATUS(config.optenvUint64(CANARY_BIT_RATE_ENV_VAR, &config.bitRate, CANARY_DEFAULT_BITRATE));
+    CHK_STATUS(config.optenvUint64(CANARY_FRAME_RATE_ENV_VAR, &config.frameRate, CANARY_DEFAULT_FRAMERATE));
+
+    if (config.isStorage) {
+        CHK_STATUS(config.optenv(STORAGE_CANARY_FIRST_FRAME_TS_FILE_ENV_VAR, &config.storageFristFrameSentTSFileName, STORAGE_CANARY_DEFAULT_FIRST_FRAME_TS_FILE));
+    }
+//
+//    /* This is ignored for master. Master can extract the info from offer. Viewer has to know if peer can trickle or
+//     * not ahead of time. */
+    pDemoConfiguration->appConfigCtx.trickleIce = config.trickleIce.value;
+    pDemoConfiguration->appConfigCtx.useTurn = config.useTurn.value;
+    if(config.isMaster.value) {
+        pDemoConfiguration->appConfigCtx.roleType = SIGNALING_CHANNEL_ROLE_TYPE_MASTER;
+    } else {
+        pDemoConfiguration->appConfigCtx.roleType = SIGNALING_CHANNEL_ROLE_TYPE_VIEWER;
+    }
+    pDemoConfiguration->appSignalingCtx.channelInfo.useMediaStorage = FALSE;
+    pDemoConfiguration->appConfigCtx.pChannelName = (PCHAR) MEMCALLOC(1, STRLEN(config.channelName.value.c_str()+ 1));
+    DLOGI("Channel name: %s", config.channelName.value.c_str());
+    STRCPY(pDemoConfiguration->appConfigCtx.pChannelName, config.channelName.value.c_str());
+CleanUp:
+    return retStatus;
+}
+
 INT32 main(INT32 argc, CHAR* argv[])
 {
-#ifndef _WIN32
-    signal(SIGINT, handleSignal);
-#endif
-
     STATUS retStatus = STATUS_SUCCESS;
-    initializeEndianness();
-    SET_INSTRUMENTED_ALLOCATORS();
-    SRAND(time(0));
+    PDemoConfiguration pDemoConfiguration = NULL;
+    TimerTaskConfiguration statsconfig;
     // Make sure that all destructors have been called first before resetting the instrumented allocators
     CHK_STATUS([&]() -> STATUS {
         STATUS retStatus = STATUS_SUCCESS;
-        auto config = Canary::Config();
 
         Aws::SDKOptions options;
         Aws::InitAPI(options);
 
-        CHK_STATUS(config.init(argc, argv));
-        CHK_STATUS(run(&config));
+        CHK_STATUS(initializeConfiguration(&pDemoConfiguration, SIGNALING_CHANNEL_ROLE_TYPE_MASTER, argc, argv, initFromEnvs));
+        DLOGI("Channel name: %s", pDemoConfiguration->appConfigCtx.pChannelName);
+        CHK_STATUS(enablePregenerateCertificate(pDemoConfiguration));
+        CHK_STATUS(initializeMediaSenders(pDemoConfiguration, sendAudioPackets, sendVideoPackets));
+        CHK_STATUS(initializeMediaReceivers(pDemoConfiguration, sampleReceiveAudioVideoFrame));
+        CHK_STATUS(initSignaling(pDemoConfiguration, (PCHAR) SAMPLE_MASTER_CLIENT_ID));
+        statsconfig.startTime = SAMPLE_STATS_DURATION;
+        statsconfig.iterationTime = SAMPLE_STATS_DURATION;
+        statsconfig.timerCallbackFunc = getIceCandidatePairStatsCallback;
+        statsconfig.customData = (UINT64) pDemoConfiguration;
+        CHK_STATUS(addTaskToTimerQueue(pDemoConfiguration, &statsconfig));
+        // Checking for termination
+        CHK_STATUS(sessionCleanupWait(pDemoConfiguration));
 
     CleanUp:
 
@@ -85,88 +310,6 @@ CleanUp:
     return STATUS_FAILED(retStatus) ? EXIT_FAILURE : EXIT_SUCCESS;
 }
 
-STATUS run(Canary::PConfig pConfig)
-{
-    STATUS retStatus = STATUS_SUCCESS;
-    BOOL initialized = FALSE;
-    TIMER_QUEUE_HANDLE timerQueueHandle = 0;
-    UINT32 timeoutTimerId;
-
-    CHK_STATUS(Canary::Cloudwatch::init(pConfig));
-    CHK_STATUS(initKvsWebRtc());
-    initialized = TRUE;
-
-    SET_LOGGER_LOG_LEVEL(pConfig->logLevel.value);
-
-    CHK_STATUS(timerQueueCreate(&timerQueueHandle));
-    if (pConfig->duration.value != 0) {
-        auto terminate = [](UINT32 timerId, UINT64 currentTime, UINT64 customData) -> STATUS {
-            UNUSED_PARAM(timerId);
-            UNUSED_PARAM(currentTime);
-            UNUSED_PARAM(customData);
-            terminated = TRUE;
-            return STATUS_TIMER_QUEUE_STOP_SCHEDULING;
-        };
-        CHK_STATUS(timerQueueAddTimer(timerQueueHandle, pConfig->duration.value, TIMER_QUEUE_SINGLE_INVOCATION_PERIOD, terminate, (UINT64) NULL,
-                                      &timeoutTimerId));
-    }
-
-    if (!pConfig->runBothPeers.value) {
-        runPeer(pConfig, timerQueueHandle, &retStatus);
-    } else {
-        // Modify config to differentiate master and viewer
-        UINT64 timestamp = GETTIME() / HUNDREDS_OF_NANOS_IN_A_SECOND;
-        STATUS masterRetStatus;
-        std::stringstream ss;
-
-        Canary::Config masterConfig = *pConfig;
-        masterConfig.isMaster.value = TRUE;
-
-        ss << pConfig->clientId.value << "Master";
-        masterConfig.clientId.value = ss.str();
-        ss.str("");
-
-        ss << pConfig->channelName.value << "-master-" << timestamp;
-        masterConfig.logStreamName.value = ss.str();
-        ss.str("");
-
-        Canary::Config viewerConfig = *pConfig;
-        viewerConfig.isMaster.value = FALSE;
-
-        ss << pConfig->clientId.value << "Viewer";
-        viewerConfig.clientId.value = ss.str();
-        ss.str("");
-
-        ss << pConfig->channelName.value << "-viewer-" << timestamp;
-        viewerConfig.logStreamName.value = ss.str();
-        ss.str("");
-
-        std::thread masterThread(runPeer, &masterConfig, timerQueueHandle, &masterRetStatus);
-        THREAD_SLEEP(CANARY_DEFAULT_VIEWER_INIT_DELAY);
-
-        runPeer(&viewerConfig, timerQueueHandle, &retStatus);
-        masterThread.join();
-
-        retStatus = STATUS_FAILED(retStatus) ? retStatus : masterRetStatus;
-    }
-
-CleanUp:
-
-    if (IS_VALID_TIMER_QUEUE_HANDLE(timerQueueHandle)) {
-        timerQueueFree(&timerQueueHandle);
-    }
-
-    DLOGI("Exiting with 0x%08x", retStatus);
-    if (initialized) {
-        Canary::Cloudwatch::getInstance().monitoring.pushExitStatus(retStatus);
-    }
-
-    deinitKvsWebRtc();
-    Canary::Cloudwatch::deinit();
-
-    return retStatus;
-}
-
 // This is not a time sensitive thread. It is ok if pushing the metrics gets delayed by 100 ms because of the
 // thread sleep
 VOID sendProfilingMetrics(Canary::PPeer pPeer)
@@ -186,49 +329,6 @@ VOID sendProfilingMetrics(Canary::PPeer pPeer)
     if(!done) {
         DLOGE("First frame never got sent out...no profiling metrics pushed to cloudwatch..error code: 0x%08x", retStatus);
     }
-}
-
-VOID runPeer(Canary::PConfig pConfig, TIMER_QUEUE_HANDLE timerQueueHandle, STATUS* pRetStatus)
-{
-    STATUS retStatus = STATUS_SUCCESS;
-    UINT32 timeoutTimerId;
-
-    Canary::Peer::Callbacks callbacks;
-    callbacks.onNewConnection = onNewConnection;
-    callbacks.onDisconnected = []() { terminated = TRUE; };
-
-    Canary::Peer peer;
-
-    CHK(pConfig != NULL, STATUS_NULL_ARG);
-    pConfig->print();
-    CHK_STATUS(timerQueueAddTimer(timerQueueHandle, KVS_METRICS_INVOCATION_PERIOD, KVS_METRICS_INVOCATION_PERIOD,
-                                  canaryKvsStats, (UINT64) &peer, &timeoutTimerId));
-    CHK_STATUS(peer.init(pConfig, callbacks));
-    CHK_STATUS(peer.connect());
-
-    {
-        // Since the goal of the canary is to test robustness of the SDK, there is not an immediate need
-        // to send audio frames as well. It can always be added in if needed in the future
-        std::thread videoThread(sendCustomFrames, &peer, MEDIA_STREAM_TRACK_KIND_VIDEO, pConfig->bitRate.value, pConfig->frameRate.value);
-        // All metrics tracking will happen on a time queue to simplify handling periodicity
-        CHK_STATUS(timerQueueAddTimer(timerQueueHandle, METRICS_INVOCATION_PERIOD, METRICS_INVOCATION_PERIOD, canaryRtpOutboundStats, (UINT64) &peer,
-                                      &timeoutTimerId));
-        CHK_STATUS(timerQueueAddTimer(timerQueueHandle, METRICS_INVOCATION_PERIOD, METRICS_INVOCATION_PERIOD, canaryRtpInboundStats, (UINT64) &peer,
-                                      &timeoutTimerId));
-        CHK_STATUS(timerQueueAddTimer(timerQueueHandle, END_TO_END_METRICS_INVOCATION_PERIOD, END_TO_END_METRICS_INVOCATION_PERIOD,
-                                      canaryEndToEndStats, (UINT64) &peer, &timeoutTimerId));
-        if(pConfig->isProfilingMode.value && pConfig->isMaster.value) {
-            std::thread pushProfilingThread(sendProfilingMetrics, &peer);
-            pushProfilingThread.join();
-        }
-        videoThread.join();
-    }
-
-    CHK_STATUS(peer.shutdown());
-
-CleanUp:
-
-    *pRetStatus = retStatus;
 }
 
 STATUS onNewConnection(Canary::PPeer pPeer)
@@ -260,63 +360,6 @@ STATUS onNewConnection(Canary::PPeer pPeer)
 CleanUp:
 
     return retStatus;
-}
-
-VOID sendCustomFrames(Canary::PPeer pPeer, MEDIA_STREAM_TRACK_KIND kind, UINT64 dataRate, UINT64 frameRate)
-{
-    STATUS retStatus = STATUS_SUCCESS;
-    Frame frame;
-    UINT32 hexStrLen = 0;
-    UINT32 actualFrameSize = 0;
-    UINT32 frameSizeWithoutNalu = 0;
-    // This is the actual frame size that includes the metadata and the actual frame data
-    actualFrameSize = CANARY_METADATA_SIZE + ((dataRate / 8) / frameRate);
-    frameSizeWithoutNalu = actualFrameSize - ANNEX_B_NALU_SIZE;
-
-    PBYTE canaryFrameData = NULL;
-    canaryFrameData = (PBYTE) MEMALLOC(actualFrameSize);
-
-    // We allocate a bigger buffer to accomodate the hex encoded string
-    frame.frameData = (PBYTE) MEMALLOC(frameSizeWithoutNalu * 2 + 1 + ANNEX_B_NALU_SIZE);
-    frame.version = FRAME_CURRENT_VERSION;
-    frame.presentationTs = GETTIME();
-
-    while (!terminated.load()) {
-        frame.size = actualFrameSize;
-        createCanaryFrameData(canaryFrameData, &frame);
-
-        // Hex encode the data (without the ANNEX-B NALu) to ensure parts of random frame data is not skipped if they
-        // are the same as the ANNEX-B NALu
-        CHK_STATUS(hexEncode(frame.frameData + ANNEX_B_NALU_SIZE, frameSizeWithoutNalu, NULL, &hexStrLen));
-
-        // This re-alloc is done in case the estimated size does not match the actual requirement.
-        // We do not want to constantly malloc within a loop. Hence, we re-allocate only if required
-        // Either ways, the realloc should not happen
-        if (hexStrLen != (frameSizeWithoutNalu * 2 + 1)) {
-            DLOGW("Re allocating...this should not happen...something might be wrong");
-            frame.frameData = (PBYTE) REALLOC(frame.frameData, hexStrLen + ANNEX_B_NALU_SIZE);
-            CHK_ERR(frame.frameData != NULL, STATUS_NOT_ENOUGH_MEMORY, "Failed to realloc media buffer");
-        }
-        CHK_STATUS(hexEncode(canaryFrameData + ANNEX_B_NALU_SIZE, frameSizeWithoutNalu, (PCHAR)(frame.frameData + ANNEX_B_NALU_SIZE), &hexStrLen));
-        MEMCPY(frame.frameData, canaryFrameData, ANNEX_B_NALU_SIZE);
-
-        // We must update the size to reflect the original data with hex encoded data
-        frame.size = hexStrLen + ANNEX_B_NALU_SIZE;
-        pPeer->writeFrame(&frame, kind);
-        THREAD_SLEEP(HUNDREDS_OF_NANOS_IN_A_SECOND / frameRate);
-        frame.presentationTs = GETTIME();
-    }
-CleanUp:
-
-    SAFE_MEMFREE(frame.frameData);
-    SAFE_MEMFREE(canaryFrameData);
-
-    auto threadKind = kind == MEDIA_STREAM_TRACK_KIND_VIDEO ? "video" : "audio";
-    if (STATUS_FAILED(retStatus)) {
-        DLOGE("%s thread exited with 0x%08x", threadKind, retStatus);
-    } else {
-        DLOGI("%s thread exited successfully", threadKind);
-    }
 }
 
 STATUS canaryRtpOutboundStats(UINT32 timerId, UINT64 currentTime, UINT64 customData)
@@ -377,58 +420,4 @@ STATUS canaryKvsStats(UINT32 timerId, UINT64 currentTime, UINT64 customData)
     }
 
     return retStatus;
-}
-
-VOID sendLocalFrames(Canary::PPeer pPeer, MEDIA_STREAM_TRACK_KIND kind, const std::string& pattern, UINT64 frameCount, UINT32 frameDuration)
-{
-    STATUS retStatus = STATUS_SUCCESS;
-    Frame frame;
-    UINT64 fileIndex = 0, frameSize;
-    CHAR filePath[MAX_PATH_LEN + 1];
-    UINT64 startTime, lastFrameTime, elapsed;
-
-    frame.frameData = NULL;
-    frame.size = 0;
-    frame.presentationTs = 0;
-    startTime = GETTIME();
-    lastFrameTime = startTime;
-
-    while (!terminated.load()) {
-        fileIndex = fileIndex % frameCount + 1;
-        SNPRINTF(filePath, MAX_PATH_LEN, pattern.c_str(), fileIndex);
-
-        CHK_STATUS(readFile(filePath, TRUE, NULL, &frameSize));
-
-        // Re-alloc if needed
-        if (frameSize > frame.size) {
-            frame.frameData = (PBYTE) REALLOC(frame.frameData, frameSize);
-            CHK_ERR(frame.frameData != NULL, STATUS_NOT_ENOUGH_MEMORY, "Failed to realloc media buffer");
-        }
-        frame.size = (UINT32) frameSize;
-
-        CHK_STATUS(readFile(filePath, TRUE, frame.frameData, &frameSize));
-
-        frame.presentationTs += frameDuration;
-
-        pPeer->writeFrame(&frame, kind);
-
-        // Adjust sleep in the case the sleep itself and writeFrame take longer than expected. Since sleep makes sure that the thread
-        // will be paused at least until the given amount, we can assume that there's no too early frame scenario.
-        // Also, it's very unlikely to have a delay greater than SAMPLE_VIDEO_FRAME_DURATION, so the logic assumes that this is always
-        // true for simplicity.
-        elapsed = lastFrameTime - startTime;
-        THREAD_SLEEP(frameDuration - elapsed % frameDuration);
-        lastFrameTime = GETTIME();
-    }
-
-CleanUp:
-
-    SAFE_MEMFREE(frame.frameData);
-
-    auto threadKind = kind == MEDIA_STREAM_TRACK_KIND_VIDEO ? "video" : "audio";
-    if (STATUS_FAILED(retStatus)) {
-        DLOGE("%s thread exited with 0x%08x", threadKind, retStatus);
-    } else {
-        DLOGI("%s thread exited successfully", threadKind);
-    }
 }
