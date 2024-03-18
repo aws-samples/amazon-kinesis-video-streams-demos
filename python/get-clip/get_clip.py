@@ -8,7 +8,7 @@ from datetime import datetime, timedelta, timezone
 import boto3
 import botocore
 
-from constants import *
+from constants import Constants
 
 def fetch_clip(session: boto3.session, stream_name: str, start_timestamp: datetime, end_timestamp: datetime,
                chunk_size: timedelta, fragment_selector_type: str) -> list[str]:
@@ -44,7 +44,7 @@ def fetch_clip(session: boto3.session, stream_name: str, start_timestamp: dateti
     if chunk_size <= timedelta(0):
         raise ValueError('chunk_size must be greater than 0!')
 
-    kvs_client = session.client(service_name=KINESIS_VIDEO_SERVICE_NAME)
+    kvs_client = session.client(service_name=Constants.KINESIS_VIDEO_SERVICE_NAME)
 
     # Obtain the GetClip endpoint using GetDataEndpoint
     get_data_endpoint_args = {
@@ -69,11 +69,11 @@ def fetch_clip(session: boto3.session, stream_name: str, start_timestamp: dateti
             print(f"Request ID: {e.response['ResponseMetadata']['RequestId']}")
             print(f"Http status code: {e.response['ResponseMetadata']['HTTPStatusCode']}")
 
-            if not e.response['Error']['Code'] in RETRYABLE_EXCEPTIONS:
+            if not e.response['Error']['Code'] in Constants.RETRYABLE_EXCEPTIONS:
                 # Print and exit on non-retryable errors, such as InvalidArgumentException
                 raise e
 
-            if retry_count >= MAX_RETRIES:
+            if retry_count >= Constants.MAX_RETRIES:
                 # Print and exit after hitting the maximum number of retries
                 print("Maximum retries encountered!")
                 raise e
@@ -84,8 +84,10 @@ def fetch_clip(session: boto3.session, stream_name: str, start_timestamp: dateti
         time.sleep(random.uniform(0.1, 5))
 
     # Create the archived media client using the obtained endpoint
-    kinesis_video_archived_media_client = session.client(service_name=KINESIS_VIDEO_ARCHIVED_MEDIA_SERVICE_NAME,
-                                                         endpoint_url=endpoint)
+    kinesis_video_archived_media_client = session.client(
+        service_name=Constants.KINESIS_VIDEO_ARCHIVED_MEDIA_SERVICE_NAME,
+        endpoint_url=endpoint
+    )
 
     get_clip_args = {
         'StreamName': stream_name,
@@ -139,11 +141,11 @@ def fetch_clip(session: boto3.session, stream_name: str, start_timestamp: dateti
                     print(f'No media found between {chunk_start_timestamp} to {chunk_end_timestamp}')
                     break
 
-                if not e.response['Error']['Code'] in RETRYABLE_EXCEPTIONS:
+                if not e.response['Error']['Code'] in Constants.RETRYABLE_EXCEPTIONS:
                     # Print and exit on non-retryable errors, such as InvalidArgumentException
                     raise e
 
-                if retry_count >= MAX_RETRIES:
+                if retry_count >= Constants.MAX_RETRIES:
                     # Print and exit after hitting the maximum retries
                     print("Maximum retries encountered!")
                     raise e
@@ -157,7 +159,7 @@ def fetch_clip(session: boto3.session, stream_name: str, start_timestamp: dateti
             # Write the payload to a file
             print(f'Received {len(chunk_data) / 1000 / 1000:0.2f} MB from Kinesis Video Streams')
             output_file_name = f'{stream_name}-{chunk_start_timestamp}-{chunk_end_timestamp}.mp4'
-            with open(output_file_name, 'wb') as f:
+            with open(output_file_name, 'wb', encoding='utf-8') as f:
                 f.write(chunk_data)
 
             output_file_names.append(output_file_name)
@@ -168,7 +170,7 @@ def fetch_clip(session: boto3.session, stream_name: str, start_timestamp: dateti
         if chunk_start_timestamp == end_timestamp:
             return output_file_names
 
-        time.sleep(1 / MAX_REQUESTS_PER_SECOND)
+        time.sleep(1 / Constants.MAX_REQUESTS_PER_SECOND)
 
 
 def check_ffmpeg() -> bool:
@@ -186,7 +188,7 @@ def check_ffmpeg() -> bool:
     try:
         subprocess.run(['ffmpeg', '-version'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True)
         return True
-    except FileNotFoundError:
+    except (subprocess.CalledProcessError, FileNotFoundError):
         print("Error: ffmpeg is not installed or not found. "
               "Install it and make sure it is added to your PATH environment variable.")
         return False
@@ -211,7 +213,7 @@ def merge_files(input_files: list[str], output_file: str, delete: bool = True) -
     # https://trac.ffmpeg.org/wiki/Concatenate
     script_content = '\n'.join([f"file '{file}'" for file in input_files])
     script_filename = 'input_files_list.txt'
-    with open(script_filename, 'w') as script_file:
+    with open(script_filename, 'w', encoding='utf-8') as script_file:
         script_file.write(script_content)
 
     # FFmpeg commend to concatenate the MP4 files
@@ -283,16 +285,19 @@ if __name__ == "__main__":
     parser.add_argument("--to", "--end", "--end-time", dest="end_time", type=str, required=True,
                         help="End time in ISO 8601 format, in your timezone.")
     parser.add_argument("--tz-offset", "--tz", "--utc-offset", dest="offset_hours", type=float,
-                        required=False, default=DEFAULT_TIMEZONE_OFFSET_HOURS,
+                        required=False, default=Constants.DEFAULT_TIMEZONE_OFFSET_HOURS,
                         help="Your timezone offset from UTC (in hours). Example: PST is -8. "
-                             f"Default: {DEFAULT_TIMEZONE_OFFSET_HOURS}.")
+                             f"Default: {Constants.DEFAULT_TIMEZONE_OFFSET_HOURS}.")
     parser.add_argument("--selector-type", dest="selector_type", type=str, required=False,
-                        choices=TIMESTAMP_SELECTOR_CHOICES, default=DEFAULT_TIMESTAMP_SELECTOR_CHOICE,
-                        help=f"The origin of the timestamps to use. Default: {DEFAULT_TIMESTAMP_SELECTOR_CHOICE}.")
+                        choices=Constants.TIMESTAMP_SELECTOR_CHOICES,
+                        default=Constants.DEFAULT_TIMESTAMP_SELECTOR_CHOICE,
+                        help="The origin of the timestamps to use. "
+                             f"Default: {Constants.DEFAULT_TIMESTAMP_SELECTOR_CHOICE}.")
     parser.add_argument("--chunk-size-minutes", dest="chunk_size_minutes", type=float, required=False,
-                        default=DEFAULT_CHUNK_SIZE_MINUTES,
-                        help=f"The chunk size in minutes. Default: {DEFAULT_CHUNK_SIZE_MINUTES}.")
+                        default=Constants.DEFAULT_CHUNK_SIZE_MINUTES,
+                        help=f"The chunk size in minutes. Default: {Constants.DEFAULT_CHUNK_SIZE_MINUTES}.")
 
     # Parse the arguments and pass them to main
     args = parser.parse_args()
-    main(args.stream_name, args.start_time, args.end_time, args.offset_hours, args.selector_type, args.chunk_size_minutes)
+    main(args.stream_name, args.start_time, args.end_time, args.offset_hours, args.selector_type,
+         args.chunk_size_minutes)
