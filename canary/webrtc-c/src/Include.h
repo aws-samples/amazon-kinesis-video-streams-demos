@@ -1,5 +1,7 @@
 #pragma once
 
+#include <Samples.h>
+
 #define DEFAULT_CLOUDWATCH_NAMESPACE "KinesisVideoSDKCanary"
 #define DEFAULT_FPS_VALUE            25
 // TODO: This value shouldn't matter. But, since we don't allow NULL value, we have to set to a value
@@ -129,6 +131,29 @@ using namespace Aws::CloudWatchLogs::Model;
 using namespace Aws::CloudWatch::Model;
 using namespace Aws::CloudWatch;
 using namespace std;
+
+
+typedef struct {
+    PDemoConfiguration pDemoConfiguration;
+    UINT64 prevNumberOfPacketsSent;
+    UINT64 prevNumberOfPacketsReceived;
+    UINT64 prevNumberOfBytesSent;
+    UINT64 prevNumberOfBytesReceived;
+    UINT64 prevFramesDiscardedOnSend;
+    UINT64 prevTs;
+    UINT64 prevVideoFramesGenerated;
+    UINT64 prevFramesSent;
+    UINT64 prevNackCount;
+    UINT64 prevRetxBytesSent;
+    std::atomic<UINT64> videoFramesGenerated;
+    UINT64 videoBytesGenerated;
+    DOUBLE framesPercentageDiscarded;
+    DOUBLE nacksPerSecond;
+    DOUBLE averageFramesSentPerSecond;
+    DOUBLE retxBytesPercentage;
+} OutgoingRTPMetricsContext;
+
+typedef OutgoingRTPMetricsContext* POutgoingRTPMetricsContext;
 
 #include "Config.h"
 #include "CloudwatchLogs.h"

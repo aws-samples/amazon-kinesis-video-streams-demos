@@ -65,8 +65,7 @@ add_library(
   src/CloudwatchLogs.cpp
   src/CloudwatchMonitoring.cpp
   src/Cloudwatch.cpp
-  src/Peer.cpp
-  src/media-server-storage/Common.cpp)
+  src/Peer.cpp)
 target_link_libraries(
   kvsWebrtcCanary
   kvsWebrtcClientDemo
@@ -88,11 +87,5 @@ target_link_libraries(
   kvsWebrtcCanarySignaling
   kvsWebrtcCanary)
 
-add_executable(
-  kvsWebrtcStorageSample
-  src/media-server-storage/kvsWebRTCClientMaster.cpp)
-target_link_libraries(
-  kvsWebrtcStorageSample
-  kvsWebrtcCanary)
 
 file(COPY "${CMAKE_CURRENT_SOURCE_DIR}/assets" DESTINATION .)

@@ -1,4 +1,5 @@
 #pragma once
+#include "Include.h"
 
 namespace Canary {
 
@@ -15,7 +16,7 @@ class CloudwatchMonitoring {
     VOID pushSignalingRoundtripLatency(UINT64, Aws::CloudWatch::Model::StandardUnit);
     VOID pushSignalingConnectionDuration(UINT64, Aws::CloudWatch::Model::StandardUnit);
     VOID pushICEHolePunchingDelay(UINT64, Aws::CloudWatch::Model::StandardUnit);
-    VOID pushOutboundRtpStats(Canary::POutgoingRTPMetricsContext);
+    VOID pushOutboundRtpStats(POutgoingRTPMetricsContext);
     VOID pushInboundRtpStats(Canary::PIncomingRTPMetricsContext);
     VOID pushEndToEndMetrics(Canary::EndToEndMetricsContext);
     VOID pushPeerConnectionMetrics(PPeerConnectionMetrics);

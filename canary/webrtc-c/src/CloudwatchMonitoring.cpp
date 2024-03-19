@@ -235,7 +235,7 @@ VOID CloudwatchMonitoring::pushICEHolePunchingDelay(UINT64 delay, Aws::CloudWatc
     this->push(datum);
 }
 
-VOID CloudwatchMonitoring::pushOutboundRtpStats(Canary::POutgoingRTPMetricsContext pOutboundRtpStats)
+VOID CloudwatchMonitoring::pushOutboundRtpStats(POutgoingRTPMetricsContext pOutboundRtpStats)
 {
     MetricDatum bytesDiscardedPercentageDatum, averageFramesRateDatum, nackRateDatum, retransmissionPercentDatum;
     

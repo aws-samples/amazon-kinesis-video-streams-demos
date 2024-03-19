@@ -1,8 +1,5 @@
 #include "Include.h"
-#include <Samples.h>
-STATUS onNewConnection(Canary::PPeer);
-STATUS run(Canary::PConfig);
-VOID runPeer(Canary::PConfig, TIMER_QUEUE_HANDLE, STATUS*);
+
 VOID sendLocalFrames(Canary::PPeer, MEDIA_STREAM_TRACK_KIND, const std::string&, UINT64, UINT32);
 VOID sendCustomFrames(Canary::PPeer, MEDIA_STREAM_TRACK_KIND, UINT64, UINT64);
 VOID sendProfilingMetrics(Canary::PPeer);
@@ -12,11 +9,6 @@ STATUS canaryEndToEndStats(UINT32, UINT64, UINT64);
 STATUS canaryKvsStats(UINT32, UINT64, UINT64);
 
 std::atomic<bool> terminated;
-VOID handleSignal(INT32 signal)
-{
-    UNUSED_PARAM(signal);
-    terminated = TRUE;
-}
 
 PVOID sampleReceiveAudioVideoFrame(PVOID args)
 {
@@ -276,15 +268,16 @@ INT32 main(INT32 argc, CHAR* argv[])
         Aws::InitAPI(options);
 
         CHK_STATUS(initializeConfiguration(&pDemoConfiguration, SIGNALING_CHANNEL_ROLE_TYPE_MASTER, argc, argv, initFromEnvs));
-        DLOGI("Channel name: %s", pDemoConfiguration->appConfigCtx.pChannelName);
         CHK_STATUS(enablePregenerateCertificate(pDemoConfiguration));
         CHK_STATUS(initializeMediaSenders(pDemoConfiguration, sendAudioPackets, sendVideoPackets));
         CHK_STATUS(initializeMediaReceivers(pDemoConfiguration, sampleReceiveAudioVideoFrame));
         CHK_STATUS(initSignaling(pDemoConfiguration, (PCHAR) SAMPLE_MASTER_CLIENT_ID));
-        statsconfig.startTime = SAMPLE_STATS_DURATION;
-        statsconfig.iterationTime = SAMPLE_STATS_DURATION;
-        statsconfig.timerCallbackFunc = getIceCandidatePairStatsCallback;
-        statsconfig.customData = (UINT64) pDemoConfiguration;
+        OutgoingRTPMetricsContext outgoingRTPMetricsContext;
+        outgoingRTPMetricsContext.pDemoConfiguration = pDemoConfiguration;
+        statsconfig.startTime = METRICS_INVOCATION_PERIOD;
+        statsconfig.iterationTime = METRICS_INVOCATION_PERIOD;
+        statsconfig.timerCallbackFunc = canaryRtpOutboundStats;
+        statsconfig.customData = (UINT64) &outgoingRTPMetricsContext;
         CHK_STATUS(addTaskToTimerQueue(pDemoConfiguration, &statsconfig));
         // Checking for termination
         CHK_STATUS(sessionCleanupWait(pDemoConfiguration));
@@ -331,35 +324,41 @@ VOID sendProfilingMetrics(Canary::PPeer pPeer)
     }
 }
 
-STATUS onNewConnection(Canary::PPeer pPeer)
+STATUS populateOutgoingRtpMetricsContext()
 {
-    STATUS retStatus = STATUS_SUCCESS;
-    RtcMediaStreamTrack videoTrack, audioTrack;
+    DOUBLE currentDuration = 0;
 
-    MEMSET(&videoTrack, 0x00, SIZEOF(RtcMediaStreamTrack));
-    MEMSET(&audioTrack, 0x00, SIZEOF(RtcMediaStreamTrack));
+//    currentDuration = (DOUBLE)(this->canaryMetrics.timestamp - this->canaryOutgoingRTPMetricsContext.prevTs) / HUNDREDS_OF_NANOS_IN_A_SECOND;
+//    {
+//        std::lock_guard<std::mutex> lock(this->countUpdateMutex);
+//        this->canaryOutgoingRTPMetricsContext.framesPercentageDiscarded =
+//                ((DOUBLE)(this->canaryMetrics.rtcStatsObject.outboundRtpStreamStats.framesDiscardedOnSend -
+//                          this->canaryOutgoingRTPMetricsContext.prevFramesDiscardedOnSend) /
+//                 (DOUBLE) this->canaryOutgoingRTPMetricsContext.videoFramesGenerated) *
+//                100.0;
+//        this->canaryOutgoingRTPMetricsContext.retxBytesPercentage =
+//                (((DOUBLE) this->canaryMetrics.rtcStatsObject.outboundRtpStreamStats.retransmittedBytesSent -
+//                           (DOUBLE)(this->canaryOutgoingRTPMetricsContext.prevRetxBytesSent)) /
+//        (DOUBLE) this->canaryOutgoingRTPMetricsContext.videoBytesGenerated) *
+//                100.0;
+//    }
+//
+//    // This flag ensures the reset of video bytes count is done only when this flag is set
+//    this->recorded = TRUE;
+//    this->canaryOutgoingRTPMetricsContext.averageFramesSentPerSecond =
+//            ((DOUBLE)(this->canaryMetrics.rtcStatsObject.outboundRtpStreamStats.framesSent -
+//                      (DOUBLE) this->canaryOutgoingRTPMetricsContext.prevFramesSent)) /
+//    currentDuration;
+//    this->canaryOutgoingRTPMetricsContext.nacksPerSecond =
+//            ((DOUBLE) this->canaryMetrics.rtcStatsObject.outboundRtpStreamStats.nackCount - this->canaryOutgoingRTPMetricsContext.prevNackCount) /
+//    currentDuration;
+//    this->canaryOutgoingRTPMetricsContext.prevFramesSent = this->canaryMetrics.rtcStatsObject.outboundRtpStreamStats.framesSent;
+//    this->canaryOutgoingRTPMetricsContext.prevTs = this->canaryMetrics.timestamp;
+//    this->canaryOutgoingRTPMetricsContext.prevFramesDiscardedOnSend = this->canaryMetrics.rtcStatsObject.outboundRtpStreamStats.framesDiscardedOnSend;
+//    this->canaryOutgoingRTPMetricsContext.prevNackCount = this->canaryMetrics.rtcStatsObject.outboundRtpStreamStats.nackCount;
+//    this->canaryOutgoingRTPMetricsContext.prevRetxBytesSent = this->canaryMetrics.rtcStatsObject.outboundRtpStreamStats.retransmittedBytesSent;
 
-    // Declare that we support H264,Profile=42E01F,level-asymmetry-allowed=1,packetization-mode=1 and Opus
-    CHK_STATUS(pPeer->addSupportedCodec(RTC_CODEC_H264_PROFILE_42E01F_LEVEL_ASYMMETRY_ALLOWED_PACKETIZATION_MODE));
-    CHK_STATUS(pPeer->addSupportedCodec(RTC_CODEC_OPUS));
-
-    // Add a SendRecv Transceiver of type video
-    videoTrack.kind = MEDIA_STREAM_TRACK_KIND_VIDEO;
-    videoTrack.codec = RTC_CODEC_H264_PROFILE_42E01F_LEVEL_ASYMMETRY_ALLOWED_PACKETIZATION_MODE;
-    STRCPY(videoTrack.streamId, "myKvsVideoStream");
-    STRCPY(videoTrack.trackId, "myVideoTrack");
-    CHK_STATUS(pPeer->addTransceiver(videoTrack));
-
-    // Add a SendRecv Transceiver of type video
-    audioTrack.kind = MEDIA_STREAM_TRACK_KIND_AUDIO;
-    audioTrack.codec = RTC_CODEC_OPUS;
-    STRCPY(audioTrack.streamId, "myKvsVideoStream");
-    STRCPY(audioTrack.trackId, "myAudioTrack");
-    CHK_STATUS(pPeer->addTransceiver(audioTrack));
-
-CleanUp:
-
-    return retStatus;
+    return STATUS_SUCCESS;
 }
 
 STATUS canaryRtpOutboundStats(UINT32 timerId, UINT64 currentTime, UINT64 customData)
@@ -368,8 +367,16 @@ STATUS canaryRtpOutboundStats(UINT32 timerId, UINT64 currentTime, UINT64 customD
     UNUSED_PARAM(currentTime);
     STATUS retStatus = STATUS_SUCCESS;
     if (!terminated.load()) {
-        Canary::PPeer pPeer = (Canary::PPeer) customData;
-        pPeer->publishStatsForCanary(RTC_STATS_TYPE_OUTBOUND_RTP);
+        POutgoingRTPMetricsContext pOutgoingRtpMetricsContext = (POutgoingRTPMetricsContext) customData;
+        PDemoConfiguration pDemoConfiguration = pOutgoingRtpMetricsContext->pDemoConfiguration;
+        DLOGI("Channel name: %s", pDemoConfiguration->appConfigCtx.pChannelName);
+//        this->canaryMetrics.requestedTypeOfStats = RTC_STATS_TYPE_OUTBOUND_RTP;
+//        if (!this->videoTransceivers.empty()) {
+//            CHK_LOG_ERR(::rtcPeerConnectionGetMetrics(this->pPeerConnection, this->videoTransceivers.back(),
+//                                                      &this->canaryMetrics));
+//            populateOutgoingRtpMetricsContext();
+//            Canary::Cloudwatch::getInstance().monitoring.pushOutboundRtpStats(&this->canaryOutgoingRTPMetricsContext);
+//        }
     } else {
         retStatus = STATUS_TIMER_QUEUE_STOP_SCHEDULING;
     }
@@ -377,7 +384,7 @@ STATUS canaryRtpOutboundStats(UINT32 timerId, UINT64 currentTime, UINT64 customD
     return retStatus;
 }
 
-STATUS canaryRtpInboundStats(UINT32 timerId, UINT64 currentTime, UINT64 customData)
+STATUS canaryRtp09InboundStats(UINT32 timerId, UINT64 currentTime, UINT64 customData)
 {
     UNUSED_PARAM(timerId);
     UNUSED_PARAM(currentTime);

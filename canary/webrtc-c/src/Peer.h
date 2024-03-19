@@ -4,25 +4,25 @@ namespace Canary {
 class Peer;
 typedef Peer* PPeer;
 
-typedef struct {
-    UINT64 prevNumberOfPacketsSent;
-    UINT64 prevNumberOfPacketsReceived;
-    UINT64 prevNumberOfBytesSent;
-    UINT64 prevNumberOfBytesReceived;
-    UINT64 prevFramesDiscardedOnSend;
-    UINT64 prevTs;
-    UINT64 prevVideoFramesGenerated;
-    UINT64 prevFramesSent;
-    UINT64 prevNackCount;
-    UINT64 prevRetxBytesSent;
-    std::atomic<UINT64> videoFramesGenerated;
-    UINT64 videoBytesGenerated;
-    DOUBLE framesPercentageDiscarded;
-    DOUBLE nacksPerSecond;
-    DOUBLE averageFramesSentPerSecond;
-    DOUBLE retxBytesPercentage;
-} OutgoingRTPMetricsContext;
-typedef OutgoingRTPMetricsContext* POutgoingRTPMetricsContext;
+//typedef struct {
+//    UINT64 prevNumberOfPacketsSent;
+//    UINT64 prevNumberOfPacketsReceived;
+//    UINT64 prevNumberOfBytesSent;
+//    UINT64 prevNumberOfBytesReceived;
+//    UINT64 prevFramesDiscardedOnSend;
+//    UINT64 prevTs;
+//    UINT64 prevVideoFramesGenerated;
+//    UINT64 prevFramesSent;
+//    UINT64 prevNackCount;
+//    UINT64 prevRetxBytesSent;
+//    std::atomic<UINT64> videoFramesGenerated;
+//    UINT64 videoBytesGenerated;
+//    DOUBLE framesPercentageDiscarded;
+//    DOUBLE nacksPerSecond;
+//    DOUBLE averageFramesSentPerSecond;
+//    DOUBLE retxBytesPercentage;
+//} OutgoingRTPMetricsContext;
+//typedef OutgoingRTPMetricsContext* POutgoingRTPMetricsContext;
 
 typedef struct {
     UINT64 prevPacketsReceived;
