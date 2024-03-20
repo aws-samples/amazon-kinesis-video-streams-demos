@@ -1,7 +1,7 @@
 import jenkins.model.*
 
 GIT_URL='https://github.com/aws-samples/amazon-kinesis-video-streams-demos.git'
-GIT_HASH='master'
+GIT_HASH='update-producer-sdk-cpp-commit-hash'
 RUNNER_JOB_NAME_PREFIX = "producercpp-runner"
 
 LONG_RUN_DURATION_IN_SECONDS = 12 * 60 * 60
