@@ -1,0 +1,77 @@
+plugins {
+    id 'com.android.library'
+}
+
+android {
+    namespace 'com.amazonaws.kinesisvideo.webrtc.urlvideocapturer'
+    compileSdk 33
+
+    defaultConfig {
+        minSdk 29
+        targetSdk 33
+        versionCode 1
+        versionName "1.0"
+
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+    }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }
+}
+
+dependencies {
+
+    implementation 'androidx.appcompat:appcompat:1.6.1'
+    implementation 'com.google.android.material:material:1.11.0'
+    testImplementation 'junit:junit:4.13.2'
+    testImplementation 'org.powermock:powermock-api-mockito:1.4.12'
+    testImplementation 'org.powermock:powermock-module-junit4:1.6.2'
+    androidTestImplementation 'androidx.test.ext:junit:1.1.5'
+    androidTestImplementation 'androidx.test.espresso:espresso-core:3.5.1'
+
+    implementation 'org.videolan.android:libvlc-all:3.3.13'
+}
+
+// Check that libwebrtc is present during build
+task checkForLibWebRTC() {
+    doLast {
+        boolean webrtcFound = false
+
+        // Check dependencies by name
+        configurations.implementation.dependencies.forEach(dependency -> {
+            // Check the name of the dependency, and also the name of the group
+            if ((dependency.group && dependency.group.contains("webrtc") || dependency.name.contains("webrtc"))
+                    && !dependency.name.contains("webrtcstorage")) {
+                webrtcFound = true
+            }
+        })
+
+        // Check file dependencies
+        if (!webrtcFound) {
+            fileTree(dir: 'libs', include: ['*.jar', '*.aar']).forEach(file -> {
+                if (file.name.contains("webrtc")) {
+                    webrtcFound = true
+                }
+            })
+        }
+
+        if (!webrtcFound) {
+            throw new RuntimeException(
+                    "Unable to find Google WebRTC. You will need to either: (1) Build libwebrtc on " +
+                            "your own following directions here https://webrtc.github.io/webrtc-org/native-code/android/ " +
+                            "to create the AAR, and place it in the app/libs folder so they can be properly referenced in the " +
+                            "build.gradle file or (2) Reference another public repository which vends the android binaries."
+            )
+        }
+    }
+}
+
+preBuild.dependsOn checkForLibWebRTC
