@@ -32,4 +32,4 @@ jobs:
       - name: Build
         run: |
           cd webrtc-js
-          npm build
+          npm run build
