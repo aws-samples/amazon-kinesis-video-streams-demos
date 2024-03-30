@@ -4,9 +4,15 @@ on:
   push:
     branches:
       - master
+    paths:
+      - 'webrtc-js/**'
+      - '.github/workflows/webrtc-js.yaml'
   pull_request:
     branches:
       - master
+    paths:
+      - 'webrtc-js/**'
+      - '.github/workflows/webrtc-js.yaml'
 
 jobs:
   build:
