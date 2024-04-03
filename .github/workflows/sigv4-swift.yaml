@@ -1,0 +1,48 @@
+name: SigV4 Swift Tests
+
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - sigv4-signing/swift/**
+      - .github/workflows/sigv4-swift.yaml
+  pull_request:
+    branches:
+      - master
+    paths:
+      - sigv4-signing/swift/**
+      - .github/workflows/sigv4-swift.yaml
+
+jobs:
+  run-unit-tests:
+    strategy:
+      matrix:
+        config:
+          - mac_ver: '13'
+            xc_ver: '14.3'
+          - mac_ver: '13'
+            xc_ver: '15.0'
+
+    name: 'Build and run unit tests (MacOS ${{ matrix.config.mac_ver }}, XCode ${{ matrix.config.xc_ver }})'
+    runs-on: 'macos-${{ matrix.config.mac_ver }}'
+    steps:
+      - name: Git - Checkout
+        uses: actions/checkout@v4
+      - name: Setup - Xcode
+        run: >-
+          sudo xcode-select -s /Applications/Xcode_${{ matrix.config.xc_ver }}.app
+      - name: Install dependencies
+        run: |
+          cd sigv4-signing/swift/sigv4
+          pod setup
+          pod install --repo-update
+      - name: XCode Test
+        run: set -o pipefail && xcodebuild clean test -workspace sigv4-signing/swift/sigv4/sigv4.xcworkspace -scheme sigv4 -resultBundlePath TestResults -enableCodeCoverage YES | xcpretty
+      - name: Publish results
+        uses: kishikawakatsumi/xcresulttool@v1
+        with:
+          title: 'Test results (MacOS ${{ matrix.config.mac_ver }}, XCode ${{ matrix.config.xc_ver }})'
+          path: TestResults.xcresult
+          upload-bundles: never
+        if: success() || failure()
