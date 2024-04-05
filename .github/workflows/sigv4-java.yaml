@@ -1,0 +1,33 @@
+name: SigV4 Java Tests
+
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - sigv4-signing/java/**
+      - .github/workflows/sigv4-java.yaml
+  pull_request:
+    branches:
+      - master
+    paths:
+      - sigv4-signing/java/**
+      - .github/workflows/sigv4-java.yaml
+
+jobs:
+  run-unit-tests:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        java-version: ['8', '11', '17', '21']
+    name: Build and run unit tests (Java ${{ matrix.java-version }})
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Set up JDK ${{ matrix.java-version }}
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ matrix.java-version }}
+          distribution: corretto
+      - name: Build with Maven
+        run: mvn -B clean verify --file sigv4-signing/java/SigV4Signer.java/pom.xml
