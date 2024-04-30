@@ -80,6 +80,7 @@ class Peer {
     std::atomic<BOOL> recorded;
     BOOL initializedSignaling = FALSE;
     std::string peerId;
+    RTC_CODEC videoCodec;
     RtcConfiguration rtcConfiguration;
     PRtcPeerConnection pPeerConnection;
     std::vector<PRtcRtpTransceiver> audioTransceivers;

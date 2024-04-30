@@ -39,6 +39,12 @@ STATUS Peer::init(const Canary::PConfig pConfig, const Callbacks& callbacks)
     this->canaryIncomingRTPMetricsContext.prevTs = GETTIME();
     this->firstFrame = TRUE;
     this->useIotCredentialProvider = pConfig->useIotCredentialProvider.value;
+    this->videoCodec = RTC_CODEC_H264_PROFILE_42E01F_LEVEL_ASYMMETRY_ALLOWED_PACKETIZATION_MODE;
+
+    if (STRCMP(CANARY_VIDEO_CODEC_H265, pConfig->videoCodec.value.c_str()) == 0) {
+        this->videoCodec = RTC_CODEC_H265;
+    } else
+
     if(this->useIotCredentialProvider) {
         CHK_STATUS(createLwsIotCredentialProvider((PCHAR) pConfig->iotEndpoint,
                                                   (PCHAR) pConfig->iotCoreCert.value.c_str(),
