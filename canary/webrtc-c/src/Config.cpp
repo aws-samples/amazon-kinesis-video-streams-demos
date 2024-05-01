@@ -263,7 +263,7 @@ VOID Config::print()
           this->endpoint.value.c_str(), this->region.value.c_str(), this->label.value.c_str(), this->channelName.value.c_str(),
           this->clientId.value.c_str(), this->isMaster.value ? "Master" : "Viewer", this->trickleIce.value ? "True" : "False",
           this->useTurn.value ? "True" : "False", this->logLevel.value, this->logGroupName.value.c_str(), this->logStreamName.value.c_str(),
-          this->duration.value / HUNDREDS_OF_NANOS_IN_A_SECOND, this->iterationDuration.value / HUNDREDS_OF_NANOS_IN_A_SECOND,
+          this->duration.value / HUNDREDS_OF_NANOS_IN_A_SECOND, this->videoCodec.value.c_str(), this->iterationDuration.value / HUNDREDS_OF_NANOS_IN_A_SECOND,
           this->runBothPeers.value ? "True" : "False", this->useIotCredentialProvider.value ? "IoT" : "Static", this->isStorage ? "True" : "False");
     if(this->useIotCredentialProvider.value) {
         DLOGD("\tIoT endpoint : %s\n"
