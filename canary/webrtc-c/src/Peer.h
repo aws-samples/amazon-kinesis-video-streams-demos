@@ -90,6 +90,10 @@ class Peer {
     UINT64 offerReceiveTimestamp;
     BOOL firstFrame;
     BOOL useIotCredentialProvider;
+    BOOL useTurn;
+    BOOL forceTurn;
+    std::string endpoint;
+    std::string region;
     STATUS status;
     SignalingClientInfo clientInfo;
     PIceConfigInfo pIceConfigInfo;

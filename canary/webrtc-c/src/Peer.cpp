@@ -38,6 +38,10 @@ STATUS Peer::init(const Canary::PConfig pConfig, const Callbacks& callbacks)
     this->canaryIncomingRTPMetricsContext.prevFramesDropped = 0;
     this->canaryIncomingRTPMetricsContext.prevTs = GETTIME();
     this->firstFrame = TRUE;
+    this->forceTurn = pConfig->forceTurn.value;
+    this->endpoint = pConfig->endpoint.value;
+    this->useTurn = pConfig->useTurn.value;
+    this->region = pConfig->region.value;
     this->useIotCredentialProvider = pConfig->useIotCredentialProvider.value;
     if(this->useIotCredentialProvider) {
         CHK_STATUS(createLwsIotCredentialProvider((PCHAR) pConfig->iotEndpoint,
@@ -186,37 +190,12 @@ CleanUp:
 STATUS Peer::initRtcConfiguration(const Canary::PConfig pConfig)
 {
     STATUS retStatus = STATUS_SUCCESS;
-    UINT32 i, iceConfigCount, uriCount;
     PRtcConfiguration pConfiguration = &this->rtcConfiguration;
 
     MEMSET(pConfiguration, 0x00, SIZEOF(RtcConfiguration));
 
     // Set this to custom callback to enable filtering of interfaces
     pConfiguration->kvsRtcConfiguration.iceSetInterfaceFilterFunc = NULL;
-
-    if (pConfig->forceTurn.value) {
-        pConfiguration->iceTransportPolicy = ICE_TRANSPORT_POLICY_RELAY;
-    } else {
-        pConfiguration->iceTransportPolicy = ICE_TRANSPORT_POLICY_ALL;
-    }
-
-    // Set the  STUN server
-    if (pConfig->endpoint.value.empty()) {
-        SNPRINTF(pConfiguration->iceServers[0].urls, MAX_ICE_CONFIG_URI_LEN, KINESIS_VIDEO_STUN_URL, pConfig->region.value.c_str(), KINESIS_VIDEO_STUN_URL_POSTFIX);
-    } else {
-        SNPRINTF(pConfiguration->iceServers[0].urls, MAX_ICE_CONFIG_URI_LEN, "stun:stun.%s:443", pConfig->endpoint.value.c_str());
-    }
-
-    if (pConfig->useTurn.value) {
-
-        /* signalingClientGetIceConfigInfoCount can return more than one turn server. Use only one to optimize
-         * candidate gathering latency. But user can also choose to use more than 1 turn server. */
-        for (uriCount = 0, i = 0; i < MAX_TURN_SERVERS; i++) {
-            CHK_STATUS(signalingClientGetIceConfigInfo(signalingClientHandle, i, &pIceConfigInfo));
-            CHECK(uriCount < MAX_ICE_SERVERS_COUNT);
-            uriCount += pIceConfigInfo->uriCount;
-        }
-    }
 
 CleanUp:
 
@@ -286,7 +265,6 @@ STATUS Peer::initPeerConnection()
     STATUS retStatus = STATUS_SUCCESS;
     CHK(this->pPeerConnection == NULL, STATUS_INVALID_OPERATION);
     CHK_STATUS(createPeerConnection(&this->rtcConfiguration, &this->pPeerConnection));
-    CHK_STATUS(addConfigToServerList(&this->pPeerConnection, this->pIceConfigInfo));
     CHK_STATUS(peerConnectionOnIceCandidate(this->pPeerConnection, (UINT64) this, handleOnIceCandidate));
     CHK_STATUS(peerConnectionOnConnectionStateChange(this->pPeerConnection, (UINT64) this, onConnectionStateChange));
 
@@ -401,6 +379,7 @@ STATUS Peer::handleSignalingMsg(PReceivedSignalingMessage pMsg)
         STATUS retStatus = STATUS_SUCCESS;
         RtcSessionDescriptionInit offerSDPInit, answerSDPInit;
         NullableBool canTrickle;
+        UINT32 i, iceConfigCount, uriCount;
         UINT32 buffLen;
         this->offerReceiveTimestamp = GETTIME();
         if (!this->isMaster) {
@@ -411,6 +390,31 @@ STATUS Peer::handleSignalingMsg(PReceivedSignalingMessage pMsg)
         if (receivedOffer.exchange(TRUE)) {
             DLOGW("Offer already received, ignore new offer from client id %s", msg.peerClientId);
             CHK(FALSE, retStatus);
+        }
+
+        if (this->forceTurn) {
+            this->rtcConfiguration.iceTransportPolicy = ICE_TRANSPORT_POLICY_RELAY;
+        } else {
+            this->rtcConfiguration.iceTransportPolicy = ICE_TRANSPORT_POLICY_ALL;
+        }
+
+        // Set the  STUN server
+        if (this->endpoint.empty()) {
+            SNPRINTF(this->rtcConfiguration.iceServers[0].urls, MAX_ICE_CONFIG_URI_LEN, KINESIS_VIDEO_STUN_URL, this->region.c_str(), KINESIS_VIDEO_STUN_URL_POSTFIX);
+        } else {
+            SNPRINTF(this->rtcConfiguration.iceServers[0].urls, MAX_ICE_CONFIG_URI_LEN, "stun:stun.%s:443", this->endpoint.c_str());
+        }
+
+        if (this->useTurn) {
+
+            /* signalingClientGetIceConfigInfoCount can return more than one turn server. Use only one to optimize
+             * candidate gathering latency. But user can also choose to use more than 1 turn server. */
+            for (uriCount = 0, i = 0; i < MAX_TURN_SERVERS; i++) {
+                CHK_STATUS(signalingClientGetIceConfigInfo(this->signalingClientHandle, i, &this->pIceConfigInfo));
+                CHECK(uriCount < MAX_ICE_SERVERS_COUNT);
+                uriCount += this->pIceConfigInfo->uriCount;
+                CHK_STATUS(addConfigToServerList(&this->pPeerConnection, this->pIceConfigInfo));
+            }
         }
 
         MEMSET(&offerSDPInit, 0, SIZEOF(offerSDPInit));
