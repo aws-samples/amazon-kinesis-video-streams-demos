@@ -51,6 +51,8 @@ class Peer {
 
     Peer();
     ~Peer();
+
+    RTC_CODEC videoCodec;
     STATUS init(const Canary::PConfig, const Callbacks&);
     STATUS shutdown();
     STATUS connect();
@@ -80,7 +82,6 @@ class Peer {
     std::atomic<BOOL> recorded;
     BOOL initializedSignaling = FALSE;
     std::string peerId;
-    RTC_CODEC videoCodec;
     RtcConfiguration rtcConfiguration;
     PRtcPeerConnection pPeerConnection;
     std::vector<PRtcRtpTransceiver> audioTransceivers;

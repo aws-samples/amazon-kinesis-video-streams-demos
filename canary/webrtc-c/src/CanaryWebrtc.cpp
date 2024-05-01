@@ -49,20 +49,27 @@ INT32 main(INT32 argc, CHAR* argv[])
     signal(SIGINT, handleSignal);
 #endif
 
+    printf("RRRRRRRRR: %d\n", __LINE__);
     STATUS retStatus = STATUS_SUCCESS;
     initializeEndianness();
+    printf("TTTTTTTT: %d\n", __LINE__);
     SET_INSTRUMENTED_ALLOCATORS();
     SRAND(time(0));
     // Make sure that all destructors have been called first before resetting the instrumented allocators
     CHK_STATUS([&]() -> STATUS {
+        printf("TTTTTTTT: %d\n", __LINE__);
         STATUS retStatus = STATUS_SUCCESS;
         auto config = Canary::Config();
 
         Aws::SDKOptions options;
         Aws::InitAPI(options);
+        printf("TTTTTTTT: %d\n", __LINE__);
 
+        printf("TTTTTTTT: %d\n", __LINE__);
         CHK_STATUS(config.init(argc, argv));
+        printf("TTTTTTTT: %d\n", __LINE__);
         CHK_STATUS(run(&config));
+        printf("TTTTTTTT: %d\n", __LINE__);
 
     CleanUp:
 
@@ -93,12 +100,16 @@ STATUS run(Canary::PConfig pConfig)
     UINT32 timeoutTimerId;
 
     CHK_STATUS(Canary::Cloudwatch::init(pConfig));
+    DLOGI("TTTTTTTT: %d", __LINE__);
     CHK_STATUS(initKvsWebRtc());
+    DLOGI("TTTTTTTT: %d", __LINE__);
     initialized = TRUE;
 
     SET_LOGGER_LOG_LEVEL(pConfig->logLevel.value);
+    DLOGI("TTTTTTTT: %d", __LINE__);
 
     CHK_STATUS(timerQueueCreate(&timerQueueHandle));
+    DLOGI("TTTTTTTT: %d", __LINE__);
     if (pConfig->duration.value != 0) {
         auto terminate = [](UINT32 timerId, UINT64 currentTime, UINT64 customData) -> STATUS {
             UNUSED_PARAM(timerId);
@@ -111,13 +122,17 @@ STATUS run(Canary::PConfig pConfig)
                                       &timeoutTimerId));
     }
 
+    DLOGI("TTTTTTTT: %d", __LINE__);
     if (!pConfig->runBothPeers.value) {
+        DLOGI("TTTTTTTT: %d", __LINE__);
         runPeer(pConfig, timerQueueHandle, &retStatus);
     } else {
         // Modify config to differentiate master and viewer
         UINT64 timestamp = GETTIME() / HUNDREDS_OF_NANOS_IN_A_SECOND;
         STATUS masterRetStatus;
         std::stringstream ss;
+
+        DLOGI("TTTTTTTT: %d", __LINE__);
 
         Canary::Config masterConfig = *pConfig;
         masterConfig.isMaster.value = TRUE;
@@ -126,9 +141,13 @@ STATUS run(Canary::PConfig pConfig)
         masterConfig.clientId.value = ss.str();
         ss.str("");
 
+        DLOGI("TTTTTTTT: %d", __LINE__);
+
         ss << pConfig->channelName.value << "-master-" << timestamp;
         masterConfig.logStreamName.value = ss.str();
         ss.str("");
+
+        DLOGI("TTTTTTTT: %d", __LINE__);
 
         Canary::Config viewerConfig = *pConfig;
         viewerConfig.isMaster.value = FALSE;
@@ -144,8 +163,11 @@ STATUS run(Canary::PConfig pConfig)
         std::thread masterThread(runPeer, &masterConfig, timerQueueHandle, &masterRetStatus);
         THREAD_SLEEP(CANARY_DEFAULT_VIEWER_INIT_DELAY);
 
+        DLOGI("TTTTTTTT: %d", __LINE__);
         runPeer(&viewerConfig, timerQueueHandle, &retStatus);
+        DLOGI("TTTTTTTT: %d", __LINE__);
         masterThread.join();
+        DLOGI("TTTTTTTT: %d", __LINE__);
 
         retStatus = STATUS_FAILED(retStatus) ? retStatus : masterRetStatus;
     }
@@ -195,16 +217,22 @@ VOID runPeer(Canary::PConfig pConfig, TIMER_QUEUE_HANDLE timerQueueHandle, STATU
 
     Canary::Peer::Callbacks callbacks;
     callbacks.onNewConnection = onNewConnection;
+    DLOGI("TTTTTTTT: %d", __LINE__);
     callbacks.onDisconnected = []() { terminated = TRUE; };
 
     Canary::Peer peer;
 
     CHK(pConfig != NULL, STATUS_NULL_ARG);
+    DLOGI("TTTTTTTT: %d", __LINE__);
     pConfig->print();
+    DLOGI("TTTTTTTT: %d", __LINE__);
     CHK_STATUS(timerQueueAddTimer(timerQueueHandle, KVS_METRICS_INVOCATION_PERIOD, KVS_METRICS_INVOCATION_PERIOD,
                                   canaryKvsStats, (UINT64) &peer, &timeoutTimerId));
+    DLOGI("TTTTTTTT: %d", __LINE__);
     CHK_STATUS(peer.init(pConfig, callbacks));
+    DLOGI("TTTTTTTT: %d", __LINE__);
     CHK_STATUS(peer.connect());
+    DLOGI("TTTTTTTT: %d", __LINE__);
 
     {
         // Since the goal of the canary is to test robustness of the SDK, there is not an immediate need
@@ -213,15 +241,22 @@ VOID runPeer(Canary::PConfig pConfig, TIMER_QUEUE_HANDLE timerQueueHandle, STATU
         // All metrics tracking will happen on a time queue to simplify handling periodicity
         CHK_STATUS(timerQueueAddTimer(timerQueueHandle, METRICS_INVOCATION_PERIOD, METRICS_INVOCATION_PERIOD, canaryRtpOutboundStats, (UINT64) &peer,
                                       &timeoutTimerId));
+        DLOGI("TTTTTTTT: %d", __LINE__);
         CHK_STATUS(timerQueueAddTimer(timerQueueHandle, METRICS_INVOCATION_PERIOD, METRICS_INVOCATION_PERIOD, canaryRtpInboundStats, (UINT64) &peer,
                                       &timeoutTimerId));
+        DLOGI("TTTTTTTT: %d", __LINE__);
         CHK_STATUS(timerQueueAddTimer(timerQueueHandle, END_TO_END_METRICS_INVOCATION_PERIOD, END_TO_END_METRICS_INVOCATION_PERIOD,
                                       canaryEndToEndStats, (UINT64) &peer, &timeoutTimerId));
+        DLOGI("TTTTTTTT: %d", __LINE__);
         if(pConfig->isProfilingMode.value && pConfig->isMaster.value) {
             std::thread pushProfilingThread(sendProfilingMetrics, &peer);
+            DLOGI("TTTTTTTT: %d", __LINE__);
             pushProfilingThread.join();
+            DLOGI("TTTTTTTT: %d", __LINE__);
         }
+        DLOGI("TTTTTTTT: %d", __LINE__);
         videoThread.join();
+        DLOGI("TTTTTTTT: %d", __LINE__);
     }
 
     CHK_STATUS(peer.shutdown());
@@ -236,6 +271,8 @@ STATUS onNewConnection(Canary::PPeer pPeer)
     STATUS retStatus = STATUS_SUCCESS;
     RtcMediaStreamTrack videoTrack, audioTrack;
 
+    DLOGI("TTTTTTTT: %d", __LINE__);
+
     MEMSET(&videoTrack, 0x00, SIZEOF(RtcMediaStreamTrack));
     MEMSET(&audioTrack, 0x00, SIZEOF(RtcMediaStreamTrack));
 
@@ -248,6 +285,7 @@ STATUS onNewConnection(Canary::PPeer pPeer)
     STRCPY(videoTrack.streamId, "myKvsVideoStream");
     STRCPY(videoTrack.trackId, "myVideoTrack");
     CHK_STATUS(pPeer->addTransceiver(videoTrack));
+    DLOGI("TTTTTTTT: %d", __LINE__);
 
     // Add a SendRecv Transceiver of type video
     audioTrack.kind = MEDIA_STREAM_TRACK_KIND_AUDIO;
@@ -282,7 +320,9 @@ VOID sendCustomFrames(Canary::PPeer pPeer, MEDIA_STREAM_TRACK_KIND kind, UINT64 
 
     while (!terminated.load()) {
         frame.size = actualFrameSize;
+        DLOGI("TTTTTTTT: %d", __LINE__);
         createCanaryFrameData(canaryFrameData, &frame);
+        DLOGI("TTTTTTTT: %d", __LINE__);
 
         // Hex encode the data (without the ANNEX-B NALu) to ensure parts of random frame data is not skipped if they
         // are the same as the ANNEX-B NALu
@@ -301,9 +341,12 @@ VOID sendCustomFrames(Canary::PPeer pPeer, MEDIA_STREAM_TRACK_KIND kind, UINT64 
 
         // We must update the size to reflect the original data with hex encoded data
         frame.size = hexStrLen + ANNEX_B_NALU_SIZE;
+        DLOGI("TTTTTTTT: %d", __LINE__);
         pPeer->writeFrame(&frame, kind);
+        DLOGI("TTTTTTTT: %d", __LINE__);
         THREAD_SLEEP(HUNDREDS_OF_NANOS_IN_A_SECOND / frameRate);
         frame.presentationTs = GETTIME();
+        DLOGI("TTTTTTTT: %d", __LINE__);
     }
 CleanUp:
 
@@ -311,10 +354,14 @@ CleanUp:
     SAFE_MEMFREE(canaryFrameData);
 
     auto threadKind = kind == MEDIA_STREAM_TRACK_KIND_VIDEO ? "video" : "audio";
+    DLOGI("TTTTTTTT: %d", __LINE__);
     if (STATUS_FAILED(retStatus)) {
+        DLOGI("TTTTTTTT: %d", __LINE__);
         DLOGE("%s thread exited with 0x%08x", threadKind, retStatus);
+        DLOGI("TTTTTTTT: %d", __LINE__);
     } else {
         DLOGI("%s thread exited successfully", threadKind);
+        DLOGI("TTTTTTTT: %d", __LINE__);
     }
 }
 

@@ -43,7 +43,7 @@ STATUS Peer::init(const Canary::PConfig pConfig, const Callbacks& callbacks)
 
     if (STRCMP(CANARY_VIDEO_CODEC_H265, pConfig->videoCodec.value.c_str()) == 0) {
         this->videoCodec = RTC_CODEC_H265;
-    } else
+    }
 
     if(this->useIotCredentialProvider) {
         CHK_STATUS(createLwsIotCredentialProvider((PCHAR) pConfig->iotEndpoint,
@@ -506,17 +506,21 @@ CleanUp:
 
 STATUS Peer::addTransceiver(RtcMediaStreamTrack& track)
 {
+    DLOGI("TTTTTTTT: %d", __LINE__);
     auto handleBandwidthEstimation = [](UINT64 customData, DOUBLE maxiumBitrate) -> VOID {
         UNUSED_PARAM(customData);
         // TODO: Probably reexpose or add metrics here directly
         DLOGV("received bitrate suggestion: %f", maxiumBitrate);
     };
+    DLOGI("TTTTTTTT: %d", __LINE__);
 
     auto handleVideoFrame = [](UINT64 customData, PFrame pFrame) -> VOID {
         PPeer pPeer = (Canary::PPeer)(customData);
         std::unique_lock<std::recursive_mutex> lock(pPeer->mutex);
         PBYTE frameDataPtr = pFrame->frameData + ANNEX_B_NALU_SIZE;
         UINT32 rawPacketSize = 0;
+
+        printf("TTTTTTTT handleVideoFrame: %d\n", __LINE__);
 
         // Get size of hex encoded data
         hexDecode((PCHAR) frameDataPtr, pFrame->size - ANNEX_B_NALU_SIZE, NULL, &rawPacketSize);
@@ -529,6 +533,8 @@ STATUS Peer::addTransceiver(RtcMediaStreamTrack& track)
         frameDataPtr += SIZEOF(UINT64);
         UINT32 receivedSize = getUnalignedInt32BigEndian((PINT32)(frameDataPtr));
 
+        printf("TTTTTTTT handleVideoFrame: %d\n", __LINE__);
+
         pPeer->endToEndMetricsContext.frameLatencyAvg =
             EMA_ACCUMULATOR_GET_NEXT(pPeer->endToEndMetricsContext.frameLatencyAvg, GETTIME() - receivedTs);
 
@@ -539,23 +545,30 @@ STATUS Peer::addTransceiver(RtcMediaStreamTrack& track)
         } else {
             pPeer->endToEndMetricsContext.sizeMatchAvg = EMA_ACCUMULATOR_GET_NEXT(pPeer->endToEndMetricsContext.sizeMatchAvg, 0);
         }
+
+        printf("TTTTTTTT handleVideoFrame: %d\n", __LINE__);
         SAFE_MEMFREE(rawPacket);
     };
 
     PRtcRtpTransceiver pTransceiver;
     STATUS retStatus = STATUS_SUCCESS;
 
+    DLOGI("TTTTTTTT: %d", __LINE__);
     CHK_STATUS(::addTransceiver(pPeerConnection, &track, NULL, &pTransceiver));
     if (track.kind == MEDIA_STREAM_TRACK_KIND_VIDEO) {
         this->videoTransceivers.push_back(pTransceiver);
 
         // As part of canaries, we will only be monitoring video transceiver as we do for every other metrics
+        DLOGI("TTTTTTTT: %d", __LINE__);
         CHK_STATUS(transceiverOnFrame(pTransceiver, (UINT64) this, handleVideoFrame));
+        DLOGI("TTTTTTTT: %d", __LINE__);
     } else {
         this->audioTransceivers.push_back(pTransceiver);
+        DLOGI("TTTTTTTT: %d", __LINE__);
     }
 
     CHK_STATUS(transceiverOnBandwidthEstimation(pTransceiver, (UINT64) this, handleBandwidthEstimation));
+    DLOGI("TTTTTTTT: %d", __LINE__);
 
 CleanUp:
 
