@@ -506,13 +506,11 @@ CleanUp:
 
 STATUS Peer::addTransceiver(RtcMediaStreamTrack& track)
 {
-    DLOGI("TTTTTTTT: %d", __LINE__);
     auto handleBandwidthEstimation = [](UINT64 customData, DOUBLE maxiumBitrate) -> VOID {
         UNUSED_PARAM(customData);
         // TODO: Probably reexpose or add metrics here directly
         DLOGV("received bitrate suggestion: %f", maxiumBitrate);
     };
-    DLOGI("TTTTTTTT: %d", __LINE__);
 
     auto handleVideoFrame = [](UINT64 customData, PFrame pFrame) -> VOID {
         PPeer pPeer = (Canary::PPeer)(customData);
@@ -553,22 +551,18 @@ STATUS Peer::addTransceiver(RtcMediaStreamTrack& track)
     PRtcRtpTransceiver pTransceiver;
     STATUS retStatus = STATUS_SUCCESS;
 
-    DLOGI("TTTTTTTT: %d", __LINE__);
     CHK_STATUS(::addTransceiver(pPeerConnection, &track, NULL, &pTransceiver));
     if (track.kind == MEDIA_STREAM_TRACK_KIND_VIDEO) {
         this->videoTransceivers.push_back(pTransceiver);
 
         // As part of canaries, we will only be monitoring video transceiver as we do for every other metrics
-        DLOGI("TTTTTTTT: %d", __LINE__);
         CHK_STATUS(transceiverOnFrame(pTransceiver, (UINT64) this, handleVideoFrame));
-        DLOGI("TTTTTTTT: %d", __LINE__);
+
     } else {
         this->audioTransceivers.push_back(pTransceiver);
-        DLOGI("TTTTTTTT: %d", __LINE__);
     }
 
     CHK_STATUS(transceiverOnBandwidthEstimation(pTransceiver, (UINT64) this, handleBandwidthEstimation));
-    DLOGI("TTTTTTTT: %d", __LINE__);
 
 CleanUp:
 

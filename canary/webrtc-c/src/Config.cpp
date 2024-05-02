@@ -9,15 +9,13 @@ STATUS Config::init(INT32 argc, PCHAR argv[])
 
     CHK(argv != NULL, STATUS_NULL_ARG);
 
-    DLOGI("TTTTTTTT: %d", __LINE__);
     if (argc == 2) {
         DLOGI("Reading configuration from %s\n", argv[1]);
         CHK_STATUS(initWithJSON(argv[1]));
-        DLOGI("TTTTTTTT: %d", __LINE__);
+
     }
 
     CHK_STATUS(initWithEnvVars());
-    DLOGI("TTTTTTTT: %d", __LINE__);
 
     // Need to impose a min duration
     if (duration.value != 0 && duration.value < CANARY_MIN_DURATION) {
@@ -25,7 +23,6 @@ STATUS Config::init(INT32 argc, PCHAR argv[])
               CANARY_MIN_DURATION / HUNDREDS_OF_NANOS_IN_A_SECOND);
         duration.value = CANARY_MIN_DURATION;
     }
-    DLOGI("TTTTTTTT: %d", __LINE__);
 
     // Need to impose a min iteration duration
     if (iterationDuration.value < CANARY_MIN_ITERATION_DURATION) {
@@ -33,7 +30,6 @@ STATUS Config::init(INT32 argc, PCHAR argv[])
               CANARY_MIN_ITERATION_DURATION / HUNDREDS_OF_NANOS_IN_A_SECOND);
         iterationDuration.value = CANARY_MIN_ITERATION_DURATION;
     }
-    DLOGI("TTTTTTTT: %d", __LINE__);
 
 CleanUp:
 
