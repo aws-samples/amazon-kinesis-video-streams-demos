@@ -268,19 +268,26 @@ VOID sendCustomFrames(Canary::PPeer pPeer, MEDIA_STREAM_TRACK_KIND kind, UINT64 
     UINT32 hexStrLen = 0;
     UINT32 actualFrameSize = 0;
     UINT32 frameSizeWithoutNalu = 0;
-    // This is the actual frame size that includes the metadata and the actual frame data
-    actualFrameSize = CANARY_METADATA_SIZE + ((dataRate / 8) / frameRate);
-    frameSizeWithoutNalu = actualFrameSize - ANNEX_B_NALU_SIZE;
-
+    UINT32 minFrameSize = CANARY_METADATA_SIZE + ((dataRate / 8) / frameRate);
+    UINT32 maxFrameSize = CANARY_METADATA_SIZE * 3 + ((dataRate / 8) / frameRate);
     PBYTE canaryFrameData = NULL;
-    canaryFrameData = (PBYTE) MEMALLOC(actualFrameSize);
+    
+    canaryFrameData = (PBYTE) MEMALLOC(maxFrameSize);
+
+    DLOGI("WWWWWWWWWWWW: %d %d %d", minFrameSize, maxFrameSize, CANARY_METADATA_SIZE);
 
     // We allocate a bigger buffer to accomodate the hex encoded string
-    frame.frameData = (PBYTE) MEMALLOC(frameSizeWithoutNalu * 2 + 1 + ANNEX_B_NALU_SIZE);
+    frame.frameData = (PBYTE) MEMALLOC(maxFrameSize * 2 + 1 + ANNEX_B_NALU_SIZE);
     frame.version = FRAME_CURRENT_VERSION;
     frame.presentationTs = GETTIME();
 
     while (!terminated.load()) {
+
+        // This is the actual frame size that includes the metadata and the actual frame data
+        actualFrameSize = (RAND() % (maxFrameSize - minFrameSize + 1));
+        frameSizeWithoutNalu = actualFrameSize - ANNEX_B_NALU_SIZE;
+        DLOGI("UUUUUUU: %d", actualFrameSize);
+
         frame.size = actualFrameSize;
         createCanaryFrameData(canaryFrameData, &frame);
 

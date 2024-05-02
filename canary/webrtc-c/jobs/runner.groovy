@@ -112,6 +112,7 @@ def buildPeer(isMaster, params) {
       'CANARY_CLIENT_ID': clientID,
       'CANARY_IS_MASTER': isMaster,
       'CANARY_DURATION_IN_SECONDS': params.DURATION_IN_SECONDS,
+      'CANARY_VIDEO_CODEC': params.VIDEO_CODEC,
       'AWS_IOT_CORE_CREDENTIAL_ENDPOINT': "${endpoint}",
       'AWS_IOT_CORE_CERT': "${core_cert_file}",
       'AWS_IOT_CORE_PRIVATE_KEY': "${private_key_file}",
@@ -263,6 +264,7 @@ pipeline {
         string(name: 'RUNNER_LABEL')
         string(name: 'SCENARIO_LABEL')
         string(name: 'DURATION_IN_SECONDS')
+        string(name: 'VIDEO_CODEC')
         string(name: 'MIN_RETRY_DELAY_IN_SECONDS')
         string(name: 'GIT_URL')
         string(name: 'GIT_HASH')
@@ -434,6 +436,7 @@ pipeline {
                       string(name: 'RUNNER_LABEL', value: params.RUNNER_LABEL),
                       string(name: 'SCENARIO_LABEL', value: params.SCENARIO_LABEL),
                       string(name: 'DURATION_IN_SECONDS', value: params.DURATION_IN_SECONDS),
+                      string(name: 'VIDEO_CODEC', value: params.VIDEO_CODEC),
                       string(name: 'MIN_RETRY_DELAY_IN_SECONDS', value: params.MIN_RETRY_DELAY_IN_SECONDS),
                       string(name: 'GIT_URL', value: params.GIT_URL),
                       string(name: 'GIT_HASH', value: params.GIT_HASH),
