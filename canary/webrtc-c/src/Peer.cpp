@@ -518,8 +518,6 @@ STATUS Peer::addTransceiver(RtcMediaStreamTrack& track)
         PBYTE frameDataPtr = pFrame->frameData + ANNEX_B_NALU_SIZE;
         UINT32 rawPacketSize = 0;
 
-        printf("TTTTTTTT handleVideoFrame: %d\n", __LINE__);
-
         // Get size of hex encoded data
         hexDecode((PCHAR) frameDataPtr, pFrame->size - ANNEX_B_NALU_SIZE, NULL, &rawPacketSize);
         PBYTE rawPacket = (PBYTE) MEMCALLOC(1, (rawPacketSize * SIZEOF(BYTE)));
@@ -531,7 +529,7 @@ STATUS Peer::addTransceiver(RtcMediaStreamTrack& track)
         frameDataPtr += SIZEOF(UINT64);
         UINT32 receivedSize = getUnalignedInt32BigEndian((PINT32)(frameDataPtr));
 
-        printf("TTTTTTTT handleVideoFrame: %d\n", __LINE__);
+        
 
         pPeer->endToEndMetricsContext.frameLatencyAvg =
             EMA_ACCUMULATOR_GET_NEXT(pPeer->endToEndMetricsContext.frameLatencyAvg, GETTIME() - receivedTs);
@@ -539,12 +537,12 @@ STATUS Peer::addTransceiver(RtcMediaStreamTrack& track)
         // Do a size match of the raw packet. Since raw packet does not contain the NALu, the
         // comparison would be rawPacketSize + ANNEX_B_NALU_SIZE and the received size
         if (rawPacketSize + ANNEX_B_NALU_SIZE == receivedSize) {
+            printf("TTTTTTTT handleVideoFrame: %d\n", pFrame->size);
             pPeer->endToEndMetricsContext.sizeMatchAvg = EMA_ACCUMULATOR_GET_NEXT(pPeer->endToEndMetricsContext.sizeMatchAvg, 1);
         } else {
+            printf("RRRRRRRRR handleVideoFrame: %d\n", pFrame->size);
             pPeer->endToEndMetricsContext.sizeMatchAvg = EMA_ACCUMULATOR_GET_NEXT(pPeer->endToEndMetricsContext.sizeMatchAvg, 0);
         }
-
-        printf("TTTTTTTT handleVideoFrame: %d\n", __LINE__);
         SAFE_MEMFREE(rawPacket);
     };
 
