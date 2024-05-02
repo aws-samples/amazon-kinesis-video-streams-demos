@@ -218,7 +218,7 @@ pipeline {
                                 string(name: 'MASTER_NODE_LABEL', value: "openssl-master"),
                                 string(name: 'VIEWER_NODE_LABEL', value: "openssl-viewer"),
                                 string(name: 'RUNNER_LABEL', value: "WebrtcLongRunningOpenSSL-H265"),
-                                string(name: 'SCENARIO_LABEL', value: "WebrtcLongRunning"),
+                                string(name: 'SCENARIO_LABEL', value: "WebrtcLongRunning-H265"),
                             ],
                             wait: false
                         )
@@ -235,7 +235,7 @@ pipeline {
                                 string(name: 'MASTER_NODE_LABEL', value: "mbedtls-master"),
                                 string(name: 'VIEWER_NODE_LABEL', value: "mbedtls-viewer"),
                                 string(name: 'RUNNER_LABEL', value: "WebrtcPeriodicStaticMbedTLS-H265"),
-                                string(name: 'SCENARIO_LABEL', value: "MbedTLSPeriodic"),
+                                string(name: 'SCENARIO_LABEL', value: "MbedTLSPeriodic-H265"),
                             ],
                             wait: false
                         )
@@ -252,7 +252,7 @@ pipeline {
                                 string(name: 'MASTER_NODE_LABEL', value: "mbedtls-master"),
                                 string(name: 'VIEWER_NODE_LABEL', value: "mbedtls-viewer"),
                                 string(name: 'RUNNER_LABEL', value: "WebrtcLongRunningStaticMbedTLS-H265"),
-                                string(name: 'SCENARIO_LABEL', value: "WebrtcLongRunning"),
+                                string(name: 'SCENARIO_LABEL', value: "WebrtcLongRunning-H265"),
                             ],
                             wait: false
                         )
