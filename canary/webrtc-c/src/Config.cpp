@@ -12,7 +12,6 @@ STATUS Config::init(INT32 argc, PCHAR argv[])
     if (argc == 2) {
         DLOGI("Reading configuration from %s\n", argv[1]);
         CHK_STATUS(initWithJSON(argv[1]));
-
     }
 
     CHK_STATUS(initWithEnvVars());

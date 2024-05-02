@@ -557,7 +557,6 @@ STATUS Peer::addTransceiver(RtcMediaStreamTrack& track)
 
         // As part of canaries, we will only be monitoring video transceiver as we do for every other metrics
         CHK_STATUS(transceiverOnFrame(pTransceiver, (UINT64) this, handleVideoFrame));
-
     } else {
         this->audioTransceivers.push_back(pTransceiver);
     }

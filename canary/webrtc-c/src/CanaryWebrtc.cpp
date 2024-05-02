@@ -216,22 +216,15 @@ VOID runPeer(Canary::PConfig pConfig, TIMER_QUEUE_HANDLE timerQueueHandle, STATU
         // All metrics tracking will happen on a time queue to simplify handling periodicity
         CHK_STATUS(timerQueueAddTimer(timerQueueHandle, METRICS_INVOCATION_PERIOD, METRICS_INVOCATION_PERIOD, canaryRtpOutboundStats, (UINT64) &peer,
                                       &timeoutTimerId));
-
         CHK_STATUS(timerQueueAddTimer(timerQueueHandle, METRICS_INVOCATION_PERIOD, METRICS_INVOCATION_PERIOD, canaryRtpInboundStats, (UINT64) &peer,
                                       &timeoutTimerId));
-
         CHK_STATUS(timerQueueAddTimer(timerQueueHandle, END_TO_END_METRICS_INVOCATION_PERIOD, END_TO_END_METRICS_INVOCATION_PERIOD,
                                       canaryEndToEndStats, (UINT64) &peer, &timeoutTimerId));
-
         if(pConfig->isProfilingMode.value && pConfig->isMaster.value) {
             std::thread pushProfilingThread(sendProfilingMetrics, &peer);
-    
             pushProfilingThread.join();
-    
         }
-
         videoThread.join();
-
     }
 
     CHK_STATUS(peer.shutdown());
@@ -246,8 +239,6 @@ STATUS onNewConnection(Canary::PPeer pPeer)
     STATUS retStatus = STATUS_SUCCESS;
     RtcMediaStreamTrack videoTrack, audioTrack;
 
-    DLOGI("TTTTTTTT: %d", __LINE__);
-
     MEMSET(&videoTrack, 0x00, SIZEOF(RtcMediaStreamTrack));
     MEMSET(&audioTrack, 0x00, SIZEOF(RtcMediaStreamTrack));
 
@@ -260,7 +251,6 @@ STATUS onNewConnection(Canary::PPeer pPeer)
     STRCPY(videoTrack.streamId, "myKvsVideoStream");
     STRCPY(videoTrack.trackId, "myVideoTrack");
     CHK_STATUS(pPeer->addTransceiver(videoTrack));
-    DLOGI("TTTTTTTT: %d", __LINE__);
 
     // Add a SendRecv Transceiver of type video
     audioTrack.kind = MEDIA_STREAM_TRACK_KIND_AUDIO;
@@ -295,9 +285,7 @@ VOID sendCustomFrames(Canary::PPeer pPeer, MEDIA_STREAM_TRACK_KIND kind, UINT64 
 
     while (!terminated.load()) {
         frame.size = actualFrameSize;
-        DLOGI("TTTTTTTT: %d", __LINE__);
         createCanaryFrameData(canaryFrameData, &frame);
-        DLOGI("TTTTTTTT: %d", __LINE__);
 
         // Hex encode the data (without the ANNEX-B NALu) to ensure parts of random frame data is not skipped if they
         // are the same as the ANNEX-B NALu
@@ -316,12 +304,9 @@ VOID sendCustomFrames(Canary::PPeer pPeer, MEDIA_STREAM_TRACK_KIND kind, UINT64 
 
         // We must update the size to reflect the original data with hex encoded data
         frame.size = hexStrLen + ANNEX_B_NALU_SIZE;
-        DLOGI("TTTTTTTT: %d", __LINE__);
         pPeer->writeFrame(&frame, kind);
-        DLOGI("TTTTTTTT: %d", __LINE__);
         THREAD_SLEEP(HUNDREDS_OF_NANOS_IN_A_SECOND / frameRate);
         frame.presentationTs = GETTIME();
-        DLOGI("TTTTTTTT: %d", __LINE__);
     }
 CleanUp:
 
@@ -329,14 +314,10 @@ CleanUp:
     SAFE_MEMFREE(canaryFrameData);
 
     auto threadKind = kind == MEDIA_STREAM_TRACK_KIND_VIDEO ? "video" : "audio";
-    DLOGI("TTTTTTTT: %d", __LINE__);
     if (STATUS_FAILED(retStatus)) {
-        DLOGI("TTTTTTTT: %d", __LINE__);
         DLOGE("%s thread exited with 0x%08x", threadKind, retStatus);
-        DLOGI("TTTTTTTT: %d", __LINE__);
     } else {
         DLOGI("%s thread exited successfully", threadKind);
-        DLOGI("TTTTTTTT: %d", __LINE__);
     }
 }
 
