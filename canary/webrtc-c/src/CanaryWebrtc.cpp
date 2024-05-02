@@ -144,11 +144,8 @@ STATUS run(Canary::PConfig pConfig)
         std::thread masterThread(runPeer, &masterConfig, timerQueueHandle, &masterRetStatus);
         THREAD_SLEEP(CANARY_DEFAULT_VIEWER_INIT_DELAY);
 
-
         runPeer(&viewerConfig, timerQueueHandle, &retStatus);
-
         masterThread.join();
-
 
         retStatus = STATUS_FAILED(retStatus) ? retStatus : masterRetStatus;
     }

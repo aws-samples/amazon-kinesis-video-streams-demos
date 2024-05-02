@@ -10,6 +10,7 @@ export CANARY_DURATION_IN_SECONDS=90 # How long you want to run this in seconds.
 export CANARY_FORCE_TURN=FALSE #This will enforce TURN, which is your use case
 export CANARY_USE_IOT_PROVIDER=FALSE #This will enforce use of IoT credential provider
 export CANARY_LABEL=Profiling
+export CANARY_IS_PROFILING_MODE=TRUE
 export CANARY_VIDEO_CODEC=h265 # This sets the video codec (can take h264(default), h265)
 #export AWS_IOT_CORE_CREDENTIAL_ENDPOINT=$(PWD)/iot-credential-provider.txt
 #export AWS_IOT_CORE_CERT=$(PWD)/${prefix}_certificate.pem
