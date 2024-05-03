@@ -13,7 +13,7 @@ STORAGE_EXTENDED_DURATION_IN_SECONDS = 43200 // 12 hr
 MIN_RETRY_DELAY_IN_SECONDS = 60
 COLD_STARTUP_DELAY_IN_SECONDS = 60 * 60
 GIT_URL = 'https://github.com/aws-samples/amazon-kinesis-video-streams-demos.git'
-GIT_HASH = 'master'
+GIT_HASH = 'h265-support'
 COMMON_PARAMS = [
     string(name: 'AWS_KVS_LOG_LEVEL', value: "2"),
     string(name: 'MIN_RETRY_DELAY_IN_SECONDS', value: MIN_RETRY_DELAY_IN_SECONDS.toString()),
@@ -198,8 +198,8 @@ pipeline {
                                 booleanParam(name: 'USE_MBEDTLS', value: false),
                                 string(name: 'DURATION_IN_SECONDS', value: PERIODIC_DURATION_IN_SECONDS.toString()),
                                 string(name: 'VIDEO_CODEC', value: "h265"),
-                                string(name: 'MASTER_NODE_LABEL', value: "openssl-master"),
-                                string(name: 'VIEWER_NODE_LABEL', value: "openssl-viewer"),
+                                string(name: 'MASTER_NODE_LABEL', value: "openssl-h265-master"),
+                                string(name: 'VIEWER_NODE_LABEL', value: "openssl-h265-viewer"),
                                 string(name: 'RUNNER_LABEL', value: "WebrtcPeriodicOpenSSL-H265"),
                                 string(name: 'SCENARIO_LABEL', value: "OpenSSLPeriodic-H265"),
                             ],
@@ -215,8 +215,8 @@ pipeline {
                                 booleanParam(name: 'USE_MBEDTLS', value: false),
                                 string(name: 'DURATION_IN_SECONDS', value: LONG_RUNNING_DURATION_IN_SECONDS.toString()),
                                 string(name: 'VIDEO_CODEC', value: "h265"),
-                                string(name: 'MASTER_NODE_LABEL', value: "openssl-master"),
-                                string(name: 'VIEWER_NODE_LABEL', value: "openssl-viewer"),
+                                string(name: 'MASTER_NODE_LABEL', value: "openssl-h265-master"),
+                                string(name: 'VIEWER_NODE_LABEL', value: "openssl-h265-viewer"),
                                 string(name: 'RUNNER_LABEL', value: "WebrtcLongRunningOpenSSL-H265"),
                                 string(name: 'SCENARIO_LABEL', value: "WebrtcLongRunning-H265"),
                             ],
@@ -232,8 +232,8 @@ pipeline {
                                 booleanParam(name: 'USE_MBEDTLS', value: true),
                                 string(name: 'DURATION_IN_SECONDS', value: PERIODIC_DURATION_IN_SECONDS.toString()),
                                 string(name: 'VIDEO_CODEC', value: "h265"),
-                                string(name: 'MASTER_NODE_LABEL', value: "mbedtls-master"),
-                                string(name: 'VIEWER_NODE_LABEL', value: "mbedtls-viewer"),
+                                string(name: 'MASTER_NODE_LABEL', value: "mbedtls-h265-master"),
+                                string(name: 'VIEWER_NODE_LABEL', value: "mbedtls-h265-viewer"),
                                 string(name: 'RUNNER_LABEL', value: "WebrtcPeriodicStaticMbedTLS-H265"),
                                 string(name: 'SCENARIO_LABEL', value: "MbedTLSPeriodic-H265"),
                             ],
@@ -249,8 +249,8 @@ pipeline {
                                 booleanParam(name: 'USE_MBEDTLS', value: true),
                                 string(name: 'DURATION_IN_SECONDS', value: LONG_RUNNING_DURATION_IN_SECONDS.toString()),
                                 string(name: 'VIDEO_CODEC', value: "h265"),
-                                string(name: 'MASTER_NODE_LABEL', value: "mbedtls-master"),
-                                string(name: 'VIEWER_NODE_LABEL', value: "mbedtls-viewer"),
+                                string(name: 'MASTER_NODE_LABEL', value: "mbedtls-h265-master"),
+                                string(name: 'VIEWER_NODE_LABEL', value: "mbedtls-h265-viewer"),
                                 string(name: 'RUNNER_LABEL', value: "WebrtcLongRunningStaticMbedTLS-H265"),
                                 string(name: 'SCENARIO_LABEL', value: "WebrtcLongRunning-H265"),
                             ],
