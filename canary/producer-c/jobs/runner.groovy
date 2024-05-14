@@ -57,7 +57,7 @@ def withRunnerWrapper(envs, fn) {
 
 def runClient(isProducer, params) {
     def consumerEnvs = [        
-        'JAVA_HOME': "/usr/lib/jvm/java-11-openjdk-amd64/",
+        'JAVA_HOME': "/usr/lib/jvm/default-java",
         'M2_HOME': "/opt/apache-maven-3.6.3"
     ].collect({k,v -> "${k}=${v}" })
 
@@ -110,7 +110,7 @@ def runClient(isProducer, params) {
     def thing_name = "p${env.NODE_NAME}_thing"
 
     def envs = [
-        'JAVA_HOME': "/usr/lib/jvm/java-11-openjdk-amd64/",
+        'JAVA_HOME': "/usr/lib/jvm/default-java",
         'M2_HOME': "/opt/apache-maven-3.6.3",
         'AWS_KVS_LOG_LEVEL': params.AWS_KVS_LOG_LEVEL,
         'CANARY_STREAM_NAME': "${env.JOB_NAME}",
