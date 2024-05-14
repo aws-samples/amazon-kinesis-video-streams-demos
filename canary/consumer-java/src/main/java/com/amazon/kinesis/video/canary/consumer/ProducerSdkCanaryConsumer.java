@@ -34,7 +34,7 @@ public class ProducerSdkCanaryConsumer {
         final String streamName = String.format("%s-%s-%s", streamNamePrefix, canaryType,
                     canaryLabel);
         Integer canaryRunTime = Integer.parseInt(System.getenv("CANARY_DURATION_IN_SECONDS"));
-        log.info("Stream name {}", streamName);
+        logger.info("Stream name {}", streamName);
 
         final SystemPropertiesCredentialsProvider credentialsProvider = new SystemPropertiesCredentialsProvider();
         final AmazonKinesisVideo amazonKinesisVideo = AmazonKinesisVideoClientBuilder.standard()
