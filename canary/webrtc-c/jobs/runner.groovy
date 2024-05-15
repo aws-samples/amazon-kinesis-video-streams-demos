@@ -258,7 +258,7 @@ pipeline {
         booleanParam(name: 'IS_PROFILING')
         booleanParam(name: 'TRICKLE_ICE')
         booleanParam(name: 'USE_MBEDTLS', defaultValue: false)
-        string(name: 'DEBUG_LOG_SDP', defaultValue: true)
+        booleanParam(name: 'DEBUG_LOG_SDP', defaultValue: true)
         string(name: 'LOG_GROUP_NAME')
         string(name: 'MASTER_NODE_LABEL')
         string(name: 'CONSUMER_NODE_LABEL')
