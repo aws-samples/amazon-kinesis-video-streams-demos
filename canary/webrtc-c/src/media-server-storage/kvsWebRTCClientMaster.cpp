@@ -159,7 +159,7 @@ VOID writeFirstFrameSentTimeToFile(PCHAR fileName){
     DLOGI("[Canary] Writing to {} file", fileName);
     UINT64 currentTimeMilliS =  GETTIME() / HUNDREDS_OF_NANOS_IN_A_MILLISECOND;
     CHAR cuurrentTimeChars[MAX_UINT64_DIGIT_COUNT + 1]; // +1 accounts for null terminator
-    UINT64 writeSize = SPRINTF(cuurrentTimeChars, "%lu", currentTimeMilliS);
+    UINT64 writeSize = SPRINTF(cuurrentTimeChars, "%llu", currentTimeMilliS);
     writeFile((PCHAR) fileName, false, false, static_cast<PBYTE>(static_cast<PVOID>(cuurrentTimeChars)), writeSize);
 }
 

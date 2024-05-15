@@ -239,13 +239,12 @@ STATUS onNewConnection(Canary::PPeer pPeer)
     MEMSET(&videoTrack, 0x00, SIZEOF(RtcMediaStreamTrack));
     MEMSET(&audioTrack, 0x00, SIZEOF(RtcMediaStreamTrack));
 
-    // Declare that we support H264,Profile=42E01F,level-asymmetry-allowed=1,packetization-mode=1 and Opus
-    CHK_STATUS(pPeer->addSupportedCodec(RTC_CODEC_H264_PROFILE_42E01F_LEVEL_ASYMMETRY_ALLOWED_PACKETIZATION_MODE));
+    CHK_STATUS(pPeer->addSupportedCodec(pPeer->videoCodec));
     CHK_STATUS(pPeer->addSupportedCodec(RTC_CODEC_OPUS));
 
     // Add a SendRecv Transceiver of type video
     videoTrack.kind = MEDIA_STREAM_TRACK_KIND_VIDEO;
-    videoTrack.codec = RTC_CODEC_H264_PROFILE_42E01F_LEVEL_ASYMMETRY_ALLOWED_PACKETIZATION_MODE;
+    videoTrack.codec = pPeer->videoCodec;
     STRCPY(videoTrack.streamId, "myKvsVideoStream");
     STRCPY(videoTrack.trackId, "myVideoTrack");
     CHK_STATUS(pPeer->addTransceiver(videoTrack));
@@ -269,19 +268,25 @@ VOID sendCustomFrames(Canary::PPeer pPeer, MEDIA_STREAM_TRACK_KIND kind, UINT64 
     UINT32 hexStrLen = 0;
     UINT32 actualFrameSize = 0;
     UINT32 frameSizeWithoutNalu = 0;
-    // This is the actual frame size that includes the metadata and the actual frame data
-    actualFrameSize = CANARY_METADATA_SIZE + ((dataRate / 8) / frameRate);
-    frameSizeWithoutNalu = actualFrameSize - ANNEX_B_NALU_SIZE;
-
+    UINT32 minFrameSize = CANARY_METADATA_SIZE + ((dataRate / 8) / frameRate);
+    UINT32 maxFrameSize = (CANARY_METADATA_SIZE + ((dataRate / 8) / frameRate)) * 2;
     PBYTE canaryFrameData = NULL;
-    canaryFrameData = (PBYTE) MEMALLOC(actualFrameSize);
+    
+    canaryFrameData = (PBYTE) MEMALLOC(maxFrameSize);
 
     // We allocate a bigger buffer to accomodate the hex encoded string
-    frame.frameData = (PBYTE) MEMALLOC(frameSizeWithoutNalu * 2 + 1 + ANNEX_B_NALU_SIZE);
+    frame.frameData = (PBYTE) MEMALLOC(maxFrameSize * 3 + 1 + ANNEX_B_NALU_SIZE);
     frame.version = FRAME_CURRENT_VERSION;
     frame.presentationTs = GETTIME();
 
     while (!terminated.load()) {
+
+        // This is the actual frame size that includes the metadata and the actual frame data
+        // It generates a number between 1082 and 2164 but the actual frame.size may be larger 
+        // because hexStrLen will vary
+        actualFrameSize = (RAND() % (maxFrameSize - minFrameSize + 1)) + minFrameSize;
+        frameSizeWithoutNalu = actualFrameSize - ANNEX_B_NALU_SIZE;
+
         frame.size = actualFrameSize;
         createCanaryFrameData(canaryFrameData, &frame);
 
