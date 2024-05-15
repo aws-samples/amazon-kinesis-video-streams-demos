@@ -422,7 +422,7 @@ pipeline {
                     parameters: [
                       string(name: 'AWS_DEFAULT_REGION', value: params.AWS_DEFAULT_REGION),
                       string(name: 'AWS_KVS_LOG_LEVEL', value: params.AWS_KVS_LOG_LEVEL),
-                      string(name: 'DEBUG_LOG_SDP', value: params.DEBUG_LOG_SDP),
+                      booleanParam(name: 'DEBUG_LOG_SDP', value: params.DEBUG_LOG_SDP),
                       booleanParam(name: 'IS_SIGNALING', value: params.IS_SIGNALING),
                       booleanParam(name: 'IS_STORAGE', value: params.IS_STORAGE),
                       booleanParam(name: 'IS_STORAGE_SINGLE_NODE', value: params.IS_STORAGE_SINGLE_NODE),
