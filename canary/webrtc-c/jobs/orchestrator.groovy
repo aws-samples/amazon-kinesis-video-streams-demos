@@ -57,7 +57,7 @@ ACTIVE_RUNNERS = []
 
 pipeline {
     agent {
-        label 'profiling'
+        label 'openssl-master'
     }
 
     options {
