@@ -132,7 +132,7 @@ pipeline {
                                 booleanParam(name: 'USE_IOT', value: true),
                                 booleanParam(name: 'USE_MBEDTLS', value: false),
                                 string(name: 'DURATION_IN_SECONDS', value: PERIODIC_DURATION_IN_SECONDS.toString()),
-                                string(name: 'CONFIG_FILE_HEADER', value: "config_periodic.h")
+                                string(name: 'CONFIG_FILE_HEADER', value: "config_periodic.h"),
                                 string(name: 'MASTER_NODE_LABEL', value: "openssl-master"),
                                 string(name: 'VIEWER_NODE_LABEL', value: "openssl-viewer"),
                                 string(name: 'RUNNER_LABEL', value: "WebrtcPeriodicOpenSSL"),
