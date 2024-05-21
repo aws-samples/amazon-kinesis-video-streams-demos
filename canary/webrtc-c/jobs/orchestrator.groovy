@@ -130,6 +130,7 @@ pipeline {
                                 string(name: 'CONFIG_FILE_HEADER', value: "config_periodic.h"),
                                 string(name: 'MASTER_NODE_LABEL', value: "openssl-master"),
                                 string(name: 'VIEWER_NODE_LABEL', value: "openssl-viewer"),
+                                string(name: 'RUNNER_LABEL', value: "WebrtcPeriodicOpenSSL"),
                             ],
                             wait: false
                         )

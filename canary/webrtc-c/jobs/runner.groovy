@@ -111,7 +111,8 @@ def buildPeer(isMaster, params) {
         sh """
             cd ./canary/webrtc-c/build &&
             ${isMaster ? "" : "sleep 10 &&"}
-            ./kvsWebrtcCanaryWebrtc ${env.JOB_NAME}"""
+            ${isMaster} ? "./cloudwatch-integ/kvsWebrtcClientMasterCW ${env.JOB_NAME}" : "./cloudwatch-integ/kvsWebrtcClientViewerCW ${env.JOB_NAME}"}
+        """
     }
 }
 
@@ -197,6 +198,7 @@ pipeline {
         string(name: 'MASTER_NODE_LABEL')
         string(name: 'CONSUMER_NODE_LABEL')
         string(name: 'VIEWER_NODE_LABEL')
+        string(name: 'RUNNER_LABEL')
         string(name: 'MIN_RETRY_DELAY_IN_SECONDS')
         string(name: 'GIT_URL')
         string(name: 'GIT_HASH')
@@ -335,6 +337,7 @@ pipeline {
                       string(name: 'MASTER_NODE_LABEL', value: params.MASTER_NODE_LABEL),
                       string(name: 'CONSUMER_NODE_LABEL', value: params.CONSUMER_NODE_LABEL),
                       string(name: 'VIEWER_NODE_LABEL', value: params.VIEWER_NODE_LABEL),
+                      string(name: 'RUNNER_LABEL', value: params.RUNNER_LABEL),
                       string(name: 'MIN_RETRY_DELAY_IN_SECONDS', value: params.MIN_RETRY_DELAY_IN_SECONDS),
                       string(name: 'GIT_URL', value: params.GIT_URL),
                       string(name: 'GIT_HASH', value: params.GIT_HASH),
