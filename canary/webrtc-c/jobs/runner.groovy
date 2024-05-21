@@ -16,8 +16,11 @@ def buildWebRTCProject(useMbedTLS, config_file_header, thing_prefix) {
     echo 'Flag set to ' + useMbedTLS
     checkout([$class: 'GitSCM', branches: [[name: params.GIT_HASH]], userRemoteConfigs: [[url: params.GIT_URL]]])
 
-    def configureCmd = "cmake .. -DCMAKE_BUILD_TYPE=Debug -DCMAKE_INSTALL_PREFIX=\"\$PWD\""
-    echo ${configureCmd}
+    def config_file_path = "../cloudwatch-integ/"
+    config_file_path += "${config_file_header}"
+    echo "Config file path: ${config_file_path}"
+    def configureCmd = "cmake .. -DSAMPLE_CONFIG_HEADER=${config_file_path} -DCMAKE_BUILD_TYPE=Debug"
+    echo "Configure Command: ${configureCmd}"
     if (useMbedTLS) {
       echo 'Using mbedtls'
       configureCmd += " -DUSE_OPENSSL=OFF -DUSE_MBEDTLS=ON"
