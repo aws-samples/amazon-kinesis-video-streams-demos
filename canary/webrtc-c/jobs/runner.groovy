@@ -24,13 +24,9 @@ def buildWebRTCProject(useMbedTLS, config_file_header, thing_prefix) {
     if (useMbedTLS) {
       echo 'Using mbedtls'
       configureCmd += " -DUSE_OPENSSL=OFF -DUSE_MBEDTLS=ON"
-    }     
+    }
 
     sh """
-        cd ./canary/webrtc-c/scripts &&
-        chmod a+x cert_setup.sh &&
-        ./cert_setup.sh ${thing_prefix} &&
-        cd .. &&
         mkdir -p build &&
         cd build &&
         ${configureCmd} &&
@@ -241,17 +237,17 @@ pipeline {
                     }
                 }
 
-//                 stage('Viewer') {
-//                     agent {
-//                         label params.VIEWER_NODE_LABEL
-//                     }
-//
-//                     steps {
-//                         script {
-//                             buildPeer(false, params)
-//                         }
-//                     }
-//                 }
+                stage('Viewer') {
+                    agent {
+                        label params.VIEWER_NODE_LABEL
+                    }
+
+                    steps {
+                        script {
+                            buildPeer(false, params)
+                        }
+                    }
+                }
             }
         }
 
