@@ -16,9 +16,7 @@ def buildWebRTCProject(useMbedTLS, config_file_header, thing_prefix) {
     echo 'Flag set to ' + useMbedTLS
     checkout([$class: 'GitSCM', branches: [[name: params.GIT_HASH]], userRemoteConfigs: [[url: params.GIT_URL]]])
 
-    def config_file_path = "../cloudwatch-integ/"
-    config_file_path += ${config_file_header}
-    def configureCmd = "cmake .. -DSAMPLE_CONFIG_HEADER=${config_file_path} -DCMAKE_BUILD_TYPE=Debug -DCMAKE_INSTALL_PREFIX=\"\$PWD\""
+    def configureCmd = "cmake .. -DCMAKE_BUILD_TYPE=Debug -DCMAKE_INSTALL_PREFIX=\"\$PWD\""
     echo ${configureCmd}
     if (useMbedTLS) {
       echo 'Using mbedtls'
@@ -240,77 +238,77 @@ pipeline {
                     }
                 }
 
-                stage('Viewer') {
-                    agent {
-                        label params.VIEWER_NODE_LABEL
-                    }
-
-                    steps {
-                        script {
-                            buildPeer(false, params)
-                        }
-                    }
-                }
+//                 stage('Viewer') {
+//                     agent {
+//                         label params.VIEWER_NODE_LABEL
+//                     }
+//
+//                     steps {
+//                         script {
+//                             buildPeer(false, params)
+//                         }
+//                     }
+//                 }
             }
         }
 
-        stage('Build and Run Webrtc-Storage Master and Consumer Canaries') {
-            failFast true
-            when {
-                allOf {
-                    equals expected: false, actual: params.IS_SIGNALING
-                    equals expected: true, actual: params.IS_STORAGE
-                    equals expected: false, actual: params.IS_STORAGE_SINGLE_NODE 
-                }
-            }
-            parallel {
-                stage('StorageMaster') {
-                    steps {
-                        script {
-                            buildStorageCanary(false, params)
-                        }
-                    }
-                }
-                stage('StorageConsumer') {
-                     agent {
-                        label params.CONSUMER_NODE_LABEL
-                    }
-                    steps {
-                        script {
-                            buildStorageCanary(true, params)
-                        }
-                    }
-                }
-            }
-        }
-
-
-        stage('Build and Run Webrtc-Storage Master and Consumer Canaries on Same Node') {
-            failFast true
-            when {
-                allOf {
-                    equals expected: false, actual: params.IS_SIGNALING
-                    equals expected: true, actual: params.IS_STORAGE
-                    equals expected: true, actual: params.IS_STORAGE_SINGLE_NODE 
-                }
-            }
-            parallel {
-                stage('StorageMaster') {
-                    steps {
-                        script {
-                            buildStorageCanary(false, params)
-                        }
-                    }
-                }
-                stage('StorageConsumer') {
-                    steps {
-                        script {
-                            buildStorageCanary(true, params)
-                        }
-                    }
-                }
-            }
-        }
+//         stage('Build and Run Webrtc-Storage Master and Consumer Canaries') {
+//             failFast true
+//             when {
+//                 allOf {
+//                     equals expected: false, actual: params.IS_SIGNALING
+//                     equals expected: true, actual: params.IS_STORAGE
+//                     equals expected: false, actual: params.IS_STORAGE_SINGLE_NODE
+//                 }
+//             }
+//             parallel {
+//                 stage('StorageMaster') {
+//                     steps {
+//                         script {
+//                             buildStorageCanary(false, params)
+//                         }
+//                     }
+//                 }
+//                 stage('StorageConsumer') {
+//                      agent {
+//                         label params.CONSUMER_NODE_LABEL
+//                     }
+//                     steps {
+//                         script {
+//                             buildStorageCanary(true, params)
+//                         }
+//                     }
+//                 }
+//             }
+//         }
+//
+//
+//         stage('Build and Run Webrtc-Storage Master and Consumer Canaries on Same Node') {
+//             failFast true
+//             when {
+//                 allOf {
+//                     equals expected: false, actual: params.IS_SIGNALING
+//                     equals expected: true, actual: params.IS_STORAGE
+//                     equals expected: true, actual: params.IS_STORAGE_SINGLE_NODE
+//                 }
+//             }
+//             parallel {
+//                 stage('StorageMaster') {
+//                     steps {
+//                         script {
+//                             buildStorageCanary(false, params)
+//                         }
+//                     }
+//                 }
+//                 stage('StorageConsumer') {
+//                     steps {
+//                         script {
+//                             buildStorageCanary(true, params)
+//                         }
+//                     }
+//                 }
+//             }
+//         }
 
         // In case of failures, we should add some delays so that we don't get into a tight loop of retrying
         stage('Throttling Retry') {
