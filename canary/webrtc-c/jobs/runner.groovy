@@ -109,7 +109,7 @@ def buildPeer(isMaster, params) {
 
     withRunnerWrapper(envs) {
         sh """
-            cd ./canary/webrtc-c/build &&
+            cd build &&
             ${isMaster ? "" : "sleep 10 &&"}
             ${isMaster} ? "./cloudwatch-integ/kvsWebrtcClientMasterCW ${env.JOB_NAME}" : "./cloudwatch-integ/kvsWebrtcClientViewerCW ${env.JOB_NAME}"}
         """
