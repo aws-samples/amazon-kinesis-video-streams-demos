@@ -126,16 +126,10 @@ pipeline {
                         build(
                             job: NEXT_AVAILABLE_RUNNER,
                             parameters: COMMON_PARAMS + [
-                                booleanParam(name: 'USE_TURN', value: true),
-                                booleanParam(name: 'FORCE_TURN', value: true),
-                                booleanParam(name: 'TRICKLE_ICE', value: true),
-                                booleanParam(name: 'USE_IOT', value: true),
                                 booleanParam(name: 'USE_MBEDTLS', value: false),
                                 string(name: 'CONFIG_FILE_HEADER', value: "config_periodic.h"),
                                 string(name: 'MASTER_NODE_LABEL', value: "openssl-master"),
                                 string(name: 'VIEWER_NODE_LABEL', value: "openssl-viewer"),
-                                string(name: 'RUNNER_LABEL', value: "WebrtcPeriodicOpenSSL"),
-                                string(name: 'SCENARIO_LABEL', value: "OpenSSLPeriodic"),
                             ],
                             wait: false
                         )

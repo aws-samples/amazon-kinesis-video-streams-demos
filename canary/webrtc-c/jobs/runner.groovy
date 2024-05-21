@@ -16,9 +16,7 @@ def buildWebRTCProject(useMbedTLS, config_file_header, thing_prefix) {
     echo 'Flag set to ' + useMbedTLS
     checkout([$class: 'GitSCM', branches: [[name: params.GIT_HASH ]],
               userRemoteConfigs: [[url: params.GIT_URL]]])
-    def config_file_path = "../cloudwatch-integ/"
-    config_file_path += ${config_file_header}
-    def configureCmd = "cmake .. -DSAMPLE_CONFIG_HEADER=${config_file_path} -DCMAKE_BUILD_TYPE=Debug -DCMAKE_INSTALL_PREFIX=\"\$PWD\""
+    def configureCmd = "cmake .. -DCMAKE_BUILD_TYPE=Debug -DCMAKE_INSTALL_PREFIX=\"\$PWD\""
     echo ${configureCmd}
     if (useMbedTLS) {
       echo 'Using mbedtls'
@@ -335,12 +333,9 @@ pipeline {
                       booleanParam(name: 'IS_STORAGE', value: params.IS_STORAGE),
                       booleanParam(name: 'IS_STORAGE_SINGLE_NODE', value: params.IS_STORAGE_SINGLE_NODE),
                       booleanParam(name: 'USE_MBEDTLS', value: params.USE_MBEDTLS),
-                      string(name: 'LOG_GROUP_NAME', value: params.LOG_GROUP_NAME),
                       string(name: 'MASTER_NODE_LABEL', value: params.MASTER_NODE_LABEL),
                       string(name: 'CONSUMER_NODE_LABEL', value: params.CONSUMER_NODE_LABEL),
                       string(name: 'VIEWER_NODE_LABEL', value: params.VIEWER_NODE_LABEL),
-                      string(name: 'RUNNER_LABEL', value: params.RUNNER_LABEL),
-                      string(name: 'SCENARIO_LABEL', value: params.SCENARIO_LABEL),
                       string(name: 'MIN_RETRY_DELAY_IN_SECONDS', value: params.MIN_RETRY_DELAY_IN_SECONDS),
                       string(name: 'GIT_URL', value: params.GIT_URL),
                       string(name: 'GIT_HASH', value: params.GIT_HASH),
