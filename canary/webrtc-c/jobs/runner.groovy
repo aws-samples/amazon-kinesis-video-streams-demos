@@ -110,9 +110,9 @@ def buildPeer(isMaster, params) {
 
     def executable = ""
     if(isMaster) {
-        executable += "cloudwatch-integ/kvsWebrtcClientMasterCW ${env.JOB_NAME}"
+        executable += "cloudwatch-integ/kvsWebrtcClientMasterCW test"
     } else {
-        executable += "cloudwatch-integ/kvsWebrtcClientViewerCW ${env.JOB_NAME}"
+        executable += "cloudwatch-integ/kvsWebrtcClientViewerCW test"
     }
     withRunnerWrapper(envs) {
         sh """
