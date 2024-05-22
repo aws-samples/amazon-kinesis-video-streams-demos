@@ -16,6 +16,7 @@ def buildWebRTCProject(useMbedTLS, config_file_header, thing_prefix) {
     echo 'Flag set to ' + useMbedTLS
     checkout([$class: 'GitSCM', branches: [[name: params.GIT_HASH]], userRemoteConfigs: [[url: params.GIT_URL]]])
 
+    echo "Config file: ${config_file_header}"
     def config_file_path = "../cloudwatch-integ/"
     config_file_path += "${config_file_header}"
     echo "Config file path: ${config_file_path}"
