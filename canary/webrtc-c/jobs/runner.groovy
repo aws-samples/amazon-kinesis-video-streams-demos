@@ -108,17 +108,20 @@ def buildPeer(isMaster, params) {
       'IOT_CORE_THING_NAME': "${thing_name}"
     ].collect{ k, v -> "${k}=${v}" }
 
-    def executable = ""
     if(isMaster) {
-        executable += "cloudwatch-integ/kvsWebrtcClientMasterCW test"
+        withRunnerWrapper(envs) {
+            sh """
+                cd build &&
+                ${isMaster ? "" : "sleep 10 &&"}
+                ./cloudwatch-integ/kvsWebrtcClientMasterCW ${env.JOB_NAME}"""
+        }
     } else {
-        executable += "cloudwatch-integ/kvsWebrtcClientViewerCW test"
-    }
-    withRunnerWrapper(envs) {
-        sh """
-            cd build &&
-            ${isMaster ? "" : "sleep 10 &&"}
-            ./${executable}"""
+        withRunnerWrapper(envs) {
+            sh """
+                cd build &&
+                ${isMaster ? "" : "sleep 10 &&"}
+                ./cloudwatch-integ/kvsWebrtcClientViewerCW ${env.JOB_NAME}"""
+        }
     }
 }
 
