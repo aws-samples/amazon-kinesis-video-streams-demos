@@ -343,6 +343,7 @@ pipeline {
                       booleanParam(name: 'IS_STORAGE', value: params.IS_STORAGE),
                       booleanParam(name: 'IS_STORAGE_SINGLE_NODE', value: params.IS_STORAGE_SINGLE_NODE),
                       booleanParam(name: 'USE_MBEDTLS', value: params.USE_MBEDTLS),
+                      string(name: 'CONFIG_FILE_HEADER', value: params.CONFIG_FILE_HEADER),
                       string(name: 'MASTER_NODE_LABEL', value: params.MASTER_NODE_LABEL),
                       string(name: 'CONSUMER_NODE_LABEL', value: params.CONSUMER_NODE_LABEL),
                       string(name: 'VIEWER_NODE_LABEL', value: params.VIEWER_NODE_LABEL),
