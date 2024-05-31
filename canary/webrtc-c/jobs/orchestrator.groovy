@@ -121,92 +121,84 @@ pipeline {
 
                         // TODO: Use matrix to spawn runners
 
-                        build(
-                            job: NEXT_AVAILABLE_RUNNER,
-                            parameters: COMMON_PARAMS + [
-                                string(name: 'CONFIG_FILE_HEADER', value: "lr_iot_h264_openssl.h"),
-                                string(name: 'MASTER_NODE_LABEL', value: "openssl-master"),
-                                string(name: 'VIEWER_NODE_LABEL', value: "openssl-viewer"),
-                            ],
-                            wait: false
-                        )
-
-                        build(
-                            job: NEXT_AVAILABLE_RUNNER,
-                            parameters: COMMON_PARAMS + [
-                                string(name: 'CONFIG_FILE_HEADER', value: "p_iot_h265_openssl.h"),
-                                string(name: 'MASTER_NODE_LABEL', value: "mbedtls-master"),
-                                string(name: 'VIEWER_NODE_LABEL', value: "mbedtls-viewer"),
-                            ],
-                            wait: false
-                        )
-
-                        build(
-                            job: NEXT_AVAILABLE_RUNNER,
-                            parameters: COMMON_PARAMS + [
-                                string(name: 'CONFIG_FILE_HEADER', value: "lr_static_h265_openssl.h"),
-                                string(name: 'MASTER_NODE_LABEL', value: "openssl-master"),
-                                string(name: 'VIEWER_NODE_LABEL', value: "openssl-viewer"),
-                            ],
-                            wait: false
-                        )
-
-                        build(
-                            job: NEXT_AVAILABLE_RUNNER,
-                            parameters: COMMON_PARAMS + [
-                                booleanParam(name: 'USE_MBEDTLS', value: true),
-                                string(name: 'CONFIG_FILE_HEADER', value: "p_static_h264_mbedtls.h"),
-                                string(name: 'MASTER_NODE_LABEL', value: "mbedtls-master"),
-                                string(name: 'VIEWER_NODE_LABEL', value: "mbedtls-viewer"),
-                            ],
-                            wait: false
-                        )
-
-                        build(
-                            job: NEXT_AVAILABLE_RUNNER,
-                            parameters: COMMON_PARAMS + [
-                                booleanParam(name: 'USE_MBEDTLS', value: true),
-                                string(name: 'CONFIG_FILE_HEADER', value: "lr_iot_h264_mbedtls.h"),
-                                string(name: 'MASTER_NODE_LABEL', value: "openssl-master"),
-                                string(name: 'VIEWER_NODE_LABEL', value: "openssl-viewer"),
-                            ],
-                            wait: false
-                        )
-
-                        build(
-                            job: NEXT_AVAILABLE_RUNNER,
-                            parameters: COMMON_PARAMS + [
-                                booleanParam(name: 'USE_MBEDTLS', value: true),
-                                string(name: 'CONFIG_FILE_HEADER', value: "p_iot_h265_mbedtls.h"),
-                                string(name: 'MASTER_NODE_LABEL', value: "mbedtls-master"),
-                                string(name: 'VIEWER_NODE_LABEL', value: "mbedtls-viewer"),
-                                string(name: 'RUNNER_LABEL', value: "WebrtcPeriodicMbedTLS"),
-                            ],
-                            wait: false
-                        )
-
-
-//
-//                         // Storage Periodic.
 //                         build(
 //                             job: NEXT_AVAILABLE_RUNNER,
 //                             parameters: COMMON_PARAMS + [
-//                                 booleanParam(name: 'IS_SIGNALING', value: false),
-//                                 booleanParam(name: 'IS_STORAGE', value: true),
-//                                 booleanParam(name: 'IS_STORAGE_SINGLE_NODE', value: true),
-//                                 booleanParam(name: 'USE_TURN', value: true),
-//                                 booleanParam(name: 'TRICKLE_ICE', value: true),
-//                                 booleanParam(name: 'USE_IOT', value: false),
-//                                 string(name: 'DURATION_IN_SECONDS', value: STORAGE_PERIODIC_DURATION_IN_SECONDS.toString()),
-//                                 string(name: 'MASTER_NODE_LABEL', value: "webrtc-storage-master"),
-//                                 string(name: 'CONSUMER_NODE_LABEL', value: "webrtc-storage-consumer"),
-//                                 string(name: 'RUNNER_LABEL', value: "StoragePeriodic"),
-//                                 string(name: 'SCENARIO_LABEL', value: "StoragePeriodic"),
-//                                 string(name: 'AWS_DEFAULT_REGION', value: "us-west-2"),
+//                                 string(name: 'CONFIG_FILE_HEADER', value: "lr_iot_h264_openssl.h"),
+//                                 string(name: 'MASTER_NODE_LABEL', value: "openssl-master"),
+//                                 string(name: 'VIEWER_NODE_LABEL', value: "openssl-viewer"),
 //                             ],
 //                             wait: false
 //                         )
 //
+//                         build(
+//                             job: NEXT_AVAILABLE_RUNNER,
+//                             parameters: COMMON_PARAMS + [
+//                                 string(name: 'CONFIG_FILE_HEADER', value: "p_iot_h265_openssl.h"),
+//                                 string(name: 'MASTER_NODE_LABEL', value: "mbedtls-master"),
+//                                 string(name: 'VIEWER_NODE_LABEL', value: "mbedtls-viewer"),
+//                             ],
+//                             wait: false
+//                         )
+//
+//                         build(
+//                             job: NEXT_AVAILABLE_RUNNER,
+//                             parameters: COMMON_PARAMS + [
+//                                 string(name: 'CONFIG_FILE_HEADER', value: "lr_static_h265_openssl.h"),
+//                                 string(name: 'MASTER_NODE_LABEL', value: "openssl-master"),
+//                                 string(name: 'VIEWER_NODE_LABEL', value: "openssl-viewer"),
+//                             ],
+//                             wait: false
+//                         )
+//
+//                         build(
+//                             job: NEXT_AVAILABLE_RUNNER,
+//                             parameters: COMMON_PARAMS + [
+//                                 booleanParam(name: 'USE_MBEDTLS', value: true),
+//                                 string(name: 'CONFIG_FILE_HEADER', value: "p_static_h264_mbedtls.h"),
+//                                 string(name: 'MASTER_NODE_LABEL', value: "mbedtls-master"),
+//                                 string(name: 'VIEWER_NODE_LABEL', value: "mbedtls-viewer"),
+//                             ],
+//                             wait: false
+//                         )
+//
+//                         build(
+//                             job: NEXT_AVAILABLE_RUNNER,
+//                             parameters: COMMON_PARAMS + [
+//                                 booleanParam(name: 'USE_MBEDTLS', value: true),
+//                                 string(name: 'CONFIG_FILE_HEADER', value: "lr_iot_h264_mbedtls.h"),
+//                                 string(name: 'MASTER_NODE_LABEL', value: "openssl-master"),
+//                                 string(name: 'VIEWER_NODE_LABEL', value: "openssl-viewer"),
+//                             ],
+//                             wait: false
+//                         )
+//
+//                         build(
+//                             job: NEXT_AVAILABLE_RUNNER,
+//                             parameters: COMMON_PARAMS + [
+//                                 booleanParam(name: 'USE_MBEDTLS', value: true),
+//                                 string(name: 'CONFIG_FILE_HEADER', value: "p_iot_h265_mbedtls.h"),
+//                                 string(name: 'MASTER_NODE_LABEL', value: "mbedtls-master"),
+//                                 string(name: 'VIEWER_NODE_LABEL', value: "mbedtls-viewer"),
+//                             ],
+//                             wait: false
+//                         )
+
+
+
+                        // Storage Periodic.
+                        build(
+                            job: NEXT_AVAILABLE_RUNNER,
+                            parameters: COMMON_PARAMS + [
+                                booleanParam(name: 'IS_STORAGE', value: true),
+                                booleanParam(name: 'IS_STORAGE_SINGLE_NODE', value: true),
+                                string(name: 'CONFIG_FILE_HEADER', value: "storage_periodic.h"),
+                                string(name: 'MASTER_NODE_LABEL', value: "openssl-master"),
+                                string(name: 'CONSUMER_NODE_LABEL', value: "openssl-viewer"),
+                            ],
+                            wait: false
+                        )
+
 //                         // Storage Sub-Reconnect.
 //                         build(
 //                             job: NEXT_AVAILABLE_RUNNER,

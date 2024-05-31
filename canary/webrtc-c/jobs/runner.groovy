@@ -12,7 +12,7 @@ CREDENTIALS = [
     ]
 ]
 
-def buildWebRTCProject(useMbedTLS, config_file_header, thing_prefix) {
+def buildWebRTCProject(useMbedTLS, config_file_header) {
     echo 'Flag set to ' + useMbedTLS
     checkout([$class: 'GitSCM', branches: [[name: params.GIT_HASH]], userRemoteConfigs: [[url: params.GIT_URL]]])
 
@@ -83,7 +83,7 @@ def buildPeer(isMaster, params) {
     }
 
     def thing_prefix = "${env.JOB_NAME}-${params.RUNNER_LABEL}"
-    buildWebRTCProject(params.USE_MBEDTLS, params.CONFIG_FILE_HEADER, thing_prefix)
+    buildWebRTCProject(params.USE_MBEDTLS, params.CONFIG_FILE_HEADER)
 
     RUNNING_NODES_IN_BUILDING--
     
@@ -128,30 +128,11 @@ def buildPeer(isMaster, params) {
 def buildStorageCanary(isConsumer, params) {
     def scripts_dir = !isConsumer ? "$WORKSPACE/canary/webrtc-c/scripts" :
         "$WORKSPACE/canary/webrtc-c/scripts"
-    def thing_prefix = "${env.JOB_NAME}-${params.RUNNER_LABEL}"
-    def endpoint = "${scripts_dir}/iot-credential-provider.txt"
-    def core_cert_file = "${scripts_dir}/${thing_prefix}_certificate.pem"
-    def private_key_file = "${scripts_dir}/${thing_prefix}_private.key"
-    def role_alias = "${thing_prefix}_role_alias"
-    def thing_name = "${thing_prefix}_thing"
 
-    def commonEnvs = [
+    def envs = [
       'AWS_KVS_LOG_LEVEL': params.AWS_KVS_LOG_LEVEL,
-      'CANARY_USE_IOT_PROVIDER': params.USE_IOT,
-      'CANARY_LABEL': params.SCENARIO_LABEL,
-      'IOT_CORE_CREDENTIAL_ENDPOINT': "${endpoint}",
-      'IOT_CORE_CERT': "${core_cert_file}",
-      'IOT_CORE_PRIVATE_KEY': "${private_key_file}",
-      'IOT_CORE_ROLE_ALIAS': "${role_alias}",
-      'IOT_CORE_THING_NAME': "${thing_name}"
-    ]
-
-    def masterEnvs = [
-      'CANARY_LOG_STREAM_NAME': "${params.RUNNER_LABEL}-StorageMaster-${START_TIMESTAMP}",
-      'CANARY_CLIENT_ID': "Master",
-      'CANARY_IS_MASTER': true,
-      'CANARY_CHANNEL_NAME': "${env.JOB_NAME}-${params.RUNNER_LABEL}"
-    ]
+      'DEBUG_LOG_SDP': params.DEBUG_LOG_SDP,
+    ].collect{ k, v -> "${k}=${v}" }
 
     def consumerEnvs = [
       'JAVA_HOME': "/opt/jdk-11.0.20",
@@ -164,8 +145,8 @@ def buildStorageCanary(isConsumer, params) {
     if (params.FIRST_ITERATION) {
         deleteDir()
     }
-    if (!isConsumer){
-        buildWebRTCProject(params.USE_MBEDTLS, params.CONFIG_FILE_HEADER, thing_prefix)
+    if (!isConsumer) {
+        buildWebRTCProject(params.USE_MBEDTLS, params.CONFIG_FILE_HEADER)
     } else {
         buildConsumerProject()
     }
@@ -176,14 +157,14 @@ def buildStorageCanary(isConsumer, params) {
     }
 
     if (!isConsumer) {
-        def envs = (commonEnvs + masterEnvs).collect{ k, v -> "${k}=${v}" }
         withRunnerWrapper(envs) {
             sh """
-                cd ./canary/webrtc-c/build &&
-                ./kvsWebrtcStorageSample"""
+                cd build &&
+                ${isMaster ? "" : "sleep 10 &&"}
+                ./cloudwatch-integ/kvsWebrtcClientMasterCW ${env.JOB_NAME}"""
         }
     } else {
-        def envs = (commonEnvs + consumerEnvs).collect{ k, v -> "${k}=${v}" }
+        def envs = consumerEnvs.collect{ k, v -> "${k}=${v}" }
         withRunnerWrapper(envs) {
             sh '''
                 cd $WORKSPACE/canary/consumer-java
@@ -230,43 +211,42 @@ pipeline {
             }
         }
 
-        stage('Build and Run Webrtc Canary') {
-            failFast true
-            when {
-                allOf {
-                    equals expected: false, actual: params.IS_STORAGE
-                    equals expected: false, actual: params.IS_STORAGE_SINGLE_NODE 
-
-                }
-            }
-            parallel {
-                stage('Master') {
-                    steps {
-                        script {
-                            buildPeer(true, params)
-                        }
-                    }
-                }
-
-                stage('Viewer') {
-                    agent {
-                        label params.VIEWER_NODE_LABEL
-                    }
-
-                    steps {
-                        script {
-                            buildPeer(false, params)
-                        }
-                    }
-                }
-            }
-        }
-
+//         stage('Build and Run Webrtc Canary') {
+//             failFast true
+//             when {
+//                 allOf {
+//                     equals expected: false, actual: params.IS_STORAGE
+//                     equals expected: false, actual: params.IS_STORAGE_SINGLE_NODE
+//
+//                 }
+//             }
+//             parallel {
+//                 stage('Master') {
+//                     steps {
+//                         script {
+//                             buildPeer(true, params)
+//                         }
+//                     }
+//                 }
+//
+//                 stage('Viewer') {
+//                     agent {
+//                         label params.VIEWER_NODE_LABEL
+//                     }
+//
+//                     steps {
+//                         script {
+//                             buildPeer(false, params)
+//                         }
+//                     }
+//                 }
+//             }
+//         }
+//
 //         stage('Build and Run Webrtc-Storage Master and Consumer Canaries') {
 //             failFast true
 //             when {
 //                 allOf {
-//                     equals expected: false, actual: params.IS_SIGNALING
 //                     equals expected: true, actual: params.IS_STORAGE
 //                     equals expected: false, actual: params.IS_STORAGE_SINGLE_NODE
 //                 }
@@ -291,34 +271,33 @@ pipeline {
 //                 }
 //             }
 //         }
-//
-//
-//         stage('Build and Run Webrtc-Storage Master and Consumer Canaries on Same Node') {
-//             failFast true
-//             when {
-//                 allOf {
-//                     equals expected: false, actual: params.IS_SIGNALING
-//                     equals expected: true, actual: params.IS_STORAGE
-//                     equals expected: true, actual: params.IS_STORAGE_SINGLE_NODE
-//                 }
-//             }
-//             parallel {
-//                 stage('StorageMaster') {
-//                     steps {
-//                         script {
-//                             buildStorageCanary(false, params)
-//                         }
-//                     }
-//                 }
-//                 stage('StorageConsumer') {
-//                     steps {
-//                         script {
-//                             buildStorageCanary(true, params)
-//                         }
-//                     }
-//                 }
-//             }
-//         }
+
+
+        stage('Build and Run Webrtc-Storage Master and Consumer Canaries on Same Node') {
+            failFast true
+            when {
+                allOf {
+                    equals expected: true, actual: params.IS_STORAGE
+                    equals expected: true, actual: params.IS_STORAGE_SINGLE_NODE
+                }
+            }
+            parallel {
+                stage('StorageMaster') {
+                    steps {
+                        script {
+                            buildStorageCanary(false, params)
+                        }
+                    }
+                }
+                stage('StorageConsumer') {
+                    steps {
+                        script {
+                            buildStorageCanary(true, params)
+                        }
+                    }
+                }
+            }
+        }
 
         // In case of failures, we should add some delays so that we don't get into a tight loop of retrying
         stage('Throttling Retry') {
