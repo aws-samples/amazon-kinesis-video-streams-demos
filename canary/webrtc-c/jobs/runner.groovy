@@ -22,23 +22,23 @@ def buildWebRTCProject(useMbedTLS, params, config_file_header) {
             pwd
             ls
         """
+        echo "Config file: ${config_file_header}"
+        def config_file_path = "../cloudwatch-integ/configs/"
+        config_file_path += "${config_file_header}"
+        echo "Config file path: ${config_file_path}"
+        def configureCmd = "cmake .. -DSAMPLE_CONFIG_HEADER=${config_file_path}"
+        echo "Configure Command: ${configureCmd}"
+        if (useMbedTLS) {
+          echo 'Using mbedtls'
+          configureCmd += " -DUSE_OPENSSL=OFF -DUSE_MBEDTLS=ON"
+        }
+
+        sh """
+            mkdir -p build &&
+            cd build &&
+            ${configureCmd} &&
+            make"""
     }
-//     echo "Config file: ${config_file_header}"
-//     def config_file_path = "../cloudwatch-integ/configs/"
-//     config_file_path += "${config_file_header}"
-//     echo "Config file path: ${config_file_path}"
-//     def configureCmd = "cmake .. -DSAMPLE_CONFIG_HEADER=${config_file_path}"
-//     echo "Configure Command: ${configureCmd}"
-//     if (useMbedTLS) {
-//       echo 'Using mbedtls'
-//       configureCmd += " -DUSE_OPENSSL=OFF -DUSE_MBEDTLS=ON"
-//     }
-//
-//     sh """
-//         mkdir -p build &&
-//         cd build &&
-//         ${configureCmd} &&
-//         make"""
 }
 
 def buildConsumerProject(params) {
@@ -55,19 +55,19 @@ def buildConsumerProject(params) {
             pwd
             ls
         """
+        def consumerEnvs = [
+            'JAVA_HOME': "/usr/lib/jvm/java-1.11.0-openjdk-amd64/",
+            'M2_HOME': "/usr/share/maven"
+        ].collect({k,v -> "${k}=${v}" })
+
+        withEnv(consumerEnvs) {
+            sh '''
+                PATH="$JAVA_HOME/bin:$PATH"
+                export PATH="$M2_HOME/bin:$PATH"
+                cd ./canary/consumer-java
+                make -j4'''
+        }
     }
-//     def consumerEnvs = [
-//         'JAVA_HOME': "/usr/lib/jvm/java-1.11.0-openjdk-amd64/",
-//         'M2_HOME': "/usr/share/maven"
-//     ].collect({k,v -> "${k}=${v}" })
-//
-//     withEnv(consumerEnvs) {
-//         sh '''
-//             PATH="$JAVA_HOME/bin:$PATH"
-//             export PATH="$M2_HOME/bin:$PATH"
-//             cd ./canary/consumer-java
-//             make -j4'''
-//     }
 }
 
 def withRunnerWrapper(envs, fn) {
