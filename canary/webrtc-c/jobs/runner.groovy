@@ -14,7 +14,7 @@ CREDENTIALS = [
 
 def buildWebRTCProject(useMbedTLS, config_file_header) {
     echo 'Flag set to ' + useMbedTLS
-    checkout([$class: 'GitSCM', branches: [[name: params.GIT_HASH]], userRemoteConfigs: [[url: params.GIT_URL]]])
+    checkout([$class: 'GitSCM', branches: [[name: params.GIT_HASH_WEBRTC]], userRemoteConfigs: [[url: params.GIT_URL_WEBRTC]]])
 
     echo "Config file: ${config_file_header}"
     def config_file_path = "../cloudwatch-integ/configs/"
@@ -39,8 +39,8 @@ def buildConsumerProject() {
     def consumerStartUpDelay = 45
     sleep consumerStartUpDelay
 
-    checkout([$class: 'GitSCM', branches: [[name: params.GIT_HASH ]],
-              userRemoteConfigs: [[url: params.GIT_URL]]])
+    checkout([$class: 'GitSCM', branches: [[name: params.GIT_HASH_CONSUMER ]],
+              userRemoteConfigs: [[url: params.GIT_URL_CONSUMER]]])
               
     def consumerEnvs = [        
         'JAVA_HOME': "/usr/lib/jvm/default-java",
@@ -190,8 +190,10 @@ pipeline {
         string(name: 'VIEWER_NODE_LABEL')
         string(name: 'RUNNER_LABEL')
         string(name: 'MIN_RETRY_DELAY_IN_SECONDS')
-        string(name: 'GIT_URL')
-        string(name: 'GIT_HASH')
+        string(name: 'GIT_URL_WEBRTC')
+        string(name: 'GIT_HASH_WEBRTC')
+        string(name: 'GIT_URL_CONSUMER')
+        string(name: 'GIT_HASH_CONSUMER')
         string(name: 'CONFIG_FILE_HEADER')
         booleanParam(name: 'FIRST_ITERATION', defaultValue: true)
     }
@@ -328,8 +330,10 @@ pipeline {
                       string(name: 'VIEWER_NODE_LABEL', value: params.VIEWER_NODE_LABEL),
                       string(name: 'RUNNER_LABEL', value: params.RUNNER_LABEL),
                       string(name: 'MIN_RETRY_DELAY_IN_SECONDS', value: params.MIN_RETRY_DELAY_IN_SECONDS),
-                      string(name: 'GIT_URL', value: params.GIT_URL),
-                      string(name: 'GIT_HASH', value: params.GIT_HASH),
+                      string(name: 'GIT_URL_WEBRTC', value: params.GIT_URL_WEBRTC),
+                      string(name: 'GIT_HASH_WEBRTC', value: params.GIT_HASH_WEBRTC),
+                      string(name: 'GIT_URL_CONSUMER', value: params.GIT_URL_CONSUMER),
+                      string(name: 'GIT_HASH_CONSUMER', value: params.GIT_HASH_CONSUMER),
                       booleanParam(name: 'FIRST_ITERATION', value: false)
                     ],
                     wait: false

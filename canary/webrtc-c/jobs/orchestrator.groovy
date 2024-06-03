@@ -9,13 +9,16 @@ STORAGE_EXTENDED_DURATION_IN_SECONDS = 43200 // 12 hr
 
 MIN_RETRY_DELAY_IN_SECONDS = 60
 COLD_STARTUP_DELAY_IN_SECONDS = 60 * 60
-GIT_URL = 'https://github.com/awslabs/amazon-kinesis-video-streams-webrtc-sdk-c.git'
-GIT_HASH = 'simplify-sample'
+GIT_URL_WEBRTC = 'https://github.com/awslabs/amazon-kinesis-video-streams-webrtc-sdk-c.git'
+GIT_HASH_WEBRTC = 'simplify-sample'
+GIT_URL_CONSUMER = 'https://github.com/aws-samples/amazon-kinesis-video-streams-demos.git'
+GIT_HASH_CONSUMER = 'new-canary'
 COMMON_PARAMS = [
     string(name: 'AWS_KVS_LOG_LEVEL', value: "2"),
     string(name: 'DEBUG_LOG_SDP', value: "TRUE"),
     string(name: 'MIN_RETRY_DELAY_IN_SECONDS', value: MIN_RETRY_DELAY_IN_SECONDS.toString()),
-    string(name: 'GIT_URL', value: GIT_URL),
+    string(name: 'GIT_URL_WEBRTC', value: GIT_URL_WEBRTC),
+    string(name: 'GIT_URL_CONSUMER', value: GIT_URL_CONSUMER),
     string(name: 'LOG_GROUP_NAME', value: "WebrtcSDK"),
 ]
 
@@ -63,12 +66,12 @@ pipeline {
     }
 
     stages {
-        stage('Checkout') {
-            steps {
-                checkout([$class: 'GitSCM', branches: [[name: GIT_HASH ]],
-                          userRemoteConfigs: [[url: GIT_URL]]])
-            }
-        }
+//         stage('Checkout') {
+//             steps {
+//                 checkout([$class: 'GitSCM', branches: [[name: GIT_HASH ]],
+//                           userRemoteConfigs: [[url: GIT_URL]]])
+//             }
+//         }
 
         stage('Update runners') {
             /* TODO: Add a conditional step to check if there's any update in webrtc canary
