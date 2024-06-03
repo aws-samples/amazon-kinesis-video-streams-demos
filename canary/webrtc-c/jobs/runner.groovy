@@ -16,22 +16,27 @@ def buildWebRTCProject(useMbedTLS, params, config_file_header) {
     echo 'Flag set to ' + useMbedTLS
     checkout([$class: 'GitSCM', branches: [[name: params.GIT_HASH_WEBRTC]], userRemoteConfigs: [[url: params.GIT_URL_WEBRTC]]])
 
-    echo "Config file: ${config_file_header}"
-    def config_file_path = "../cloudwatch-integ/configs/"
-    config_file_path += "${config_file_header}"
-    echo "Config file path: ${config_file_path}"
-    def configureCmd = "cmake .. -DSAMPLE_CONFIG_HEADER=${config_file_path}"
-    echo "Configure Command: ${configureCmd}"
-    if (useMbedTLS) {
-      echo 'Using mbedtls'
-      configureCmd += " -DUSE_OPENSSL=OFF -DUSE_MBEDTLS=ON"
-    }
-
+    echo "WebRTC"
     sh """
-        mkdir -p build &&
-        cd build &&
-        ${configureCmd} &&
-        make"""
+        pwd
+        ls
+    """
+//     echo "Config file: ${config_file_header}"
+//     def config_file_path = "../cloudwatch-integ/configs/"
+//     config_file_path += "${config_file_header}"
+//     echo "Config file path: ${config_file_path}"
+//     def configureCmd = "cmake .. -DSAMPLE_CONFIG_HEADER=${config_file_path}"
+//     echo "Configure Command: ${configureCmd}"
+//     if (useMbedTLS) {
+//       echo 'Using mbedtls'
+//       configureCmd += " -DUSE_OPENSSL=OFF -DUSE_MBEDTLS=ON"
+//     }
+//
+//     sh """
+//         mkdir -p build &&
+//         cd build &&
+//         ${configureCmd} &&
+//         make"""
 }
 
 def buildConsumerProject(params) {
@@ -40,19 +45,24 @@ def buildConsumerProject(params) {
     sleep consumerStartUpDelay
     checkout([$class: 'GitSCM', branches: [[name: params.GIT_HASH_CONSUMER ]],
               userRemoteConfigs: [[url: params.GIT_URL_CONSUMER]]])
-              
-    def consumerEnvs = [        
-        'JAVA_HOME': "/usr/lib/jvm/java-1.11.0-openjdk-amd64/",
-        'M2_HOME': "/usr/share/maven"
-    ].collect({k,v -> "${k}=${v}" })
 
-    withEnv(consumerEnvs) {
-        sh '''
-            PATH="$JAVA_HOME/bin:$PATH"
-            export PATH="$M2_HOME/bin:$PATH"
-            cd ./canary/consumer-java
-            make -j4'''
-    }
+    echo "Consumer"
+    sh """
+        pwd
+        ls
+    """
+//     def consumerEnvs = [
+//         'JAVA_HOME': "/usr/lib/jvm/java-1.11.0-openjdk-amd64/",
+//         'M2_HOME': "/usr/share/maven"
+//     ].collect({k,v -> "${k}=${v}" })
+//
+//     withEnv(consumerEnvs) {
+//         sh '''
+//             PATH="$JAVA_HOME/bin:$PATH"
+//             export PATH="$M2_HOME/bin:$PATH"
+//             cd ./canary/consumer-java
+//             make -j4'''
+//     }
 }
 
 def withRunnerWrapper(envs, fn) {
@@ -125,9 +135,6 @@ def buildPeer(isMaster, params) {
 }
 
 def buildStorageCanary(isConsumer, params) {
-    def scripts_dir = !isConsumer ? "$WORKSPACE/canary/webrtc-c/scripts" :
-        "$WORKSPACE/canary/webrtc-c/scripts"
-
     def envs = [
       'AWS_KVS_LOG_LEVEL': params.AWS_KVS_LOG_LEVEL,
       'DEBUG_LOG_SDP': params.DEBUG_LOG_SDP,
@@ -155,22 +162,22 @@ def buildStorageCanary(isConsumer, params) {
         RUNNING_NODES_IN_BUILDING == 0
     }
 
-    if (!isConsumer) {
-        withRunnerWrapper(envs) {
-            sh """
-                cd build &&
-                ${isMaster ? "" : "sleep 10 &&"}
-                ./cloudwatch-integ/kvsWebrtcClientMasterCW ${env.JOB_NAME}"""
-        }
-    } else {
-        def cenvs = consumerEnvs.collect{ k, v -> "${k}=${v}" }
-        withRunnerWrapper(cenvs) {
-            sh '''
-                cd $WORKSPACE/canary/consumer-java
-                java -classpath target/aws-kinesisvideo-producer-sdk-canary-consumer-1.0-SNAPSHOT.jar:$(cat tmp_jar) -Daws.accessKeyId=${AWS_ACCESS_KEY_ID} -Daws.secretKey=${AWS_SECRET_ACCESS_KEY} com.amazon.kinesis.video.canary.consumer.WebrtcStorageCanaryConsumer
-            '''
-        }
-    }
+//     if (!isConsumer) {
+//         withRunnerWrapper(envs) {
+//             sh """
+//                 cd build &&
+//                 ${isMaster ? "" : "sleep 10 &&"}
+//                 ./cloudwatch-integ/kvsWebrtcClientMasterCW ${env.JOB_NAME}"""
+//         }
+//     } else {
+//         def cenvs = consumerEnvs.collect{ k, v -> "${k}=${v}" }
+//         withRunnerWrapper(cenvs) {
+//             sh '''
+//                 cd $WORKSPACE/canary/consumer-java
+//                 java -classpath target/aws-kinesisvideo-producer-sdk-canary-consumer-1.0-SNAPSHOT.jar:$(cat tmp_jar) -Daws.accessKeyId=${AWS_ACCESS_KEY_ID} -Daws.secretKey=${AWS_SECRET_ACCESS_KEY} com.amazon.kinesis.video.canary.consumer.WebrtcStorageCanaryConsumer
+//             '''
+//         }
+//     }
 }
 
 pipeline {
