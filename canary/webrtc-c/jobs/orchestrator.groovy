@@ -19,6 +19,8 @@ COMMON_PARAMS = [
     string(name: 'MIN_RETRY_DELAY_IN_SECONDS', value: MIN_RETRY_DELAY_IN_SECONDS.toString()),
     string(name: 'GIT_URL_WEBRTC', value: GIT_URL_WEBRTC),
     string(name: 'GIT_URL_CONSUMER', value: GIT_URL_CONSUMER),
+    string(name: 'GIT_HASH_WEBRTC', value: GIT_HASH_WEBRTC),
+    string(name: 'GIT_HASH_CONSUMER', value: GIT_HASH_CONSUMER),
     string(name: 'LOG_GROUP_NAME', value: "WebrtcSDK"),
 ]
 
@@ -120,10 +122,10 @@ pipeline {
                             Jenkins.instance.getItemByFullName(NEXT_AVAILABLE_RUNNER).setDisabled(false)
 
                             // Lock in current commit hash to avoid inconsistent version across runners
-                            def gitHashWebRtc = sh(returnStdout: true, script: 'git rev-parse HEAD')
-                            COMMON_PARAMS << string(name: 'GIT_HASH_WEBRTC', value: gitHashWebRtc)
-                            def gitHashConsumer = sh(returnStdout: true, script: 'git rev-parse HEAD')
-                            COMMON_PARAMS << string(name: 'GIT_HASH_CONSUMER', value: gitHashConsumer)
+//                             def gitHashWebRtc = sh(returnStdout: true, script: 'git rev-parse HEAD')
+//                             COMMON_PARAMS << string(name: 'GIT_HASH_WEBRTC', value: gitHashWebRtc)
+//                             def gitHashConsumer = sh(returnStdout: true, script: 'git rev-parse HEAD')
+//                             COMMON_PARAMS << string(name: 'GIT_HASH_CONSUMER', value: gitHashConsumer)
                         }
 
                         // TODO: Use matrix to spawn runners
