@@ -14,13 +14,15 @@ CREDENTIALS = [
 
 def buildWebRTCProject(useMbedTLS, params, config_file_header) {
     echo 'Flag set to ' + useMbedTLS
-    checkout([$class: 'GitSCM', branches: [[name: params.GIT_HASH_WEBRTC]], userRemoteConfigs: [[url: params.GIT_URL_WEBRTC]]])
+    dir('webrtc') {
+        checkout([$class: 'GitSCM', branches: [[name: params.GIT_HASH_WEBRTC]], userRemoteConfigs: [[url: params.GIT_URL_WEBRTC]]])
 
-    echo "WebRTC"
-    sh """
-        pwd
-        ls
-    """
+        echo "WebRTC"
+        sh """
+            pwd
+            ls
+        """
+    }
 //     echo "Config file: ${config_file_header}"
 //     def config_file_path = "../cloudwatch-integ/configs/"
 //     config_file_path += "${config_file_header}"
@@ -43,14 +45,17 @@ def buildConsumerProject(params) {
     // TODO: should probably remove this - not needed for webrtc consumer
     def consumerStartUpDelay = 45
     sleep consumerStartUpDelay
-    checkout([$class: 'GitSCM', branches: [[name: params.GIT_HASH_CONSUMER ]],
-              userRemoteConfigs: [[url: params.GIT_URL_CONSUMER]]])
 
-    echo "Consumer"
-    sh """
-        pwd
-        ls
-    """
+    dir('consumer') {
+        checkout([$class: 'GitSCM', branches: [[name: params.GIT_HASH_CONSUMER ]],
+                  userRemoteConfigs: [[url: params.GIT_URL_CONSUMER]]])
+
+        echo "Consumer"
+        sh """
+            pwd
+            ls
+        """
+    }
 //     def consumerEnvs = [
 //         'JAVA_HOME': "/usr/lib/jvm/java-1.11.0-openjdk-amd64/",
 //         'M2_HOME': "/usr/share/maven"
