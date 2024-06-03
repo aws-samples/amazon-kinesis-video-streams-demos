@@ -70,6 +70,8 @@ pipeline {
             steps {
                 checkout([$class: 'GitSCM', branches: [[name: GIT_HASH_WEBRTC ]],
                           userRemoteConfigs: [[url: GIT_URL_WEBRTC]]])
+                checkout([$class: 'GitSCM', branches: [[name: GIT_HASH_CONSUMER ]],
+                          userRemoteConfigs: [[url: GIT_URL_CONSUMER]]])
             }
         }
 
