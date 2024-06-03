@@ -38,13 +38,11 @@ def buildConsumerProject(params) {
     // TODO: should probably remove this - not needed for webrtc consumer
     def consumerStartUpDelay = 45
     sleep consumerStartUpDelay
-    echo '${params.GIT_HASH_CONSUMER}'
-    echo '${params.GIT_URL_CONSUMER}'
     checkout([$class: 'GitSCM', branches: [[name: params.GIT_HASH_CONSUMER ]],
               userRemoteConfigs: [[url: params.GIT_URL_CONSUMER]]])
               
     def consumerEnvs = [        
-        'JAVA_HOME': "/usr/lib/jvm/default-java",
+        'JAVA_HOME': "/usr/lib/jvm/java-1.11.0-openjdk-amd64/",
         'M2_HOME': "/usr/share/maven"
     ].collect({k,v -> "${k}=${v}" })
 
@@ -136,7 +134,7 @@ def buildStorageCanary(isConsumer, params) {
     ].collect{ k, v -> "${k}=${v}" }
 
     def consumerEnvs = [
-      'JAVA_HOME': "/opt/jdk-11.0.20",
+      'JAVA_HOME': "/usr/lib/jvm/java-1.11.0-openjdk-amd64/",
       'M2_HOME': "/opt/apache-maven-3.6.3",
       'AWS_DEFAULT_REGION': params.AWS_DEFAULT_REGION,
       'CANARY_STREAM_NAME': "${env.JOB_NAME}-${params.RUNNER_LABEL}"
