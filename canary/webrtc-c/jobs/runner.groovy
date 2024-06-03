@@ -34,11 +34,12 @@ def buildWebRTCProject(useMbedTLS, config_file_header) {
         make"""
 }
 
-def buildConsumerProject() {
+def buildConsumerProject(params) {
     // TODO: should probably remove this - not needed for webrtc consumer
     def consumerStartUpDelay = 45
     sleep consumerStartUpDelay
-
+    echo ${params.GIT_HASH_CONSUMER}
+    echo ${params.GIT_URL_CONSUMER}
     checkout([$class: 'GitSCM', branches: [[name: params.GIT_HASH_CONSUMER ]],
               userRemoteConfigs: [[url: params.GIT_URL_CONSUMER]]])
               
@@ -146,9 +147,9 @@ def buildStorageCanary(isConsumer, params) {
         deleteDir()
     }
     if (!isConsumer) {
-        buildWebRTCProject(params.USE_MBEDTLS, params.CONFIG_FILE_HEADER)
+        buildWebRTCProject(params.USE_MBEDTLS, params, params.CONFIG_FILE_HEADER)
     } else {
-        buildConsumerProject()
+        buildConsumerProject(params)
     }
     RUNNING_NODES_IN_BUILDING--
     

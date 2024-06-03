@@ -66,12 +66,12 @@ pipeline {
     }
 
     stages {
-//         stage('Checkout') {
-//             steps {
-//                 checkout([$class: 'GitSCM', branches: [[name: GIT_HASH ]],
-//                           userRemoteConfigs: [[url: GIT_URL]]])
-//             }
-//         }
+        stage('Checkout') {
+            steps {
+                checkout([$class: 'GitSCM', branches: [[name: GIT_HASH_WEBRTC ]],
+                          userRemoteConfigs: [[url: GIT_URL_WEBRTC]]])
+            }
+        }
 
         stage('Update runners') {
             /* TODO: Add a conditional step to check if there's any update in webrtc canary
