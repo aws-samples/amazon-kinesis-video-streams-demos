@@ -12,7 +12,7 @@ CREDENTIALS = [
     ]
 ]
 
-def buildWebRTCProject(useMbedTLS, config_file_header) {
+def buildWebRTCProject(useMbedTLS, params, config_file_header) {
     echo 'Flag set to ' + useMbedTLS
     checkout([$class: 'GitSCM', branches: [[name: params.GIT_HASH_WEBRTC]], userRemoteConfigs: [[url: params.GIT_URL_WEBRTC]]])
 
