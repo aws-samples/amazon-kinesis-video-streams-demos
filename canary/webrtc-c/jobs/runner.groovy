@@ -97,7 +97,7 @@ def buildPeer(isMaster, params) {
     }
 
     def thing_prefix = "${env.JOB_NAME}-${params.RUNNER_LABEL}"
-    buildWebRTCProject(params.USE_MBEDTLS, params.CONFIG_FILE_HEADER)
+    buildWebRTCProject(params.USE_MBEDTLS, params, params.CONFIG_FILE_HEADER)
 
     RUNNING_NODES_IN_BUILDING--
     
