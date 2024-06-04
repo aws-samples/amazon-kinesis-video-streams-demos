@@ -167,22 +167,22 @@ def buildStorageCanary(isConsumer, params) {
         RUNNING_NODES_IN_BUILDING == 0
     }
 
-//     if (!isConsumer) {
-//         withRunnerWrapper(envs) {
-//             sh """
-//                 cd build &&
-//                 ${isMaster ? "" : "sleep 10 &&"}
-//                 ./cloudwatch-integ/kvsWebrtcClientMasterCW ${env.JOB_NAME}"""
-//         }
-//     } else {
-//         def cenvs = consumerEnvs.collect{ k, v -> "${k}=${v}" }
-//         withRunnerWrapper(cenvs) {
-//             sh '''
-//                 cd $WORKSPACE/canary/consumer-java
-//                 java -classpath target/aws-kinesisvideo-producer-sdk-canary-consumer-1.0-SNAPSHOT.jar:$(cat tmp_jar) -Daws.accessKeyId=${AWS_ACCESS_KEY_ID} -Daws.secretKey=${AWS_SECRET_ACCESS_KEY} com.amazon.kinesis.video.canary.consumer.WebrtcStorageCanaryConsumer
-//             '''
-//         }
-//     }
+    if (!isConsumer) {
+        withRunnerWrapper(envs) {
+            sh """
+                cd build &&
+                ${isMaster ? "" : "sleep 10 &&"}
+                ./cloudwatch-integ/kvsWebrtcClientMasterCW ${env.JOB_NAME}"""
+        }
+    } else {
+        def cenvs = consumerEnvs.collect{ k, v -> "${k}=${v}" }
+        withRunnerWrapper(cenvs) {
+            sh '''
+                cd $WORKSPACE/canary/consumer-java
+                java -classpath target/aws-kinesisvideo-producer-sdk-canary-consumer-1.0-SNAPSHOT.jar:$(cat tmp_jar) -Daws.accessKeyId=${AWS_ACCESS_KEY_ID} -Daws.secretKey=${AWS_SECRET_ACCESS_KEY} com.amazon.kinesis.video.canary.consumer.WebrtcStorageCanaryConsumer
+            '''
+        }
+    }
 }
 
 pipeline {
