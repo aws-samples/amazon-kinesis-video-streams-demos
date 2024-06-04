@@ -60,7 +60,7 @@ ACTIVE_RUNNERS = []
 
 pipeline {
     agent {
-        label 'openssl-master'
+        label 'mbedtls-master'
     }
 
     options {
