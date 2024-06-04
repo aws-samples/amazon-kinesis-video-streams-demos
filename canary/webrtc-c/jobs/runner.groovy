@@ -43,7 +43,7 @@ def buildWebRTCProject(useMbedTLS, params, config_file_header) {
 
 def buildConsumerProject(params) {
     // TODO: should probably remove this - not needed for webrtc consumer
-    def consumerStartUpDelay = 45
+    def consumerStartUpDelay = 10
     sleep consumerStartUpDelay
 
     dir('consumer') {
