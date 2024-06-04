@@ -203,8 +203,11 @@ pipeline {
                                 booleanParam(name: 'IS_STORAGE_SINGLE_NODE', value: true),
                                 string(name: 'DURATION_IN_SECONDS', value: STORAGE_PERIODIC_DURATION_IN_SECONDS.toString()),
                                 string(name: 'CONFIG_FILE_HEADER', value: "storage_periodic.h"),
+                                string(name: 'RUNNER_LABEL', value: "StoragePeriodic"),
+                                string(name: 'SCENARIO_LABEL', value: "StoragePeriodic"),
                                 string(name: 'MASTER_NODE_LABEL', value: "openssl-master"),
                                 string(name: 'CONSUMER_NODE_LABEL', value: "openssl-viewer"),
+                                string(name: 'AWS_DEFAULT_REGION', value: "us-west-2"),
                             ],
                             wait: false
                         )

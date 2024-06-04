@@ -150,6 +150,7 @@ def buildStorageCanary(isConsumer, params) {
       'M2_HOME': "/opt/apache-maven-3.6.3",
       'AWS_DEFAULT_REGION': params.AWS_DEFAULT_REGION,
       'CANARY_DURATION_IN_SECONDS': params.DURATION_IN_SECONDS,
+      'CANARY_LABEL': params.SCENARIO_LABEL,
       'CANARY_STREAM_NAME': "${env.JOB_NAME}-${params.RUNNER_LABEL}"
     ]
 
@@ -203,6 +204,7 @@ pipeline {
         string(name: 'CONSUMER_NODE_LABEL')
         string(name: 'VIEWER_NODE_LABEL')
         string(name: 'RUNNER_LABEL')
+        string(name: 'SCENARIO_LABEL')
         string(name: 'MIN_RETRY_DELAY_IN_SECONDS')
         string(name: 'GIT_URL_WEBRTC')
         string(name: 'GIT_HASH_WEBRTC')
@@ -343,6 +345,7 @@ pipeline {
                       string(name: 'CONSUMER_NODE_LABEL', value: params.CONSUMER_NODE_LABEL),
                       string(name: 'VIEWER_NODE_LABEL', value: params.VIEWER_NODE_LABEL),
                       string(name: 'RUNNER_LABEL', value: params.RUNNER_LABEL),
+                      string(name: 'SCENARIO_LABEL', value: params.SCENARIO_LABEL),
                       string(name: 'MIN_RETRY_DELAY_IN_SECONDS', value: params.MIN_RETRY_DELAY_IN_SECONDS),
                       string(name: 'DURATION_IN_SECONDS', value: params.DURATION_IN_SECONDS),
                       string(name: 'GIT_URL_WEBRTC', value: params.GIT_URL_WEBRTC),
