@@ -125,14 +125,13 @@ def buildPeer(isMaster, params) {
     if(isMaster) {
         withRunnerWrapper(envs) {
             sh """
-                cd build &&
-                ${isMaster ? "" : "sleep 10 &&"}
+                cd $WORKSPACE/webrtc/build
                 ./cloudwatch-integ/kvsWebrtcClientMasterCW ${env.JOB_NAME}"""
         }
     } else {
         withRunnerWrapper(envs) {
             sh """
-                cd build &&
+                cd $WORKSPACE/webrtc/build &&
                 ${isMaster ? "" : "sleep 10 &&"}
                 ./cloudwatch-integ/kvsWebrtcClientViewerCW ${env.JOB_NAME}"""
         }
