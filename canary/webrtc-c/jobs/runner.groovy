@@ -149,6 +149,7 @@ def buildStorageCanary(isConsumer, params) {
       'JAVA_HOME': "/usr/lib/jvm/java-1.11.0-openjdk-amd64/",
       'M2_HOME': "/opt/apache-maven-3.6.3",
       'AWS_DEFAULT_REGION': params.AWS_DEFAULT_REGION,
+      'CANARY_DURATION_IN_SECONDS': params.DURATION_IN_SECONDS,
       'CANARY_STREAM_NAME': "${env.JOB_NAME}-${params.RUNNER_LABEL}"
     ]
 
@@ -197,6 +198,7 @@ pipeline {
         booleanParam(name: 'IS_STORAGE_SINGLE_NODE')
         booleanParam(name: 'USE_MBEDTLS', defaultValue: false)
         booleanParam(name: 'DEBUG_LOG_SDP', defaultValue: true)
+        string(name: 'DURATION_IN_SECONDS')
         string(name: 'MASTER_NODE_LABEL')
         string(name: 'CONSUMER_NODE_LABEL')
         string(name: 'VIEWER_NODE_LABEL')
@@ -342,6 +344,7 @@ pipeline {
                       string(name: 'VIEWER_NODE_LABEL', value: params.VIEWER_NODE_LABEL),
                       string(name: 'RUNNER_LABEL', value: params.RUNNER_LABEL),
                       string(name: 'MIN_RETRY_DELAY_IN_SECONDS', value: params.MIN_RETRY_DELAY_IN_SECONDS),
+                      string(name: 'DURATION_IN_SECONDS', value: params.DURATION_IN_SECONDS),
                       string(name: 'GIT_URL_WEBRTC', value: params.GIT_URL_WEBRTC),
                       string(name: 'GIT_HASH_WEBRTC', value: params.GIT_HASH_WEBRTC),
                       string(name: 'GIT_URL_CONSUMER', value: params.GIT_URL_CONSUMER),
