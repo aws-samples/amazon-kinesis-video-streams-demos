@@ -226,6 +226,7 @@ pipeline {
                                 booleanParam(name: 'TRICKLE_ICE', value: true),
                                 booleanParam(name: 'USE_IOT', value: false),
                                 string(name: 'DURATION_IN_SECONDS', value: STORAGE_SUB_RECONNECT_DURATION_IN_SECONDS.toString()),
+                                string(name: 'CONFIG_FILE_HEADER', value: "storage_sub_reconnect.h"),
                                 string(name: 'MASTER_NODE_LABEL', value: "openssl-master"),
                                 string(name: 'CONSUMER_NODE_LABEL', value: "openssl-viewer"),
                                 string(name: 'RUNNER_LABEL', value: "StorageSubReconnect"),
@@ -234,7 +235,7 @@ pipeline {
                             ],
                             wait: false
                         )
-//
+
 //                         // Storage Single Reconnect.
 //                         build(
 //                             job: NEXT_AVAILABLE_RUNNER,
@@ -244,6 +245,7 @@ pipeline {
 //                                 booleanParam(name: 'TRICKLE_ICE', value: true),
 //                                 booleanParam(name: 'USE_IOT', value: false),
 //                                 string(name: 'DURATION_IN_SECONDS', value: STORAGE_SINGLE_RECONNECT_DURATION_IN_SECONDS.toString()),
+//                                 string(name: 'CONFIG_FILE_HEADER', value: "storage_single_reconnect.h"),
 //                                 string(name: 'MASTER_NODE_LABEL', value: "webrtc-storage-master"),
 //                                 string(name: 'CONSUMER_NODE_LABEL', value: "webrtc-storage-consumer"),
 //                                 string(name: 'RUNNER_LABEL', value: "StorageSingleReconnect"),
@@ -262,6 +264,7 @@ pipeline {
 //                                 booleanParam(name: 'TRICKLE_ICE', value: true),
 //                                 booleanParam(name: 'USE_IOT', value: false),
 //                                 string(name: 'DURATION_IN_SECONDS', value: STORAGE_EXTENDED_DURATION_IN_SECONDS.toString()),
+//                                 string(name: 'CONFIG_FILE_HEADER', value: "storage_extended.h"),
 //                                 string(name: 'MASTER_NODE_LABEL', value: "webrtc-storage-master"),
 //                                 string(name: 'CONSUMER_NODE_LABEL', value: "webrtc-storage-consumer"),
 //                                 string(name: 'RUNNER_LABEL', value: "StorageExtended"),
