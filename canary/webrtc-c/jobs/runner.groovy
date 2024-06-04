@@ -229,66 +229,66 @@ pipeline {
             }
         }
 
-//         stage('Build and Run Webrtc Canary') {
-//             failFast true
-//             when {
-//                 allOf {
-//                     equals expected: false, actual: params.IS_STORAGE
-//                     equals expected: false, actual: params.IS_STORAGE_SINGLE_NODE
-//
-//                 }
-//             }
-//             parallel {
-//                 stage('Master') {
-//                     steps {
-//                         script {
-//                             buildPeer(true, params)
-//                         }
-//                     }
-//                 }
-//
-//                 stage('Viewer') {
-//                     agent {
-//                         label params.VIEWER_NODE_LABEL
-//                     }
-//
-//                     steps {
-//                         script {
-//                             buildPeer(false, params)
-//                         }
-//                     }
-//                 }
-//             }
-//         }
-//
-//         stage('Build and Run Webrtc-Storage Master and Consumer Canaries') {
-//             failFast true
-//             when {
-//                 allOf {
-//                     equals expected: true, actual: params.IS_STORAGE
-//                     equals expected: false, actual: params.IS_STORAGE_SINGLE_NODE
-//                 }
-//             }
-//             parallel {
-//                 stage('StorageMaster') {
-//                     steps {
-//                         script {
-//                             buildStorageCanary(false, params)
-//                         }
-//                     }
-//                 }
-//                 stage('StorageConsumer') {
-//                      agent {
-//                         label params.CONSUMER_NODE_LABEL
-//                     }
-//                     steps {
-//                         script {
-//                             buildStorageCanary(true, params)
-//                         }
-//                     }
-//                 }
-//             }
-//         }
+        stage('Build and Run Webrtc Canary') {
+            failFast true
+            when {
+                allOf {
+                    equals expected: false, actual: params.IS_STORAGE
+                    equals expected: false, actual: params.IS_STORAGE_SINGLE_NODE
+
+                }
+            }
+            parallel {
+                stage('Master') {
+                    steps {
+                        script {
+                            buildPeer(true, params)
+                        }
+                    }
+                }
+
+                stage('Viewer') {
+                    agent {
+                        label params.VIEWER_NODE_LABEL
+                    }
+
+                    steps {
+                        script {
+                            buildPeer(false, params)
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Build and Run Webrtc-Storage Master and Consumer Canaries') {
+            failFast true
+            when {
+                allOf {
+                    equals expected: true, actual: params.IS_STORAGE
+                    equals expected: false, actual: params.IS_STORAGE_SINGLE_NODE
+                }
+            }
+            parallel {
+                stage('StorageMaster') {
+                    steps {
+                        script {
+                            buildStorageCanary(false, params)
+                        }
+                    }
+                }
+                stage('StorageConsumer') {
+                     agent {
+                        label params.CONSUMER_NODE_LABEL
+                    }
+                    steps {
+                        script {
+                            buildStorageCanary(true, params)
+                        }
+                    }
+                }
+            }
+        }
 
 
         stage('Build and Run Webrtc-Storage Master and Consumer Canaries on Same Node') {
