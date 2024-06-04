@@ -217,43 +217,43 @@ pipeline {
 //                         )
 
                         // Storage Sub-Reconnect.
-                        build(
-                            job: NEXT_AVAILABLE_RUNNER,
-                            parameters: COMMON_PARAMS + [
-                                booleanParam(name: 'IS_SIGNALING', value: false),
-                                booleanParam(name: 'IS_STORAGE', value: true),
-                                booleanParam(name: 'USE_TURN', value: true),
-                                booleanParam(name: 'TRICKLE_ICE', value: true),
-                                booleanParam(name: 'USE_IOT', value: false),
-                                string(name: 'DURATION_IN_SECONDS', value: STORAGE_SUB_RECONNECT_DURATION_IN_SECONDS.toString()),
-                                string(name: 'CONFIG_FILE_HEADER', value: "storage_sub_reconnect.h"),
-                                string(name: 'MASTER_NODE_LABEL', value: "openssl-master"),
-                                string(name: 'CONSUMER_NODE_LABEL', value: "openssl-viewer"),
-                                string(name: 'RUNNER_LABEL', value: "StorageSubReconnect"),
-                                string(name: 'SCENARIO_LABEL', value: "StorageSubReconnect"),
-                                string(name: 'AWS_DEFAULT_REGION', value: "us-west-2"),
-                            ],
-                            wait: false
-                        )
-
-//                         // Storage Single Reconnect.
 //                         build(
 //                             job: NEXT_AVAILABLE_RUNNER,
 //                             parameters: COMMON_PARAMS + [
+//                                 booleanParam(name: 'IS_SIGNALING', value: false),
 //                                 booleanParam(name: 'IS_STORAGE', value: true),
 //                                 booleanParam(name: 'USE_TURN', value: true),
 //                                 booleanParam(name: 'TRICKLE_ICE', value: true),
 //                                 booleanParam(name: 'USE_IOT', value: false),
-//                                 string(name: 'DURATION_IN_SECONDS', value: STORAGE_SINGLE_RECONNECT_DURATION_IN_SECONDS.toString()),
-//                                 string(name: 'CONFIG_FILE_HEADER', value: "storage_single_reconnect.h"),
-//                                 string(name: 'MASTER_NODE_LABEL', value: "webrtc-storage-master"),
-//                                 string(name: 'CONSUMER_NODE_LABEL', value: "webrtc-storage-consumer"),
-//                                 string(name: 'RUNNER_LABEL', value: "StorageSingleReconnect"),
-//                                 string(name: 'SCENARIO_LABEL', value: "StorageSingleReconnect"),
+//                                 string(name: 'DURATION_IN_SECONDS', value: STORAGE_SUB_RECONNECT_DURATION_IN_SECONDS.toString()),
+//                                 string(name: 'CONFIG_FILE_HEADER', value: "storage_sub_reconnect.h"),
+//                                 string(name: 'MASTER_NODE_LABEL', value: "openssl-master"),
+//                                 string(name: 'CONSUMER_NODE_LABEL', value: "openssl-viewer"),
+//                                 string(name: 'RUNNER_LABEL', value: "StorageSubReconnect"),
+//                                 string(name: 'SCENARIO_LABEL', value: "StorageSubReconnect"),
 //                                 string(name: 'AWS_DEFAULT_REGION', value: "us-west-2"),
 //                             ],
 //                             wait: false
 //                         )
+
+                        // Storage Single Reconnect.
+                        build(
+                            job: NEXT_AVAILABLE_RUNNER,
+                            parameters: COMMON_PARAMS + [
+                                booleanParam(name: 'IS_STORAGE', value: true),
+                                booleanParam(name: 'USE_TURN', value: true),
+                                booleanParam(name: 'TRICKLE_ICE', value: true),
+                                booleanParam(name: 'USE_IOT', value: false),
+                                string(name: 'DURATION_IN_SECONDS', value: STORAGE_SINGLE_RECONNECT_DURATION_IN_SECONDS.toString()),
+                                string(name: 'CONFIG_FILE_HEADER', value: "storage_single_reconnect.h"),
+                                string(name: 'MASTER_NODE_LABEL', value: "webrtc-storage-master"),
+                                string(name: 'CONSUMER_NODE_LABEL', value: "webrtc-storage-consumer"),
+                                string(name: 'RUNNER_LABEL', value: "StorageSingleReconnect"),
+                                string(name: 'SCENARIO_LABEL', value: "StorageSingleReconnect"),
+                                string(name: 'AWS_DEFAULT_REGION', value: "us-west-2"),
+                            ],
+                            wait: false
+                        )
 //
 //                         // Storage Extended.
 //                         build(
