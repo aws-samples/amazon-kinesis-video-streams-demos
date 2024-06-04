@@ -170,8 +170,9 @@ def buildStorageCanary(isConsumer, params) {
     if (!isConsumer) {
         withRunnerWrapper(envs) {
             sh """
-                cd build &&
-                ${!isConsumer ? "" : "sleep 10 &&"}
+                pwd
+                ls
+                cd build
                 ./cloudwatch-integ/kvsWebrtcClientMasterCW ${env.JOB_NAME}"""
         }
     } else {
