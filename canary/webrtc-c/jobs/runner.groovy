@@ -12,7 +12,7 @@ CREDENTIALS = [
     ]
 ]
 
-def buildWebRTCProject(useMbedTLS, params, config_file_header) {
+def buildWebRTCProject(useMbedTLS, params, config_file_header, thing_prefix) {
     echo 'Flag set to ' + useMbedTLS
     dir('webrtc') {
         checkout([$class: 'GitSCM', branches: [[name: params.GIT_HASH_WEBRTC]], userRemoteConfigs: [[url: params.GIT_URL_WEBRTC]]])
@@ -34,8 +34,7 @@ def buildWebRTCProject(useMbedTLS, params, config_file_header) {
         }
 
         sh """
-            pwd
-            cd ./scripts &&
+            cd scripts &&
             chmod a+x cert_setup.sh &&
             ./cert_setup.sh ${thing_prefix} &&
             cd .. &&
@@ -102,7 +101,7 @@ def buildPeer(isMaster, params) {
     }
 
     def thing_prefix = "${env.JOB_NAME}-${params.RUNNER_LABEL}"
-    buildWebRTCProject(params.USE_MBEDTLS, params, params.CONFIG_FILE_HEADER)
+    buildWebRTCProject(params.USE_MBEDTLS, params, params.CONFIG_FILE_HEADER, thing_prefix)
 
     RUNNING_NODES_IN_BUILDING--
     
