@@ -119,11 +119,11 @@ def buildPeer(isMaster, params) {
     def envs = [
       'AWS_KVS_LOG_LEVEL': params.AWS_KVS_LOG_LEVEL,
       'DEBUG_LOG_SDP': params.DEBUG_LOG_SDP,
-      'IOT_CORE_CREDENTIAL_ENDPOINT': "${endpoint}",
-      'IOT_CORE_CERT': "${core_cert_file}",
-      'IOT_CORE_PRIVATE_KEY': "${private_key_file}",
-      'IOT_CORE_ROLE_ALIAS': "${role_alias}",
-      'IOT_CORE_THING_NAME': "${thing_name}"
+      'AWS_IOT_CORE_CREDENTIAL_ENDPOINT': "${endpoint}",
+      'AWS_IOT_CORE_CERT': "${core_cert_file}",
+      'AWS_IOT_CORE_PRIVATE_KEY': "${private_key_file}",
+      'AWS_IOT_CORE_ROLE_ALIAS': "${role_alias}",
+      'AWS_IOT_CORE_THING_NAME': "${thing_name}"
     ].collect{ k, v -> "${k}=${v}" }
 
     if(isMaster) {
