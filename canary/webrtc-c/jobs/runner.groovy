@@ -109,7 +109,7 @@ def buildPeer(isMaster, params) {
         RUNNING_NODES_IN_BUILDING == 0
     }
 
-    def scripts_dir = "$WORKSPACE/canary/webrtc-c/scripts"
+    def scripts_dir = "$WORKSPACE/webrtc/scripts"
     def endpoint = "${scripts_dir}/iot-credential-provider.txt"
     def core_cert_file = "${scripts_dir}/${thing_prefix}_certificate.pem"
     def private_key_file = "${scripts_dir}/${thing_prefix}_private.key"
