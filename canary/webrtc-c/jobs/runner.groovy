@@ -110,7 +110,8 @@ def buildPeer(isMaster, params) {
     }
 
     def scripts_dir = "$WORKSPACE/webrtc/scripts"
-    def endpoint = "${scripts_dir}/iot-credential-provider.txt"
+    def endpoint = readFile("${scripts_dir}/iot-credential-provider.txt").trim()
+    echo "File contents: ${endpoint}"
     def core_cert_file = "${scripts_dir}/${thing_prefix}_certificate.pem"
     def private_key_file = "${scripts_dir}/${thing_prefix}_private.key"
     def role_alias = "${thing_prefix}_role_alias"
