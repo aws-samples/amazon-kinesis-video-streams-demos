@@ -60,7 +60,7 @@ ACTIVE_RUNNERS = []
 
 pipeline {
     agent {
-        label 'openssl-master'
+        label 'mbedtls-master'
     }
 
     options {
@@ -130,16 +130,16 @@ pipeline {
 
                         // TODO: Use matrix to spawn runners
 
-                        build(
-                            job: NEXT_AVAILABLE_RUNNER,
-                            parameters: COMMON_PARAMS + [
-                                string(name: 'CONFIG_FILE_HEADER', value: "lr_iot_h264_openssl.h"),
-                                string(name: 'MASTER_NODE_LABEL', value: "openssl-master"),
-                                string(name: 'VIEWER_NODE_LABEL', value: "openssl-viewer"),
-                                string(name: 'RUNNER_LABEL', value: "WebrtcPeriodicOpenSSL"),
-                            ],
-                            wait: false
-                        )
+//                         build(
+//                             job: NEXT_AVAILABLE_RUNNER,
+//                             parameters: COMMON_PARAMS + [
+//                                 string(name: 'CONFIG_FILE_HEADER', value: "lr_iot_h264_openssl.h"),
+//                                 string(name: 'MASTER_NODE_LABEL', value: "openssl-master"),
+//                                 string(name: 'VIEWER_NODE_LABEL', value: "openssl-viewer"),
+//                                 string(name: 'RUNNER_LABEL', value: "WebrtcPeriodicOpenSSL"),
+//                             ],
+//                             wait: false
+//                         )
 //
 //                         build(
 //                             job: NEXT_AVAILABLE_RUNNER,
@@ -187,17 +187,17 @@ pipeline {
 //                             wait: false
 //                         )
 //
-//                         build(
-//                             job: NEXT_AVAILABLE_RUNNER,
-//                             parameters: COMMON_PARAMS + [
-//                                 booleanParam(name: 'USE_MBEDTLS', value: true),
-//                                 string(name: 'CONFIG_FILE_HEADER', value: "p_iot_h265_mbedtls.h"),
-//                                 string(name: 'RUNNER_LABEL', value: "WebrtcPeriodicMbedTLS"),
-//                                 string(name: 'MASTER_NODE_LABEL', value: "mbedtls-master"),
-//                                 string(name: 'VIEWER_NODE_LABEL', value: "mbedtls-viewer"),
-//                             ],
-//                             wait: false
-//                         )
+                        build(
+                            job: NEXT_AVAILABLE_RUNNER,
+                            parameters: COMMON_PARAMS + [
+                                booleanParam(name: 'USE_MBEDTLS', value: true),
+                                string(name: 'CONFIG_FILE_HEADER', value: "p_iot_h265_mbedtls.h"),
+                                string(name: 'RUNNER_LABEL', value: "WebrtcPeriodicMbedTLS"),
+                                string(name: 'MASTER_NODE_LABEL', value: "mbedtls-master"),
+                                string(name: 'VIEWER_NODE_LABEL', value: "mbedtls-viewer"),
+                            ],
+                            wait: false
+                        )
 
                         // Storage Periodic.
 //                         build(
