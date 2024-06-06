@@ -136,7 +136,7 @@ pipeline {
                                 string(name: 'CONFIG_FILE_HEADER', value: "lr_iot_h264_openssl.h"),
                                 string(name: 'MASTER_NODE_LABEL', value: "openssl-master"),
                                 string(name: 'VIEWER_NODE_LABEL', value: "openssl-viewer"),
-                                string(name: 'RUNNER_LABEL', value: "WebrtcLongRunOpenSSL"),
+                                string(name: 'RUNNER_LABEL', value: "WebrtcLongRunningOpenSSL"),
                             ],
                             wait: false
                         )
