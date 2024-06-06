@@ -163,7 +163,7 @@ def buildStorageCanary(isConsumer, params) {
         deleteDir()
     }
     if (!isConsumer) {
-        buildWebRTCProject(params.USE_MBEDTLS, params, params.CONFIG_FILE_HEADER)
+        buildWebRTCProject(params.USE_MBEDTLS, params, params.CONFIG_FILE_HEADER, "")
     } else {
         buildConsumerProject(params)
     }
