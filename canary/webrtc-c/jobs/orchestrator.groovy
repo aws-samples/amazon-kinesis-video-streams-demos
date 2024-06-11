@@ -146,8 +146,8 @@ pipeline {
                             parameters: COMMON_PARAMS + [
                                 string(name: 'CONFIG_FILE_HEADER', value: "p_iot_h265_openssl.h"),
                                 string(name: 'RUNNER_LABEL', value: "WebrtcPeriodicOpenSSL-H265"),
-                                string(name: 'MASTER_NODE_LABEL', value: "openssl-master"),
-                                string(name: 'VIEWER_NODE_LABEL', value: "openssl-viewer"),
+                                string(name: 'MASTER_NODE_LABEL', value: "openssl-h265-master"),
+                                string(name: 'VIEWER_NODE_LABEL', value: "openssl-h265-viewer"),
                             ],
                             wait: false
                         )
@@ -157,8 +157,8 @@ pipeline {
                             parameters: COMMON_PARAMS + [
                                 string(name: 'CONFIG_FILE_HEADER', value: "lr_static_h265_openssl.h"),
                                 string(name: 'RUNNER_LABEL', value: "WebrtcLongRunningStaticOpenSSL-H265"),
-                                string(name: 'MASTER_NODE_LABEL', value: "openssl-master"),
-                                string(name: 'VIEWER_NODE_LABEL', value: "openssl-viewer"),
+                                string(name: 'MASTER_NODE_LABEL', value: "openssl-h265-master"),
+                                string(name: 'VIEWER_NODE_LABEL', value: "openssl-h265-viewer"),
                             ],
                             wait: false
                         )
@@ -193,8 +193,8 @@ pipeline {
                                 booleanParam(name: 'USE_MBEDTLS', value: true),
                                 string(name: 'CONFIG_FILE_HEADER', value: "p_iot_h265_mbedtls.h"),
                                 string(name: 'RUNNER_LABEL', value: "WebrtcPeriodicMbedTLS-H265"),
-                                string(name: 'MASTER_NODE_LABEL', value: "mbedtls-master"),
-                                string(name: 'VIEWER_NODE_LABEL', value: "mbedtls-viewer"),
+                                string(name: 'MASTER_NODE_LABEL', value: "mbedtls-h265-master"),
+                                string(name: 'VIEWER_NODE_LABEL', value: "mbedtls-h265-viewer"),
                             ],
                             wait: false
                         )
