@@ -11,7 +11,7 @@ option(CANARY_USE_MBEDTLS "MBedtls" OFF)
 FetchContent_Declare(
   webrtc
   GIT_REPOSITORY https://github.com/awslabs/amazon-kinesis-video-streams-webrtc-sdk-c
-  GIT_TAG        master
+  GIT_TAG        develop
 )
 
 FetchContent_Declare(
@@ -33,6 +33,7 @@ if(NOT webrtc_POPULATED)
     set(USE_MBEDTLS ON CACHE BOOL "Openssl" FORCE)
   endif()
   set(BUILD_SAMPLE OFF)
+  set(KVS_STACK_SIZE 131072)
   add_subdirectory(${webrtc_SOURCE_DIR} ${webrtc_BINARY_DIR} EXCLUDE_FROM_ALL)
 endif()
 
