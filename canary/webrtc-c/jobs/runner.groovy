@@ -26,7 +26,7 @@ def buildWebRTCProject(useMbedTLS, params, config_file_header, thing_prefix) {
         def config_file_path = "../cloudwatch-integ/configs/"
         config_file_path += "${config_file_header}"
         echo "Config file path: ${config_file_path}"
-        def configureCmd = "cmake .. -DSAMPLE_CONFIG_HEADER=${config_file_path} -DENABLE_AWS_SDK_INTEG=ON"
+        def configureCmd = "cmake .. -DCW_CONFIG_HEADER=${config_file_path} -DENABLE_AWS_SDK_INTEG=ON"
         echo "Configure Command: ${configureCmd}"
         if (useMbedTLS) {
           echo 'Using mbedtls'
