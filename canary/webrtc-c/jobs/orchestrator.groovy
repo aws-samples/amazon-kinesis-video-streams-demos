@@ -122,10 +122,18 @@ pipeline {
                             Jenkins.instance.getItemByFullName(NEXT_AVAILABLE_RUNNER).setDisabled(false)
 
                             // Lock in current commit hash to avoid inconsistent version across runners
-//                             def gitHashWebRtc = sh(returnStdout: true, script: 'git rev-parse HEAD')
-//                             COMMON_PARAMS << string(name: 'GIT_HASH_WEBRTC', value: gitHashWebRtc)
-//                             def gitHashConsumer = sh(returnStdout: true, script: 'git rev-parse HEAD')
-//                             COMMON_PARAMS << string(name: 'GIT_HASH_CONSUMER', value: gitHashConsumer)
+                            dir('webrtc-repo') {
+                                checkout scm: [$class: 'GitSCM', userRemoteConfigs: [[url: GIT_URL_WEBRTC]], branches: [[name: GIT_HASH_WEBRTC]]]
+                                GIT_HASH_WEBRTC = sh(returnStdout: true, script: 'git rev-parse HEAD').trim()
+                            }
+
+                            // Checkout Consumer repository
+                            dir('consumer-repo') {
+                                checkout scm: [$class: 'GitSCM', userRemoteConfigs: [[url: GIT_URL_CONSUMER]], branches: [[name: GIT_HASH_CONSUMER]]]
+                                GIT_HASH_CONSUMER = sh(returnStdout: true, script: 'git rev-parse HEAD').trim()
+                            }
+                            COMMON_PARAMS << string(name: 'GIT_HASH_WEBRTC', value: GIT_HASH_WEBRTC)
+                            COMMON_PARAMS << string(name: 'GIT_HASH_CONSUMER', value: GIT_HASH_CONSUMER)
                         }
 
                         // TODO: Use matrix to spawn runners
