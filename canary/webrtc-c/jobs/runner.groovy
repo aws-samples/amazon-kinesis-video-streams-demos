@@ -79,9 +79,10 @@ def withRunnerWrapper(envs, fn) {
             } catch (FlowInterruptedException err) {
                 echo 'Aborted due to cancellation'
                 throw err
-            } catch (err) {
+            } catch (Exception err) {
                 HAS_ERROR = true
                 // Ignore errors so that we can auto recover by retrying
+                echo "Error occurred: ${err.toString()}"
                 unstable err.toString()
             }
         }
