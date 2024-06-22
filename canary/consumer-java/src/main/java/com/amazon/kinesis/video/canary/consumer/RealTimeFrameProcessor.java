@@ -50,6 +50,7 @@ public class RealTimeFrameProcessor extends WebrtcStorageCanaryConsumer implemen
                     logger.info(
                             "Consumer started after master sent out first frame, not pushing the FirstFrameSentToFirstFrameConsumed metric.");
                 } else {
+                    logger.info("Timestamp read from file: " + frameSentTimeStr + " and " + frameSentTime + "...currentTime:" + currentTime);
                     long rtpToFirstFragment = currentTime - frameSentTime;
                     super.publishMetricToCW("FirstFrameSentToFirstFrameConsumed", rtpToFirstFragment,
                             StandardUnit.Milliseconds);

@@ -1,9 +1,6 @@
 import jenkins.model.*
 
 RUNNER_JOB_NAME_PREFIX = "webrtc-canary-runner"
-PERIODIC_DURATION_IN_SECONDS = 90
-PERIODIC_PROFILING_DURATION_IN_SECONDS = 90
-LONG_RUNNING_DURATION_IN_SECONDS = 0
 
 STORAGE_PERIODIC_DURATION_IN_SECONDS = 300 // 5 min
 STORAGE_SUB_RECONNECT_DURATION_IN_SECONDS = 2700 // 45 min
@@ -12,13 +9,18 @@ STORAGE_EXTENDED_DURATION_IN_SECONDS = 43200 // 12 hr
 
 MIN_RETRY_DELAY_IN_SECONDS = 60
 COLD_STARTUP_DELAY_IN_SECONDS = 60 * 60
-GIT_URL = 'https://github.com/aws-samples/amazon-kinesis-video-streams-demos.git'
-GIT_HASH = 'master'
+GIT_URL_WEBRTC = 'https://github.com/awslabs/amazon-kinesis-video-streams-webrtc-sdk-c.git'
+GIT_HASH_WEBRTC = 'test-simplify-sample'
+GIT_URL_CONSUMER = 'https://github.com/aws-samples/amazon-kinesis-video-streams-demos.git'
+GIT_HASH_CONSUMER = 'new-canary'
 COMMON_PARAMS = [
     string(name: 'AWS_KVS_LOG_LEVEL', value: "2"),
     string(name: 'DEBUG_LOG_SDP', value: "TRUE"),
     string(name: 'MIN_RETRY_DELAY_IN_SECONDS', value: MIN_RETRY_DELAY_IN_SECONDS.toString()),
-    string(name: 'GIT_URL', value: GIT_URL),
+    string(name: 'GIT_URL_WEBRTC', value: GIT_URL_WEBRTC),
+    string(name: 'GIT_URL_CONSUMER', value: GIT_URL_CONSUMER),
+    string(name: 'GIT_HASH_WEBRTC', value: GIT_HASH_WEBRTC),
+    string(name: 'GIT_HASH_CONSUMER', value: GIT_HASH_CONSUMER),
     string(name: 'LOG_GROUP_NAME', value: "WebrtcSDK"),
 ]
 
@@ -68,8 +70,10 @@ pipeline {
     stages {
         stage('Checkout') {
             steps {
-                checkout([$class: 'GitSCM', branches: [[name: GIT_HASH ]],
-                          userRemoteConfigs: [[url: GIT_URL]]])
+                checkout([$class: 'GitSCM', branches: [[name: GIT_HASH_WEBRTC ]],
+                          userRemoteConfigs: [[url: GIT_URL_WEBRTC]]])
+                checkout([$class: 'GitSCM', branches: [[name: GIT_HASH_CONSUMER ]],
+                          userRemoteConfigs: [[url: GIT_URL_CONSUMER]]])
             }
         }
 
@@ -118,8 +122,18 @@ pipeline {
                             Jenkins.instance.getItemByFullName(NEXT_AVAILABLE_RUNNER).setDisabled(false)
 
                             // Lock in current commit hash to avoid inconsistent version across runners
-                            def gitHash = sh(returnStdout: true, script: 'git rev-parse HEAD')
-                            COMMON_PARAMS << string(name: 'GIT_HASH', value: gitHash)
+                            dir('webrtc-repo') {
+                                checkout scm: [$class: 'GitSCM', userRemoteConfigs: [[url: GIT_URL_WEBRTC]], branches: [[name: GIT_HASH_WEBRTC]]]
+                                GIT_HASH_WEBRTC = sh(returnStdout: true, script: 'git rev-parse HEAD').trim()
+                            }
+
+                            // Checkout Consumer repository
+                            dir('consumer-repo') {
+                                checkout scm: [$class: 'GitSCM', userRemoteConfigs: [[url: GIT_URL_CONSUMER]], branches: [[name: GIT_HASH_CONSUMER]]]
+                                GIT_HASH_CONSUMER = sh(returnStdout: true, script: 'git rev-parse HEAD').trim()
+                            }
+                            COMMON_PARAMS << string(name: 'GIT_HASH_WEBRTC', value: GIT_HASH_WEBRTC)
+                            COMMON_PARAMS << string(name: 'GIT_HASH_CONSUMER', value: GIT_HASH_CONSUMER)
                         }
 
                         // TODO: Use matrix to spawn runners
@@ -127,32 +141,10 @@ pipeline {
                         build(
                             job: NEXT_AVAILABLE_RUNNER,
                             parameters: COMMON_PARAMS + [
-                                booleanParam(name: 'USE_TURN', value: true),
-                                booleanParam(name: 'FORCE_TURN', value: true),
-                                booleanParam(name: 'TRICKLE_ICE', value: true),
-                                booleanParam(name: 'USE_IOT', value: true),
-                                booleanParam(name: 'USE_MBEDTLS', value: false),
-                                string(name: 'DURATION_IN_SECONDS', value: PERIODIC_DURATION_IN_SECONDS.toString()),
-                                string(name: 'MASTER_NODE_LABEL', value: "openssl-master"),
-                                string(name: 'VIEWER_NODE_LABEL', value: "openssl-viewer"),
-                                string(name: 'RUNNER_LABEL', value: "WebrtcPeriodicOpenSSL"),
-                                string(name: 'SCENARIO_LABEL', value: "OpenSSLPeriodic"),
-                            ],
-                            wait: false
-                        )
-
-                        build(
-                            job: NEXT_AVAILABLE_RUNNER,
-                            parameters: COMMON_PARAMS + [
-                                booleanParam(name: 'USE_TURN', value: true),
-                                booleanParam(name: 'TRICKLE_ICE', value: true),
-                                booleanParam(name: 'USE_IOT', value: true),
-                                booleanParam(name: 'USE_MBEDTLS', value: false),
-                                string(name: 'DURATION_IN_SECONDS', value: LONG_RUNNING_DURATION_IN_SECONDS.toString()),
+                                string(name: 'CONFIG_FILE_HEADER', value: "lr_iot_h264_openssl.h"),
                                 string(name: 'MASTER_NODE_LABEL', value: "openssl-master"),
                                 string(name: 'VIEWER_NODE_LABEL', value: "openssl-viewer"),
                                 string(name: 'RUNNER_LABEL', value: "WebrtcLongRunningOpenSSL"),
-                                string(name: 'SCENARIO_LABEL', value: "WebrtcLongRunning"),
                             ],
                             wait: false
                         )
@@ -160,66 +152,10 @@ pipeline {
                         build(
                             job: NEXT_AVAILABLE_RUNNER,
                             parameters: COMMON_PARAMS + [
-                                booleanParam(name: 'USE_TURN', value: true),
-                                booleanParam(name: 'TRICKLE_ICE', value: true),
-                                booleanParam(name: 'USE_IOT', value: false),
-                                booleanParam(name: 'USE_MBEDTLS', value: true),
-                                string(name: 'DURATION_IN_SECONDS', value: PERIODIC_DURATION_IN_SECONDS.toString()),
-                                string(name: 'MASTER_NODE_LABEL', value: "mbedtls-master"),
-                                string(name: 'VIEWER_NODE_LABEL', value: "mbedtls-viewer"),
-                                string(name: 'RUNNER_LABEL', value: "WebrtcPeriodicStaticMbedTLS"),
-                                string(name: 'SCENARIO_LABEL', value: "MbedTLSPeriodic"),
-                            ],
-                            wait: false
-                        )
-
-                        build(
-                            job: NEXT_AVAILABLE_RUNNER,
-                            parameters: COMMON_PARAMS + [
-                                booleanParam(name: 'USE_TURN', value: true),
-                                booleanParam(name: 'TRICKLE_ICE', value: true),
-                                booleanParam(name: 'USE_IOT', value: false),
-                                booleanParam(name: 'USE_MBEDTLS', value: true),
-                                string(name: 'DURATION_IN_SECONDS', value: LONG_RUNNING_DURATION_IN_SECONDS.toString()),
-                                string(name: 'MASTER_NODE_LABEL', value: "mbedtls-master"),
-                                string(name: 'VIEWER_NODE_LABEL', value: "mbedtls-viewer"),
-                                string(name: 'RUNNER_LABEL', value: "WebrtcLongRunningStaticMbedTLS"),
-                                string(name: 'SCENARIO_LABEL', value: "WebrtcLongRunning"),
-                            ],
-                            wait: false
-                        )
-
-                        build(
-                            job: NEXT_AVAILABLE_RUNNER,
-                            parameters: COMMON_PARAMS + [
-                                booleanParam(name: 'USE_TURN', value: true),
-                                booleanParam(name: 'FORCE_TURN', value: true),
-                                booleanParam(name: 'TRICKLE_ICE', value: true),
-                                booleanParam(name: 'USE_IOT', value: true),
-                                booleanParam(name: 'USE_MBEDTLS', value: false),
-                                string(name: 'DURATION_IN_SECONDS', value: PERIODIC_DURATION_IN_SECONDS.toString()),
-                                string(name: 'VIDEO_CODEC', value: "h265"),
-                                string(name: 'MASTER_NODE_LABEL', value: "openssl-h265-master"),
-                                string(name: 'VIEWER_NODE_LABEL', value: "openssl-h265-viewer"),
+                                string(name: 'CONFIG_FILE_HEADER', value: "p_iot_h265_openssl.h"),
                                 string(name: 'RUNNER_LABEL', value: "WebrtcPeriodicOpenSSL-H265"),
-                                string(name: 'SCENARIO_LABEL', value: "OpenSSLPeriodic-H265"),
-                            ],
-                            wait: false
-                        )
-
-                        build(
-                            job: NEXT_AVAILABLE_RUNNER,
-                            parameters: COMMON_PARAMS + [
-                                booleanParam(name: 'USE_TURN', value: true),
-                                booleanParam(name: 'TRICKLE_ICE', value: true),
-                                booleanParam(name: 'USE_IOT', value: true),
-                                booleanParam(name: 'USE_MBEDTLS', value: false),
-                                string(name: 'DURATION_IN_SECONDS', value: LONG_RUNNING_DURATION_IN_SECONDS.toString()),
-                                string(name: 'VIDEO_CODEC', value: "h265"),
                                 string(name: 'MASTER_NODE_LABEL', value: "openssl-h265-master"),
                                 string(name: 'VIEWER_NODE_LABEL', value: "openssl-h265-viewer"),
-                                string(name: 'RUNNER_LABEL', value: "WebrtcLongRunningOpenSSL-H265"),
-                                string(name: 'SCENARIO_LABEL', value: "WebrtcLongRunning-H265"),
                             ],
                             wait: false
                         )
@@ -227,84 +163,46 @@ pipeline {
                         build(
                             job: NEXT_AVAILABLE_RUNNER,
                             parameters: COMMON_PARAMS + [
-                                booleanParam(name: 'USE_TURN', value: true),
-                                booleanParam(name: 'TRICKLE_ICE', value: true),
-                                booleanParam(name: 'USE_IOT', value: false),
+                                string(name: 'CONFIG_FILE_HEADER', value: "lr_static_h265_openssl.h"),
+                                string(name: 'RUNNER_LABEL', value: "WebrtcLongRunningStaticOpenSSL-H265"),
+                                string(name: 'MASTER_NODE_LABEL', value: "openssl-h265-master"),
+                                string(name: 'VIEWER_NODE_LABEL', value: "openssl-h265-viewer"),
+                            ],
+                            wait: false
+                        )
+
+                        build(
+                            job: NEXT_AVAILABLE_RUNNER,
+                            parameters: COMMON_PARAMS + [
                                 booleanParam(name: 'USE_MBEDTLS', value: true),
-                                string(name: 'DURATION_IN_SECONDS', value: PERIODIC_DURATION_IN_SECONDS.toString()),
-                                string(name: 'VIDEO_CODEC', value: "h265"),
+                                string(name: 'RUNNER_LABEL', value: "WebrtcPeriodicStaticMbedTLS"),
+                                string(name: 'CONFIG_FILE_HEADER', value: "p_static_h264_mbedtls.h"),
+                                string(name: 'MASTER_NODE_LABEL', value: "mbedtls-master"),
+                                string(name: 'VIEWER_NODE_LABEL', value: "mbedtls-viewer"),
+                            ],
+                            wait: false
+                        )
+
+                        build(
+                            job: NEXT_AVAILABLE_RUNNER,
+                            parameters: COMMON_PARAMS + [
+                                booleanParam(name: 'USE_MBEDTLS', value: true),
+                                string(name: 'CONFIG_FILE_HEADER', value: "lr_iot_h264_mbedtls.h"),
+                                string(name: 'RUNNER_LABEL', value: "WebrtcLongRunningMBedTLS"),
+                                string(name: 'MASTER_NODE_LABEL', value: "mbedtls-master"),
+                                string(name: 'VIEWER_NODE_LABEL', value: "mbedtls-viewer"),
+                            ],
+                            wait: false
+                        )
+
+                        build(
+                            job: NEXT_AVAILABLE_RUNNER,
+                            parameters: COMMON_PARAMS + [
+                                booleanParam(name: 'USE_MBEDTLS', value: true),
+                                string(name: 'CONFIG_FILE_HEADER', value: "p_iot_h265_mbedtls.h"),
+                                string(name: 'RUNNER_LABEL', value: "WebrtcPeriodicMbedTLS-H265"),
                                 string(name: 'MASTER_NODE_LABEL', value: "mbedtls-h265-master"),
                                 string(name: 'VIEWER_NODE_LABEL', value: "mbedtls-h265-viewer"),
-                                string(name: 'RUNNER_LABEL', value: "WebrtcPeriodicStaticMbedTLS-H265"),
-                                string(name: 'SCENARIO_LABEL', value: "MbedTLSPeriodic-H265"),
-                            ],
-                            wait: false
-                        )
-
-                        build(
-                            job: NEXT_AVAILABLE_RUNNER,
-                            parameters: COMMON_PARAMS + [
-                                booleanParam(name: 'USE_TURN', value: true),
-                                booleanParam(name: 'TRICKLE_ICE', value: true),
-                                booleanParam(name: 'USE_IOT', value: false),
-                                booleanParam(name: 'USE_MBEDTLS', value: true),
-                                string(name: 'DURATION_IN_SECONDS', value: LONG_RUNNING_DURATION_IN_SECONDS.toString()),
-                                string(name: 'VIDEO_CODEC', value: "h265"),
-                                string(name: 'MASTER_NODE_LABEL', value: "mbedtls-h265-master"),
-                                string(name: 'VIEWER_NODE_LABEL', value: "mbedtls-h265-viewer"),
-                                string(name: 'RUNNER_LABEL', value: "WebrtcLongRunningStaticMbedTLS-H265"),
-                                string(name: 'SCENARIO_LABEL', value: "WebrtcLongRunning-H265"),
-                            ],
-                            wait: false
-                        )
-
-                        build(
-                            job: NEXT_AVAILABLE_RUNNER,
-                            parameters: COMMON_PARAMS + [
-                                booleanParam(name: 'IS_SIGNALING', value: true),
-                                booleanParam(name: 'USE_IOT', value: false),
-                                booleanParam(name: 'USE_MBEDTLS', value: false),
-                                string(name: 'DURATION_IN_SECONDS', value: PERIODIC_DURATION_IN_SECONDS.toString()),
-                                string(name: 'MASTER_NODE_LABEL', value: "signaling"),
-                                // TODO: should not need viewer node label for signaling. If not set, Jenkins pipeline will crash
-                                //       because it's used to defined an agent
-                                string(name: 'VIEWER_NODE_LABEL', value: "signaling"),
-                                string(name: 'RUNNER_LABEL', value: "SignalingStaticPeriodic"),
-                                string(name: 'SCENARIO_LABEL', value: "SignalingPeriodic"),
-                            ],
-                            wait: false
-                        )
-
-                        build(
-                            job: NEXT_AVAILABLE_RUNNER,
-                            parameters: COMMON_PARAMS + [
-                                booleanParam(name: 'IS_SIGNALING', value: true),
-                                booleanParam(name: 'USE_IOT', value: true),
-                                booleanParam(name: 'USE_MBEDTLS', value: false),
-                                string(name: 'DURATION_IN_SECONDS', value: LONG_RUNNING_DURATION_IN_SECONDS.toString()),
-                                string(name: 'MASTER_NODE_LABEL', value: "signaling"),
-                                // TODO: should not need viewer node label for signaling. If not set, Jenkins pipeline will crash
-                                //       because it's used to defined an agent
-                                string(name: 'VIEWER_NODE_LABEL', value: "signaling"),
-                                string(name: 'RUNNER_LABEL', value: "SignalingLongRunning"),
-                                string(name: 'SCENARIO_LABEL', value: "SignalingLongRunning"),
-                            ],
-                            wait: false
-                        )
-
-                        build(
-                            job: NEXT_AVAILABLE_RUNNER,
-                            parameters: COMMON_PARAMS + [
-                                booleanParam(name: 'USE_TURN', value: true),
-                                booleanParam(name: 'TRICKLE_ICE', value: true),
-                                booleanParam(name: 'USE_IOT', value: false),
-                                booleanParam(name: 'USE_MBEDTLS', value: false),
-                                booleanParam(name: 'IS_PROFILING', value: true),
-                                string(name: 'DURATION_IN_SECONDS', value: PERIODIC_PROFILING_DURATION_IN_SECONDS.toString()),
-                                string(name: 'MASTER_NODE_LABEL', value: "profiling"),
-                                string(name: 'VIEWER_NODE_LABEL', value: "profiling"),
-                                string(name: 'RUNNER_LABEL', value: "WebrtcPeriodicProfiling"),
-                                string(name: 'SCENARIO_LABEL', value: "WebrtcProfiling"),
                             ],
                             wait: false
                         )
@@ -313,17 +211,14 @@ pipeline {
                         build(
                             job: NEXT_AVAILABLE_RUNNER,
                             parameters: COMMON_PARAMS + [
-                                booleanParam(name: 'IS_SIGNALING', value: false),
                                 booleanParam(name: 'IS_STORAGE', value: true),
                                 booleanParam(name: 'IS_STORAGE_SINGLE_NODE', value: true),
-                                booleanParam(name: 'USE_TURN', value: true),
-                                booleanParam(name: 'TRICKLE_ICE', value: true),
-                                booleanParam(name: 'USE_IOT', value: false),
                                 string(name: 'DURATION_IN_SECONDS', value: STORAGE_PERIODIC_DURATION_IN_SECONDS.toString()),
-                                string(name: 'MASTER_NODE_LABEL', value: "webrtc-storage-master"),
-                                string(name: 'CONSUMER_NODE_LABEL', value: "webrtc-storage-consumer"),
+                                string(name: 'CONFIG_FILE_HEADER', value: "storage_periodic.h"),
                                 string(name: 'RUNNER_LABEL', value: "StoragePeriodic"),
                                 string(name: 'SCENARIO_LABEL', value: "StoragePeriodic"),
+                                string(name: 'MASTER_NODE_LABEL', value: "webrtc-storage-master"),
+                                string(name: 'CONSUMER_NODE_LABEL', value: "webrtc-storage-consumer"),
                                 string(name: 'AWS_DEFAULT_REGION', value: "us-west-2"),
                             ],
                             wait: false
@@ -339,6 +234,7 @@ pipeline {
                                 booleanParam(name: 'TRICKLE_ICE', value: true),
                                 booleanParam(name: 'USE_IOT', value: false),
                                 string(name: 'DURATION_IN_SECONDS', value: STORAGE_SUB_RECONNECT_DURATION_IN_SECONDS.toString()),
+                                string(name: 'CONFIG_FILE_HEADER', value: "storage_sub_reconnect.h"),
                                 string(name: 'MASTER_NODE_LABEL', value: "webrtc-storage-master"),
                                 string(name: 'CONSUMER_NODE_LABEL', value: "webrtc-storage-consumer"),
                                 string(name: 'RUNNER_LABEL', value: "StorageSubReconnect"),
@@ -352,12 +248,12 @@ pipeline {
                         build(
                             job: NEXT_AVAILABLE_RUNNER,
                             parameters: COMMON_PARAMS + [
-                                booleanParam(name: 'IS_SIGNALING', value: false),
                                 booleanParam(name: 'IS_STORAGE', value: true),
                                 booleanParam(name: 'USE_TURN', value: true),
                                 booleanParam(name: 'TRICKLE_ICE', value: true),
                                 booleanParam(name: 'USE_IOT', value: false),
                                 string(name: 'DURATION_IN_SECONDS', value: STORAGE_SINGLE_RECONNECT_DURATION_IN_SECONDS.toString()),
+                                string(name: 'CONFIG_FILE_HEADER', value: "storage_single_reconnect.h"),
                                 string(name: 'MASTER_NODE_LABEL', value: "webrtc-storage-master"),
                                 string(name: 'CONSUMER_NODE_LABEL', value: "webrtc-storage-consumer"),
                                 string(name: 'RUNNER_LABEL', value: "StorageSingleReconnect"),
@@ -371,12 +267,12 @@ pipeline {
                         build(
                             job: NEXT_AVAILABLE_RUNNER,
                             parameters: COMMON_PARAMS + [
-                                booleanParam(name: 'IS_SIGNALING', value: false),
                                 booleanParam(name: 'IS_STORAGE', value: true),
                                 booleanParam(name: 'USE_TURN', value: true),
                                 booleanParam(name: 'TRICKLE_ICE', value: true),
                                 booleanParam(name: 'USE_IOT', value: false),
                                 string(name: 'DURATION_IN_SECONDS', value: STORAGE_EXTENDED_DURATION_IN_SECONDS.toString()),
+                                string(name: 'CONFIG_FILE_HEADER', value: "storage_extended.h"),
                                 string(name: 'MASTER_NODE_LABEL', value: "webrtc-storage-master"),
                                 string(name: 'CONSUMER_NODE_LABEL', value: "webrtc-storage-consumer"),
                                 string(name: 'RUNNER_LABEL', value: "StorageExtended"),
