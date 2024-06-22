@@ -83,9 +83,15 @@ def buildPeer(isMaster, params) {
     }
 
     def thing_prefix = "${env.JOB_NAME}-${params.RUNNER_LABEL}"
-    buildWebRTCProject(params.USE_MBEDTLS, thing_prefix)
 
-    RUNNING_NODES_IN_BUILDING--
+    try {
+        buildWebRTCProject(params.USE_MBEDTLS, thing_prefix)
+        RUNNING_NODES_IN_BUILDING--
+    } catch (Exception e) {
+        echo "Error occurred in buildWebRTCProject: ${e.message}"
+        HAS_ERROR = true
+        RUNNING_NODES_IN_BUILDING--
+    }
 
     waitUntil {
         RUNNING_NODES_IN_BUILDING == 0 || HAS_ERROR
