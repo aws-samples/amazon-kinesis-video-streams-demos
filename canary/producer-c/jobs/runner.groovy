@@ -205,7 +205,7 @@ pipeline {
                         script {
 
                             // Only run consumer if it is not intermittent scenario
-                            if(params.CANARY_RUN_SCENARIO == "Continuous") {
+                            if(params.CANARY_RUN_SCENARIO == "Continuous" && params.RUNNER_LABEL != "Periodic") {
                                     runClient(false, params)
                             }
                         }
