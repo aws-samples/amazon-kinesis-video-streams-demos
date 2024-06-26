@@ -292,7 +292,6 @@ STATUS Peer::initPeerConnection()
     STATUS retStatus = STATUS_SUCCESS;
     CHK(this->pPeerConnection == NULL, STATUS_INVALID_OPERATION);
     CHK_STATUS(createPeerConnection(&this->rtcConfiguration, &this->pPeerConnection));
-    CHK_STATUS(addConfigToServerList(&this->pPeerConnection, this->pIceConfigInfo));
     CHK_STATUS(peerConnectionOnIceCandidate(this->pPeerConnection, (UINT64) this, handleOnIceCandidate));
     CHK_STATUS(peerConnectionOnConnectionStateChange(this->pPeerConnection, (UINT64) this, onConnectionStateChange));
 
