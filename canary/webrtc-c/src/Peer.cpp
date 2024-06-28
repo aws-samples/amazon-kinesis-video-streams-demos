@@ -379,9 +379,10 @@ STATUS Peer::connect()
         SignalingMessage msg;
 
         MEMSET(&offerSDPInit, 0, SIZEOF(offerSDPInit));
-        CHK_STATUS(createOffer(this->pPeerConnection, &offerSDPInit));
+        DLOGI("Trickle ICE: %s", this->trickleIce ? "Enabled" : "Disabled");
+        offerSDPInit.useTrickleIce = this->trickleIce;
         CHK_STATUS(setLocalDescription(this->pPeerConnection, &offerSDPInit));
-
+        CHK_STATUS(createOffer(this->pPeerConnection, &offerSDPInit));
         if (!this->trickleIce) {
             CHK_STATUS(this->awaitIceGathering(&offerSDPInit));
         }
