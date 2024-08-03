@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.11)
+cmake_minimum_required(VERSION 3.13)
 project(KVSWebRTCCanary LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 11)
@@ -7,6 +7,14 @@ include(FetchContent)
 
 option(CANARY_USE_OPENSSL "OPenssl" ON)
 option(CANARY_USE_MBEDTLS "MBedtls" OFF)
+
+if (NOT OPEN_SRC_INSTALL_PREFIX)
+  set(OPEN_SRC_INSTALL_PREFIX ${CMAKE_CURRENT_SOURCE_DIR}/build/_deps)
+  set(CMAKE_PREFIX_PATH ${CMAKE_PREFIX_PATH} ${OPEN_SRC_INSTALL_PREFIX})
+endif()
+if(NOT EXISTS ${OPEN_SRC_INSTALL_PREFIX})
+  file(MAKE_DIRECTORY ${OPEN_SRC_INSTALL_PREFIX})
+endif()
 
 FetchContent_Declare(
   webrtc
@@ -17,7 +25,7 @@ FetchContent_Declare(
 FetchContent_Declare(
   cloudwatch
   GIT_REPOSITORY https://github.com/aws/aws-sdk-cpp
-  GIT_TAG        1.9.67
+  GIT_TAG        1.11.143
 )
 
 FetchContent_GetProperties(webrtc)
@@ -55,9 +63,13 @@ add_definitions(-DCMAKE_DETECTED_CACERT_PATH)
 include_directories(${cloudwatch_SOURCE_DIR}/aws-cpp-sdk-core/include)
 include_directories(${cloudwatch_SOURCE_DIR}/aws-cpp-sdk-monitoring/include)
 include_directories(${cloudwatch_SOURCE_DIR}/aws-cpp-sdk-logs/include)
+
 include_directories(${webrtc_SOURCE_DIR}/src/include)
 include_directories(${webrtc_SOURCE_DIR}/open-source/include)
 link_directories(${webrtc_SOURCE_DIR}/open-source/lib)
+
+link_directories(${OPEN_SRC_INSTALL_PREFIX}/lib)
+
 add_library(
   kvsWebrtcCanary
   src/Config.cpp
