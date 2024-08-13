@@ -18,7 +18,6 @@ class Config {
     Value<std::string> label;
     Value<std::string> channelName;
     Value<std::string> clientId;
-    Value<std::string> videoCodec;
     Value<BOOL> isMaster;
     Value<BOOL> runBothPeers;
     Value<BOOL> trickleIce;

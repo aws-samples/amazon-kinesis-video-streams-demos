@@ -60,7 +60,6 @@
 #define CANARY_LOG_STREAM_NAME_ENV_VAR                   "CANARY_LOG_STREAM_NAME"
 #define CANARY_CERT_PATH_ENV_VAR                         "CANARY_CERT_PATH"
 #define CANARY_DURATION_IN_SECONDS_ENV_VAR               "CANARY_DURATION_IN_SECONDS"
-#define CANARY_VIDEO_CODEC_ENV_VAR                       "CANARY_VIDEO_CODEC"
 #define CANARY_ITERATION_IN_SECONDS_ENV_VAR              "CANARY_ITERATION_IN_SECONDS"
 #define CANARY_FORCE_TURN_ENV_VAR                        "CANARY_FORCE_TURN"
 #define CANARY_BIT_RATE_ENV_VAR                          "CANARY_DATARATE_IN_BITS_PER_SECOND"
@@ -77,8 +76,6 @@
 
 #define CANARY_DEFAULT_LABEL                       "ScaryTestLabel"
 #define CANARY_DEFAULT_CHANNEL_NAME                "ScaryTestStream"
-#define CANARY_VIDEO_CODEC_H264                    "h264"
-#define CANARY_VIDEO_CODEC_H265                    "h265"
 #define CANARY_DEFAULT_CLIENT_ID                   "DefaultClientId"
 #define CANARY_DEFAULT_LOG_GROUP_NAME              "DefaultLogGroupName"
 #define CANARY_DEFAULT_LOG_GROUP_NAME              "DefaultLogGroupName"
