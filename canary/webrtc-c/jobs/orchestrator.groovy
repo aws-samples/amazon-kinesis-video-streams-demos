@@ -160,13 +160,14 @@ pipeline {
                             job: NEXT_AVAILABLE_RUNNER,
                             parameters: COMMON_PARAMS + [
                                 booleanParam(name: 'USE_TURN', value: true),
+                                booleanParam(name: 'FORCE_TURN', value: true),
                                 booleanParam(name: 'TRICKLE_ICE', value: true),
                                 booleanParam(name: 'USE_IOT', value: false),
                                 booleanParam(name: 'USE_MBEDTLS', value: true),
                                 string(name: 'DURATION_IN_SECONDS', value: PERIODIC_DURATION_IN_SECONDS.toString()),
                                 string(name: 'MASTER_NODE_LABEL', value: "mbedtls-master"),
                                 string(name: 'VIEWER_NODE_LABEL', value: "mbedtls-viewer"),
-                                string(name: 'RUNNER_LABEL', value: "WebrtcPeriodicStaticMbedTLS"),
+                                string(name: 'RUNNER_LABEL', value: "WebrtcPeriodicStaticMbedTLS-ForceTURN"),
                                 string(name: 'SCENARIO_LABEL', value: "MbedTLSPeriodic"),
                             ],
                             wait: false
