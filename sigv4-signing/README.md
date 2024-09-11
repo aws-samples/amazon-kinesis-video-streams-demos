@@ -52,6 +52,8 @@ Connected (press CTRL+C to quit)
 
 ## Troubleshooting
 
+Please refer to the AWS documentation on troubleshooting: https://docs.aws.amazon.com/IAM/latest/UserGuide/signature-v4-troubleshooting.html
+
 If you are experiencing a `400` error:
 * The URL is invalid. Check the following:
 * Check the URL-encoding of the query parameters. In particular, watch out for `+`, `:`, and `==`. They should not be present in the URL. `/` should only be present in the path section of the URL, not within the query string.
