@@ -4,9 +4,9 @@
   "description": "Sample implementation of Amazon Kinesis Video Streams with WebRTC JS SDK in the React framework.",
   "license": "Apache-2.0",
   "dependencies": {
-    "@aws-sdk/client-kinesis-video": "^3.441.0",
-    "@aws-sdk/client-kinesis-video-signaling": "^3.441.0",
-    "@aws-sdk/client-kinesis-video-webrtc-storage": "^3.441.0",
+    "@aws-sdk/client-kinesis-video": "^3.650.0",
+    "@aws-sdk/client-kinesis-video-signaling": "^3.650.0",
+    "@aws-sdk/client-kinesis-video-webrtc-storage": "^3.650.0",
     "@testing-library/jest-dom": "^5.17.0",
     "@testing-library/react": "^13.4.0",
     "@testing-library/user-event": "^13.5.0",
