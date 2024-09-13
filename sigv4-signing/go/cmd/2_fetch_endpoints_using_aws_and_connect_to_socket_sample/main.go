@@ -101,7 +101,7 @@ func main() {
 
 		conn, resp, err := websocket.DefaultDialer.Dial(signedURI.String(), nil)
 		if err != nil {
-			log.Printf("error in connection: %v", err)
+			log.Fatalf("error in connection: %v", err)
 			return
 		}
 
@@ -110,7 +110,7 @@ func main() {
 
 		body, err := io.ReadAll(resp.Body)
 		if err != nil {
-			log.Printf("error in reading response body: %v", err)
+			log.Fatalf("error in reading response body: %v", err)
 			return
 		}
 
@@ -118,7 +118,7 @@ func main() {
 
 		respBody, err := httputil.DumpResponse(resp, true)
 		if err != nil {
-			log.Printf("error printing response body: %v", err)
+			log.Fatalf("error printing response body: %v", err)
 			return
 		}
 

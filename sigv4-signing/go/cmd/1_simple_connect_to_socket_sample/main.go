@@ -27,7 +27,7 @@ func main() {
 	//
 	// **Note**: The Signaling Channel Endpoints are different, depending on the role (master/viewer) specified in GetSignalingChannelEndpoint API call.
 	//   Ref: https://docs.aws.amazon.com/kinesisvideostreams/latest/dg/API_SingleMasterChannelEndpointConfiguration.html#KinesisVideo-Type-SingleMasterChannelEndpointConfiguration-Role
-	uriToSign, _ := url.Parse("wss://<Your GetSignalingEndpoint response hostname>?X-Amz-ChannelARN=<YourChannelARN>&X-Amz-ClientId=<YourClientId>")
+	uriToSign, err := url.Parse("wss://<Your GetSignalingEndpoint response hostname>?X-Amz-ChannelARN=<YourChannelARN>&X-Amz-ClientId=<YourClientId>")
 
 	// Test Credentials for sample connection verification. SessionToken can be empty string if using non-temporary credentials.
 	accessKey := "YourAccessKey"
@@ -38,6 +38,17 @@ func main() {
 	region := "YourChannelRegion"
 
 	////////////////////////////////////////////
+
+	if accessKey == "YourAccessKey" || secretKey == "YourSecretKey" ||
+		sessionToken == "YourSessionToken" || region == "YourChannelRegion" {
+		log.Fatal("you need to configure the application with your credentials, channel name, and region")
+		return
+	}
+
+	if err != nil {
+		log.Fatalf("the url could not be parsed, check the formatting: %v", err)
+		return
+	}
 
 	// Compute SigV4 signing
 	// Ref: https://docs.aws.amazon.com/AmazonS3/latest/API/sigv4-query-string-auth.html
@@ -55,7 +66,7 @@ func main() {
 
 	conn, resp, err := websocket.DefaultDialer.Dial(signedURI.String(), nil)
 	if err != nil {
-		log.Printf("Error in connection: %v", err)
+		log.Fatalf("Error in connection: %v", err)
 		return
 	}
 
@@ -64,7 +75,7 @@ func main() {
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		log.Printf("Error in reading response body: %v", err)
+		log.Fatalf("Error in reading response body: %v", err)
 		return
 	}
 
