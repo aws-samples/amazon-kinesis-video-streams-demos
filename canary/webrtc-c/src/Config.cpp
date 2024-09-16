@@ -169,8 +169,7 @@ STATUS Config::initWithEnvVars()
     CHK_STATUS(optenvBool(CANARY_FORCE_TURN_ENV_VAR, &forceTurn, FALSE));
     CHK_STATUS(optenvBool(CANARY_USE_IOT_CREDENTIALS_ENV_VAR, &useIotCredentialProvider, FALSE));
     CHK_STATUS(optenvBool(CANARY_RUN_IN_PROFILING_MODE_ENV_VAR, &isProfilingMode, FALSE));
-    
-    CHK_STATUS(optenv(CANARY_VIDEO_CODEC_ENV_VAR, &videoCodec, CANARY_VIDEO_CODEC_H264));
+
     CHK_STATUS(optenv(CACERT_PATH_ENV_VAR, &caCertPath, KVS_CA_CERT_PATH));
 
     if(useIotCredentialProvider.value == TRUE) {
@@ -249,7 +248,6 @@ VOID Config::print()
           "\tLog Group       : %s\n"
           "\tLog Stream      : %s\n"
           "\tDuration        : %lu seconds\n"
-          "\tVideo codec     : %s\n"
           "\tIteration       : %lu seconds\n"
           "\tRun both peers  : %s\n"
           "\tCredential type : %s\n"
@@ -258,7 +256,7 @@ VOID Config::print()
           this->endpoint.value.c_str(), this->region.value.c_str(), this->label.value.c_str(), this->channelName.value.c_str(),
           this->clientId.value.c_str(), this->isMaster.value ? "Master" : "Viewer", this->trickleIce.value ? "True" : "False",
           this->useTurn.value ? "True" : "False", this->logLevel.value, this->logGroupName.value.c_str(), this->logStreamName.value.c_str(),
-          this->duration.value / HUNDREDS_OF_NANOS_IN_A_SECOND, this->videoCodec.value.c_str(), this->iterationDuration.value / HUNDREDS_OF_NANOS_IN_A_SECOND,
+          this->duration.value / HUNDREDS_OF_NANOS_IN_A_SECOND, this->iterationDuration.value / HUNDREDS_OF_NANOS_IN_A_SECOND,
           this->runBothPeers.value ? "True" : "False", this->useIotCredentialProvider.value ? "IoT" : "Static", this->isStorage ? "True" : "False");
     if(this->useIotCredentialProvider.value) {
         DLOGD("\tIoT endpoint : %s\n"
@@ -343,8 +341,6 @@ STATUS Config::initWithJSON(PCHAR filePath)
         } else if (compareJsonString((PCHAR) raw, &tokens[i], JSMN_STRING, (PCHAR) CANARY_DURATION_IN_SECONDS_ENV_VAR)) {
             jsonUint64(raw, tokens[++i], &duration);
             duration.value *= HUNDREDS_OF_NANOS_IN_A_SECOND;
-        } else if (compareJsonString((PCHAR) raw, &tokens[i], JSMN_STRING, (PCHAR) CANARY_VIDEO_CODEC_ENV_VAR)) {
-            jsonString(raw, tokens[++i], &videoCodec);
         } else if (compareJsonString((PCHAR) raw, &tokens[i], JSMN_STRING, (PCHAR) CANARY_ITERATION_IN_SECONDS_ENV_VAR)) {
             jsonUint64(raw, tokens[++i], &iterationDuration);
             iterationDuration.value *= HUNDREDS_OF_NANOS_IN_A_SECOND;

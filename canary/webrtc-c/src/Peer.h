@@ -51,8 +51,6 @@ class Peer {
 
     Peer();
     ~Peer();
-
-    RTC_CODEC videoCodec;
     STATUS init(const Canary::PConfig, const Callbacks&);
     STATUS shutdown();
     STATUS connect();

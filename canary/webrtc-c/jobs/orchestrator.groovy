@@ -16,7 +16,6 @@ GIT_URL = 'https://github.com/aws-samples/amazon-kinesis-video-streams-demos.git
 GIT_HASH = '1.9.1-benchmark'
 COMMON_PARAMS = [
     string(name: 'AWS_KVS_LOG_LEVEL', value: "2"),
-    string(name: 'DEBUG_LOG_SDP', value: "TRUE"),
     string(name: 'MIN_RETRY_DELAY_IN_SECONDS', value: MIN_RETRY_DELAY_IN_SECONDS.toString()),
     string(name: 'GIT_URL', value: GIT_URL),
     string(name: 'LOG_GROUP_NAME', value: "WebrtcSDK"),
@@ -185,75 +184,6 @@ pipeline {
                                 string(name: 'VIEWER_NODE_LABEL', value: "mbedtls-viewer"),
                                 string(name: 'RUNNER_LABEL', value: "WebrtcLongRunningStaticMbedTLS"),
                                 string(name: 'SCENARIO_LABEL', value: "WebrtcLongRunning"),
-                            ],
-                            wait: false
-                        )
-
-                        build(
-                            job: NEXT_AVAILABLE_RUNNER,
-                            parameters: COMMON_PARAMS + [
-                                booleanParam(name: 'USE_TURN', value: true),
-                                booleanParam(name: 'FORCE_TURN', value: true),
-                                booleanParam(name: 'TRICKLE_ICE', value: true),
-                                booleanParam(name: 'USE_IOT', value: true),
-                                booleanParam(name: 'USE_MBEDTLS', value: false),
-                                string(name: 'DURATION_IN_SECONDS', value: PERIODIC_DURATION_IN_SECONDS.toString()),
-                                string(name: 'VIDEO_CODEC', value: "h265"),
-                                string(name: 'MASTER_NODE_LABEL', value: "openssl-h265-master"),
-                                string(name: 'VIEWER_NODE_LABEL', value: "openssl-h265-viewer"),
-                                string(name: 'RUNNER_LABEL', value: "WebrtcPeriodicOpenSSL-H265"),
-                                string(name: 'SCENARIO_LABEL', value: "OpenSSLPeriodic-H265"),
-                            ],
-                            wait: false
-                        )
-
-                        build(
-                            job: NEXT_AVAILABLE_RUNNER,
-                            parameters: COMMON_PARAMS + [
-                                booleanParam(name: 'USE_TURN', value: true),
-                                booleanParam(name: 'TRICKLE_ICE', value: true),
-                                booleanParam(name: 'USE_IOT', value: true),
-                                booleanParam(name: 'USE_MBEDTLS', value: false),
-                                string(name: 'DURATION_IN_SECONDS', value: LONG_RUNNING_DURATION_IN_SECONDS.toString()),
-                                string(name: 'VIDEO_CODEC', value: "h265"),
-                                string(name: 'MASTER_NODE_LABEL', value: "openssl-h265-master"),
-                                string(name: 'VIEWER_NODE_LABEL', value: "openssl-h265-viewer"),
-                                string(name: 'RUNNER_LABEL', value: "WebrtcLongRunningOpenSSL-H265"),
-                                string(name: 'SCENARIO_LABEL', value: "WebrtcLongRunning-H265"),
-                            ],
-                            wait: false
-                        )
-
-                        build(
-                            job: NEXT_AVAILABLE_RUNNER,
-                            parameters: COMMON_PARAMS + [
-                                booleanParam(name: 'USE_TURN', value: true),
-                                booleanParam(name: 'TRICKLE_ICE', value: true),
-                                booleanParam(name: 'USE_IOT', value: false),
-                                booleanParam(name: 'USE_MBEDTLS', value: true),
-                                string(name: 'DURATION_IN_SECONDS', value: PERIODIC_DURATION_IN_SECONDS.toString()),
-                                string(name: 'VIDEO_CODEC', value: "h265"),
-                                string(name: 'MASTER_NODE_LABEL', value: "mbedtls-h265-master"),
-                                string(name: 'VIEWER_NODE_LABEL', value: "mbedtls-h265-viewer"),
-                                string(name: 'RUNNER_LABEL', value: "WebrtcPeriodicStaticMbedTLS-H265"),
-                                string(name: 'SCENARIO_LABEL', value: "MbedTLSPeriodic-H265"),
-                            ],
-                            wait: false
-                        )
-
-                        build(
-                            job: NEXT_AVAILABLE_RUNNER,
-                            parameters: COMMON_PARAMS + [
-                                booleanParam(name: 'USE_TURN', value: true),
-                                booleanParam(name: 'TRICKLE_ICE', value: true),
-                                booleanParam(name: 'USE_IOT', value: false),
-                                booleanParam(name: 'USE_MBEDTLS', value: true),
-                                string(name: 'DURATION_IN_SECONDS', value: LONG_RUNNING_DURATION_IN_SECONDS.toString()),
-                                string(name: 'VIDEO_CODEC', value: "h265"),
-                                string(name: 'MASTER_NODE_LABEL', value: "mbedtls-h265-master"),
-                                string(name: 'VIEWER_NODE_LABEL', value: "mbedtls-h265-viewer"),
-                                string(name: 'RUNNER_LABEL', value: "WebrtcLongRunningStaticMbedTLS-H265"),
-                                string(name: 'SCENARIO_LABEL', value: "WebrtcLongRunning-H265"),
                             ],
                             wait: false
                         )
