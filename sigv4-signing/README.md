@@ -56,7 +56,7 @@ Please refer to the AWS documentation on troubleshooting: https://docs.aws.amazo
 
 If you are experiencing a `400` error:
 * The URL is invalid. Check the following:
-* Check the URL-encoding of the query parameters. In particular, watch out for `+`, `:`, and `==`. They should not be present in the URL. `/` should only be present in the path section of the URL, not within the query string.
+* Make sure the query paramters are made URL-safe (URL encoding). In particular, watch out for `+`, `:`, and `==`, these characters should not be present in the final URL. Any `/` in the query parameters should also be made URL-safe.
 * Ensure that the endpoint used matches the role you are connecting as. The `uri`/`wssUri` for your signaling channel is different depending on `role` specified when making the [GetSignalingChannelEndpoint](https://docs.aws.amazon.com/kinesisvideostreams/latest/dg/API_GetSignalingChannelEndpoint.html) API request.
 * If [connecting as viewer](https://docs.aws.amazon.com/kinesisvideostreams-webrtc-dg/latest/devguide/kvswebrtc-websocket-apis-1.html), ensure that the value for the `X-Amz-ClientId` query parameter does not begin with `AWS_`.
 
