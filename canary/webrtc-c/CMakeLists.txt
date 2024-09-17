@@ -44,7 +44,7 @@ if(NOT cloudwatch_POPULATED)
   set(ENABLE_TESTING OFF)
   set(BUILD_ONLY "monitoring;logs")
   set(USE_OPENSSL ON)
-  set(CMAKE_CXX_FLAGS "-Wno-error=deprecated-declarations")
+  set(CMAKE_CXX_FLAGS "-Wno-error=deprecated-declarations -Wno-error=stringop-overflow")
   add_subdirectory(${cloudwatch_SOURCE_DIR} ${cloudwatch_BINARY_DIR} EXCLUDE_FROM_ALL)
 endif()
 

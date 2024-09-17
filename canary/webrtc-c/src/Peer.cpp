@@ -211,6 +211,32 @@ STATUS Peer::initRtcConfiguration(const Canary::PConfig pConfig)
         return retStatus;
     };
 
+    auto awaitGetIceConfigInfoCount = [](SIGNALING_CLIENT_HANDLE signalingClientHandle, PUINT32 pIceConfigInfoCount) -> STATUS {
+        STATUS retStatus = STATUS_SUCCESS;
+        UINT64 elapsed = 0;
+
+        CHK(IS_VALID_SIGNALING_CLIENT_HANDLE(signalingClientHandle) && pIceConfigInfoCount != NULL, STATUS_NULL_ARG);
+
+        while (TRUE) {
+            // Get the configuration count
+            CHK_STATUS(signalingClientGetIceConfigInfoCount(signalingClientHandle, pIceConfigInfoCount));
+
+            // Return OK if we have some ice configs
+            CHK(*pIceConfigInfoCount == 0, retStatus);
+
+            // Check for timeout
+            CHK_ERR(elapsed <= ASYNC_ICE_CONFIG_INFO_WAIT_TIMEOUT, STATUS_OPERATION_TIMED_OUT,
+                    "Couldn't retrieve ICE configurations in alotted time.");
+
+            THREAD_SLEEP(ICE_CONFIG_INFO_POLL_PERIOD);
+            elapsed += ICE_CONFIG_INFO_POLL_PERIOD;
+        }
+
+    CleanUp:
+
+        return retStatus;
+    };
+
     STATUS retStatus = STATUS_SUCCESS;
     UINT32 i, j, iceConfigCount, uriCount;
     PIceConfigInfo pIceConfigInfo;
@@ -274,12 +300,12 @@ STATUS Peer::initPeerConnection()
         STATUS retStatus = STATUS_SUCCESS;
         auto pPeer = (PPeer) customData;
         SignalingMessage message;
+
         if (candidateJson == NULL) {
             DLOGD("ice candidate gathering finished");
             pPeer->iceGatheringDone = TRUE;
             pPeer->cvar.notify_all();
         } else if (pPeer->trickleIce) {
-            DLOGI("Sending ICE candidate");
             message.messageType = SIGNALING_MESSAGE_TYPE_ICE_CANDIDATE;
             STRCPY(message.payload, candidateJson);
             CHK_STATUS(pPeer->send(&message));
