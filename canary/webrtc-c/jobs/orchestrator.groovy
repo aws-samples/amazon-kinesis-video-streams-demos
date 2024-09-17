@@ -160,6 +160,7 @@ pipeline {
                             job: NEXT_AVAILABLE_RUNNER,
                             parameters: COMMON_PARAMS + [
                                 booleanParam(name: 'USE_TURN', value: true),
+                                booleanParam(name: 'FORCE_TURN', value: true),
                                 booleanParam(name: 'TRICKLE_ICE', value: true),
                                 booleanParam(name: 'USE_IOT', value: false),
                                 booleanParam(name: 'USE_MBEDTLS', value: true),
@@ -176,6 +177,7 @@ pipeline {
                             job: NEXT_AVAILABLE_RUNNER,
                             parameters: COMMON_PARAMS + [
                                 booleanParam(name: 'USE_TURN', value: true),
+                                booleanParam(name: 'FORCE_TURN', value: true),
                                 booleanParam(name: 'TRICKLE_ICE', value: true),
                                 booleanParam(name: 'USE_IOT', value: false),
                                 booleanParam(name: 'USE_MBEDTLS', value: true),
