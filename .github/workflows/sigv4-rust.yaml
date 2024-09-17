@@ -1,0 +1,40 @@
+name: SigV4 Rust Tests
+
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - sigv4-signing/rust/**
+      - .github/workflows/sigv4-rust.yaml
+  pull_request:
+    branches:
+      - master
+    paths:
+      - sigv4-signing/rust/**
+      - .github/workflows/sigv4-rust.yaml
+
+jobs:
+  run-unit-tests:
+    runs-on: ubuntu-latest
+    name: Build and run unit tests
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Set up rust
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: nightly
+          override: true
+      - name: Generate test result and coverage report
+        run: |
+          cd sigv4-signing/rust;
+          cargo install cargo2junit;
+          cargo test $CARGO_OPTIONS -- -Z unstable-options --format json | cargo2junit > ~/results.xml;
+      - name: Upload test results
+        uses: EnricoMi/publish-unit-test-result-action@v1
+        with:
+          check_name: Test Results
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          files: ~/results.xml
