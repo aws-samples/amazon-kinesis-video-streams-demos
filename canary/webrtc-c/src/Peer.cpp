@@ -250,11 +250,11 @@ STATUS Peer::initRtcConfiguration(const Canary::PConfig pConfig)
             for (j = 0; j < pIceConfigInfo->uriCount; j++) {
                 CHECK(uriCount < MAX_ICE_SERVERS_COUNT);
                 /*
-                 * if configuration.iceServers[uriCount + 1].urls is "turn:ip:port?transport=udp" then ICE will try TURN over UDP
-                 * if configuration.iceServers[uriCount + 1].urls is "turn:ip:port?transport=tcp" then ICE will try TURN over TCP/TLS
-                 * if configuration.iceServers[uriCount + 1].urls is "turns:ip:port?transport=udp", it's currently ignored because sdk dont do
-                 * TURN over DTLS yet. if configuration.iceServers[uriCount + 1].urls is "turns:ip:port?transport=tcp" then ICE will try TURN over
-                 * TCP/TLS if configuration.iceServers[uriCount + 1].urls is "turn:ip:port" then ICE will try both TURN over UPD and TCP/TLS
+                 * If configuration.iceServers[uriCount + 1].urls is "turn:ip:port?transport=udp", then ICE will try TURN over UDP.
+                 * If configuration.iceServers[uriCount + 1].urls is "turn:ip:port?transport=tcp", then ICE will try TURN over TCP/TLS.
+                 * If configuration.iceServers[uriCount + 1].urls is "turns:ip:port?transport=udp", it's currently ignored because the SDK doesn't do
+                 * TURN over DTLS yet. If configuration.iceServers[uriCount + 1].urls is "turns:ip:port?transport=tcp", then ICE will try TURN over
+                 * TCP/TLS. If configuration.iceServers[uriCount + 1].urls is "turn:ip:port", then ICE will try both TURN over UPD and TCP/TLS.
                  *
                  * It's recommended to not pass too many TURN iceServers to configuration because it will slow down ice gathering in non-trickle
                  * mode.
