@@ -57,8 +57,8 @@ def withRunnerWrapper(envs, fn) {
 
 def runClient(isProducer, params) {
     def consumerEnvs = [        
-        'JAVA_HOME': "/opt/jdk-13.0.1",
-        'M2_HOME': "/opt/apache-maven-3.6.3"
+        'JAVA_HOME': "/usr/lib/jvm/default-java",
+        'M2_HOME': "/usr/share/maven"
     ].collect({k,v -> "${k}=${v}" })
 
     // TODO: get the branch and version from orchestrator
