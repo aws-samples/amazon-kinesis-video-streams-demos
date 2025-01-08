@@ -38,5 +38,4 @@ jobs:
       - name: Build
         run: |
           cd producer-js/browser-based-ingestion
-          unset CI # todo: remove later & fix warnings
           npm run build
