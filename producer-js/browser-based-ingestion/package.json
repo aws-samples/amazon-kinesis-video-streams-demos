@@ -8,7 +8,7 @@
   },
   "main": "index.js",
   "scripts": {
-    "build": "webpack",
+    "build": "webpack --mode=development",
     "test": "jest"
   },
   "keywords": [],
