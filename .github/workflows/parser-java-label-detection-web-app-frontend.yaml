@@ -32,7 +32,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          cd webrtc-js
+          cd parser-java/label-detection-web-app/src/main/frontend
           npm install
 
       - name: Build
