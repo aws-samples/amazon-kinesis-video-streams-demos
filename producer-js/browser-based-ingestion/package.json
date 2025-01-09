@@ -8,7 +8,7 @@
   },
   "main": "index.js",
   "scripts": {
-    "build": "webpack",
+    "build": "webpack --mode=development",
     "test": "jest"
   },
   "keywords": [],
@@ -37,6 +37,7 @@
     "json-schema": "^0.4.0",
     "node-notifier": "^10.0.1",
     "nth-check": "^2.1.1",
-    "recordrtc": "^5.6.1"
+    "recordrtc": "^5.6.1",
+    "url": "^0.11.4"
   }
 }

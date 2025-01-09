@@ -1,0 +1,41 @@
+name: Build React Application
+
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - 'webrtc-js/**'
+      - '.github/workflows/producer-js-browser-based-ingestion.yaml'
+  pull_request:
+    branches:
+      - master
+    paths:
+      - 'webrtc-js/**'
+      - '.github/workflows/producer-js-browser-based-ingestion.yaml'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node: [ 18, 20 ]
+    name: webrtc-js on Node ${{ matrix.node }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Setup node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+
+      - name: Install dependencies
+        run: |
+          cd producer-js/browser-based-ingestion
+          npm install
+
+      - name: Build
+        run: |
+          cd producer-js/browser-based-ingestion
+          npm run build
