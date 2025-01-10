@@ -1,0 +1,42 @@
+name: Build React Application
+
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - 'parser-java/label-detection-web-app/src/main/frontend/**'
+      - '.github/workflows/parser-java-label-detection-web-app-frontend.yaml'
+  pull_request:
+    branches:
+      - master
+    paths:
+      - 'parser-java/label-detection-web-app/src/main/frontend/**'
+      - '.github/workflows/parser-java-label-detection-web-app-frontend.yaml'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node: [ 18, 20 ]
+    name: parser-java-label-detection-web-app-frontend on Node ${{ matrix.node }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Setup node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+
+      - name: Install dependencies
+        run: |
+          cd parser-java/label-detection-web-app/src/main/frontend
+          npm install
+
+      - name: Build
+        run: |
+          cd parser-java/label-detection-web-app/src/main/frontend
+          unset CI # todo: remove later & fix warnings
+          npm run build

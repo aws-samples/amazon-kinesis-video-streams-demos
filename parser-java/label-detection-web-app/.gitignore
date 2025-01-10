@@ -40,3 +40,7 @@ dependency-reduced-pom.xm
 # Maven
 log/
 target/
+
+# Node
+src/main/frontend/build
+src/main/frontend/node_modules
