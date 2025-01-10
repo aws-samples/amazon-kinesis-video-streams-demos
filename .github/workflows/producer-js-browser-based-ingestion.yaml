@@ -5,13 +5,13 @@ on:
     branches:
       - master
     paths:
-      - 'webrtc-js/**'
+      - 'producer-js/browser-based-ingestion/**'
       - '.github/workflows/producer-js-browser-based-ingestion.yaml'
   pull_request:
     branches:
       - master
     paths:
-      - 'webrtc-js/**'
+      - 'producer-js/browser-based-ingestion/**'
       - '.github/workflows/producer-js-browser-based-ingestion.yaml'
 
 jobs:
