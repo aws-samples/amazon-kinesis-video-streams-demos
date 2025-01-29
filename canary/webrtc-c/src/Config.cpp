@@ -221,16 +221,24 @@ STATUS Config::initWithEnvVars()
     else {
         CHK_STATUS(mustenv(ACCESS_KEY_ENV_VAR, &accessKey));
         CHK_STATUS(mustenv(SECRET_KEY_ENV_VAR, &secretKey));
+
+        Aws::Client::ClientConfiguration clientConfig;
+
+        bool retStatus = false;
         
-        Config::assumeRole(const Aws::String &roleArn,
-                             const Aws::String &roleSessionName,
-                             const Aws::String &externalId,
-                             &credentials,
-                             const Aws::Client::ClientConfiguration &clientConfig);
+        DLOGW("Using static credentials");
+        clientConfig.region = region.value;
+        retStatus = this->assumeRole("arn:aws:iam::<account>:role/<roleName>", "roleSessionName", "externalId", credentials, clientConfig);
+        if (!retStatus) {
+            DLOGW("Failed to assume role");
+            CHK(FALSE, STATUS_AWS_IOT_FAILED_TO_ASSUME_ROLE);
+        }
 
         // accessKey = credentials.GetAWSAccessKeyId;
         // secretKey =  credentials.GetAWSSecretKey;
         // sessionToken = credentials.GetSessionToken;
+
+        DLOGW("Retreived credentials");
 
         CHK_STATUS(optenv(CANARY_CHANNEL_NAME_ENV_VAR, &channelName, CANARY_DEFAULT_CHANNEL_NAME));
     }
