@@ -155,6 +155,40 @@ CleanUp:
     return retStatus;
 }
 
+bool Config::assumeRole(const Aws::String &roleArn,
+                             const Aws::String &roleSessionName,
+                             const Aws::String &externalId,
+                             Aws::Auth::AWSCredentials &credentials,
+                             const Aws::Client::ClientConfiguration &clientConfig) {
+    Aws::STS::STSClient sts(clientConfig);
+    Aws::STS::Model::AssumeRoleRequest sts_req;
+
+    sts_req.SetRoleArn(roleArn);
+    sts_req.SetRoleSessionName(roleSessionName);
+    sts_req.SetExternalId(externalId);
+
+    const Aws::STS::Model::AssumeRoleOutcome outcome = sts.AssumeRole(sts_req);
+
+    if (!outcome.IsSuccess()) {
+        std::cerr << "Error assuming IAM role. " <<
+                  outcome.GetError().GetMessage() << std::endl;
+    }
+    else {
+        std::cout << "Credentials successfully retrieved." << std::endl;
+        const Aws::STS::Model::AssumeRoleResult result = outcome.GetResult();
+        const Aws::STS::Model::Credentials &temp_credentials = result.GetCredentials();
+
+        // Store temporary credentials in return argument.
+        // Note: The credentials object returned by assumeRole differs
+        // from the AWSCredentials object used in most situations.
+        credentials.SetAWSAccessKeyId(temp_credentials.GetAccessKeyId());
+        credentials.SetAWSSecretKey(temp_credentials.GetSecretAccessKey());
+        credentials.SetSessionToken(temp_credentials.GetSessionToken());
+    }
+
+    return outcome.IsSuccess();
+}
+
 STATUS Config::initWithEnvVars()
 {
     STATUS retStatus = STATUS_SUCCESS;
@@ -187,6 +221,17 @@ STATUS Config::initWithEnvVars()
     else {
         CHK_STATUS(mustenv(ACCESS_KEY_ENV_VAR, &accessKey));
         CHK_STATUS(mustenv(SECRET_KEY_ENV_VAR, &secretKey));
+        
+        Config::assumeRole(const Aws::String &roleArn,
+                             const Aws::String &roleSessionName,
+                             const Aws::String &externalId,
+                             &credentials,
+                             const Aws::Client::ClientConfiguration &clientConfig);
+
+        // accessKey = credentials.GetAWSAccessKeyId;
+        // secretKey =  credentials.GetAWSSecretKey;
+        // sessionToken = credentials.GetSessionToken;
+
         CHK_STATUS(optenv(CANARY_CHANNEL_NAME_ENV_VAR, &channelName, CANARY_DEFAULT_CHANNEL_NAME));
     }
     CHK_STATUS(optenv(SESSION_TOKEN_ENV_VAR, &sessionToken, ""));

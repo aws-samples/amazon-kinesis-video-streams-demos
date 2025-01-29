@@ -1,5 +1,11 @@
 #pragma once
 
+// #include <aws/s3/S3Client.h>
+#include <aws/core/auth/AWSCredentialsProvider.h>
+#include <aws/sts/STSClient.h>
+#include <aws/sts/model/AssumeRoleRequest.h>
+// #include <aws/s3/model/ListBucketsResult.h>
+
 namespace Canary {
 
 class Config;
@@ -30,6 +36,7 @@ class Config {
     BOOL isStorage;
 
     // credentials
+    Aws::Auth::AWSCredentials credentials;
     Value<std::string> accessKey;
     Value<std::string> secretKey;
     Value<std::string> sessionToken;
@@ -59,6 +66,11 @@ class Config {
   private:
     STATUS initWithJSON(PCHAR);
     STATUS initWithEnvVars();
+    bool assumeRole(const Aws::String &roleArn,
+                             const Aws::String &roleSessionName,
+                             const Aws::String &externalId,
+                             Aws::Auth::AWSCredentials &credentials,
+                             const Aws::Client::ClientConfiguration &clientConfig);
 };
 
 } // namespace Canary
