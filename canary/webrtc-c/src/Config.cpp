@@ -219,30 +219,32 @@ STATUS Config::initWithEnvVars()
         CHK_STATUS(mustenv(IOT_CORE_THING_NAME_ENV_VAR, &channelName));
     }
     else {
-        CHK_STATUS(mustenv(ACCESS_KEY_ENV_VAR, &accessKey));
-        CHK_STATUS(mustenv(SECRET_KEY_ENV_VAR, &secretKey));
+        // CHK_STATUS(mustenv(ACCESS_KEY_ENV_VAR, &));
+        // CHK_STATUS(mustenv(SECRET_KEY_ENV_VAR, &secretKey));
 
         Aws::Client::ClientConfiguration clientConfig;
 
         bool retStatus = false;
         
         DLOGW("Using static credentials");
-        clientConfig.region = region.value;
-        retStatus = this->assumeRole("arn:aws:iam::<account>:role/<roleName>", "roleSessionName", "externalId", credentials, clientConfig);
+        clientConfig.region = "us-west-2";
+        retStatus = this->assumeRole("XXXXXX", "roleSessionName", "externalId", credentials, clientConfig);
         if (!retStatus) {
             DLOGW("Failed to assume role");
             CHK(FALSE, STATUS_AWS_IOT_FAILED_TO_ASSUME_ROLE);
         }
 
-        // accessKey = credentials.GetAWSAccessKeyId;
-        // secretKey =  credentials.GetAWSSecretKey;
-        // sessionToken = credentials.GetSessionToken;
+        this->accessKey = std::string(credentials.GetAWSAccessKeyId().c_str());
+        this->secretKey =  std::string(credentials.GetAWSSecretKey().c_str());
+        this->sessionToken = std::string(credentials.GetSessionToken().c_str());
 
         DLOGW("Retreived credentials");
 
         CHK_STATUS(optenv(CANARY_CHANNEL_NAME_ENV_VAR, &channelName, CANARY_DEFAULT_CHANNEL_NAME));
     }
-    CHK_STATUS(optenv(SESSION_TOKEN_ENV_VAR, &sessionToken, ""));
+
+    // CHK_STATUS(optenv(SESSION_TOKEN_ENV_VAR, &sessionToken, ""));
+    
     CHK_STATUS(optenv(DEFAULT_REGION_ENV_VAR, &region, DEFAULT_AWS_REGION));
 
     // Set the logger log level

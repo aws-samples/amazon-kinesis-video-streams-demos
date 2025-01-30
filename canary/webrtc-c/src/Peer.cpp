@@ -55,12 +55,12 @@ STATUS Peer::init(const Canary::PConfig pConfig, const Callbacks& callbacks)
                                                   &pAwsCredentialProvider));
     }
     else {
-        if(IS_EMPTY_STRING(pConfig->sessionToken.value.c_str())) {
-            CHK_STATUS(createStaticCredentialProvider((PCHAR) pConfig->accessKey.value.c_str(), 0, (PCHAR) pConfig->secretKey.value.c_str(), 0,
+        if(IS_EMPTY_STRING(pConfig->sessionToken.c_str())) {
+            CHK_STATUS(createStaticCredentialProvider((PCHAR) pConfig->accessKey.c_str(), 0, (PCHAR) pConfig->secretKey.c_str(), 0,
                                                       NULL, 0, MAX_UINT64, &pAwsCredentialProvider));
         } else {
-            CHK_STATUS(createStaticCredentialProvider((PCHAR) pConfig->accessKey.value.c_str(), 0, (PCHAR) pConfig->secretKey.value.c_str(), 0,
-                                                      (PCHAR) pConfig->sessionToken.value.c_str(), 0, MAX_UINT64, &pAwsCredentialProvider));
+            CHK_STATUS(createStaticCredentialProvider((PCHAR) pConfig->accessKey.c_str(), 0, (PCHAR) pConfig->secretKey.c_str(), 0,
+                                                      (PCHAR) pConfig->sessionToken.c_str(), 0, MAX_UINT64, &pAwsCredentialProvider));
         }
 
     }

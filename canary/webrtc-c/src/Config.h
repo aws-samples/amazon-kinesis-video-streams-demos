@@ -37,9 +37,9 @@ class Config {
 
     // credentials
     Aws::Auth::AWSCredentials credentials;
-    Value<std::string> accessKey;
-    Value<std::string> secretKey;
-    Value<std::string> sessionToken;
+    std::string accessKey;
+    std::string secretKey;
+    std::string sessionToken;
     Value<std::string> region;
     Value<std::string> iotCoreCredentialEndPointFile;
     Value<std::string> iotCoreCert;
