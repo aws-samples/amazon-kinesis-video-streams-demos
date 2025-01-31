@@ -222,13 +222,16 @@ STATUS Config::initWithEnvVars()
         // CHK_STATUS(mustenv(ACCESS_KEY_ENV_VAR, &));
         // CHK_STATUS(mustenv(SECRET_KEY_ENV_VAR, &secretKey));
 
+        Value<std::string> stsArn;
+        CHK_STATUS(mustenv("AWS_KVS_STS_ROLE_ARN", &stsArn));
+
         Aws::Client::ClientConfiguration clientConfig;
 
         bool retStatus = false;
         
         DLOGW("Using static credentials");
         clientConfig.region = "us-west-2";
-        retStatus = this->assumeRole("XXXXXX", "roleSessionName", "externalId", credentials, clientConfig);
+        retStatus = this->assumeRole(stsArn.value, "roleSessionName", "externalId", credentials, clientConfig);
         if (!retStatus) {
             DLOGW("Failed to assume role");
             CHK(FALSE, STATUS_AWS_IOT_FAILED_TO_ASSUME_ROLE);
