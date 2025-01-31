@@ -58,7 +58,7 @@ def buildConsumerProject() {
 
 def withRunnerWrapper(envs, fn) {
     withEnv(envs) {
-        withCredentials(CREDENTIALS) {
+        // withCredentials(CREDENTIALS) {
             try {
                 fn()
             } catch (FlowInterruptedException err) {
@@ -69,7 +69,7 @@ def withRunnerWrapper(envs, fn) {
                 // Ignore errors so that we can auto recover by retrying
                 unstable err.toString()
             }
-        }
+        // }
     }
 }
 
@@ -247,6 +247,10 @@ def buildStorageCanary(isConsumer, params) {
 pipeline {
     agent {
         label params.MASTER_NODE_LABEL
+    }
+
+    environment {
+        AWS_KVS_STS_ROLE_ARN = credentials('CANARY_STS_ROLE_ARN')
     }
 
     parameters {
