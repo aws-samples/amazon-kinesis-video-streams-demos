@@ -255,9 +255,9 @@ pipeline {
         label params.MASTER_NODE_LABEL
     }
 
-    environment {
-        AWS_KVS_STS_ROLE_ARN = credentials('CANARY_STS_ROLE_ARN')
-    }
+    // environment {
+    //     AWS_KVS_STS_ROLE_ARN = credentials('CANARY_STS_ROLE_ARN')
+    // }
 
     parameters {
         choice(name: 'AWS_KVS_LOG_LEVEL', choices: ["1", "2", "3", "4", "5"])
@@ -287,18 +287,36 @@ pipeline {
         stage('Fetch and export STS credentials') {
             steps {
                 script {
-                    // echo 'CANARY_STS_ROLE_ARN: ${env.CANARY_STS_ROLE_ARN}'
 
+                    def AWS_KVS_STS_ROLE_ARN = credentials('CANARY_STS_ROLE_ARN')
+
+                    // Run the assume-role AWS CLI command and capture the output
                     def assumeRoleOutput = sh(
-                        script: """
-                            unset AWS_ACCESS_KEY_ID
-                            unset AWS_SECRET_ACCESS_KEY
-                            aws sts assume-role \\
-                                --role-arn ${env.AWS_KVS_STS_ROLE_ARN} \\
-                                --role-session-name s3-access-example
-                        """,
+                        script: '''
+                            aws sts assume-role \
+                                --role-arn "${AWS_KVS_STS_ROLE_ARN}" \
+                                --role-session-name roleSessionName --output json
+                        ''',
                         returnStdout: true
                     ).trim()
+
+                    // Parse the JSON output
+                    def assumeRoleJson = readJSON text: assumeRoleOutput
+
+                    // Assign the credentials to environment variables
+                    env.AWS_ACCESS_KEY_ID = assumeRoleJson.Credentials.AccessKeyId
+                    env.AWS_SECRET_ACCESS_KEY = assumeRoleJson.Credentials.SecretAccessKey
+                    env.AWS_SESSION_TOKEN = assumeRoleJson.Credentials.SessionToken
+
+                    echo "AWS_ACCESS_KEY_ID: ${env.AWS_ACCESS_KEY_ID}"
+                    
+                    // echo 'CANARY_STS_ROLE_ARN: ${env.CANARY_STS_ROLE_ARN}'
+
+                    // read AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_SESSION_TOKEN <<< \
+                    // $(aws sts assume-role                                           \
+                    //     --role-arn $(aws configure get my_profile.role_arn)           \
+                    //     --role-session-name my_profile_session --output text |        \
+                    //     awk '/^CREDENTIALS/ { print $2, $4, $5 }')
 
                     // def json = readJSON text: assumeRoleOutput
                     // env.AWS_ACCESS_KEY_ID = json.Credentials.AccessKeyId
