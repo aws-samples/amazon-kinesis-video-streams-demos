@@ -238,7 +238,7 @@ def buildStorageCanary(isConsumer, params) {
         withRunnerWrapper(envs) {
             sh '''
                 cd $WORKSPACE/canary/consumer-java
-                java -classpath target/aws-kinesisvideo-producer-sdk-canary-consumer-1.0-SNAPSHOT.jar:$(cat tmp_jar) -Daws.accessKeyId=${AWS_ACCESS_KEY_ID} -Daws.secretKey=${AWS_SECRET_ACCESS_KEY} com.amazon.kinesis.video.canary.consumer.WebrtcStorageCanaryConsumer
+                java -classpath target/aws-kinesisvideo-producer-sdk-canary-consumer-1.0-SNAPSHOT.jar:$(cat tmp_jar) -Daws.accessKeyId=${env.AWS_ACCESS_KEY_ID} -Daws.secretKey=${env.AWS_SECRET_ACCESS_KEY} com.amazon.kinesis.video.canary.consumer.WebrtcStorageCanaryConsumer
             '''
         }
     }
