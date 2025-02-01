@@ -286,11 +286,11 @@ pipeline {
 
                     // Run the assume-role AWS CLI command and capture the output
                     def assumeRoleOutput = sh(
-                        script: '''
+                        script: '
                             aws sts assume-role \
                                 --role-arn $AWS_KVS_STS_ROLE_ARN \
                                 --role-session-name roleSessionName --output json
-                        ''',
+                        ',
                         returnStdout: true
                     ).trim()
 
