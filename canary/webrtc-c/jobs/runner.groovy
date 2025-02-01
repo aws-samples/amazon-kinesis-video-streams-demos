@@ -280,19 +280,19 @@ pipeline {
     stages {
         stage('Fetch and export STS credentials') {
             steps {
-                // script {
-                // Run the assume-role AWS CLI command and capture the output
-                def assumeRoleOutput = sh('aws sts assume-role --role-arn $AWS_KVS_STS_ROLE_ARN --role-session-name roleSessionName --output json', returnStdout: true).trim()
+                script {
+                    // Run the assume-role AWS CLI command and capture the output
+                    def assumeRoleOutput = sh('aws sts assume-role --role-arn $AWS_KVS_STS_ROLE_ARN --role-session-name roleSessionName --output json', returnStdout: true).trim()
 
-                // Parse the JSON output
-                def assumeRoleJson = readJSON text: assumeRoleOutput
+                    // Parse the JSON output
+                    def assumeRoleJson = readJSON text: assumeRoleOutput
 
-                // Assign the credentials to environment variables
-                env.AWS_ACCESS_KEY_ID = assumeRoleJson.Credentials.AccessKeyId
-                env.AWS_SECRET_ACCESS_KEY = assumeRoleJson.Credentials.SecretAccessKey
-                env.AWS_SESSION_TOKEN = assumeRoleJson.Credentials.SessionToken
+                    // Assign the credentials to environment variables
+                    env.AWS_ACCESS_KEY_ID = assumeRoleJson.Credentials.AccessKeyId
+                    env.AWS_SECRET_ACCESS_KEY = assumeRoleJson.Credentials.SecretAccessKey
+                    env.AWS_SESSION_TOKEN = assumeRoleJson.Credentials.SessionToken
 
-                echo "AWS_ACCESS_KEY_ID: ${env.AWS_ACCESS_KEY_ID}"
+                    echo "AWS_ACCESS_KEY_ID: ${env.AWS_ACCESS_KEY_ID}"
                     
                     // echo 'CANARY_STS_ROLE_ARN: ${env.CANARY_STS_ROLE_ARN}'
 
@@ -306,7 +306,7 @@ pipeline {
                     // env.AWS_ACCESS_KEY_ID = json.Credentials.AccessKeyId
                     // env.AWS_SECRET_ACCESS_KEY = json.Credentials.SecretAccessKey
                     // env.AWS_SESSION_TOKEN = json.Credentials.SessionToken
-                // }
+                }
             }
         }
 
