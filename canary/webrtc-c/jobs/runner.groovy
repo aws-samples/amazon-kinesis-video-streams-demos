@@ -123,8 +123,6 @@ def buildPeer(isMaster, params) {
 
     withRunnerWrapper(envs) {
         sh """
-            unset AWS_ACCESS_KEY_ID
-            unset AWS_SECRET_ACCESS_KEY
             cd ./canary/webrtc-c/build &&
             ${isMaster ? "" : "sleep 10 &&"}
             ./kvsWebrtcCanaryWebrtc"""
@@ -169,8 +167,6 @@ def buildSignaling(params) {
 
     withRunnerWrapper(envs) {
         sh """
-            unset AWS_ACCESS_KEY_ID
-            unset AWS_SECRET_ACCESS_KEY
             cd ./canary/webrtc-c/build && 
             ./kvsWebrtcCanarySignaling"""
     }
@@ -234,8 +230,6 @@ def buildStorageCanary(isConsumer, params) {
         def envs = (commonEnvs + masterEnvs).collect{ k, v -> "${k}=${v}" }
         withRunnerWrapper(envs) {
             sh """
-                unset AWS_ACCESS_KEY_ID
-                unset AWS_SECRET_ACCESS_KEY
                 cd ./canary/webrtc-c/build &&
                 ./kvsWebrtcStorageSample"""
         }
