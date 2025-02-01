@@ -255,9 +255,9 @@ pipeline {
         label params.MASTER_NODE_LABEL
     }
 
-    environment {
-        AWS_KVS_STS_ROLE_ARN = credentials('CANARY_STS_ROLE_ARN')
-    }
+    // environment {
+    //     AWS_KVS_STS_ROLE_ARN = credentials('CANARY_STS_ROLE_ARN')
+    // }
 
     parameters {
         choice(name: 'AWS_KVS_LOG_LEVEL', choices: ["1", "2", "3", "4", "5"])
@@ -287,16 +287,17 @@ pipeline {
         stage('Fetch and export STS credentials') {
             steps {
                 script {
-                    def assumeRoleOutput = sh(
-                        script: '''
-                            unset AWS_ACCESS_KEY_ID
-                            unset AWS_SECRET_ACCESS_KEY
-                            aws sts assume-role \
-                                --role-arn arn:aws:iam::123456789012:role/xaccounts3access \
-                                --role-session-name s3-access-example
-                        ''',
-                        returnStdout: true
-                    ).trim()
+                def roleArn = credentials('CANARY_STS_ROLE_ARN') 
+                def assumeRoleOutput = sh(
+                    script: """
+                        unset AWS_ACCESS_KEY_ID
+                        unset AWS_SECRET_ACCESS_KEY
+                        aws sts assume-role \\
+                            --role-arn ${roleArn} \\
+                            --role-session-name roleSessionName
+                    """,
+                    returnStdout: true
+                ).trim()
 
                     def json = readJSON text: assumeRoleOutput
                     env.AWS_ACCESS_KEY_ID = json.Credentials.AccessKeyId
