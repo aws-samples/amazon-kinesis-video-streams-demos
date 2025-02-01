@@ -296,12 +296,14 @@ pipeline {
                     def assumeRoleJson = readJSON text: assumeRoleOutput
 
                     echo "Parsed JSON: ${assumeRoleJson}"
+                    env.ASSUME_ROLE_OUTPUT = assumeRoleJson
+                    echo "ASSUME_ROLE_OUTPUT: ${env.ASSUME_ROLE_OUTPUT}"
 
-                    env.AWS_ACCESS_KEY_ID = assumeRoleJson.Credentials.AccessKeyId
-                    env.AWS_SECRET_ACCESS_KEY = assumeRoleJson.Credentials.SecretAccessKey
-                    env.AWS_SESSION_TOKEN = assumeRoleJson.Credentials.SessionToken
+                    // env.AWS_ACCESS_KEY_ID = assumeRoleJson.Credentials.AccessKeyId
+                    // env.AWS_SECRET_ACCESS_KEY = assumeRoleJson.Credentials.SecretAccessKey
+                    // env.AWS_SESSION_TOKEN = assumeRoleJson.Credentials.SessionToken
 
-                    echo "AWS_ACCESS_KEY_ID: ${env.AWS_ACCESS_KEY_ID}"
+                    // echo "AWS_ACCESS_KEY_ID: ${env.AWS_ACCESS_KEY_ID}"
                 }
                 
                 // echo 'CANARY_STS_ROLE_ARN: ${env.CANARY_STS_ROLE_ARN}'
