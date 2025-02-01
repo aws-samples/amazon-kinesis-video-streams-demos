@@ -281,6 +281,9 @@ pipeline {
         stage('Fetch and export STS credentials') {
             steps {
                 script {
+                    echo 'Testing print. '
+                }
+                script {
                     echo "Performing assume-role call"
 
                     def assumeRoleOutput = sh('aws sts assume-role --role-arn $AWS_KVS_STS_ROLE_ARN --role-session-name roleSessionName --output json', returnStdout: true).trim()
