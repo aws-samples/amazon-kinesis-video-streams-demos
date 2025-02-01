@@ -285,7 +285,8 @@ pipeline {
                 script {
                     echo "Running in script block"
 
-                    def assumeRoleOutput = sh('aws sts assume-role --role-arn $AWS_KVS_STS_ROLE_ARN --role-session-name roleSessionName --output json', returnStdout: true).trim()
+                    def roleArn = env.AWS_KVS_STS_ROLE_ARN
+                    def assumeRoleOutput = sh('aws sts assume-role --role-arn ${roleArn} --role-session-name roleSessionName --output json', returnStdout: true).trim()
                     
                     echo "Finished performing assume-role call"
                     echo "Assume Role Output: ${assumeRoleOutput}"
