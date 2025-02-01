@@ -219,27 +219,32 @@ STATUS Config::initWithEnvVars()
         CHK_STATUS(mustenv(IOT_CORE_THING_NAME_ENV_VAR, &channelName));
     }
     else {
-        // CHK_STATUS(mustenv(ACCESS_KEY_ENV_VAR, &));
-        // CHK_STATUS(mustenv(SECRET_KEY_ENV_VAR, &secretKey));
+        CHK_STATUS(mustenv(ACCESS_KEY_ENV_VAR, &valAccessKey));
+        CHK_STATUS(mustenv(SECRET_KEY_ENV_VAR, &valSecretKey));
+        CHK_STATUS(mustenv(SESSION_TOKEN_ENV_VAR, &valSessionToken));
 
-        Value<std::string> stsArn;
-        CHK_STATUS(mustenv("AWS_KVS_STS_ROLE_ARN", &stsArn));
+        this->sessionToken = valAccessKey.value;
+        this->secretKey = valSecretKey.value;
+        this->sessionToken = valSessionToken.value;
 
-        Aws::Client::ClientConfiguration clientConfig;
+        // Value<std::string> stsArn;
+        // CHK_STATUS(mustenv("AWS_KVS_STS_ROLE_ARN", &stsArn));
 
-        bool retStatus = false;
+        // Aws::Client::ClientConfiguration clientConfig;
+
+        // bool retStatus = false;
         
-        DLOGW("Using static credentials");
-        clientConfig.region = "us-west-2";
-        retStatus = this->assumeRole(stsArn.value, "roleSessionName", "externalId", credentials, clientConfig);
-        if (!retStatus) {
-            DLOGW("Failed to assume role");
-            CHK(FALSE, STATUS_AWS_IOT_FAILED_TO_ASSUME_ROLE);
-        }
+        // DLOGW("Using static credentials");
+        // clientConfig.region = "us-west-2";
+        // retStatus = this->assumeRole(stsArn.value, "roleSessionName", "externalId", credentials, clientConfig);
+        // if (!retStatus) {
+        //     DLOGW("Failed to assume role");
+        //     CHK(FALSE, STATUS_AWS_IOT_FAILED_TO_ASSUME_ROLE);
+        // }
 
-        this->accessKey = std::string(credentials.GetAWSAccessKeyId().c_str());
-        this->secretKey =  std::string(credentials.GetAWSSecretKey().c_str());
-        this->sessionToken = std::string(credentials.GetSessionToken().c_str());
+        // this->accessKey = std::string(credentials.GetAWSAccessKeyId().c_str());
+        // this->secretKey =  std::string(credentials.GetAWSSecretKey().c_str());
+        // this->sessionToken = std::string(credentials.GetSessionToken().c_str());
 
         DLOGW("Retreived credentials");
 

@@ -40,6 +40,9 @@ class Config {
     std::string accessKey;
     std::string secretKey;
     std::string sessionToken;
+    Value<std::string> valAccessKey;
+    Value<std::string> valSecretKey;
+    Value<std::string> valSessionToken;
     Value<std::string> region;
     Value<std::string> iotCoreCredentialEndPointFile;
     Value<std::string> iotCoreCert;
