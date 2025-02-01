@@ -300,10 +300,10 @@ pipeline {
                         returnStdout: true
                     ).trim()
 
-                    def json = readJSON text: assumeRoleOutput
-                    env.AWS_ACCESS_KEY_ID = json.Credentials.AccessKeyId
-                    env.AWS_SECRET_ACCESS_KEY = json.Credentials.SecretAccessKey
-                    env.AWS_SESSION_TOKEN = json.Credentials.SessionToken
+                    // def json = readJSON text: assumeRoleOutput
+                    // env.AWS_ACCESS_KEY_ID = json.Credentials.AccessKeyId
+                    // env.AWS_SECRET_ACCESS_KEY = json.Credentials.SecretAccessKey
+                    // env.AWS_SESSION_TOKEN = json.Credentials.SessionToken
                 }
             }
         }
