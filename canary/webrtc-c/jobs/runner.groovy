@@ -287,7 +287,7 @@ pipeline {
         stage('Fetch and export STS credentials') {
             steps {
                 script {
-                    echo 'CANARY_STS_ROLE_ARN: ${env.CANARY_STS_ROLE_ARN}'
+                    // echo 'CANARY_STS_ROLE_ARN: ${env.CANARY_STS_ROLE_ARN}'
 
                     def assumeRoleOutput = sh(
                         script: """
