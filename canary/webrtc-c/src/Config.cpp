@@ -223,7 +223,7 @@ STATUS Config::initWithEnvVars()
         CHK_STATUS(mustenv(SECRET_KEY_ENV_VAR, &valSecretKey));
         CHK_STATUS(mustenv(SESSION_TOKEN_ENV_VAR, &valSessionToken));
 
-        this->sessionToken = valAccessKey.value;
+        this->accessKey = valAccessKey.value;
         this->secretKey = valSecretKey.value;
         this->sessionToken = valSessionToken.value;
 

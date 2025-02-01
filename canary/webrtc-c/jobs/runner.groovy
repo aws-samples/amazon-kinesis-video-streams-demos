@@ -291,7 +291,7 @@ pipeline {
                     def assumeRoleOutput = sh(script: 'aws sts assume-role --role-arn $AWS_KVS_STS_ROLE_ARN --role-session-name roleSessionName --output json', returnStdout: true)//.trim()
                     
                     echo "Finished performing assume-role call"
-                    echo "Assume Role Output: ${assumeRoleOutput}"
+                    // echo "Assume Role Output: ${assumeRoleOutput}"
 
                     def assumeRoleJson = readJSON text: assumeRoleOutput
 
@@ -300,7 +300,7 @@ pipeline {
                     // env.ASSUME_ROLE_OUTPUT = assumeRoleJson
                     // echo "ASSUME_ROLE_OUTPUT: ${env.ASSUME_ROLE_OUTPUT}"
 
-                    def AWS_ACCESS_KEY_ID = assumeRoleJson.Credentials.AccessKeyId
+                    // def AWS_ACCESS_KEY_ID = assumeRoleJson.Credentials.AccessKeyId
                     // echo "AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}"
 
                     env.AWS_ACCESS_KEY_ID = assumeRoleJson.Credentials.AccessKeyId
