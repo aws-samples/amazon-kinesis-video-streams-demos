@@ -280,9 +280,7 @@ pipeline {
     stages {
         stage('Fetch and export STS credentials') {
             steps {
-                script {
-                    echo 'Testing print. '
-                }
+                echo 'Testing print. '
                 script {
                     echo "Performing assume-role call"
 
