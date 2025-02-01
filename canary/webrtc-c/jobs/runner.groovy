@@ -293,13 +293,14 @@ pipeline {
                     echo "Finished performing assume-role call"
                     echo "Assume Role Output: ${assumeRoleOutput}"
 
-                    // def assumeRoleJson = readJSON text: assumeRoleOutput
+                    def assumeRoleJson = readJSON text: assumeRoleOutput
 
-                    // echo "Parsed JSON: ${assumeRoleJson}"
+                    echo "Parsed JSON: ${assumeRoleJson}"
+
                     // env.ASSUME_ROLE_OUTPUT = assumeRoleJson
                     // echo "ASSUME_ROLE_OUTPUT: ${env.ASSUME_ROLE_OUTPUT}"
 
-                    def AWS_ACCESS_KEY_ID = assumeRoleOutput.Credentials.AccessKeyId
+                    def AWS_ACCESS_KEY_ID = assumeRoleJson.Credentials.AccessKeyId
                     // env.AWS_SECRET_ACCESS_KEY = assumeRoleOutput.Credentials.SecretAccessKey
                     // env.AWS_SESSION_TOKEN = assumeRoleOutput.Credentials.SessionToken
 
