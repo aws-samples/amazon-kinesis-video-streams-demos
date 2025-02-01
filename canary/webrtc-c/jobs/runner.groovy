@@ -294,7 +294,7 @@ pipeline {
                             unset AWS_ACCESS_KEY_ID
                             unset AWS_SECRET_ACCESS_KEY
                             aws sts assume-role \\
-                                --role-arn '${env.AWS_KVS_STS_ROLE_ARN}' \\
+                                --role-arn ${env.AWS_KVS_STS_ROLE_ARN} \\
                                 --role-session-name s3-access-example
                         """,
                         returnStdout: true
