@@ -287,14 +287,16 @@ pipeline {
         stage('Fetch and export STS credentials') {
             steps {
                 script {
+                    echo 'CANARY_STS_ROLE_ARN: ${env.CANARY_STS_ROLE_ARN}'
+
                     def assumeRoleOutput = sh(
-                        script: """
+                        script: '
                             unset AWS_ACCESS_KEY_ID
                             unset AWS_SECRET_ACCESS_KEY
                             aws sts assume-role \\
                                 --role-arn '${env.AWS_KVS_STS_ROLE_ARN}' \\
                                 --role-session-name s3-access-example
-                        """,
+                        ',
                         returnStdout: true
                     ).trim()
 
