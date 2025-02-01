@@ -287,30 +287,33 @@ pipeline {
         stage('Fetch and export STS credentials') {
             steps {
                 script {
-                    def roleArn = credentials('CANARY_STS_ROLE_ARN') 
+                    // Retrieve the role ARN from Jenkins credentials
+                    def roleArn = credentials('CANARY_STS_ROLE_ARN')
+
                     def assumeRoleOutput = sh(
                         script: """
                             unset AWS_ACCESS_KEY_ID
                             unset AWS_SECRET_ACCESS_KEY
                             aws sts assume-role \\
-                                --role-arn ${roleArn} \\
+                                --role-arn '${roleArn}' \\
                                 --role-session-name s3-access-example
                         """,
                         returnStdout: true
                     ).trim()
-
+                    
                     def json = readJSON text: assumeRoleOutput
                     env.AWS_ACCESS_KEY_ID = json.Credentials.AccessKeyId
                     env.AWS_SECRET_ACCESS_KEY = json.Credentials.SecretAccessKey
                     env.AWS_SESSION_TOKEN = json.Credentials.SessionToken
-                }                                           
-        }
+                }
+            }
 
-        stage('Set build description') {
-            steps {
-                script {
-                    currentBuild.displayName = "${params.RUNNER_LABEL} [#${BUILD_NUMBER}]"
-                    currentBuild.description = "Executed on: ${NODE_NAME}\n"
+            stage('Set build description') {
+                steps {
+                    script {
+                        currentBuild.displayName = "${params.RUNNER_LABEL} [#${BUILD_NUMBER}]"
+                        currentBuild.description = "Executed on: ${NODE_NAME}\n"
+                    }
                 }
             }
         }
