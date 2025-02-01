@@ -289,8 +289,8 @@ pipeline {
                 script {
                     def assumeRoleOutput = sh(
                         script: '''
-                            unset AWS_ACCESS_KEY_ID \
-                            unset AWS_SECRET_ACCESS_KEY \
+                            unset AWS_ACCESS_KEY_ID
+                            unset AWS_SECRET_ACCESS_KEY
                             aws sts assume-role \
                                 --role-arn arn:aws:iam::123456789012:role/xaccounts3access \
                                 --role-session-name s3-access-example
