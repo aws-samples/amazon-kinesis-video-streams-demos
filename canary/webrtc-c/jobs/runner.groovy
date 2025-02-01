@@ -299,11 +299,11 @@ pipeline {
                     // env.ASSUME_ROLE_OUTPUT = assumeRoleJson
                     // echo "ASSUME_ROLE_OUTPUT: ${env.ASSUME_ROLE_OUTPUT}"
 
-                    env.AWS_ACCESS_KEY_ID = assumeRoleOutput.Credentials.AccessKeyId
-                    env.AWS_SECRET_ACCESS_KEY = assumeRoleOutput.Credentials.SecretAccessKey
-                    env.AWS_SESSION_TOKEN = assumeRoleOutput.Credentials.SessionToken
+                    def AWS_ACCESS_KEY_ID = assumeRoleOutput.Credentials.AccessKeyId
+                    // env.AWS_SECRET_ACCESS_KEY = assumeRoleOutput.Credentials.SecretAccessKey
+                    // env.AWS_SESSION_TOKEN = assumeRoleOutput.Credentials.SessionToken
 
-                    echo "AWS_ACCESS_KEY_ID: ${env.AWS_ACCESS_KEY_ID}"
+                    echo "AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}"
                 }
                 
                 // echo 'CANARY_STS_ROLE_ARN: ${env.CANARY_STS_ROLE_ARN}'
