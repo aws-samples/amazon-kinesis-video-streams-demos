@@ -283,28 +283,23 @@ pipeline {
                 echo "Performing assume-role call"
 
                 script {
-                    def browsers = ['chrome', 'firefox']
-                    for (int i = 0; i < browsers.size(); ++i) {
-                        echo "Testing the ${browsers[i]} browser"
-                    }
+                    echo "Running in script block"
+
+                    def assumeRoleOutput = sh('aws sts assume-role --role-arn $AWS_KVS_STS_ROLE_ARN --role-session-name roleSessionName --output json', returnStdout: true).trim()
+                    
+                    echo "Finished performing assume-role call"
+                    echo "Assume Role Output: ${assumeRoleOutput}"
+
+                    def assumeRoleJson = readJSON text: assumeRoleOutput
+
+                    echo "Parsed JSON: ${assumeRoleJson}"
+
+                    env.AWS_ACCESS_KEY_ID = assumeRoleJson.Credentials.AccessKeyId
+                    env.AWS_SECRET_ACCESS_KEY = assumeRoleJson.Credentials.SecretAccessKey
+                    env.AWS_SESSION_TOKEN = assumeRoleJson.Credentials.SessionToken
+
+                    echo "AWS_ACCESS_KEY_ID: ${env.AWS_ACCESS_KEY_ID}"
                 }
-
-                // assumeRoleOutput = sh('aws sts assume-role --role-arn $AWS_KVS_STS_ROLE_ARN --role-session-name roleSessionName --output json', returnStdout: true).trim()
-                
-                // echo "Finished performing assume-role call"
-
-                // echo "Assume Role Output: ${assumeRoleOutput}"
-
-                // assumeRoleJson = readJSON text: assumeRoleOutput
-
-                // echo "Parsed JSON: ${assumeRoleJson}"
-
-                // env.AWS_ACCESS_KEY_ID = assumeRoleJson.Credentials.AccessKeyId
-                // env.AWS_SECRET_ACCESS_KEY = assumeRoleJson.Credentials.SecretAccessKey
-                // env.AWS_SESSION_TOKEN = assumeRoleJson.Credentials.SessionToken
-
-                // echo "AWS_ACCESS_KEY_ID: ${env.AWS_ACCESS_KEY_ID}"
-
                 
                 // echo 'CANARY_STS_ROLE_ARN: ${env.CANARY_STS_ROLE_ARN}'
 
