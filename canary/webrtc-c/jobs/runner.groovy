@@ -288,7 +288,7 @@ pipeline {
                     def assumeRoleOutput = sh(
                         script: '''
                             aws sts assume-role \
-                                --role-arn "${AWS_KVS_STS_ROLE_ARN}" \
+                                --role-arn $AWS_KVS_STS_ROLE_ARN \
                                 --role-session-name roleSessionName --output json
                         ''',
                         returnStdout: true
