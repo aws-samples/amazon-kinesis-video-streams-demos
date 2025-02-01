@@ -300,20 +300,20 @@ pipeline {
                         """,
                         returnStdout: true
                     ).trim()
-                    
+
                     def json = readJSON text: assumeRoleOutput
                     env.AWS_ACCESS_KEY_ID = json.Credentials.AccessKeyId
                     env.AWS_SECRET_ACCESS_KEY = json.Credentials.SecretAccessKey
                     env.AWS_SESSION_TOKEN = json.Credentials.SessionToken
                 }
             }
+        }
 
-            stage('Set build description') {
-                steps {
-                    script {
-                        currentBuild.displayName = "${params.RUNNER_LABEL} [#${BUILD_NUMBER}]"
-                        currentBuild.description = "Executed on: ${NODE_NAME}\n"
-                    }
+        stage('Set build description') {
+            steps {
+                script {
+                    currentBuild.displayName = "${params.RUNNER_LABEL} [#${BUILD_NUMBER}]"
+                    currentBuild.description = "Executed on: ${NODE_NAME}\n"
                 }
             }
         }
