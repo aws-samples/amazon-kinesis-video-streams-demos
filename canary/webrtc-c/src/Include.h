@@ -101,7 +101,6 @@
 #define STATUS_WEBRTC_CANARY_BASE                       0x74000000
 #define STATUS_WEBRTC_EMPTY_IOT_CRED_FILE               STATUS_WEBRTC_CANARY_BASE + 0x00000001
 #define STATUS_WAITING_ON_FIRST_FRAME                   STATUS_WEBRTC_CANARY_BASE + 0x00000002
-#define STATUS_AWS_IOT_FAILED_TO_ASSUME_ROLE            STATUS_WEBRTC_CANARY_BASE + 0x00000003
 
 #define CANARY_VIDEO_FRAMES_PATH (PCHAR) "./assets/h264SampleFrames/frame-%04d.h264"
 #define CANARY_AUDIO_FRAMES_PATH (PCHAR) "./assets/opusSampleFrames/sample-%03d.opus"
@@ -124,6 +123,9 @@
 #include <aws/logs/model/PutLogEventsRequest.h>
 #include <aws/logs/model/DeleteLogStreamRequest.h>
 #include <aws/logs/model/DescribeLogStreamsRequest.h>
+#include <aws/core/auth/AWSCredentialsProvider.h>
+#include <aws/sts/STSClient.h>
+#include <aws/sts/model/AssumeRoleRequest.h>
 
 #include <com/amazonaws/kinesis/video/webrtcclient/Include.h>
 

@@ -1,11 +1,5 @@
 #pragma once
 
-// #include <aws/s3/S3Client.h>
-#include <aws/core/auth/AWSCredentialsProvider.h>
-#include <aws/sts/STSClient.h>
-#include <aws/sts/model/AssumeRoleRequest.h>
-// #include <aws/s3/model/ListBucketsResult.h>
-
 namespace Canary {
 
 class Config;
@@ -37,12 +31,9 @@ class Config {
 
     // credentials
     Aws::Auth::AWSCredentials credentials;
-    std::string accessKey;
-    std::string secretKey;
-    std::string sessionToken;
-    Value<std::string> valAccessKey;
-    Value<std::string> valSecretKey;
-    Value<std::string> valSessionToken;
+    Value<std::string> accessKey;
+    Value<std::string> secretKey;
+    Value<std::string> sessionToken;
     Value<std::string> region;
     Value<std::string> iotCoreCredentialEndPointFile;
     Value<std::string> iotCoreCert;
@@ -69,11 +60,6 @@ class Config {
   private:
     STATUS initWithJSON(PCHAR);
     STATUS initWithEnvVars();
-    bool assumeRole(const Aws::String &roleArn,
-                             const Aws::String &roleSessionName,
-                             const Aws::String &externalId,
-                             Aws::Auth::AWSCredentials &credentials,
-                             const Aws::Client::ClientConfiguration &clientConfig);
 };
 
 } // namespace Canary

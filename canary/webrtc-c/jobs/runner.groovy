@@ -58,18 +58,16 @@ def buildConsumerProject() {
 
 def withRunnerWrapper(envs, fn) {
     withEnv(envs) {
-        // withCredentials(CREDENTIALS) {
-            try {
-                fn()
-            } catch (FlowInterruptedException err) {
-                echo 'Aborted due to cancellation'
-                throw err
-            } catch (err) {
-                HAS_ERROR = true
-                // Ignore errors so that we can auto recover by retrying
-                unstable err.toString()
-            }
-        // }
+        try {
+            fn()
+        } catch (FlowInterruptedException err) {
+            echo 'Aborted due to cancellation'
+            throw err
+        } catch (err) {
+            HAS_ERROR = true
+            // Ignore errors so that we can auto recover by retrying
+            unstable err.toString()
+        }
     }
 }
 
@@ -278,50 +276,19 @@ pipeline {
     }
 
     stages {
-        stage('Fetch and export STS credentials') {
+        stage('Fetch STS credentials and export to env vars') {
             steps {
-                echo "Performing assume-role call"
-
                 script {
-                    echo "Running in script block"
-                    echo "AWS_KVS_STS_ROLE_ARN: ${env.AWS_KVS_STS_ROLE_ARN}"
                     def roleArn = env.AWS_KVS_STS_ROLE_ARN
-                    echo "roleArn: ${roleArn}"
 
+                    // TODO: Add back the .trim if it works.
                     def assumeRoleOutput = sh(script: 'aws sts assume-role --role-arn $AWS_KVS_STS_ROLE_ARN --role-session-name roleSessionName --duration-seconds 43200 --output json', returnStdout: true)//.trim()
-                    
-                    echo "Finished performing assume-role call"
-                    // echo "Assume Role Output: ${assumeRoleOutput}"
-
                     def assumeRoleJson = readJSON text: assumeRoleOutput
-
-                    // echo "Parsed JSON: ${assumeRoleJson}"
-
-                    // env.ASSUME_ROLE_OUTPUT = assumeRoleJson
-                    // echo "ASSUME_ROLE_OUTPUT: ${env.ASSUME_ROLE_OUTPUT}"
-
-                    // def AWS_ACCESS_KEY_ID = assumeRoleJson.Credentials.AccessKeyId
-                    // echo "AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}"
 
                     env.AWS_ACCESS_KEY_ID = assumeRoleJson.Credentials.AccessKeyId
                     env.AWS_SECRET_ACCESS_KEY = assumeRoleJson.Credentials.SecretAccessKey
                     env.AWS_SESSION_TOKEN = assumeRoleJson.Credentials.SessionToken
-
-                    // echo "AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}"
                 }
-                
-                // echo 'CANARY_STS_ROLE_ARN: ${env.CANARY_STS_ROLE_ARN}'
-
-                // read AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_SESSION_TOKEN <<< \
-                // $(aws sts assume-role                                           \
-                //     --role-arn $(aws configure get my_profile.role_arn)           \
-                //     --role-session-name my_profile_session --output text |        \
-                //     awk '/^CREDENTIALS/ { print $2, $4, $5 }')
-
-                // def json = readJSON text: assumeRoleOutput
-                // env.AWS_ACCESS_KEY_ID = json.Credentials.AccessKeyId
-                // env.AWS_SECRET_ACCESS_KEY = json.Credentials.SecretAccessKey
-                // env.AWS_SESSION_TOKEN = json.Credentials.SessionToken
             }
         }
 

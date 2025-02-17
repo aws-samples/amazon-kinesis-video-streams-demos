@@ -155,40 +155,6 @@ CleanUp:
     return retStatus;
 }
 
-bool Config::assumeRole(const Aws::String &roleArn,
-                             const Aws::String &roleSessionName,
-                             const Aws::String &externalId,
-                             Aws::Auth::AWSCredentials &credentials,
-                             const Aws::Client::ClientConfiguration &clientConfig) {
-    Aws::STS::STSClient sts(clientConfig);
-    Aws::STS::Model::AssumeRoleRequest sts_req;
-
-    sts_req.SetRoleArn(roleArn);
-    sts_req.SetRoleSessionName(roleSessionName);
-    sts_req.SetExternalId(externalId);
-
-    const Aws::STS::Model::AssumeRoleOutcome outcome = sts.AssumeRole(sts_req);
-
-    if (!outcome.IsSuccess()) {
-        std::cerr << "Error assuming IAM role. " <<
-                  outcome.GetError().GetMessage() << std::endl;
-    }
-    else {
-        std::cout << "Credentials successfully retrieved." << std::endl;
-        const Aws::STS::Model::AssumeRoleResult result = outcome.GetResult();
-        const Aws::STS::Model::Credentials &temp_credentials = result.GetCredentials();
-
-        // Store temporary credentials in return argument.
-        // Note: The credentials object returned by assumeRole differs
-        // from the AWSCredentials object used in most situations.
-        credentials.SetAWSAccessKeyId(temp_credentials.GetAccessKeyId());
-        credentials.SetAWSSecretKey(temp_credentials.GetSecretAccessKey());
-        credentials.SetSessionToken(temp_credentials.GetSessionToken());
-    }
-
-    return outcome.IsSuccess();
-}
-
 STATUS Config::initWithEnvVars()
 {
     STATUS retStatus = STATUS_SUCCESS;
@@ -219,40 +185,11 @@ STATUS Config::initWithEnvVars()
         CHK_STATUS(mustenv(IOT_CORE_THING_NAME_ENV_VAR, &channelName));
     }
     else {
-        CHK_STATUS(mustenv(ACCESS_KEY_ENV_VAR, &valAccessKey));
-        CHK_STATUS(mustenv(SECRET_KEY_ENV_VAR, &valSecretKey));
-        CHK_STATUS(mustenv(SESSION_TOKEN_ENV_VAR, &valSessionToken));
-
-        this->accessKey = valAccessKey.value;
-        this->secretKey = valSecretKey.value;
-        this->sessionToken = valSessionToken.value;
-
-        // Value<std::string> stsArn;
-        // CHK_STATUS(mustenv("AWS_KVS_STS_ROLE_ARN", &stsArn));
-
-        // Aws::Client::ClientConfiguration clientConfig;
-
-        // bool retStatus = false;
-        
-        // DLOGW("Using static credentials");
-        // clientConfig.region = "us-west-2";
-        // retStatus = this->assumeRole(stsArn.value, "roleSessionName", "externalId", credentials, clientConfig);
-        // if (!retStatus) {
-        //     DLOGW("Failed to assume role");
-        //     CHK(FALSE, STATUS_AWS_IOT_FAILED_TO_ASSUME_ROLE);
-        // }
-
-        // this->accessKey = std::string(credentials.GetAWSAccessKeyId().c_str());
-        // this->secretKey =  std::string(credentials.GetAWSSecretKey().c_str());
-        // this->sessionToken = std::string(credentials.GetSessionToken().c_str());
-
-        DLOGW("Retreived credentials");
-
+        CHK_STATUS(mustenv(ACCESS_KEY_ENV_VAR, &accessKey));
+        CHK_STATUS(mustenv(SECRET_KEY_ENV_VAR, &secretKey));
         CHK_STATUS(optenv(CANARY_CHANNEL_NAME_ENV_VAR, &channelName, CANARY_DEFAULT_CHANNEL_NAME));
     }
-
-    // CHK_STATUS(optenv(SESSION_TOKEN_ENV_VAR, &sessionToken, ""));
-    
+    CHK_STATUS(optenv(SESSION_TOKEN_ENV_VAR, &sessionToken, ""));
     CHK_STATUS(optenv(DEFAULT_REGION_ENV_VAR, &region, DEFAULT_AWS_REGION));
 
     // Set the logger log level
