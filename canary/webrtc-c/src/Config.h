@@ -30,7 +30,6 @@ class Config {
     BOOL isStorage;
 
     // credentials
-    Aws::Auth::AWSCredentials credentials;
     Value<std::string> accessKey;
     Value<std::string> secretKey;
     Value<std::string> sessionToken;
