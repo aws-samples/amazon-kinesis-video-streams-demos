@@ -278,10 +278,10 @@ pipeline {
                     def roleArn = credentials('CANARY_STS_ROLE_ARN')
 
                     // Export the role ARN to env var to avoid string interpolation to follow Jenkins security guidelines.
-                    def assumeRoleOutput = sh(script: '''
-                        export AWS_KVS_STS_ROLE_ARN=${roleArn}
-                        aws sts assume-role --role-arn $AWS_KVS_STS_ROLE_ARN --role-session-name roleSessionName --duration-seconds 43200 --output json''',
-                        returnStdout: true).trim()
+                    def assumeRoleOutput = sh(script: 'aws sts assume-role --role-arn $AWS_KVS_STS_ROLE_ARN --role-session-name roleSessionName --duration-seconds 43200 --output json',
+                                              returnStdout: true,
+                                              environment: [AWS_KVS_STS_ROLE_ARN: roleArn]
+                                             ).trim()
                     def assumeRoleJson = readJSON text: assumeRoleOutput
 
                     env.AWS_ACCESS_KEY_ID = assumeRoleJson.Credentials.AccessKeyId
