@@ -3,14 +3,6 @@ import org.jenkinsci.plugins.workflow.steps.FlowInterruptedException
 START_TIMESTAMP = new Date().getTime()
 RUNNING_NODES_IN_BUILDING = 0
 HAS_ERROR = false
-CREDENTIALS = [
-    [
-        $class: 'AmazonWebServicesCredentialsBinding', 
-        accessKeyVariable: 'AWS_ACCESS_KEY_ID',
-        credentialsId: 'CANARY_CREDENTIALS',
-        secretKeyVariable: 'AWS_SECRET_ACCESS_KEY'
-    ]
-]
 
 def buildWebRTCProject(useMbedTLS, thing_prefix) {
     echo 'Flag set to ' + useMbedTLS
