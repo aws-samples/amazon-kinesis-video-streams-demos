@@ -278,7 +278,7 @@ pipeline {
                     def roleArn = credentials('CANARY_STS_ROLE_ARN')
 
                     // TODO: Add back the .trim if it works.
-                    def assumeRoleOutput = sh(script: 'aws sts assume-role --role-arn '${roleArn}' --role-session-name roleSessionName --duration-seconds 43200 --output json', returnStdout: true)//.trim()
+                    def assumeRoleOutput = sh(script: 'aws sts assume-role --role-arn '${roleArn}' --role-session-name roleSessionName --duration-seconds 43200 --output json', returnStdout: true).trim()
                     def assumeRoleJson = readJSON text: assumeRoleOutput
 
                     env.AWS_ACCESS_KEY_ID = assumeRoleJson.Credentials.AccessKeyId
