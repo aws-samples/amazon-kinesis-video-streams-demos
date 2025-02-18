@@ -42,7 +42,7 @@ if(NOT cloudwatch_POPULATED)
   # AWS SDK options
   set(CUSTOM_MEMORY_MANAGEMENT OFF)
   set(ENABLE_TESTING OFF)
-  set(BUILD_ONLY "monitoring;logs;sts")
+  set(BUILD_ONLY "monitoring;logs")
   set(USE_OPENSSL ON)
   set(CMAKE_CXX_FLAGS "-Wno-error=deprecated-declarations")
   add_subdirectory(${cloudwatch_SOURCE_DIR} ${cloudwatch_BINARY_DIR} EXCLUDE_FROM_ALL)
@@ -55,7 +55,6 @@ add_definitions(-DCMAKE_DETECTED_CACERT_PATH)
 include_directories(${cloudwatch_SOURCE_DIR}/aws-cpp-sdk-core/include)
 include_directories(${cloudwatch_SOURCE_DIR}/aws-cpp-sdk-monitoring/include)
 include_directories(${cloudwatch_SOURCE_DIR}/aws-cpp-sdk-logs/include)
-include_directories(${cloudwatch_SOURCE_DIR}/aws-cpp-sdk-sts/include)
 include_directories(${webrtc_SOURCE_DIR}/src/include)
 include_directories(${webrtc_SOURCE_DIR}/open-source/include)
 link_directories(${webrtc_SOURCE_DIR}/open-source/lib)
@@ -74,8 +73,7 @@ target_link_libraries(
   kvspicUtils
   aws-cpp-sdk-core
   aws-cpp-sdk-monitoring
-  aws-cpp-sdk-logs
-  aws-cpp-sdk-sts)
+  aws-cpp-sdk-logs)
 
 add_executable(
   kvsWebrtcCanaryWebrtc
