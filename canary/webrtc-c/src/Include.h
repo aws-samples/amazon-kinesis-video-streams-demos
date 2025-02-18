@@ -123,9 +123,6 @@
 #include <aws/logs/model/PutLogEventsRequest.h>
 #include <aws/logs/model/DeleteLogStreamRequest.h>
 #include <aws/logs/model/DescribeLogStreamsRequest.h>
-#include <aws/core/auth/AWSCredentialsProvider.h>
-#include <aws/sts/STSClient.h>
-#include <aws/sts/model/AssumeRoleRequest.h>
 
 #include <com/amazonaws/kinesis/video/webrtcclient/Include.h>
 
