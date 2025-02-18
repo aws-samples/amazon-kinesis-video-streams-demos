@@ -3,7 +3,7 @@ import jenkins.model.*
 WORKSPACE_PRODUCER="canary/producer-c"
 WORKSPACE_CONSUMER="canary/consumer-java"
 GIT_URL='https://github.com/aws-samples/amazon-kinesis-video-streams-demos.git'
-GIT_HASH='sts-auth'
+GIT_HASH='clean-sts-auth'
 RUNNER_JOB_NAME_PREFIX = "producer-runner"
 
 // TODO: Set up configurability to run different parameter combinations
