@@ -123,7 +123,7 @@ def runClient(isProducer, params) {
         withRunnerWrapper(envs) {
             sh '''
                 cd $WORKSPACE/canary/consumer-java
-                java -classpath target/aws-kinesisvideo-producer-sdk-canary-consumer-1.0-SNAPSHOT.jar:$(cat tmp_jar) -Daws.accessKeyId=${env.AWS_ACCESS_KEY_ID} -Daws.secretKey=${env.AWS_SECRET_ACCESS_KEY} -Daws.sessionToken=${env.AWS_SESSION_TOKEN} com.amazon.kinesis.video.canary.consumer.ProducerSdkCanaryConsumer
+                java -classpath target/aws-kinesisvideo-producer-sdk-canary-consumer-1.0-SNAPSHOT.jar:$(cat tmp_jar) -Daws.accessKeyId=${AWS_ACCESS_KEY_ID} -Daws.secretKey=${AWS_SECRET_ACCESS_KEY} -Daws.sessionToken=${AWS_SESSION_TOKEN} com.amazon.kinesis.video.canary.consumer.ProducerSdkCanaryConsumer
             '''
         }
     }
