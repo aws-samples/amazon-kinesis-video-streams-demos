@@ -1,7 +1,7 @@
 import jenkins.model.*
 
 GIT_URL='https://github.com/aws-samples/amazon-kinesis-video-streams-demos.git'
-GIT_HASH='master'
+GIT_HASH='sts-auth'
 RUNNER_JOB_NAME_PREFIX = "producercpp-runner"
 
 LONG_RUN_DURATION_IN_SECONDS = 12 * 60 * 60
@@ -9,7 +9,7 @@ SHORT_RUN_DURATION_IN_SECONDS = 30
 COLD_STARTUP_DELAY_IN_SECONDS = 60 * 60
 MIN_RETRY_DELAY_IN_SECONDS = 60
 FRAGMENT_SIZE_IN_BYTES = 250000
-AWS_DEFAULT_REGION = "sts-auth"
+AWS_DEFAULT_REGION = "us-west-2"
 
 COMMON_PARAMS = [
     string(name: 'AWS_KVS_LOG_LEVEL', value: "1"),
