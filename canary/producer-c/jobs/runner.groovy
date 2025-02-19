@@ -177,14 +177,6 @@ pipeline {
         stage('Fetch STS credentials and export to env vars') {
             steps {
                 script {
-                    // Unset the credential env vars in case the EC2 runner had them set somehow.
-                    // We want to use the EC2's role permissions to make the assume-role call.
-                    sh '''
-                            unset AWS_SECRET_ACCESS_KEY
-                            unset AWS_SECRET_KEY
-                            unset AWS_SESSION_TOKEN
-                        '''
-
                     def assumeRoleOutput = sh(script: 'aws sts assume-role --role-arn $AWS_KVS_STS_ROLE_ARN --role-session-name roleSessionName --duration-seconds 43200 --output json',
                                                 returnStdout: true
                                                 ).trim()
