@@ -108,10 +108,7 @@ def buildPeer(isMaster, params) {
       'AWS_IOT_CORE_CERT': "${core_cert_file}",
       'AWS_IOT_CORE_PRIVATE_KEY': "${private_key_file}",
       'AWS_IOT_CORE_ROLE_ALIAS': "${role_alias}",
-      'AWS_IOT_CORE_THING_NAME': "${thing_name}",
-      'AWS_ACCESS_KEY_ID': env.AWS_ACCESS_KEY_ID,
-      'AWS_SECRET_ACCESS_KEY': env.AWS_SECRET_ACCESS_KEY,
-      'AWS_SESSION_TOKEN': env.AWS_SESSION_TOKEN
+      'AWS_IOT_CORE_THING_NAME': "${thing_name}"
     ].collect{ k, v -> "${k}=${v}" }
 
     withRunnerWrapper(envs) {
@@ -155,10 +152,7 @@ def buildSignaling(params) {
       'AWS_IOT_CORE_CERT': "${core_cert_file}",
       'AWS_IOT_CORE_PRIVATE_KEY': "${private_key_file}",
       'AWS_IOT_CORE_ROLE_ALIAS': "${role_alias}",
-      'AWS_IOT_CORE_THING_NAME': "${thing_name}",
-      'AWS_ACCESS_KEY_ID': env.AWS_ACCESS_KEY_ID,
-      'AWS_SECRET_ACCESS_KEY': env.AWS_SECRET_ACCESS_KEY,
-      'AWS_SESSION_TOKEN': env.AWS_SESSION_TOKEN
+      'AWS_IOT_CORE_THING_NAME': "${thing_name}"
     ].collect({ k, v -> "${k}=${v}" })
 
     withRunnerWrapper(envs) {
@@ -187,10 +181,7 @@ def buildStorageCanary(isConsumer, params) {
       'AWS_IOT_CORE_CERT': "${core_cert_file}",
       'AWS_IOT_CORE_PRIVATE_KEY': "${private_key_file}",
       'AWS_IOT_CORE_ROLE_ALIAS': "${role_alias}",
-      'AWS_IOT_CORE_THING_NAME': "${thing_name}",
-      'AWS_ACCESS_KEY_ID': env.AWS_ACCESS_KEY_ID,
-      'AWS_SECRET_ACCESS_KEY': env.AWS_SECRET_ACCESS_KEY,
-      'AWS_SESSION_TOKEN': env.AWS_SESSION_TOKEN
+      'AWS_IOT_CORE_THING_NAME': "${thing_name}"
     ]
 
     def masterEnvs = [
