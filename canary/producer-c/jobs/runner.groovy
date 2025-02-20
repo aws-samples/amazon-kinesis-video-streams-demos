@@ -224,6 +224,16 @@ pipeline {
             }
         }
 
+        stage('Unset credentials') {
+            steps {
+                script {
+                    env.AWS_ACCESS_KEY_ID = ''
+                    env.AWS_SECRET_ACCESS_KEY = ''
+                    env.AWS_SESSION_TOKEN = ''
+                }
+            }
+        }
+
         // In case of failures, we should add some delays so that we don't get into a tight loop of retrying
         stage('Throttling Retry') {
             when {
