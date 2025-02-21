@@ -3,14 +3,6 @@ import org.jenkinsci.plugins.workflow.steps.FlowInterruptedException
 START_TIMESTAMP = new Date().getTime()
 RUNNING_NODES_IN_BUILDING = 0
 HAS_ERROR = false
-CREDENTIALS = [
-    [
-        $class: 'AmazonWebServicesCredentialsBinding', 
-        accessKeyVariable: 'AWS_ACCESS_KEY_ID',
-        credentialsId: 'CANARY_CREDENTIALS',
-        secretKeyVariable: 'AWS_SECRET_ACCESS_KEY'
-    ]
-]
 
 def buildWebRTCProject(useMbedTLS, thing_prefix) {
     echo 'Flag set to ' + useMbedTLS
@@ -58,17 +50,15 @@ def buildConsumerProject() {
 
 def withRunnerWrapper(envs, fn) {
     withEnv(envs) {
-        withCredentials(CREDENTIALS) {
-            try {
-                fn()
-            } catch (FlowInterruptedException err) {
-                echo 'Aborted due to cancellation'
-                throw err
-            } catch (err) {
-                HAS_ERROR = true
-                // Ignore errors so that we can auto recover by retrying
-                unstable err.toString()
-            }
+        try {
+            fn()
+        } catch (FlowInterruptedException err) {
+            echo 'Aborted due to cancellation'
+            throw err
+        } catch (err) {
+            HAS_ERROR = true
+            // Ignore errors so that we can auto recover by retrying
+            unstable err.toString()
         }
     }
 }
@@ -238,7 +228,7 @@ def buildStorageCanary(isConsumer, params) {
         withRunnerWrapper(envs) {
             sh '''
                 cd $WORKSPACE/canary/consumer-java
-                java -classpath target/aws-kinesisvideo-producer-sdk-canary-consumer-1.0-SNAPSHOT.jar:$(cat tmp_jar) -Daws.accessKeyId=${AWS_ACCESS_KEY_ID} -Daws.secretKey=${AWS_SECRET_ACCESS_KEY} com.amazon.kinesis.video.canary.consumer.WebrtcStorageCanaryConsumer
+                java -classpath target/aws-kinesisvideo-producer-sdk-canary-consumer-1.0-SNAPSHOT.jar:$(cat tmp_jar) -Daws.accessKeyId=${AWS_ACCESS_KEY_ID} -Daws.secretKey=${AWS_SECRET_ACCESS_KEY} -Daws.sessionToken=${AWS_SESSION_TOKEN} com.amazon.kinesis.video.canary.consumer.WebrtcStorageCanaryConsumer
             '''
         }
     }
@@ -272,8 +262,28 @@ pipeline {
         string(name: 'GIT_HASH')
         booleanParam(name: 'FIRST_ITERATION', defaultValue: true)
     }
+    
+    // Set the role ARN to environment to avoid string interpolation to follow Jenkins security guidelines.
+    environment {
+        AWS_KVS_STS_ROLE_ARN = credentials('CANARY_STS_ROLE_ARN')
+    }
 
     stages {
+        stage('Fetch STS credentials and export to env vars') {
+            steps {
+                script {
+                    def assumeRoleOutput = sh(script: 'aws sts assume-role --role-arn $AWS_KVS_STS_ROLE_ARN --role-session-name roleSessionName --duration-seconds 43200 --output json',
+                                                returnStdout: true
+                                                ).trim()
+                    def assumeRoleJson = readJSON text: assumeRoleOutput
+
+                    env.AWS_ACCESS_KEY_ID = assumeRoleJson.Credentials.AccessKeyId
+                    env.AWS_SECRET_ACCESS_KEY = assumeRoleJson.Credentials.SecretAccessKey
+                    env.AWS_SESSION_TOKEN = assumeRoleJson.Credentials.SessionToken
+                }
+            }
+        }
+
         stage('Set build description') {
             steps {
                 script {
@@ -282,6 +292,7 @@ pipeline {
                 }
             }
         }
+
         stage('Preparation') {
             steps {
               echo params.toString()
@@ -399,6 +410,16 @@ pipeline {
                             buildStorageCanary(true, params)
                         }
                     }
+                }
+            }
+        }
+
+        stage('Unset credentials') {
+            steps {
+                script {
+                    env.AWS_ACCESS_KEY_ID = ''
+                    env.AWS_SECRET_ACCESS_KEY = ''
+                    env.AWS_SESSION_TOKEN = ''
                 }
             }
         }
