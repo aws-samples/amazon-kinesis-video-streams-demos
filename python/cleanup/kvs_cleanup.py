@@ -11,6 +11,11 @@ import botocore
 MAX_REQUESTS_PER_SEC = 20
 SLEEP_DURATION_MS = 1 / MAX_REQUESTS_PER_SEC
 
+# This API has a lower limit than the rest. Want to avoid slowing down the entire script
+# just for this though
+MAX_REQUESTS_UPDATE_MEDIA_STORAGE_CONFIGURATION = 5
+SLEEP_DURATION_MS_UPDATE_MEDIA_STORAGE_CONFIGURATION = 1 / MAX_REQUESTS_UPDATE_MEDIA_STORAGE_CONFIGURATION
+
 # Create a Kinesis Video client
 client = boto3.client('kinesisvideo')
 
@@ -65,6 +70,12 @@ def delete_old_test_streams(stream_regex: str, dry_run: bool, time_threshold):
                             if e.response['Error']['Code'] == 'ClientLimitExceededException':
                                 # Try again when rate limited
                                 sleep(SLEEP_DURATION_MS * (attempt + 1))
+                                continue
+                            elif (e.response['Error']['Code'] == 'ResourceInUseException' and
+                                  'Disable MediaStorageConfiguration to delete the stream' in e.response['Error'][
+                                      'Message']):
+                                unlink_resources(stream_arn=stream_arn)
+                                sleep(SLEEP_DURATION_MS_UPDATE_MEDIA_STORAGE_CONFIGURATION * (attempt + 1))
                                 continue
                             raise e
 
@@ -131,6 +142,12 @@ def delete_old_test_channels(channel_regex: str, dry_run: bool, time_threshold):
                                 # Try again when rate limited
                                 sleep(SLEEP_DURATION_MS * (attempt + 1))
                                 continue
+                            elif (e.response['Error']['Code'] == 'ResourceInUseException' and
+                                  'Disable MediaStorageConfiguration to delete the channel' in e.response['Error'][
+                                      'Message']):
+                                unlink_resources(channel_arn=channel_arn)
+                                sleep(SLEEP_DURATION_MS_UPDATE_MEDIA_STORAGE_CONFIGURATION * (attempt + 1))
+                                continue
                             raise e
 
                     sleep(SLEEP_DURATION_MS)
@@ -143,6 +160,31 @@ def delete_old_test_channels(channel_regex: str, dry_run: bool, time_threshold):
             break
 
     return channel_count, channels_deleted
+
+
+def unlink_resources(stream_arn: str = None, channel_arn: str = None):
+    if not stream_arn and not channel_arn:
+        raise ValueError('Please provide either a stream arn or channel arn')
+
+    if not channel_arn:
+        response = client.describe_mapped_resource_configuration(StreamARN=stream_arn)
+        channel_arn = response.get('MappedResourceConfigurationList')[0].get('ARN')
+
+    print(f'Unlinking: {stream_arn=}, {channel_arn=}')
+    for attempt in range(5):
+        try:
+            client.update_media_storage_configuration(ChannelARN=channel_arn,
+                                                      MediaStorageConfiguration={'Status': 'DISABLED'})
+            break
+        except botocore.exceptions.ClientError as e:
+            print(e)
+            if e.response['Error']['Code'] == 'ClientLimitExceededException':
+                # Try again when rate limited
+                sleep(SLEEP_DURATION_MS_UPDATE_MEDIA_STORAGE_CONFIGURATION * (attempt + 1))
+                continue
+            raise e
+
+        sleep(SLEEP_DURATION_MS)
 
 
 def main():
