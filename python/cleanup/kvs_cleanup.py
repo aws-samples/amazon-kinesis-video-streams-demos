@@ -164,14 +164,27 @@ def delete_old_test_channels(channel_regex: str, dry_run: bool, time_threshold):
 
 def unlink_resources(stream_arn: str = None, channel_arn: str = None):
     if not stream_arn and not channel_arn:
-        raise SyntaxError('Please provide either a stream arn or channel arn')
+        raise ValueError('Please provide either a stream arn or channel arn')
 
     if not channel_arn:
         response = client.describe_mapped_resource_configuration(StreamARN=stream_arn)
         channel_arn = response.get('MappedResourceConfigurationList')[0].get('ARN')
 
     print(f'Unlinking: {stream_arn=}, {channel_arn=}')
-    client.update_media_storage_configuration(ChannelARN=channel_arn, MediaStorageConfiguration={'Status': 'DISABLED'})
+    for attempt in range(5):
+        try:
+            client.update_media_storage_configuration(ChannelARN=channel_arn,
+                                                      MediaStorageConfiguration={'Status': 'DISABLED'})
+            break
+        except botocore.exceptions.ClientError as e:
+            print(e)
+            if e.response['Error']['Code'] == 'ClientLimitExceededException':
+                # Try again when rate limited
+                sleep(SLEEP_DURATION_MS_UPDATE_MEDIA_STORAGE_CONFIGURATION * (attempt + 1))
+                continue
+            raise e
+
+        sleep(SLEEP_DURATION_MS)
 
 
 def main():
