@@ -68,7 +68,7 @@ def delete_old_test_streams(stream_regex: str, dry_run: bool, time_threshold):
                                 continue
                             raise e
 
-                    # sleep(SLEEP_DURATION_MS)
+                    sleep(SLEEP_DURATION_MS)
 
                     if not success:
                         raise Exception(f'There was an issue deleting {stream_arn}!')
