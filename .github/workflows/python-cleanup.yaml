@@ -1,0 +1,48 @@
+name: Cleanup Script Check (Python)
+
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - python/cleanup/**
+      - .github/workflows/python-cleanup.yaml
+  pull_request:
+    branches:
+      - master
+    paths:
+      - python/cleanup/**
+      - .github/workflows/python-cleanup.yaml
+
+jobs:
+  dry-run:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        working-directory: ./python/cleanup
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Setup credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
+          aws-region: us-west-2
+
+      - name: Run cleanup script (dry run)
+        working-directory: ./python/cleanup
+        run: |
+          python kvs_cleanup.py --dry-run
