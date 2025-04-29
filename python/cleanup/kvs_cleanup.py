@@ -8,7 +8,7 @@ import boto3
 import botocore
 
 # To avoid getting rate limited
-MAX_REQUESTS_PER_SEC = 5
+MAX_REQUESTS_PER_SEC = 20
 SLEEP_DURATION_MS = 1 / MAX_REQUESTS_PER_SEC
 
 # Create a Kinesis Video client
