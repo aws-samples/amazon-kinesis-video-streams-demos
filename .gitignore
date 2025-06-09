@@ -20,6 +20,5 @@ canary/webrtc-c/.vscode/settings.json
 .vscode/*
 canary/webrtc-c/firstFrameSentTimeStamp.txt
 canary/consumer-java/target/*
-sigv4-signing/*
 canary/Testing.txt
 .DS_Store

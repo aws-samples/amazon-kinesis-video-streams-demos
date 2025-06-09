@@ -1,0 +1,75 @@
+name: SigV4 Rust Tests
+
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - sigv4-signing/rust/**
+      - .github/workflows/sigv4-rust.yaml
+  pull_request:
+    branches:
+      - master
+    paths:
+      - sigv4-signing/rust/**
+      - .github/workflows/sigv4-rust.yaml
+
+jobs:
+  run-unit-tests:
+    runs-on: ubuntu-latest
+    name: Build and run unit tests
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Set up rust
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: nightly
+          override: true
+      - name: Generate test result and coverage report
+        working-directory:  sigv4-signing/rust/
+        run: |
+          cargo install cargo2junit
+          cargo test $CARGO_OPTIONS -- -Z unstable-options --format json | cargo2junit > results.xml
+      - name: Upload test results
+        uses: EnricoMi/publish-unit-test-result-action@v1
+        with:
+          check_name: Test Results
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          files: sigv4-signing/rust/results.xml
+
+  check-sample:
+    runs-on: macos-latest
+    name: Run signer sample with validation
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Install websocat
+        run: |
+          brew update
+          brew install websocat
+      - name: Set up rust
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: nightly
+          override: true
+      - name: Build project
+        working-directory: sigv4-signing/rust/
+        run: cargo build
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
+          aws-region: us-west-2
+          role-duration-seconds: 900
+      - name: Check the sample
+        working-directory: sigv4-signing/rust/
+        run: |
+          ./tests/validate_wss_url.sh demo-channel
+        shell: bash
