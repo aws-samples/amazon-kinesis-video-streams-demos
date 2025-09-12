@@ -1,0 +1,7 @@
+log4cplus.rootLogger=INFO, KvsConsoleAppender
+log4cplus.logger.kvs=INFO
+log4cplus.logger.WebRtcClient=DEBUG
+
+log4cplus.appender.KvsConsoleAppender=log4cplus::ConsoleAppender
+log4cplus.appender.KvsConsoleAppender.layout=log4cplus::PatternLayout
+log4cplus.appender.KvsConsoleAppender.layout.ConversionPattern=[%d{%d-%m-%Y %H:%M:%S:%Q %Z}] [0x%t] %p %c - %m%n

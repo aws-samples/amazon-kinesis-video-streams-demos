@@ -1,0 +1,52 @@
+# Doxyfile 1.8.20
+
+#---------------------------------------------------------------------------
+# Project related configuration options
+#---------------------------------------------------------------------------
+PROJECT_NAME           = "Amazon Kinesis Webrtc C SDK"
+OUTPUT_DIRECTORY       = doc
+INPUT                  = src/include Introduction.md src/source/
+FILE_PATTERNS          = *.h *.c
+RECURSIVE              = YES
+EXAMPLE_PATTERNS       = *
+HTML_COLORSTYLE_HUE    = 220
+HTML_COLORSTYLE_SAT    = 150
+HTML_TIMESTAMP         = YES
+HTML_DYNAMIC_MENUS     = NO
+DISABLE_INDEX          = YES
+GENERATE_TREEVIEW      = YES
+ENUM_VALUES_PER_LINE   = 4
+TREEVIEW_WIDTH         = 250
+GENERATE_LATEX         = NO
+ENABLE_PREPROCESSING   = YES
+MACRO_EXPANSION        = YES
+EXPAND_ONLY_PREDEF     = NO
+SEARCH_INCLUDES        = NO
+INCLUDE_FILE_PATTERNS  = *.h
+CLASS_DIAGRAMS         = YES
+HIDE_UNDOC_RELATIONS   = YES
+DOT_NUM_THREADS        = 0
+DOT_FONTNAME           = Helvetica
+DOT_FONTSIZE           = 10
+CLASS_GRAPH            = YES
+COLLABORATION_GRAPH    = YES
+GROUP_GRAPHS           = YES
+UML_LOOK               = YES
+UML_LIMIT_NUM_FIELDS   = 10
+TEMPLATE_RELATIONS     = YES
+INCLUDE_GRAPH          = YES
+INCLUDED_BY_GRAPH      = YES
+CALLER_GRAPH           = YES
+GRAPHICAL_HIERARCHY    = YES
+DIRECTORY_GRAPH        = YES
+DOT_IMAGE_FORMAT       = png
+DOT_GRAPH_MAX_NODES    = 50
+MAX_DOT_GRAPH_DEPTH    = 0
+DOT_TRANSPARENT        = NO
+DOT_MULTI_TARGETS      = NO
+GENERATE_LEGEND        = YES
+DOT_CLEANUP            = YES
+HAVE_DOT               = YES
+EXTRACT_ALL            = YES
+CALL_GRAPH             = YES
+
