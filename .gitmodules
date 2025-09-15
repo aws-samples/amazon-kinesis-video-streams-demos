@@ -1,3 +1,6 @@
 [submodule "webrtc-c/webrtc-and-directstream/amazon-kinesis-video-streams-producer-sdk-cpp"]
 	path = webrtc-c/webrtc-and-directstream/amazon-kinesis-video-streams-producer-sdk-cpp
 	url = https://github.com/awslabs/amazon-kinesis-video-streams-producer-sdk-cpp.git
+[submodule "webrtc-c/webrtc-and-directstream/amazon-kinesis-video-streams-webrtc-sdk-c"]
+	path = webrtc-c/webrtc-and-directstream/amazon-kinesis-video-streams-webrtc-sdk-c
+	url = https://github.com/awslabs/amazon-kinesis-video-streams-webrtc-sdk-c.git
