@@ -1,7 +1,7 @@
 # KVS WebRTC and Direct Stream Simultaneously
 ## Overview
 
-Added a gstreamer app sample (`amazon-kinesis-video-streams-webrtc-sdk-c/samples/kvsWebRTCAndDirectStream.c`) inside KVS WebRTC SDK to support streaming video to KVS with WebRTC SDK (for real-time use) and Stream Producer SDK (for near-realtime video ingestion), simultaneously from 1 camera source.
+Added a gstreamer app sample (`kvsWebRTCAndDirectStream.c`) to support streaming video to KVS with WebRTC SDK (for real-time use) and Stream Producer SDK (for near-realtime video ingestion), simultaneously from 1 camera source.
 
 This sample is only tested on Raspberry Pi equipped with USB Camera. 
 
@@ -23,7 +23,12 @@ This sample is only tested on Raspberry Pi equipped with USB Camera.
    git submodule update --init --recursive
    ```
 
-2. Configure your AWS credentials on the Raspberry Pi
+2. Copy the sample file to the WebRTC SDK samples directory:
+   ```
+   cp kvsWebRTCAndDirectStream.c amazon-kinesis-video-streams-webrtc-sdk-c/samples/
+   ```
+
+3. Configure your AWS credentials on the Raspberry Pi
 
 ### Building the AWS SDKs
 
