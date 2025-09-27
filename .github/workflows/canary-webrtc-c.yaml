@@ -11,6 +11,9 @@ on:
 env:
   DEBIAN_FRONTEND: noninteractive
 
+permissions:
+  contents: read
+
 jobs:
   check-build-ubuntu:
     runs-on: ubuntu-latest
