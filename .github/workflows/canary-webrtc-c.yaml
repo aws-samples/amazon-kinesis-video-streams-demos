@@ -1,0 +1,41 @@
+name: WebRTC-C SDK Canary
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+    branches:
+      - master
+
+env:
+  DEBIAN_FRONTEND: noninteractive
+
+jobs:
+  check-build-ubuntu:
+    runs-on: ubuntu-latest
+    container:
+      image: public.ecr.aws/ubuntu/ubuntu:22.04_stable
+
+    timeout-minutes: 60
+
+    steps:
+      - name: Clone repository
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          apt-get update
+          apt-get install -y git cmake build-essential pkg-config
+
+      - name: Setup cmake
+        uses: jwlawson/actions-setup-cmake@v2
+        with:
+          cmake-version: '3.x'
+
+      - name: Build repository
+        working-directory: canary/webrtc-c
+        run: |
+          mkdir build && cd build
+          cmake ..
+          make -j
