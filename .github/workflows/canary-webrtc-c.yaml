@@ -26,7 +26,7 @@ jobs:
       - name: Install dependencies
         run: |
           apt-get update
-          apt-get install -y git cmake build-essential pkg-config
+          apt-get install -y git cmake build-essential pkg-config zlib-dev
 
       - name: Setup cmake
         uses: jwlawson/actions-setup-cmake@v2
