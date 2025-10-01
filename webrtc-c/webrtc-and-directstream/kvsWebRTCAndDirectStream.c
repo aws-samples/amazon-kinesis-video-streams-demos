@@ -160,7 +160,6 @@ int main(int argc, char *argv[]) {
     // Create WebRTC sample configuration - video only, no audio
     retStatus = createSampleConfiguration(pChannelName, SIGNALING_CHANNEL_ROLE_TYPE_MASTER, TRUE, FALSE, TRUE, &pSampleConfiguration);
     if (retStatus != STATUS_SUCCESS) {
-        printf("createSampleConfiguration(): operation returned status code: 0x%08x\n", retStatus);
         goto CleanUp;
     }
 
@@ -176,14 +175,9 @@ int main(int argc, char *argv[]) {
     
     // Set custom data for callbacks
     pSampleConfiguration->customData = (UINT64) pSampleConfiguration;
-    
-    printf("Created signaling channel %s\n", pChannelName);
-    printf("ICE configuration: trickleIce=%s, useTurn=%s\n", 
-           pSampleConfiguration->trickleIce ? "enabled" : "disabled",
-           pSampleConfiguration->useTurn ? "enabled" : "disabled");
 
     // Set KVS log configuration path
-    setenv("KVS_LOG_CONFIG", "./kvs_log_configuration", 1);
+    setenv("KVS_LOG_CONFIG", "../../../kvs_log_configuration", 1);
     
     // Initialize KVS WebRTC
     retStatus = initKvsWebRtc();
@@ -232,7 +226,6 @@ int main(int argc, char *argv[]) {
         printf("Invoking join storage session\n");
         retStatus = signalingClientJoinSessionSync(pSampleConfiguration->signalingClientHandle);
         if (retStatus != STATUS_SUCCESS) {
-            printf("signalingClientJoinSessionSync(): operation returned status code: 0x%08x\n", retStatus);
             goto CleanUp;
         }
         printf("Joined storage session successfully\n");

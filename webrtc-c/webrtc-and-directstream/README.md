@@ -3,19 +3,20 @@
 
 Added a gstreamer app sample (`kvsWebRTCAndDirectStream.c`) to support streaming video to KVS with WebRTC SDK (for real-time use) and Stream Producer SDK (for video ingestion), simultaneously from 1 camera source.
 
-This sample is currently only tested on Raspberry Pi equipped with USB Camera. 
+This sample is currently only tested on Raspberry Pi 3B equipped with USB Camera. 
 
 ## Prerequisites
 
 - AWS Account with configured:
   - Kinesis Video Streams
   - IAM role with appropriate permissions
+- **Physical webcam required**: The application uses `autovideosrc` and will not fallback to `videotestsrc` if no camera is connected
 
 ## Installation and Configuration
 
 1. Clone this repository to your Raspberry Pi with submodules:
    ```
-   git clone --recurse-submodules <repository-url>
+   git clone --recurse-submodules https://github.com/aws-samples/amazon-kinesis-video-streams-demos.git
    ```
    
    Or if already cloned, initialize submodules:
@@ -32,14 +33,19 @@ This sample is currently only tested on Raspberry Pi equipped with USB Camera.
 
 ### Building the AWS SDKs
 
+Refer to each SDK main repository for the details of how to build. `-DALIGNED_MEMORY_MODEL=ON` flag might need to be used on Raspberry Pi 4B and 5B.
+
+- https://github.com/awslabs/amazon-kinesis-video-streams-webrtc-sdk-c
+- https://github.com/awslabs/amazon-kinesis-video-streams-producer-sdk-cpp
+
 #### Building the KVS Producer SDK
 
 ```
 cd amazon-kinesis-video-streams-producer-sdk-cpp
 mkdir -p build
 cd build
-cmake ..
-make
+cmake .. -DBUILD_DEPENDENCIES=OFF
+make -j
 ```
 
 #### Building the KVS WebRTC SDK
@@ -48,8 +54,8 @@ make
 cd amazon-kinesis-video-streams-webrtc-sdk-c
 mkdir -p build
 cd build
-cmake ..
-make
+cmake .. -DBUILD_DEPENDENCIES=OFF
+make -j
 ```
 
 ## Usage
