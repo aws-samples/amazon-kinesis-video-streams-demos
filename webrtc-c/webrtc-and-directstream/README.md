@@ -1,9 +1,9 @@
 # KVS WebRTC and Direct Stream Simultaneously
 ## Overview
 
-Added a gstreamer app sample (`kvsWebRTCAndDirectStream.c`) to support streaming video to KVS with WebRTC SDK (for real-time use) and Stream Producer SDK (for near-realtime video ingestion), simultaneously from 1 camera source.
+Added a gstreamer app sample (`kvsWebRTCAndDirectStream.c`) to support streaming video to KVS with WebRTC SDK (for real-time use) and Stream Producer SDK (for video ingestion), simultaneously from 1 camera source.
 
-This sample is only tested on Raspberry Pi equipped with USB Camera. 
+This sample is currently only tested on Raspberry Pi equipped with USB Camera. 
 
 ## Prerequisites
 
@@ -56,7 +56,32 @@ make
 
 1. Configure your AWS credentials on the Raspberry Pi
 
-2. Go to `amazon-kinesis-video-streams-webrtc-sdk-c/build/` and run `./samples/kvsWebRTCAndDirectStream <signaling channel name> <kvs stream name>`
+2. Configure GStreamer plugin path with the path where you build the KVS Streams Producer app, e.g., `export GST_PLUGIN_PATH=/home/pi/amazon-kinesis-video-streams-producer-sdk-cpp/build`
+
+3. Go to `amazon-kinesis-video-streams-webrtc-sdk-c/build/` and run `./samples/kvsWebRTCAndDirectStream <signaling channel name> <kvs stream name>`
+
+## Screenshots
+
+The following screenshots demonstrate WebRTC and Stream Producer running simultaneously:
+
+### WebRTC Signaling Channel Viewer
+![WebRTC Console View](screenshots/Screenshot-WebRTC.png)
+*Real-time WebRTC streaming through the signaling channel*
+
+### KVS Stream Viewer
+![KVS Stream Console View](screenshots/Screenshot-KVSStream.png)
+*Near real-time video ingestion to Kinesis Video Stream*
+
+### Application Logs
+
+#### WebRTC Logs
+![WebRTC Logs](screenshots/Screenshot-Log-WebRTC.png)
+*WebRTC connection and streaming logs*
+
+#### KVS Stream Logs
+![KVS Stream Logs 1](screenshots/Screenshot-Log-KVSStream-1.png)
+![KVS Stream Logs 2](screenshots/Screenshot-Log-KVSStream-2.png)
+*Kinesis Video Stream ingestion logs showing successful simultaneous operation*
 
 ## License
 
