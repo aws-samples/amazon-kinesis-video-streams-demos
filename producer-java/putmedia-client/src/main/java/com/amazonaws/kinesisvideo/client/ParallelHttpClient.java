@@ -1,6 +1,5 @@
-package com.amazonaws.kinesisvideo.java.client.mediasource;
+package com.amazonaws.kinesisvideo.client;
 
-import com.amazonaws.kinesisvideo.client.PutMediaClient;
 import com.amazonaws.kinesisvideo.java.auth.AwsSigV4Signer;
 
 import java.io.*;
@@ -13,8 +12,9 @@ import java.util.concurrent.*;
  * Supports SSL connections and AWS Signature Version 4 authentication.
  */
 public class ParallelHttpClient implements Closeable {
-    private final ExecutorService exec = Executors.newFixedThreadPool(3);
+    private final ExecutorService exec;
     private final AwsSigV4Signer signer;
+    private final boolean ownsExecutor;
     
     /**
      * Creates a new ParallelHttpClient with AWS credentials.
@@ -25,7 +25,24 @@ public class ParallelHttpClient implements Closeable {
      * @param region the AWS region
      */
     public ParallelHttpClient(String accessKey, String secretKey, String sessionToken, String region) {
+        this.exec = Executors.newFixedThreadPool(3);
         this.signer = new AwsSigV4Signer(accessKey, secretKey, sessionToken, region);
+        this.ownsExecutor = true;
+    }
+    
+    /**
+     * Creates a new ParallelHttpClient with AWS credentials and custom ExecutorService.
+     * 
+     * @param accessKey the AWS access key
+     * @param secretKey the AWS secret key
+     * @param sessionToken the AWS session token (can be null)
+     * @param region the AWS region
+     * @param executorService the ExecutorService to use for concurrent operations
+     */
+    public ParallelHttpClient(String accessKey, String secretKey, String sessionToken, String region, ExecutorService executorService) {
+        this.exec = executorService;
+        this.signer = new AwsSigV4Signer(accessKey, secretKey, sessionToken, region);
+        this.ownsExecutor = false;
     }
 
     /**
@@ -98,14 +115,12 @@ public class ParallelHttpClient implements Closeable {
         String path = (uri.getPath() == null || uri.getPath().isEmpty()) ? "/putMedia" : uri.getPath();
         
         Map<String, String> signedHeaders = signer.signRequest(uri, headers, null);
-        System.out.println("[SIGV4] Signed headers count: " + signedHeaders.size());
-        
+
         StringBuilder sb = new StringBuilder();
         sb.append("POST ").append(path).append(" HTTP/1.1\r\n");
         sb.append("Host: ").append(host).append("\r\n");
         
         for (Map.Entry<String, String> e : signedHeaders.entrySet()) {
-            System.out.println("[SIGV4] Header: " + e.getKey() + " = " + e.getValue());
             sb.append(e.getKey()).append(": ").append(e.getValue()).append("\r\n");
         }
         
@@ -116,11 +131,13 @@ public class ParallelHttpClient implements Closeable {
     }
 
     /**
-     * Closes the HTTP client and shuts down all executor threads.
+     * Closes the HTTP client and shuts down executor threads if owned by this instance.
      */
     @Override 
     public void close() { 
-        exec.shutdownNow(); 
+        if (ownsExecutor) {
+            exec.shutdownNow(); 
+        }
     }
 
     /**

@@ -5,6 +5,7 @@ import com.amazonaws.kinesisvideo.client.PutMediaClient;
 import com.amazonaws.kinesisvideo.producer.audio.AudioFrame;
 import com.amazonaws.kinesisvideo.producer.audio.AudioStreamConfiguration;
 import com.amazonaws.kinesisvideo.producer.audio.mkv.AudioMkvGenerator;
+import com.amazonaws.kinesisvideo.producer.audio.mkv.ClusterCallback;
 
 import java.io.Closeable;
 import java.net.URI;
@@ -23,6 +24,7 @@ public class StreamProducer implements Closeable {
     private PutMediaClient putMediaClient;
     private AudioMkvGenerator mkvGenerator;
     private volatile boolean streaming = false;
+    private ClusterCallback clusterCallback;
     
     /**
      * Creates a new StreamProducer.
@@ -37,6 +39,15 @@ public class StreamProducer implements Closeable {
     }
     
     /**
+     * Sets a callback for cluster creation events.
+     * 
+     * @param callback the cluster callback
+     */
+    public void setClusterCallback(ClusterCallback callback) {
+        this.clusterCallback = callback;
+    }
+    
+    /**
      * Starts audio streaming with the specified configuration.
      * 
      * @param config the audio stream configuration
@@ -48,7 +59,9 @@ public class StreamProducer implements Closeable {
         }
         
         AudioMkvGenerator.AudioTrackInfo trackInfo = createTrackInfo(config);
-        this.mkvGenerator = new AudioMkvGenerator(trackInfo);
+        this.mkvGenerator = clusterCallback != null ? 
+            new AudioMkvGenerator(trackInfo, clusterCallback) : 
+            new AudioMkvGenerator(trackInfo);
         this.putMediaClient = client.createPutMediaClient();
         
         URI putMediaUri = client.getPutMediaEndpoint(streamName);
@@ -83,11 +96,11 @@ public class StreamProducer implements Closeable {
                 while ((bytesRead = in.read(buffer)) > 0) {
                     String response = new String(buffer, 0, bytesRead).trim();
                     if (!response.isEmpty()) {
-                        System.out.println("[ACK] " + response);
+                        System.out.println("[ACK][" + streamName + "] " + response);
                     }
                 }
             } catch (Exception e) {
-                System.err.println("[RECEIVER] Error: " + e.getMessage());
+                System.err.println("[RECEIVER][" + streamName + "] Error: " + e.getMessage());
             }
         };
         

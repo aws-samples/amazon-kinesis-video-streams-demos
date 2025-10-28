@@ -36,10 +36,17 @@ public class AudioMkvGenerator {
     private boolean headerWritten = false;
     private long clusterTimestamp = 0;
     private int trackNumber = 1;
+    private ClusterCallback clusterCallback;
     
     public AudioMkvGenerator(AudioTrackInfo trackInfo) {
         this.trackInfo = trackInfo;
         this.buffer = new ByteArrayOutputStream();
+    }
+    
+    public AudioMkvGenerator(AudioTrackInfo trackInfo, ClusterCallback clusterCallback) {
+        this.trackInfo = trackInfo;
+        this.buffer = new ByteArrayOutputStream();
+        this.clusterCallback = clusterCallback;
     }
     
     public byte[] generateHeader() throws IOException {
@@ -68,9 +75,15 @@ public class AudioMkvGenerator {
             writeCluster(frameBuffer, timestampMs);
             clusterTimestamp = timestampMs;
             headerWritten = true;
+            if (clusterCallback != null) {
+                clusterCallback.onClusterCreated(timestampMs, System.currentTimeMillis());
+            }
         } else if (timestampMs - clusterTimestamp >= 2000) { // 2 second clusters
             writeCluster(frameBuffer, timestampMs);
             clusterTimestamp = timestampMs;
+            if (clusterCallback != null) {
+                clusterCallback.onClusterCreated(timestampMs, System.currentTimeMillis());
+            }
         }
         
         // Write SimpleBlock

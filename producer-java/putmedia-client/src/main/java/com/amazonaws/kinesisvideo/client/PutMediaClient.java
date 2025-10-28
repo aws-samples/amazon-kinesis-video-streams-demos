@@ -1,7 +1,5 @@
 package com.amazonaws.kinesisvideo.client;
 
-import com.amazonaws.kinesisvideo.java.client.mediasource.ParallelHttpClient;
-
 import java.io.Closeable;
 import java.io.InputStream;
 import java.io.OutputStream;

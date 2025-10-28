@@ -2,7 +2,6 @@ package com.amazonaws.kinesisvideo.client;
 
 import com.amazonaws.kinesisvideo.config.ClientConfiguration;
 import com.amazonaws.kinesisvideo.java.service.JavaKinesisVideoServiceClient;
-import com.amazonaws.kinesisvideo.java.client.mediasource.ParallelHttpClient;
 
 import java.io.Closeable;
 import java.net.URI;
@@ -29,12 +28,22 @@ public class KinesisVideoClient implements Closeable {
             config.getSecretKey(), 
             config.getSessionToken()
         );
-        this.httpClient = new ParallelHttpClient(
-            config.getAccessKey(), 
-            config.getSecretKey(), 
-            config.getSessionToken(), 
-            config.getRegion()
-        );
+        if (config.getExecutorService() != null) {
+            this.httpClient = new ParallelHttpClient(
+                config.getAccessKey(), 
+                config.getSecretKey(), 
+                config.getSessionToken(), 
+                config.getRegion(),
+                config.getExecutorService()
+            );
+        } else {
+            this.httpClient = new ParallelHttpClient(
+                config.getAccessKey(), 
+                config.getSecretKey(), 
+                config.getSessionToken(), 
+                config.getRegion()
+            );
+        }
     }
     
     /**

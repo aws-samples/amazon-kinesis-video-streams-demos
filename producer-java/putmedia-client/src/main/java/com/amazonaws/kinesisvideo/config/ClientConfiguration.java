@@ -1,5 +1,7 @@
 package com.amazonaws.kinesisvideo.config;
 
+import java.util.concurrent.ExecutorService;
+
 /**
  * Configuration for Kinesis Video Streams client
  */
@@ -10,6 +12,7 @@ public class ClientConfiguration {
     private String sessionToken;
     private int connectionTimeoutMs = 30000;
     private int socketTimeoutMs = 60000;
+    private ExecutorService executorService;
     
     /**
      * Creates a new ClientConfiguration for the specified region.
@@ -83,4 +86,18 @@ public class ClientConfiguration {
     
     /** @return the socket timeout in milliseconds */
     public int getSocketTimeoutMs() { return socketTimeoutMs; }
+    
+    /**
+     * Sets a custom ExecutorService for concurrent operations.
+     * 
+     * @param executorService the ExecutorService to use
+     * @return this configuration instance for method chaining
+     */
+    public ClientConfiguration withExecutorService(ExecutorService executorService) {
+        this.executorService = executorService;
+        return this;
+    }
+    
+    /** @return the custom ExecutorService, or null if not set */
+    public ExecutorService getExecutorService() { return executorService; }
 }
