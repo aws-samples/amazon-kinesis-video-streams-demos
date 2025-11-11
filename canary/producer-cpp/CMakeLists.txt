@@ -8,7 +8,7 @@ set(CMAKE_CXX_STANDARD 17)
 FetchContent_Declare(
         producercpp
         GIT_REPOSITORY https://github.com/awslabs/amazon-kinesis-video-streams-producer-sdk-cpp.git
-        GIT_TAG        8e59b313950d4dbb1ecfb88e2108df87e3331c4e
+        GIT_TAG        master
 )
 
 FetchContent_Declare(
