@@ -19,7 +19,7 @@
     "react-router-dom": "^5.2.0",
     "react-scripts": "^5.0.0",
     "react-slick": "^0.27.8",
-    "serialize-javascript": "^4.0.0",
+    "serialize-javascript": "^6.0.2",
     "slick-carousel": "^1.8.1"
   },
   "scripts": {
