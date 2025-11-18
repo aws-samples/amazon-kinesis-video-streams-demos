@@ -387,6 +387,26 @@ pipeline {
                             ],
                             wait: false
                         )
+                        
+                        //Storage with a viewer join
+                        build (
+                            job: NEXT_AVAILABLE_RUNNER,
+                            parameters: COMMON_PARAMS + [
+                                booleanParam(name: 'IS_SIGNALING', value: false),
+                                booleanParam(name: 'IS_STORAGE', value: true),
+                                booleanParam(name: 'IS_STORAGE_SINGLE_NODE', value: true),
+                                booleanParam(name: 'USE_TURN', value: true),
+                                booleanParam(name: 'TRICKLE_ICE', value: true),
+                                booleanParam(name: 'USE_IOT', value: false),
+                                booleanParam(name: 'VIEWER_JOIN', value: true),
+                                string(name: 'DURATION_IN_SECONDS', value: STORAGE_PERIODIC_DURATION_IN_SECONDS.toString()),
+                                string(name: 'MASTER_NODE_LABEL', value: "webrtc-storage-master"),
+                                string(name: 'STORAGE_VIEWER_NODE_LABEL', value: "webrtc-storage-viewer"),
+                                string(name: 'RUNNER_LABEL', value: "StorageWithViewer"),
+                                string(name: 'SCENARIO_LABEL', value: "StorageWithViewer"),
+                                string(name: 'AWS_DEFAULT_REGION', value: "us-west-2"),                            
+                            ]
+                        )
                     }
                 }
 

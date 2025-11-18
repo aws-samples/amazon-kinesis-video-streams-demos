@@ -254,13 +254,15 @@ pipeline {
         string(name: 'CONSUMER_NODE_LABEL')
         string(name: 'VIEWER_NODE_LABEL')
         string(name: 'RUNNER_LABEL')
+        string(name: 'STORAGE_VIEWER_NODE_LABEL')
         string(name: 'SCENARIO_LABEL')
         string(name: 'DURATION_IN_SECONDS')
         string(name: 'VIDEO_CODEC')
         string(name: 'MIN_RETRY_DELAY_IN_SECONDS')
         string(name: 'GIT_URL')
         string(name: 'GIT_HASH')
-        booleanParam(name: 'FIRST_ITERATION', defaultValue: true)
+        booleanParam(name: 'FIRST_ITERATION', defaultValue: true),
+        booleanParam(name: 'VIEWER_JOIN', defaultValue: false)
     }
     
     // Set the role ARN to environment to avoid string interpolation to follow Jenkins security guidelines.
@@ -383,6 +385,23 @@ pipeline {
                         }
                     }
                 }
+                stage('StorageViewer') {
+                    when {
+                        equals expected: true, actual: params.VIEWER_JOIN
+                    }
+                    agent {
+                        label params.STORAGE_VIEWER_NODE_LABEL
+                    }
+                    steps {
+                        script {
+                            //StorageViewer build logic
+                            sh """ 
+                                chmod +x ./scripts/join-storage-viewer.sh
+                                ./scripts/join-storage-viewer.sh "${env.JOB_NAME}-${params.RUNNER_LABEL}" "viewer-client" "${params.AWS_DEFAULT_REGION}"
+                            """
+                        }
+                    }
+                }
             }
         }
 
@@ -447,6 +466,7 @@ pipeline {
                       booleanParam(name: 'IS_SIGNALING', value: params.IS_SIGNALING),
                       booleanParam(name: 'IS_STORAGE', value: params.IS_STORAGE),
                       booleanParam(name: 'IS_STORAGE_SINGLE_NODE', value: params.IS_STORAGE_SINGLE_NODE),
+                      booleanParam(name: 'VIEWER_JOIN', value: params.VIEWER_JOIN),
                       booleanParam(name: 'USE_TURN', value: params.USE_TURN),
                       booleanParam(name: 'FORCE_TURN', value: params.FORCE_TURN),
                       booleanParam(name: 'USE_IOT', value: params.USE_IOT),
@@ -457,6 +477,7 @@ pipeline {
                       string(name: 'MASTER_NODE_LABEL', value: params.MASTER_NODE_LABEL),
                       string(name: 'CONSUMER_NODE_LABEL', value: params.CONSUMER_NODE_LABEL),
                       string(name: 'VIEWER_NODE_LABEL', value: params.VIEWER_NODE_LABEL),
+                      string(name: 'STORAGE_VIEWER_NODE_LABEL', value: params.STORAGE_VIEWER_NODE_LABEL),
                       string(name: 'RUNNER_LABEL', value: params.RUNNER_LABEL),
                       string(name: 'SCENARIO_LABEL', value: params.SCENARIO_LABEL),
                       string(name: 'DURATION_IN_SECONDS', value: params.DURATION_IN_SECONDS),
