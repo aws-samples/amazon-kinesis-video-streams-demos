@@ -73,7 +73,7 @@ async function testWebSocketConnection(channelName, region, role = 'viewer', cli
         console.log(`Channel ARN: ${channelARN}`);
         console.log(`Endpoint: ${endpoint}`);
 
-        const signer = new WebSocketSigner('us-west-2');
+        const signer = new WebSocketSigner(region);
 
         const queryParams = {
             'X-Amz-ChannelARN': channelARN,
