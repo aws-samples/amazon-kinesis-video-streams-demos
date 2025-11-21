@@ -1,0 +1,76 @@
+name: SigV4 JS Tests
+
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - sigv4-signing/js/**
+      - .github/workflows/sigv4-js.yaml
+  pull_request:
+    branches:
+      - master
+    paths:
+      - sigv4-signing/js/**
+      - .github/workflows/sigv4-js.yaml
+
+jobs:
+  run-demo-application:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: [20, 22, 24]
+      fail-fast: false
+
+    permissions:
+      id-token: write
+      contents: read
+
+    name: Run Demo App (Node ${{ matrix.node-version }})
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Setup Node.js ${{ matrix.node-version }}
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ matrix.node-version }}
+        
+    - name: Install dependencies
+      run: npm install
+      working-directory: sigv4-signing/js
+
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
+        aws-region: us-west-2
+        role-duration-seconds: 900
+        
+    - name: ConnectAsMaster
+      working-directory: ./sigv4-signing/js
+      run: |
+        # Expecting exit code 0 (working)
+        npm start demo-channel master
+      
+    - name: ConnectAsViewer
+      working-directory: ./sigv4-signing/js
+      run: |
+        # Expecting exit code 0 (working)
+        npm start demo-channel viewer githubactions-client-node-${{ matrix.node-version }}
+      
+    - name: ConnectAsViewer invalid clientId
+      working-directory: ./sigv4-signing/js
+      shell: bash
+      run: |
+        # Expecting exit code 1
+        set +e
+        npm start demo-channel viewer .,.,.,invalidClientId-${{ matrix.node-version }}
+        EXIT_CODE=$?
+        set -e
+        
+        echo "exit code: $EXIT_CODE"
+        if [ "$EXIT_CODE" != "1" ]; then
+          echo "Expected failure but command succeeded"
+          exit 1
+        fi
