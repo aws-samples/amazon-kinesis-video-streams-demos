@@ -72,7 +72,7 @@ WebSocket closed: 1005
 #### Maximum number of viewers connected to the signaling channel:
 
 ```log
-npm start demo-channel-7 viewer
+npm start demo-channel viewer
 
 > kvs-signaling-websocket-signer-sample@1.0.0 start
 > node index.js demo-channel viewer
@@ -102,17 +102,17 @@ WebSocket closed: 1006
 #### ClientID uses not allowed characters
 
 ```log
- npm start demo-channel-7 viewer ..,; 
+ npm start demo-channel viewer ..,; 
 
 > kvs-signaling-websocket-signer-sample@1.0.0 start
-> node index.js demo-channel-7 viewer ..,
+> node index.js demo-channel viewer ..,
 
 Using region: us-west-2
-Getting info for channel: demo-channel-7
+Getting info for channel: demo-channel
 Channel ARN: arn:aws:kinesisvideo:us-west-2:123412341234:channel/demo-channel/1234567890123
 Endpoint: wss://v-1234abcd.kinesisvideo.us-west-2.amazonaws.com
 Client ID: ..,
-Signed URL: wss://v-4b2fab3e.kinesisvideo.us-west-2.amazonaws.com/?X-Amz-Chann...60d81f
+Signed URL: wss://v-1234abcd.kinesisvideo.us-west-2.amazonaws.com/?X-Amz-Chann...60d81f
 
 === HTTP Error Response ===
 Status: 400 Bad Request
