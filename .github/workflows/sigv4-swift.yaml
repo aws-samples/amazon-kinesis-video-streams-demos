@@ -19,10 +19,18 @@ jobs:
     strategy:
       matrix:
         config:
-          - mac_ver: '13'
-            xc_ver: '14.3'
-          - mac_ver: '13'
-            xc_ver: '15.0'
+          # x86_64
+          - mac_ver: '15-intel'
+            xc_ver: '16.4'
+            test_results: true
+          - mac_ver: '15-intel'
+            xc_ver: '26.1.1'
+          # arm64
+          - mac_ver: '15'
+            xc_ver: '16.4'
+          - mac_ver: '15'
+            xc_ver: '26.1.1'
+      fail-fast: false
 
     name: 'Build and run unit tests (MacOS ${{ matrix.config.mac_ver }}, XCode ${{ matrix.config.xc_ver }})'
     runs-on: 'macos-${{ matrix.config.mac_ver }}'
@@ -40,9 +48,9 @@ jobs:
       - name: XCode Test
         run: set -o pipefail && xcodebuild clean test -workspace sigv4-signing/swift/sigv4/sigv4.xcworkspace -scheme sigv4 -resultBundlePath TestResults -enableCodeCoverage YES | xcpretty
       - name: Publish results
-        uses: kishikawakatsumi/xcresulttool@v1
+        uses: slidoapp/xcresulttool@v3.1.0
         with:
           title: 'Test results (MacOS ${{ matrix.config.mac_ver }}, XCode ${{ matrix.config.xc_ver }})'
           path: TestResults.xcresult
           upload-bundles: never
-        if: success() || failure()
+        if: ${{ (success() || failure()) && matrix.config.test_results == true }}
