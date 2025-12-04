@@ -1,0 +1,311 @@
+const puppeteer = require('puppeteer');
+const { CloudWatchClient } = require('@aws-sdk/client-cloudwatch');
+const { CloudWatchMetrics } = require('./cloudwatch');
+const fs = require('fs');
+
+class ViewerCanaryTest {
+  constructor(config) {
+    this.config = config;
+    this.sessionStartTime = Date.now();
+    this.storageSessionJoined = false;
+    this.screenshotTaken = false;
+    this.framesReceived = false;
+    this.testCompleted = false;
+  }
+
+  async initializeCloudWatch() {
+    const cwClient = new CloudWatchClient({ region: this.config.region || 'us-west-2' });
+    CloudWatchMetrics.init(cwClient);
+  }
+
+  async createBrowser() {
+    return await puppeteer.launch({ 
+      headless: true,
+      args: ['--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream']
+    });
+  }
+
+  setupConsoleListener(page) {
+    page.on('console', async (msg) => {
+      const text = msg.text();
+      console.log('PAGE:', text);
+      
+      if (text.includes('Successfully joined the storage session')) {
+        console.log('Storage session joined - ready to monitor frames!');
+        this.storageSessionJoined = true;
+        
+        if (this.config.saveScreenshots) {
+          await page.screenshot({ path: `storage-session-active-${Date.now()}.png` });
+          console.log('Screenshot saved!');
+        }
+        this.screenshotTaken = true;
+        
+        const joinTime = Date.now() - this.sessionStartTime;
+        await CloudWatchMetrics.publishMsMetric(
+          'StorageSessionJoinTime',
+          this.config.channelName,
+          joinTime
+        );
+      }
+    });
+  }
+
+  validateEnvironment() {
+    if (!process.env.AWS_ACCESS_KEY_ID) {
+      throw new Error('AWS_ACCESS_KEY_ID environment variable not set');
+    }
+  }
+
+  buildTestUrl() {
+    const params = new URLSearchParams({
+      channelName: this.config.channelName,
+      region: this.config.region || 'us-west-2',
+      accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+      secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+      sessionToken: process.env.AWS_SESSION_TOKEN || '',
+      sendVideo: this.config.sendVideo || 'false',
+      sendAudio: this.config.sendAudio || 'false',
+    });
+    
+    return `https://awslabs.github.io/amazon-kinesis-video-streams-webrtc-sdk-js/examples/index.html?${params}`;
+  }
+
+  async initializePage(page) {
+    const url = this.buildTestUrl();
+    console.log('Opening URL:', url);
+    
+    await page.goto(url);
+    await page.evaluate(() => {
+      document.querySelector('#ingest-media-manual-on').setAttribute('data-selected', 'true');
+    });
+    
+    console.log('Page loaded, clicking viewer button...');
+    await page.click('#viewer-button');
+  }
+
+  async waitForViewerStart(page) {
+    console.log('Waiting for viewer to start...');
+    const startTimeout = 60000;
+    const startTime = Date.now();
+    
+    while ((Date.now() - startTime) < startTimeout) {
+      const status = await page.evaluate(() => ({
+        viewerExists: !!(window.viewer),
+        connectionState: window.viewer?.pc?.iceConnectionState,
+        signalingState: window.viewer?.pc?.signalingState
+      }));
+      
+      if (status.viewerExists) {
+        console.log('Viewer started successfully!');
+        console.log(`Connection state: ${status.connectionState}`);
+        console.log(`Signaling state: ${status.signalingState}`);
+        return true;
+      }
+      
+      await new Promise(resolve => setTimeout(resolve, 1000));
+    }
+    
+    throw new Error('Viewer failed to start within 60 seconds');
+  }
+
+  async waitForStorageSession() {
+    console.log('Waiting for storage session to be joined...');
+    const sessionTimeout = 180000;
+    
+    while (!this.storageSessionJoined && (Date.now() - this.sessionStartTime) < sessionTimeout) {
+      await new Promise(resolve => setTimeout(resolve, 1000));
+    }
+    
+    if (!this.storageSessionJoined) {
+      throw new Error('Storage session not joined within 60 seconds');
+    }
+  }
+
+  async getFrameStats(page) {
+    return await page.evaluate(() => {
+      const viewerExists = !!(window.viewer);
+      const remoteViewElements = document.querySelectorAll('.remote-view');
+      
+      let hasActiveVideo = false;
+      let videoInfo = [];
+      
+      remoteViewElements.forEach((video) => {
+        if (video.srcObject && video.readyState >= 2) {
+          hasActiveVideo = true;
+          videoInfo.push({
+            videoWidth: video.videoWidth,
+            videoHeight: video.videoHeight,
+            readyState: video.readyState,
+          });
+        }
+      });
+      
+      let storageSessionActive = false;
+      let signalingConnected = false;
+      
+      if (window.viewer) {
+        signalingConnected = window.viewer.signalingClient?.readyState === 1;
+        storageSessionActive = !!(window.viewer.storageSessionJoined || 
+                                window.viewer.isStorageSessionActive ||
+                                (window.viewer.signalingClient && signalingConnected));
+      }
+      
+      return {
+        viewerExists,
+        storageSessionActive,
+        signalingConnected,
+        connectionState: signalingConnected ? 'connected' : 'disconnected',
+        hasActiveVideo,
+        remoteViewCount: remoteViewElements.length,
+        videoInfo,
+        timestamp: Date.now()
+      };
+    });
+  }
+
+  async captureVideoFrame(page) {
+    return await page.evaluate(() => {
+      const remoteVideo = document.querySelector('.remote-view');
+      if (remoteVideo && remoteVideo.videoWidth > 0) {
+        const canvas = document.createElement('canvas');
+        canvas.width = remoteVideo.videoWidth;
+        canvas.height = remoteVideo.videoHeight;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(remoteVideo, 0, 0);
+        return {
+          dataURL: canvas.toDataURL('image/png'),
+          width: canvas.width,
+          height: canvas.height
+        };
+      }
+      return null;
+    });
+  }
+
+  async handleVideoDetection(page) {
+    console.log('SUCCESS: Active video detected!');
+    
+    const frameData = await this.captureVideoFrame(page);
+    if (frameData) {
+      console.log(`First frame detected: ${frameData.width}x${frameData.height}`);
+      
+      if (this.config.saveFrames) {
+        if (!fs.existsSync('frames')) fs.mkdirSync('frames');
+        const base64Data = frameData.dataURL.replace(/^data:image\/png;base64,/, '');
+        fs.writeFileSync(`frames/first-frame-${Date.now()}.png`, base64Data, 'base64');
+        console.log('First frame saved!');
+      }
+    }
+    
+    const frameDetectionTime = Date.now() - this.sessionStartTime;
+    await CloudWatchMetrics.publishMsMetric(
+      'TimeToFirstFrame',
+      this.config.channelName,
+      frameDetectionTime
+    );
+    
+    this.framesReceived = true;
+  }
+
+  async monitorConnection(page) {
+    console.log('Storage session joined! Now monitoring connection state...');
+    let lastStatusLog = 0;
+    const statusLogInterval = 10000;
+    
+    while (!this.testCompleted) {
+      const frameStats = await this.getFrameStats(page);
+      
+      if (frameStats.hasActiveVideo && !this.framesReceived) {
+        await this.handleVideoDetection(page);
+      }
+      
+      if (frameStats.storageSessionActive && !this.screenshotTaken) {
+        console.log('Storage session active!');
+        this.screenshotTaken = true;
+        
+        console.log(`Storage session active, running test for ${this.config.duration} seconds...`);
+        setTimeout(() => {
+          this.testCompleted = true;
+        }, this.config.duration * 1000);
+      }
+      
+      if (!frameStats.viewerExists) {
+        console.log('Viewer object lost!');
+        this.testCompleted = true;
+        break;
+      }
+      
+      const now = Date.now();
+      if (now - lastStatusLog >= statusLogInterval) {
+        const elapsed = Math.floor((now - this.sessionStartTime) / 1000);
+        console.log(`[${elapsed}s]ActiveVideo: ${frameStats.hasActiveVideo}`);
+        lastStatusLog = now;
+      }
+      
+      await new Promise(resolve => setTimeout(resolve, 2000));
+    }
+  }
+
+  getTestResults() {
+    const metrics = {
+      success: this.storageSessionJoined,
+      storageSessionJoined: this.storageSessionJoined,
+      framesReceived: this.framesReceived,
+      timestamp: Date.now()
+    };
+    
+    console.log(metrics.success ? 'TEST PASSED: Storage session joined successfully' : 'TEST FAILED: Storage session not joined');
+    console.log('Test completed!');
+    console.log('Final metrics:', metrics);
+    
+    const success = metrics.success && this.framesReceived;
+    console.log(success ? 'TEST PASSED: Frames received successfully' : 'TEST FAILED: No frames received');
+    
+    return { ...metrics, success, framesReceived: this.framesReceived };
+  }
+}
+
+async function runViewerCanary(config) {
+  console.log('Starting viewer canary test...');
+  console.log('Config:', config);
+  
+  const test = new ViewerCanaryTest(config);
+  let browser;
+  
+  try {
+    await test.initializeCloudWatch();
+    test.validateEnvironment();
+    
+    browser = await test.createBrowser();
+    const page = await browser.newPage();
+    
+    test.setupConsoleListener(page);
+    await test.initializePage(page);
+    await test.waitForViewerStart(page);
+    await test.waitForStorageSession();
+    await test.monitorConnection(page);
+    
+    const results = test.getTestResults();
+    await browser.close();
+    return results;
+    
+  } catch (error) {
+    console.error('Error running viewer canary:', error);
+    if (browser) await browser.close();
+    throw error;
+  }
+}
+
+// Run the test
+runViewerCanary({
+  channelName: process.env.CANARY_CHANNEL_NAME || 'ScaryTestStream',
+  region: process.env.AWS_REGION || 'us-west-2',
+  duration: parseInt(process.env.TEST_DURATION || '180'),
+  saveFrames: process.env.SAVE_FRAMES === 'true',
+  clientId: process.env.CLIENT_ID || `test-viewer-${Date.now()}`
+}).then(result => {
+  process.exit(result.success ? 0 : 1);
+}).catch(error => {
+  console.error('Test failed with error:', error);
+  process.exit(1);
+});

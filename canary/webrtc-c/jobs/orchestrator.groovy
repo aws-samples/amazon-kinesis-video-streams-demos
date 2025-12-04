@@ -13,7 +13,7 @@ STORAGE_EXTENDED_DURATION_IN_SECONDS = 43200 // 12 hr
 MIN_RETRY_DELAY_IN_SECONDS = 60
 COLD_STARTUP_DELAY_IN_SECONDS = 60 * 60
 GIT_URL = 'https://github.com/aws-samples/amazon-kinesis-video-streams-demos.git'
-GIT_HASH = 'master'
+GIT_HASH = 'viewer_test'
 COMMON_PARAMS = [
     string(name: 'AWS_KVS_LOG_LEVEL', value: "2"),
     string(name: 'DEBUG_LOG_SDP', value: "TRUE"),
@@ -386,6 +386,26 @@ pipeline {
                                 string(name: 'AWS_DEFAULT_REGION', value: "us-west-2"),
                             ],
                             wait: false
+                        )
+
+                        //Storage with a viewer join
+                        build (
+                            job: NEXT_AVAILABLE_RUNNER,
+                            parameters: COMMON_PARAMS + [
+                                booleanParam(name: 'IS_SIGNALING', value: false),
+                                booleanParam(name: 'IS_STORAGE', value: true),
+                                booleanParam(name: 'IS_STORAGE_SINGLE_NODE', value: true),
+                                booleanParam(name: 'USE_TURN', value: true),
+                                booleanParam(name: 'TRICKLE_ICE', value: true),
+                                booleanParam(name: 'USE_IOT', value: false),
+                                booleanParam(name: 'JS_STORAGE_VIEWER_JOIN', value: true),
+                                string(name: 'DURATION_IN_SECONDS', value: STORAGE_PERIODIC_DURATION_IN_SECONDS.toString()),
+                                string(name: 'MASTER_NODE_LABEL', value: "webrtc-storage-master"),
+                                string(name: 'STORAGE_VIEWER_NODE_LABEL', value: "webrtc-storage-viewer"),
+                                string(name: 'RUNNER_LABEL', value: "StorageWithViewer"),
+                                string(name: 'SCENARIO_LABEL', value: "StorageWithViewer"),
+                                string(name: 'AWS_DEFAULT_REGION', value: "us-west-2"),                            
+                            ]
                         )
                     }
                 }
