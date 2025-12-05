@@ -70,6 +70,11 @@ class ViewerCanaryTest {
     return `https://awslabs.github.io/amazon-kinesis-video-streams-webrtc-sdk-js/examples/index.html?${params}`;
   }
 
+  async waitForChannel() {
+    console.log('Waiting 5 minutes for master to create channel...');
+    await new Promise(resolve => setTimeout(resolve, 300000));
+  }
+
   async initializePage(page) {
     const url = this.buildTestUrl();
     console.log('Opening URL:', url);
@@ -85,27 +90,42 @@ class ViewerCanaryTest {
 
   async waitForViewerStart(page) {
     console.log('Waiting for viewer to start...');
-    const startTimeout = 60000;
-    const startTime = Date.now();
+    const maxRetries = 3;
     
-    while ((Date.now() - startTime) < startTimeout) {
-      const status = await page.evaluate(() => ({
-        viewerExists: !!(window.viewer),
-        connectionState: window.viewer?.pc?.iceConnectionState,
-        signalingState: window.viewer?.pc?.signalingState
-      }));
-      
-      if (status.viewerExists) {
-        console.log('Viewer started successfully!');
-        console.log(`Connection state: ${status.connectionState}`);
-        console.log(`Signaling state: ${status.signalingState}`);
-        return true;
+    for (let retry = 0; retry < maxRetries; retry++) {
+      if (retry > 0) {
+        console.log(`Retry ${retry}: Restarting viewer...`);
+        await page.click('#viewer-button');
       }
       
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      const startTimeout = 60000;
+      const startTime = Date.now();
+      
+      while ((Date.now() - startTime) < startTimeout) {
+        const status = await page.evaluate(() => ({
+          viewerExists: !!(window.viewer),
+          connectionState: window.viewer?.pc?.iceConnectionState,
+          signalingState: window.viewer?.pc?.signalingState,
+          error: window.viewer?.error
+        }));
+        
+        if (status.viewerExists && !status.error) {
+          console.log('Viewer started successfully!');
+          console.log(`Connection state: ${status.connectionState}`);
+          console.log(`Signaling state: ${status.signalingState}`);
+          return true;
+        }
+        
+        if (status.error) {
+          console.log('Viewer error detected, will retry...');
+          break;
+        }
+        
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
     }
     
-    throw new Error('Viewer failed to start within 60 seconds');
+    throw new Error('Viewer failed to start after 3 retries');
   }
 
   async waitForStorageSession() {
@@ -275,6 +295,7 @@ async function runViewerCanary(config) {
   try {
     await test.initializeCloudWatch();
     test.validateEnvironment();
+    await test.waitForChannel();
     
     browser = await test.createBrowser();
     const page = await browser.newPage();
