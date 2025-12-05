@@ -405,7 +405,8 @@ pipeline {
                                 string(name: 'RUNNER_LABEL', value: "StorageWithViewer"),
                                 string(name: 'SCENARIO_LABEL', value: "StorageWithViewer"),
                                 string(name: 'AWS_DEFAULT_REGION', value: "us-west-2"),                            
-                            ]
+                            ],
+                            wait: false
                         )
                     }
                 }
