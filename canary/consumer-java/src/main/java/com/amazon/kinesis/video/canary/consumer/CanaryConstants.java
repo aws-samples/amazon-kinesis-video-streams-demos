@@ -22,6 +22,7 @@ public final class CanaryConstants {
     public static final String SUB_RECONNECT_LABEL = "StorageSubReconnect"; // < 1 Media Server forced reconnect, currently must be 60min.
     public static final String SINGLE_RECONNECT_LABEL = "StorageSingleReconnect"; // 1 Media Server forced reconnect, currently must be 60-120min.
     public static final String EXTENDED_LABEL = "StorageExtended"; // > 1 Media Server forced reconnect, currently must be > 120min.
+    public static final String STORAGE_WITH_VIEWER_LABEL = "StorageWithViewer"; // Storage with viewer test.
 
     public static final String CW_DIMENSION_INDIVIDUAL = "StorageWebRTCSDKCanaryStreamName";
     public static final String CW_DIMENSION_AGGREGATE = "StorageWebRTCSDKCanaryLabel";

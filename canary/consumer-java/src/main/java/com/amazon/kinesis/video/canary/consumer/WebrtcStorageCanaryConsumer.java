@@ -188,7 +188,8 @@ public class WebrtcStorageCanaryConsumer {
                 .build();
 
         switch (mCanaryLabel) {
-            case CanaryConstants.PERIODIC_LABEL: {
+            case CanaryConstants.PERIODIC_LABEL:
+            case CanaryConstants.STORAGE_WITH_VIEWER_LABEL: {
                 // Continuously attempt getMedia() calls until footage is available.
                 // GetMedia() will return after ~3 sec if no footage is available. Once footage
                 // is available,
@@ -205,9 +206,10 @@ public class WebrtcStorageCanaryConsumer {
                 if (!mCanaryLabel.equals(CanaryConstants.EXTENDED_LABEL) &&
                         !mCanaryLabel.equals(CanaryConstants.SINGLE_RECONNECT_LABEL) &&
                         !mCanaryLabel.equals(CanaryConstants.SUB_RECONNECT_LABEL)) {
-                    logger.error(String.format("Env var CANARY_LABEL: %s must be set to either %s, %s, %s, or %s.",
+                    logger.error(String.format("Env var CANARY_LABEL: %s must be set to either %s, %s, %s, %s, or %s.",
                             mCanaryLabel, CanaryConstants.PERIODIC_LABEL, CanaryConstants.EXTENDED_LABEL,
-                            CanaryConstants.SINGLE_RECONNECT_LABEL, CanaryConstants.SUB_RECONNECT_LABEL));
+                            CanaryConstants.SINGLE_RECONNECT_LABEL, CanaryConstants.SUB_RECONNECT_LABEL,
+                            CanaryConstants.STORAGE_WITH_VIEWER_LABEL));
                     throw new Exception("Improper canary label " + mCanaryLabel + " assigned to "
                             + CanaryConstants.CANARY_LABEL_ENV_VAR + " env var.");
                 }
