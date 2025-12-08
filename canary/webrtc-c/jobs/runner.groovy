@@ -250,8 +250,10 @@ pipeline {
         booleanParam(name: 'IS_STORAGE')
         booleanParam(name: 'IS_STORAGE_SINGLE_NODE')
         booleanParam(name: 'USE_TURN')
+        booleanParam(name: 'FORCE_TURN', defaultValue: false)
         booleanParam(name: 'IS_PROFILING')
         booleanParam(name: 'TRICKLE_ICE')
+        booleanParam(name: 'USE_IOT', defaultValue: false)
         booleanParam(name: 'USE_MBEDTLS', defaultValue: false)
         booleanParam(name: 'DEBUG_LOG_SDP', defaultValue: true)
         string(name: 'LOG_GROUP_NAME')
@@ -429,12 +431,17 @@ pipeline {
                     steps {
                         script {
                             sh """ 
-                                cd ./scripts
+                                cd ./canary/webrtc-c/scripts
                                 
                                 # Install Node.js dependencies if not exists
                                 if [ ! -d "node_modules" ]; then
-                                    npm install puppeteer
+                                    npm install puppeteer @aws-sdk/client-cloudwatch
                                 fi
+                                
+                                # Set environment variables for the test
+                                export CANARY_CHANNEL_NAME="${env.JOB_NAME}-${params.RUNNER_LABEL}"
+                                export AWS_REGION="${params.AWS_DEFAULT_REGION}"
+                                export TEST_DURATION="${params.DURATION_IN_SECONDS}"
                                 
                                 # Run storage viewer test
                                 chmod +x chrome-headless.js
