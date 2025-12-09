@@ -3,6 +3,11 @@ const { CloudWatchClient } = require('@aws-sdk/client-cloudwatch');
 const { CloudWatchMetrics } = require('./cloudwatch');
 const fs = require('fs');
 
+function log(message) {
+  const timestamp = new Date().toISOString();
+  console.log(`[${timestamp}] ${message}`);
+}
+
 class ViewerCanaryTest {
   constructor(config) {
     this.config = config;
@@ -11,6 +16,7 @@ class ViewerCanaryTest {
     this.screenshotTaken = false;
     this.framesReceived = false;
     this.testCompleted = false;
+    this.timerStarted = false;
   }
 
   async initializeCloudWatch() {
@@ -28,15 +34,15 @@ class ViewerCanaryTest {
   setupConsoleListener(page) {
     page.on('console', async (msg) => {
       const text = msg.text();
-      console.log('PAGE:', text);
+      log(`PAGE: ${text}`);
       
       if (text.includes('Successfully joined the storage session')) {
-        console.log('Storage session joined - ready to monitor frames!');
+        log('Storage session joined - ready to monitor frames!');
         this.storageSessionJoined = true;
         
         if (this.config.saveScreenshots) {
           await page.screenshot({ path: `storage-session-active-${Date.now()}.png` });
-          console.log('Screenshot saved!');
+          log('Screenshot saved!');
         }
         this.screenshotTaken = true;
         
@@ -71,30 +77,30 @@ class ViewerCanaryTest {
   }
 
   async waitForChannel() {
-    console.log('Waiting 5 minutes for master to create channel...');
+    log('Waiting 5 minutes for master to create channel...');
     await new Promise(resolve => setTimeout(resolve, 300000));
   }
 
   async initializePage(page) {
     const url = this.buildTestUrl();
-    console.log('Opening URL:', url);
+    log(`Opening URL: ${url}`);
     
     await page.goto(url);
     await page.evaluate(() => {
       document.querySelector('#ingest-media-manual-on').setAttribute('data-selected', 'true');
     });
     
-    console.log('Page loaded, clicking viewer button...');
+    log('Page loaded, clicking viewer button...');
     await page.click('#viewer-button');
   }
 
   async waitForViewerStart(page) {
-    console.log('Waiting for viewer to start...');
+    log('Waiting for viewer to start...');
     const maxRetries = 3;
     
     for (let retry = 0; retry < maxRetries; retry++) {
       if (retry > 0) {
-        console.log(`Retry ${retry}: Restarting viewer...`);
+        log(`Retry ${retry}: Restarting viewer...`);
         await page.click('#viewer-button');
       }
       
@@ -110,14 +116,14 @@ class ViewerCanaryTest {
         }));
         
         if (status.viewerExists && !status.error) {
-          console.log('Viewer started successfully!');
-          console.log(`Connection state: ${status.connectionState}`);
-          console.log(`Signaling state: ${status.signalingState}`);
+          log('Viewer started successfully!');
+          log(`Connection state: ${status.connectionState}`);
+          log(`Signaling state: ${status.signalingState}`);
           return true;
         }
         
         if (status.error) {
-          console.log('Viewer error detected, will retry...');
+          log('Viewer error detected, will retry...');
           break;
         }
         
@@ -129,7 +135,7 @@ class ViewerCanaryTest {
   }
 
   async waitForStorageSession() {
-    console.log('Waiting for storage session to be joined...');
+    log('Waiting for storage session to be joined...');
     const sessionTimeout = 180000;
     
     while (!this.storageSessionJoined && (Date.now() - this.sessionStartTime) < sessionTimeout) {
@@ -203,17 +209,17 @@ class ViewerCanaryTest {
   }
 
   async handleVideoDetection(page) {
-    console.log('SUCCESS: Active video detected!');
+    log('SUCCESS: Active video detected!');
     
     const frameData = await this.captureVideoFrame(page);
     if (frameData) {
-      console.log(`First frame detected: ${frameData.width}x${frameData.height}`);
+      log(`First frame detected: ${frameData.width}x${frameData.height}`);
       
       if (this.config.saveFrames) {
         if (!fs.existsSync('frames')) fs.mkdirSync('frames');
         const base64Data = frameData.dataURL.replace(/^data:image\/png;base64,/, '');
         fs.writeFileSync(`frames/first-frame-${Date.now()}.png`, base64Data, 'base64');
-        console.log('First frame saved!');
+        log('First frame saved!');
       }
     }
     
@@ -228,7 +234,7 @@ class ViewerCanaryTest {
   }
 
   async monitorConnection(page) {
-    console.log('Storage session joined! Now monitoring connection state...');
+    log('Storage session joined! Now monitoring connection state...');
     let lastStatusLog = 0;
     const statusLogInterval = 10000;
     
@@ -239,18 +245,18 @@ class ViewerCanaryTest {
         await this.handleVideoDetection(page);
       }
       
-      if (frameStats.storageSessionActive && !this.screenshotTaken) {
-        console.log('Storage session active!');
-        this.screenshotTaken = true;
+      if (frameStats.storageSessionActive && !this.timerStarted) {
+        log('Storage session active!');
+        this.timerStarted = true;
         
-        console.log(`Storage session active, running test for ${this.config.duration} seconds...`);
+        log(`Storage session active, running test for ${this.config.duration} seconds...`);
         setTimeout(() => {
           this.testCompleted = true;
         }, this.config.duration * 1000);
       }
       
       if (!frameStats.viewerExists) {
-        console.log('Viewer object lost!');
+        log('Viewer object lost!');
         this.testCompleted = true;
         break;
       }
@@ -258,7 +264,7 @@ class ViewerCanaryTest {
       const now = Date.now();
       if (now - lastStatusLog >= statusLogInterval) {
         const elapsed = Math.floor((now - this.sessionStartTime) / 1000);
-        console.log(`[${elapsed}s]ActiveVideo: ${frameStats.hasActiveVideo}`);
+        log(`[${elapsed}s]ActiveVideo: ${frameStats.hasActiveVideo}`);
         lastStatusLog = now;
       }
       
@@ -274,44 +280,56 @@ class ViewerCanaryTest {
       timestamp: Date.now()
     };
     
-    console.log(metrics.success ? 'TEST PASSED: Storage session joined successfully' : 'TEST FAILED: Storage session not joined');
-    console.log('Test completed!');
-    console.log('Final metrics:', metrics);
+    log(metrics.success ? 'TEST PASSED: Storage session joined successfully' : 'TEST FAILED: Storage session not joined');
+    log('Test completed!');
+    log(`Final metrics: ${JSON.stringify(metrics)}`);
     
     const success = metrics.success && this.framesReceived;
-    console.log(success ? 'TEST PASSED: Frames received successfully' : 'TEST FAILED: No frames received');
+    log(success ? 'TEST PASSED: Frames received successfully' : 'TEST FAILED: No frames received');
     
     return { ...metrics, success, framesReceived: this.framesReceived };
   }
 }
 
 async function runViewerCanary(config) {
-  console.log('Starting viewer canary test...');
-  console.log('Config:', config);
+  log('Starting viewer canary test...');
+  log(`Config: ${JSON.stringify(config)}`);
   
   const test = new ViewerCanaryTest(config);
   let browser;
   
+  // Overall timeout for entire test
+  const overallTimeout = (config.duration + 360) * 1000; // duration + 6min buffer
+  const timeoutPromise = new Promise((_, reject) => {
+    setTimeout(() => reject(new Error('Overall test timeout exceeded')), overallTimeout);
+  });
+  
   try {
-    await test.initializeCloudWatch();
-    test.validateEnvironment();
-    await test.waitForChannel();
+    const results = await Promise.race([
+      (async () => {
+        await test.initializeCloudWatch();
+        test.validateEnvironment();
+        // await test.waitForChannel();
+        
+        browser = await test.createBrowser();
+        const page = await browser.newPage();
+        
+        test.setupConsoleListener(page);
+        await test.initializePage(page);
+        await test.waitForViewerStart(page);
+        await test.waitForStorageSession();
+        await test.monitorConnection(page);
+        
+        return test.getTestResults();
+      })(),
+      timeoutPromise
+    ]);
     
-    browser = await test.createBrowser();
-    const page = await browser.newPage();
-    
-    test.setupConsoleListener(page);
-    await test.initializePage(page);
-    await test.waitForViewerStart(page);
-    await test.waitForStorageSession();
-    await test.monitorConnection(page);
-    
-    const results = test.getTestResults();
-    await browser.close();
+    if (browser) await browser.close();
     return results;
     
   } catch (error) {
-    console.error('Error running viewer canary:', error);
+    log(`Error running viewer canary: ${error.message}`);
     if (browser) await browser.close();
     throw error;
   }
@@ -321,12 +339,12 @@ async function runViewerCanary(config) {
 runViewerCanary({
   channelName: process.env.CANARY_CHANNEL_NAME || 'ScaryTestStream',
   region: process.env.AWS_REGION || 'us-west-2',
-  duration: parseInt(process.env.TEST_DURATION || '180'),
+  duration: parseInt(process.env.TEST_DURATION || '10'),
   saveFrames: process.env.SAVE_FRAMES === 'true',
   clientId: process.env.CLIENT_ID || `test-viewer-${Date.now()}`
 }).then(result => {
   process.exit(result.success ? 0 : 1);
 }).catch(error => {
-  console.error('Test failed with error:', error);
+  log(`Test failed with error: ${error.message}`);
   process.exit(1);
 });
