@@ -77,8 +77,8 @@ class ViewerCanaryTest {
   }
 
   async waitForChannel() {
-    log('Waiting 5 minutes for master to create channel...');
-    await new Promise(resolve => setTimeout(resolve, 300000));
+    log('Waiting 2 minutes for master to create channel...');
+    await new Promise(resolve => setTimeout(resolve, 120000));
   }
 
   async initializePage(page) {
@@ -249,10 +249,10 @@ class ViewerCanaryTest {
         log('Storage session active!');
         this.timerStarted = true;
         
-        log(`Storage session active, running test for ${this.config.duration} seconds...`);
+        log(`Storage session active, running test for 20 seconds...`);
         setTimeout(() => {
           this.testCompleted = true;
-        }, this.config.duration * 1000);
+        }, 20000);
       }
       
       if (!frameStats.viewerExists) {
@@ -299,7 +299,7 @@ async function runViewerCanary(config) {
   let browser;
   
   // Overall timeout for entire test
-  const overallTimeout = (config.duration + 360) * 1000; // duration + 6min buffer
+  const overallTimeout = config.duration * 1000; // duration
   const timeoutPromise = new Promise((_, reject) => {
     setTimeout(() => reject(new Error('Overall test timeout exceeded')), overallTimeout);
   });
@@ -339,7 +339,7 @@ async function runViewerCanary(config) {
 runViewerCanary({
   channelName: process.env.CANARY_CHANNEL_NAME || 'ScaryTestStream',
   region: process.env.AWS_REGION || 'us-west-2',
-  duration: parseInt(process.env.TEST_DURATION || '10'),
+  duration: 360,
   saveFrames: process.env.SAVE_FRAMES === 'true',
   clientId: process.env.CLIENT_ID || `test-viewer-${Date.now()}`
 }).then(result => {

@@ -6,6 +6,7 @@ PERIODIC_PROFILING_DURATION_IN_SECONDS = 90
 LONG_RUNNING_DURATION_IN_SECONDS = 0
 
 STORAGE_PERIODIC_DURATION_IN_SECONDS = 300 // 5 min
+STORAGE_WITH_VIEWER_DURATION_IN_SECONDS = 600 // 10 min
 STORAGE_SUB_RECONNECT_DURATION_IN_SECONDS = 2700 // 45 min
 STORAGE_SINGLE_RECONNECT_DURATION_IN_SECONDS = 3900 // 65 min
 STORAGE_EXTENDED_DURATION_IN_SECONDS = 43200 // 12 hr
@@ -399,7 +400,7 @@ pipeline {
                                 booleanParam(name: 'TRICKLE_ICE', value: true),
                                 booleanParam(name: 'USE_IOT', value: false),
                                 booleanParam(name: 'JS_STORAGE_VIEWER_JOIN', value: true),
-                                string(name: 'DURATION_IN_SECONDS', value: STORAGE_PERIODIC_DURATION_IN_SECONDS.toString()),
+                                string(name: 'DURATION_IN_SECONDS', value: STORAGE_WITH_VIEWER_DURATION_IN_SECONDS.toString()),
                                 string(name: 'MASTER_NODE_LABEL', value: "webrtc-storage-master"),
                                 string(name: 'CONSUMER_NODE_LABEL', value: "webrtc-storage-consumer"),
                                 string(name: 'STORAGE_VIEWER_NODE_LABEL', value: "webrtc-storage-viewer"),
