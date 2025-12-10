@@ -421,45 +421,48 @@ pipeline {
                         }
                     }
                 }
-                stage('JSStorageViewer') {
-                    when {
-                        equals expected: true, actual: params.JS_STORAGE_VIEWER_JOIN
-                    }
-                    agent {
-                        label params.STORAGE_VIEWER_NODE_LABEL
-                    }
-                    steps {
-                        script {
-                            try {
-                                sh """ 
-                                    cd ./canary/webrtc-c/scripts
-                                    
-                                    # Install Node.js dependencies if not exists
-                                    if [ ! -d "node_modules" ]; then
-                                        npm install puppeteer @aws-sdk/client-cloudwatch
-                                    fi
-                                    
-                                    # Set environment variables for the test
-                                    export CANARY_CHANNEL_NAME="${env.JOB_NAME}-${params.RUNNER_LABEL}"
-                                    export AWS_REGION="${params.AWS_DEFAULT_REGION}"
-                                    export TEST_DURATION="${params.DURATION_IN_SECONDS}"
-                                    
-                                    # Run storage viewer test
-                                    chmod +x chrome-headless.js
-                                    node chrome-headless.js
-                                """
-                            } catch (FlowInterruptedException err) {
-                                echo 'Aborted due to cancellation'
-                                throw err
-                            } catch (err) {
-                                HAS_ERROR = true
-                                unstable err.toString()
-                            }
-                        }
+
+            }
+        }
+
+        stage('Build and Run Webrtc-storage Viewer') {
+            failFast true
+            when {
+                equals expected: true, actual: params.JS_STORAGE_VIEWER_JOIN
+            }
+            agent {
+                label params.STORAGE_VIEWER_NODE_LABEL
+            }
+            steps {
+                script {
+                    try {
+                        sh """ 
+                            cd ./canary/webrtc-c/scripts
+                            
+                            # Install Node.js dependencies if not exists
+                            if [ ! -d "node_modules" ]; then
+                                npm install puppeteer @aws-sdk/client-cloudwatch
+                            fi
+                            
+                            # Set environment variables for the test
+                            export CANARY_CHANNEL_NAME="${env.JOB_NAME}-${params.RUNNER_LABEL}"
+                            export AWS_REGION="${params.AWS_DEFAULT_REGION}"
+                            export TEST_DURATION="${params.DURATION_IN_SECONDS}"
+                            
+                            # Run storage viewer test
+                            node chrome-headless.js
+                        """
+                    } catch (FlowInterruptedException err) {
+                        echo 'Aborted due to cancellation'
+                        throw err
+                    } catch (err) {
+                        HAS_ERROR = true
+                        unstable err.toString()
                     }
                 }
             }
         }
+
 
         stage('Unset credentials') {
             steps {
