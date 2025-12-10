@@ -18,6 +18,9 @@ jobs:
   run-unit-tests:
     runs-on: ubuntu-latest
     name: Build and run unit tests
+    permissions:
+      pull-requests: write
+      checks: write
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
