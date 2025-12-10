@@ -297,11 +297,82 @@ async function runViewerCanary(config) {
   
   const test = new ViewerCanaryTest(config);
   let browser;
+  let page;
   
-  // Overall timeout for entire test
-  const overallTimeout = config.duration * 1000; // duration
-  const timeoutPromise = new Promise((_, reject) => {
-    setTimeout(() => reject(new Error('Overall test timeout exceeded')), overallTimeout);
+  // Cleanup function to properly close viewer
+  const cleanup = async (reason = 'normal') => {
+    try {
+      if (page && browser) {
+        log(`Cleaning up viewer connection (${reason})...`);
+        
+        // Try to click stop viewer button for proper cleanup
+        const stopButtonClicked = await page.evaluate(() => {
+          const stopButton = document.querySelector('#stop-viewer-button');
+          if (stopButton && !stopButton.disabled) {
+            stopButton.click();
+            return true;
+          }
+          return false;
+        }).catch(() => false);
+        
+        if (stopButtonClicked) {
+          log('Stop viewer button clicked successfully');
+          await new Promise(resolve => setTimeout(resolve, 1000)); // Wait for cleanup
+        } else {
+          log('Stop viewer button not found or disabled, attempting manual cleanup');
+          // Manual cleanup if button doesn't exist
+          await page.evaluate(() => {
+            if (window.viewer && window.viewer.signalingClient) {
+              try {
+                window.viewer.signalingClient.close();
+                console.log('Manually closed signaling client');
+              } catch (e) {
+                console.log('Error closing signaling client:', e);
+              }
+            }
+          }).catch(() => {});
+        }
+      }
+    } catch (error) {
+      log(`Error during cleanup: ${error.message}`);
+    } finally {
+      if (browser) {
+        await browser.close();
+      }
+    }
+  };
+
+  // Two-stage timeout approach: cleanup timeout + hard timeout
+  let cleanupCompleted = false;
+  
+  const performCleanup = async () => {
+    if (cleanupCompleted || !page) return;
+    cleanupCompleted = true;
+    
+    try {
+      log('Timeout approaching - performing cleanup...');
+      await page.click('#stop-viewer-button');
+      log('Stop Viewer button clicked successfully');
+      await new Promise(resolve => setTimeout(resolve, 1000)); // Wait for cleanup
+    } catch (error) {
+      log(`Cleanup failed: ${error.message}`);
+    }
+  };
+
+  const cleanupTimeout = (config.duration - 10) * 1000; // Start cleanup 10 seconds early
+  const hardTimeout = config.duration * 1000; // Hard timeout
+
+  const cleanupPromise = new Promise((_, reject) => {
+    setTimeout(async () => {
+      await performCleanup();
+      reject(new Error('Test timeout - cleanup completed'));
+    }, cleanupTimeout);
+  });
+
+  const hardTimeoutPromise = new Promise((_, reject) => {
+    setTimeout(() => {
+      reject(new Error('Hard timeout exceeded'));
+    }, hardTimeout);
   });
   
   try {
@@ -312,7 +383,7 @@ async function runViewerCanary(config) {
         // await test.waitForChannel();
         
         browser = await test.createBrowser();
-        const page = await browser.newPage();
+        page = await browser.newPage();
         
         test.setupConsoleListener(page);
         await test.initializePage(page);
@@ -320,17 +391,26 @@ async function runViewerCanary(config) {
         await test.waitForStorageSession();
         await test.monitorConnection(page);
         
+        cleanupCompleted = true; // Mark cleanup as not needed (normal completion)
         return test.getTestResults();
       })(),
-      timeoutPromise
+      cleanupPromise,
+      hardTimeoutPromise
     ]);
     
-    if (browser) await browser.close();
+    await cleanup('normal');
     return results;
     
   } catch (error) {
     log(`Error running viewer canary: ${error.message}`);
-    if (browser) await browser.close();
+    
+    // If cleanup hasn't been performed yet (e.g., hard timeout), do it now
+    if (!cleanupCompleted) {
+      await performCleanup();
+    }
+    
+    const isTimeout = error.message.includes('timeout');
+    await cleanup(isTimeout ? 'timeout' : 'error');
     throw error;
   }
 }
