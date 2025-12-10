@@ -394,8 +394,8 @@ pipeline {
                             job: NEXT_AVAILABLE_RUNNER,
                             parameters: COMMON_PARAMS + [
                                 booleanParam(name: 'IS_SIGNALING', value: false),
-                                booleanParam(name: 'IS_STORAGE', value: true),
-                                booleanParam(name: 'IS_STORAGE_SINGLE_NODE', value: true),
+                                booleanParam(name: 'IS_STORAGE', value: false),
+                                booleanParam(name: 'IS_STORAGE_SINGLE_NODE', value: false),
                                 booleanParam(name: 'USE_TURN', value: true),
                                 booleanParam(name: 'TRICKLE_ICE', value: true),
                                 booleanParam(name: 'USE_IOT', value: false),
