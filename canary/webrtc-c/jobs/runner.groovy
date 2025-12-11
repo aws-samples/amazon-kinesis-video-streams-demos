@@ -435,6 +435,10 @@ pipeline {
             }
             steps {
                 script {
+                    // Checkout code since this runs on a new agent node
+                    checkout([$class: 'GitSCM', branches: [[name: params.GIT_HASH ]],
+                              userRemoteConfigs: [[url: params.GIT_URL]]])
+                    
                     try {
                         sh """ 
                             cd ./canary/webrtc-c/scripts
