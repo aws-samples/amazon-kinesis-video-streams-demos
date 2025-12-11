@@ -441,6 +441,16 @@ pipeline {
                     
                     try {
                         sh """ 
+                            # Install Node.js if not present
+                            if ! command -v npm &> /dev/null; then
+                                echo "Node.js not found, installing..."
+                                curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
+                                sudo apt-get install -y nodejs
+                                echo "Node.js installation completed"
+                            else
+                                echo "Node.js already installed: \$(node --version)"
+                            fi
+                            
                             cd ./canary/webrtc-c/scripts
                             
                             # Install Node.js dependencies if not exists
