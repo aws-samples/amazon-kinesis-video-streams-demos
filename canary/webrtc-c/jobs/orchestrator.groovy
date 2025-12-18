@@ -402,7 +402,6 @@ pipeline {
                                 booleanParam(name: 'JS_STORAGE_VIEWER_JOIN', value: true),
                                 string(name: 'DURATION_IN_SECONDS', value: STORAGE_WITH_VIEWER_DURATION_IN_SECONDS.toString()),
                                 string(name: 'MASTER_NODE_LABEL', value: "webrtc-storage-master"),
-                                string(name: 'CONSUMER_NODE_LABEL', value: "webrtc-storage-consumer"),
                                 string(name: 'STORAGE_VIEWER_NODE_LABEL', value: "webrtc-storage-viewer"),
                                 string(name: 'RUNNER_LABEL', value: "StorageWithViewer"),
                                 string(name: 'SCENARIO_LABEL', value: "StorageWithViewer"),

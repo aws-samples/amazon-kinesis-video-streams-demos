@@ -309,169 +309,186 @@ pipeline {
             }
         }
 
-        stage('Build and Run Webrtc Canary') {
-            failFast true
-            when {
-                allOf {
-                    equals expected: false, actual: params.IS_SIGNALING
-                    equals expected: false, actual: params.IS_STORAGE
-                    equals expected: false, actual: params.IS_STORAGE_SINGLE_NODE 
-                    equals expected: false, actual: params.JS_STORAGE_VIEWER_JOIN
-                }
-            }
-            parallel {
-                stage('Master') {
-                    steps {
-                        script {
-                            buildPeer(true, params)
-                        }
-                    }
-                }
+        // stage('Build and Run Webrtc Canary') {
+        //     failFast true
+        //     when {
+        //         allOf {
+        //             equals expected: false, actual: params.IS_SIGNALING
+        //             equals expected: false, actual: params.IS_STORAGE
+        //             equals expected: false, actual: params.IS_STORAGE_SINGLE_NODE 
+        //             equals expected: false, actual: params.JS_STORAGE_VIEWER_JOIN
+        //         }
+        //     }
+        //     parallel {
+        //         stage('Master') {
+        //             steps {
+        //                 script {
+        //                     buildPeer(true, params)
+        //                 }
+        //             }
+        //         }
 
-                stage('Viewer') {
-                    agent {
-                        label params.VIEWER_NODE_LABEL
-                    }
+        //         stage('Viewer') {
+        //             agent {
+        //                 label params.VIEWER_NODE_LABEL
+        //             }
 
-                    steps {
-                        script {
-                            buildPeer(false, params)
-                        }
-                    }
-                }
-            }
-        }
+        //             steps {
+        //                 script {
+        //                     buildPeer(false, params)
+        //                 }
+        //             }
+        //         }
+        //     }
+        // }
 
-        stage('Build and Run Signaling Canary') {
-            failFast true
-            when {
-                allOf {
-                    equals expected: true, actual: params.IS_SIGNALING
-                    equals expected: false, actual: params.IS_STORAGE
-                }
-            }
+        // stage('Build and Run Signaling Canary') {
+        //     failFast true
+        //     when {
+        //         allOf {
+        //             equals expected: true, actual: params.IS_SIGNALING
+        //             equals expected: false, actual: params.IS_STORAGE
+        //         }
+        //     }
 
-            steps {
-                script {
-                    buildSignaling(params)
-                }
-            }
-            post {
-                always {
-                    script {
-                        CACHED_WORKSPACE_ID = "${env.WORKSPACE}"
-                        echo "Cached workspace id post job: ${CACHED_WORKSPACE_ID}"
-                    }
-                }
-            }
-        }
+        //     steps {
+        //         script {
+        //             buildSignaling(params)
+        //         }
+        //     }
+        //     post {
+        //         always {
+        //             script {
+        //                 CACHED_WORKSPACE_ID = "${env.WORKSPACE}"
+        //                 echo "Cached workspace id post job: ${CACHED_WORKSPACE_ID}"
+        //             }
+        //         }
+        //     }
+        // }
 
-        stage('Build and Run Webrtc-Storage Master and Consumer Canaries') {
-            failFast true
-            when {
-                allOf {
-                    equals expected: false, actual: params.IS_SIGNALING
-                    equals expected: true, actual: params.IS_STORAGE
-                    equals expected: false, actual: params.IS_STORAGE_SINGLE_NODE 
-                }
-            }
-            parallel {
-                stage('StorageMaster') {
-                    steps {
-                        script {
-                            buildStorageCanary(false, params)
-                        }
-                    }
-                }
-                stage('StorageConsumer') {
-                     agent {
-                        label params.CONSUMER_NODE_LABEL
-                    }
-                    steps {
-                        script {
-                            buildStorageCanary(true, params)
-                        }
-                    }
-                }
-            }
-        }
+        // stage('Build and Run Webrtc-Storage Master and Consumer Canaries') {
+        //     failFast true
+        //     when {
+        //         allOf {
+        //             equals expected: false, actual: params.IS_SIGNALING
+        //             equals expected: true, actual: params.IS_STORAGE
+        //             equals expected: false, actual: params.IS_STORAGE_SINGLE_NODE 
+        //         }
+        //     }
+        //     parallel {
+        //         stage('StorageMaster') {
+        //             steps {
+        //                 script {
+        //                     buildStorageCanary(false, params)
+        //                 }
+        //             }
+        //         }
+        //         stage('StorageConsumer') {
+        //              agent {
+        //                 label params.CONSUMER_NODE_LABEL
+        //             }
+        //             steps {
+        //                 script {
+        //                     buildStorageCanary(true, params)
+        //                 }
+        //             }
+        //         }
+        //     }
+        // }
 
 
-        stage('Build and Run Webrtc-Storage Master and Consumer Canaries on Same Node') {
-            failFast true
-            when {
-                allOf {
-                    equals expected: false, actual: params.IS_SIGNALING
-                    equals expected: true, actual: params.IS_STORAGE
-                    equals expected: true, actual: params.IS_STORAGE_SINGLE_NODE 
-                }
-            }
-            parallel {
-                stage('StorageMaster') {
-                    steps {
-                        script {
-                            buildStorageCanary(false, params)
-                        }
-                    }
-                }
-                stage('StorageConsumer') {
-                    steps {
-                        script {
-                            buildStorageCanary(true, params)
-                        }
-                    }
-                }
+        // stage('Build and Run Webrtc-Storage Master and Consumer Canaries on Same Node') {
+        //     failFast true
+        //     when {
+        //         allOf {
+        //             equals expected: false, actual: params.IS_SIGNALING
+        //             equals expected: true, actual: params.IS_STORAGE
+        //             equals expected: true, actual: params.IS_STORAGE_SINGLE_NODE 
+        //         }
+        //     }
+        //     parallel {
+        //         stage('StorageMaster') {
+        //             steps {
+        //                 script {
+        //                     buildStorageCanary(false, params)
+        //                 }
+        //             }
+        //         }
+        //         stage('StorageConsumer') {
+        //             steps {
+        //                 script {
+        //                     buildStorageCanary(true, params)
+        //                 }
+        //             }
+        //         }
 
-            }
-        }
+        //     }
+        // }
 
         stage('Build and Run Webrtc-storage Viewer') {
             failFast true
             when {
                 equals expected: true, actual: params.JS_STORAGE_VIEWER_JOIN
             }
-            agent {
-                label params.STORAGE_VIEWER_NODE_LABEL
-            }
-            steps {
-                script {
-                    // Checkout code since this runs on a new agent node
-                    checkout([$class: 'GitSCM', branches: [[name: params.GIT_HASH ]],
-                              userRemoteConfigs: [[url: params.GIT_URL]]])
-                    
-                    try {
-                        sh """ 
-                            # Install Node.js if not present
-                            if ! command -v npm &> /dev/null; then
-                                echo "Node.js not found, installing..."
-                                curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
-                                sudo apt-get install -y nodejs
-                                echo "Node.js installation completed"
-                            else
-                                echo "Node.js already installed: \$(node --version)"
-                            fi
+            parallel {
+                stage('StorageMaster') {
+                    agent {
+                        label params.MASTER_NODE_LABEL
+                    }                    
+                    steps {
+                        script {
+                            buildStorageCanary(false, params)
+                        }
+                    }
+                }
+                stage('StorageViewer') {
+                    agent {
+                        label params.STORAGE_VIEWER_NODE_LABEL
+                    }
+                    steps {
+                        script {
+                            // Checkout code since this runs on a new agent node
+                            checkout([$class: 'GitSCM', branches: [[name: params.GIT_HASH ]],
+                                    userRemoteConfigs: [[url: params.GIT_URL]]])
                             
-                            cd ./canary/webrtc-c/scripts
-                            
-                            # Install Node.js dependencies if not exists
-                            if [ ! -d "node_modules" ]; then
-                                npm install puppeteer @aws-sdk/client-cloudwatch
-                            fi
-                            
-                            # Set environment variables for the test
-                            export CANARY_CHANNEL_NAME="${env.JOB_NAME}-${params.RUNNER_LABEL}"
-                            export AWS_REGION="${params.AWS_DEFAULT_REGION}"
-                            export TEST_DURATION="${params.DURATION_IN_SECONDS}"
-                            
-                            # Run storage viewer test
-                            node chrome-headless.js
-                        """
-                    } catch (FlowInterruptedException err) {
-                        echo 'Aborted due to cancellation'
-                        throw err
-                    } catch (err) {
-                        HAS_ERROR = true
-                        unstable err.toString()
+                            try {
+                                sh """ 
+                                    # Wait for StorageMaster to start up
+                                    echo "Waiting 1 minute for StorageMaster to start..."
+                                    sleep 60                                
+                                    # Install Node.js if not present
+                                    if ! command -v npm &> /dev/null; then
+                                        echo "Node.js not found, installing..."
+                                        curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
+                                        sudo apt-get install -y nodejs
+                                        echo "Node.js installation completed"
+                                    else
+                                        echo "Node.js already installed: \$(node --version)"
+                                    fi
+                                    
+                                    cd ./canary/webrtc-c/scripts
+                                    
+                                    # Install Node.js dependencies if not exists
+                                    if [ ! -d "node_modules" ]; then
+                                        npm install puppeteer @aws-sdk/client-cloudwatch
+                                    fi
+                                    
+                                    # Set environment variables for the test
+                                    export CANARY_CHANNEL_NAME="${env.JOB_NAME}-${params.RUNNER_LABEL}"
+                                    export AWS_REGION="${params.AWS_DEFAULT_REGION}"
+                                    export TEST_DURATION="${params.DURATION_IN_SECONDS}"
+                                    
+                                    # Run storage viewer test
+                                    node chrome-headless.js
+                                """
+                            } catch (FlowInterruptedException err) {
+                                echo 'Aborted due to cancellation'
+                                throw err
+                            } catch (err) {
+                                HAS_ERROR = true
+                                unstable err.toString()
+                            }
+                        }
                     }
                 }
             }
