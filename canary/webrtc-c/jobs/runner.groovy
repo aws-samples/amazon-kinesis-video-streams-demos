@@ -272,28 +272,8 @@ pipeline {
         booleanParam(name: 'FIRST_ITERATION', defaultValue: true)
         booleanParam(name: 'JS_STORAGE_VIEWER_JOIN', defaultValue: false)
     }
-    
-    // Set the role ARN to environment to avoid string interpolation to follow Jenkins security guidelines.
-    environment {
-        AWS_KVS_STS_ROLE_ARN = credentials('CANARY_STS_ROLE_ARN')
-    }
 
     stages {
-        stage('Fetch STS credentials and export to env vars') {
-            steps {
-                script {
-                    def assumeRoleOutput = sh(script: 'aws sts assume-role --role-arn $AWS_KVS_STS_ROLE_ARN --role-session-name roleSessionName --duration-seconds 43200 --output json',
-                                                returnStdout: true
-                                                ).trim()
-                    def assumeRoleJson = readJSON text: assumeRoleOutput
-
-                    env.AWS_ACCESS_KEY_ID = assumeRoleJson.Credentials.AccessKeyId
-                    env.AWS_SECRET_ACCESS_KEY = assumeRoleJson.Credentials.SecretAccessKey
-                    env.AWS_SESSION_TOKEN = assumeRoleJson.Credentials.SessionToken
-                }
-            }
-        }
-
         stage('Set build description') {
             steps {
                 script {
@@ -490,17 +470,6 @@ pipeline {
                             }
                         }
                     }
-                }
-            }
-        }
-
-
-        stage('Unset credentials') {
-            steps {
-                script {
-                    env.AWS_ACCESS_KEY_ID = ''
-                    env.AWS_SECRET_ACCESS_KEY = ''
-                    env.AWS_SESSION_TOKEN = ''
                 }
             }
         }
