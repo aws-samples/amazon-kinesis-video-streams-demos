@@ -244,6 +244,13 @@ pipeline {
         label params.MASTER_NODE_LABEL
     }
 
+    environment {
+        AWS_ACCESS_KEY_ID = sh(script: 'aws configure get aws_access_key_id', returnStdout: true).trim()
+        AWS_SECRET_ACCESS_KEY = sh(script: 'aws configure get aws_secret_access_key', returnStdout: true).trim()
+        AWS_DEFAULT_REGION = sh(script: 'aws configure get default.region', returnStdout: true).trim()
+    }
+
+
     parameters {
         choice(name: 'AWS_KVS_LOG_LEVEL', choices: ["1", "2", "3", "4", "5"])
         booleanParam(name: 'IS_SIGNALING')
