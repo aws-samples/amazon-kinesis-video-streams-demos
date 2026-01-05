@@ -400,12 +400,37 @@ pipeline {
                                 booleanParam(name: 'TRICKLE_ICE', value: false),
                                 booleanParam(name: 'USE_IOT', value: false),
                                 booleanParam(name: 'JS_STORAGE_VIEWER_JOIN', value: true),
+                                booleanParam(name: 'JS_STORAGE_TWO_VIEWERS', value: false),
                                 string(name: 'DURATION_IN_SECONDS', value: STORAGE_WITH_VIEWER_DURATION_IN_SECONDS.toString()),
                                 string(name: 'MASTER_NODE_LABEL', value: "webrtc-storage-master"),
                                 string(name: 'STORAGE_VIEWER_NODE_LABEL', value: "webrtc-storage-viewer"),
                                 string(name: 'RUNNER_LABEL', value: "StorageWithViewer"),
                                 string(name: 'SCENARIO_LABEL', value: "StorageWithViewer"),
-                                string(name: 'AWS_DEFAULT_REGION', value: "us-west-2"),                            
+                                string(name: 'AWS_DEFAULT_REGION', value: "us-west-2"),
+                                string(name: 'VIEWER_COUNT', value: "1"),
+                            ],
+                            wait: true
+                        )
+
+                        //Storage with two viewers join
+                        build (
+                            job: NEXT_AVAILABLE_RUNNER,
+                            parameters: COMMON_PARAMS + [
+                                booleanParam(name: 'IS_SIGNALING', value: false),
+                                booleanParam(name: 'IS_STORAGE', value: false),
+                                booleanParam(name: 'IS_STORAGE_SINGLE_NODE', value: false),
+                                booleanParam(name: 'USE_TURN', value: false),
+                                booleanParam(name: 'TRICKLE_ICE', value: false),
+                                booleanParam(name: 'USE_IOT', value: false),
+                                booleanParam(name: 'JS_STORAGE_VIEWER_JOIN', value: false),
+                                booleanParam(name: 'JS_STORAGE_TWO_VIEWERS', value: true),
+                                string(name: 'DURATION_IN_SECONDS', value: STORAGE_WITH_VIEWER_DURATION_IN_SECONDS.toString()),
+                                string(name: 'MASTER_NODE_LABEL', value: "webrtc-storage-master"),
+                                string(name: 'STORAGE_VIEWER_NODE_LABEL', value: "webrtc-storage-viewer"),
+                                string(name: 'RUNNER_LABEL', value: "StorageTwoViewers"),
+                                string(name: 'SCENARIO_LABEL', value: "StorageTwoViewers"),
+                                string(name: 'AWS_DEFAULT_REGION', value: "us-west-2"),
+                                string(name: 'VIEWER_COUNT', value: "2"),
                             ],
                             wait: true
                         )

@@ -278,6 +278,8 @@ pipeline {
         string(name: 'AWS_DEFAULT_REGION')
         booleanParam(name: 'FIRST_ITERATION', defaultValue: true)
         booleanParam(name: 'JS_STORAGE_VIEWER_JOIN', defaultValue: false)
+        booleanParam(name: 'JS_STORAGE_TWO_VIEWERS', defaultValue: false)
+        string(name: 'VIEWER_COUNT', defaultValue: '0')
     }
 
     stages {
@@ -464,8 +466,131 @@ pipeline {
                                     export CANARY_CHANNEL_NAME="${env.JOB_NAME}-${params.RUNNER_LABEL}"
                                     export AWS_REGION="${params.AWS_DEFAULT_REGION}"
                                     export TEST_DURATION="${params.DURATION_IN_SECONDS}"
+                                    export VIEWER_COUNT="${params.VIEWER_COUNT}"
+                                    export FORCE_TURN="${params.FORCE_TURN}"
                                     
                                     # Run storage viewer test
+                                    node chrome-headless.js
+                                """
+                            } catch (FlowInterruptedException err) {
+                                echo 'Aborted due to cancellation'
+                                throw err
+                            } catch (err) {
+                                HAS_ERROR = true
+                                unstable err.toString()
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Build and Run Webrtc-storage Two Viewers') {
+            failFast true
+            when {
+                equals expected: true, actual: params.JS_STORAGE_TWO_VIEWERS
+            }
+            parallel {
+                stage('StorageMaster') {
+                    agent {
+                        label params.MASTER_NODE_LABEL
+                    }                    
+                    steps {
+                        script {
+                            buildStorageCanary(false, params)
+                        }
+                    }
+                }
+                stage('StorageViewer1') {
+                    agent {
+                        label params.STORAGE_VIEWER_NODE_LABEL
+                    }
+                    steps {
+                        script {
+                            // Checkout code since this runs on a new agent node
+                            checkout([$class: 'GitSCM', branches: [[name: params.GIT_HASH ]],
+                                    userRemoteConfigs: [[url: params.GIT_URL]]])
+                            
+                            try {
+                                sh """ 
+                                    # Wait for StorageMaster to start up
+                                    echo "Waiting 1 minute for StorageMaster to start..."
+                                    sleep 60                                
+                                    # Install Node.js if not present
+                                    if ! command -v npm &> /dev/null; then
+                                        echo "Node.js not found, installing..."
+                                        curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
+                                        sudo apt-get install -y nodejs
+                                        echo "Node.js installation completed"
+                                    else
+                                        echo "Node.js already installed: \$(node --version)"
+                                    fi
+                                    
+                                    cd ./canary/webrtc-c/scripts
+                                    
+                                    # Install Node.js dependencies if not exists
+                                    if [ ! -d "node_modules" ]; then
+                                        npm install puppeteer @aws-sdk/client-cloudwatch
+                                    fi
+                                    
+                                    # Set environment variables for the test
+                                    export CANARY_CHANNEL_NAME="${env.JOB_NAME}-${params.RUNNER_LABEL}"
+                                    export AWS_REGION="${params.AWS_DEFAULT_REGION}"
+                                    export TEST_DURATION="${params.DURATION_IN_SECONDS}"
+                                    export FORCE_TURN="${params.FORCE_TURN}"
+                                    
+                                    # Run storage viewer test - first viewer
+                                    node chrome-headless.js
+                                """
+                            } catch (FlowInterruptedException err) {
+                                echo 'Aborted due to cancellation'
+                                throw err
+                            } catch (err) {
+                                HAS_ERROR = true
+                                unstable err.toString()
+                            }
+                        }
+                    }
+                }
+                stage('StorageViewer2') {
+                    agent {
+                        label params.STORAGE_VIEWER_NODE_LABEL
+                    }
+                    steps {
+                        script {
+                            // Checkout code since this runs on a new agent node
+                            checkout([$class: 'GitSCM', branches: [[name: params.GIT_HASH ]],
+                                    userRemoteConfigs: [[url: params.GIT_URL]]])
+                            
+                            try {
+                                sh """ 
+                                    # Wait for StorageMaster to start up
+                                    echo "Waiting 1 minute for StorageMaster to start..."
+                                    sleep 60                                
+                                    # Install Node.js if not present
+                                    if ! command -v npm &> /dev/null; then
+                                        echo "Node.js not found, installing..."
+                                        curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
+                                        sudo apt-get install -y nodejs
+                                        echo "Node.js installation completed"
+                                    else
+                                        echo "Node.js already installed: \$(node --version)"
+                                    fi
+                                    
+                                    cd ./canary/webrtc-c/scripts
+                                    
+                                    # Install Node.js dependencies if not exists
+                                    if [ ! -d "node_modules" ]; then
+                                        npm install puppeteer @aws-sdk/client-cloudwatch
+                                    fi
+                                    
+                                    # Set environment variables for the test
+                                    export CANARY_CHANNEL_NAME="${env.JOB_NAME}-${params.RUNNER_LABEL}"
+                                    export AWS_REGION="${params.AWS_DEFAULT_REGION}"
+                                    export TEST_DURATION="${params.DURATION_IN_SECONDS}"
+                                    export FORCE_TURN="${params.FORCE_TURN}"
+                                    
+                                    # Run storage viewer test - second viewer
                                     node chrome-headless.js
                                 """
                             } catch (FlowInterruptedException err) {
@@ -505,6 +630,7 @@ pipeline {
                       booleanParam(name: 'IS_STORAGE', value: params.IS_STORAGE),
                       booleanParam(name: 'IS_STORAGE_SINGLE_NODE', value: params.IS_STORAGE_SINGLE_NODE),
                       booleanParam(name: 'JS_STORAGE_VIEWER_JOIN', value: params.JS_STORAGE_VIEWER_JOIN),
+                      booleanParam(name: 'JS_STORAGE_TWO_VIEWERS', value: params.JS_STORAGE_TWO_VIEWERS),
                       booleanParam(name: 'USE_TURN', value: params.USE_TURN),
                       booleanParam(name: 'FORCE_TURN', value: params.FORCE_TURN),
                       booleanParam(name: 'USE_IOT', value: params.USE_IOT),
@@ -523,6 +649,7 @@ pipeline {
                       string(name: 'MIN_RETRY_DELAY_IN_SECONDS', value: params.MIN_RETRY_DELAY_IN_SECONDS),
                       string(name: 'GIT_URL', value: params.GIT_URL),
                       string(name: 'GIT_HASH', value: params.GIT_HASH),
+                      string(name: 'VIEWER_COUNT', value: params.VIEWER_COUNT),
                       booleanParam(name: 'FIRST_ITERATION', value: false)
                     ],
                     wait: false

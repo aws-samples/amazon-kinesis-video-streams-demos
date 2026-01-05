@@ -11,12 +11,17 @@ function log(message) {
 class ViewerCanaryTest {
   constructor(config) {
     this.config = config;
+    log(`Initializing test with single viewer`);
+    
     this.sessionStartTime = Date.now();
     this.storageSessionJoined = false;
     this.screenshotTaken = false;
     this.framesReceived = false;
     this.testCompleted = false;
     this.timerStarted = false;
+    
+    this.browser = null;
+    this.page = null;
   }
 
   async initializeCloudWatch() {
@@ -72,6 +77,11 @@ class ViewerCanaryTest {
       sendVideo: this.config.sendVideo || 'false',
       sendAudio: this.config.sendAudio || 'false',
     });
+    
+    // Add forceTURN parameter if configured
+    if (this.config.forceTURN === true) {
+      params.set('forceTURN', 'true');
+    }
     
     return `https://awslabs.github.io/amazon-kinesis-video-streams-webrtc-sdk-js/examples/index.html?${params}`;
   }
@@ -296,49 +306,60 @@ async function runViewerCanary(config) {
   log(`Config: ${JSON.stringify(config)}`);
   
   const test = new ViewerCanaryTest(config);
-  let browser;
-  let page;
   
   // Cleanup function to properly close viewer
   const cleanup = async (reason = 'normal') => {
     try {
-      if (page && browser) {
-        log(`Cleaning up viewer connection (${reason})...`);
-        
-        // Try to click stop viewer button for proper cleanup
-        const stopButtonClicked = await page.evaluate(() => {
-          const stopButton = document.querySelector('#stop-viewer-button');
-          if (stopButton && !stopButton.disabled) {
-            stopButton.click();
-            return true;
-          }
-          return false;
-        }).catch(() => false);
-        
-        if (stopButtonClicked) {
-          log('Stop viewer button clicked successfully');
-          await new Promise(resolve => setTimeout(resolve, 1000)); // Wait for cleanup
-        } else {
-          log('Stop viewer button not found or disabled, attempting manual cleanup');
-          // Manual cleanup if button doesn't exist
-          await page.evaluate(() => {
-            if (window.viewer && window.viewer.signalingClient) {
-              try {
-                window.viewer.signalingClient.close();
-                console.log('Manually closed signaling client');
-              } catch (e) {
-                console.log('Error closing signaling client:', e);
-              }
+      log(`Cleaning up viewer connection (${reason})...`);
+      
+      if (test.page) {
+        try {
+          // Try to click stop viewer button for proper cleanup
+          const stopButtonClicked = await test.page.evaluate(() => {
+            const stopButton = document.querySelector('#stop-viewer-button');
+            if (stopButton && !stopButton.disabled) {
+              stopButton.click();
+              return true;
             }
-          }).catch(() => {});
+            return false;
+          }).catch(() => false);
+          
+          if (stopButtonClicked) {
+            log(`Stop viewer button clicked successfully`);
+          } else {
+            log(`Stop viewer button not found, attempting manual cleanup`);
+            // Manual cleanup if button doesn't exist
+            await test.page.evaluate(() => {
+              if (window.viewer && window.viewer.signalingClient) {
+                try {
+                  window.viewer.signalingClient.close();
+                  console.log('Manually closed signaling client');
+                } catch (e) {
+                  console.log('Error closing signaling client:', e);
+                }
+              }
+            }).catch(() => {});
+          }
+        } catch (error) {
+          log(`Error cleaning up viewer: ${error.message}`);
         }
       }
+      
+      // Wait a moment for cleanup
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // Close browser
+      if (test.browser) {
+        try {
+          await test.browser.close();
+          log(`Browser closed successfully`);
+        } catch (error) {
+          log(`Error closing browser: ${error.message}`);
+        }
+      }
+      
     } catch (error) {
       log(`Error during cleanup: ${error.message}`);
-    } finally {
-      if (browser) {
-        await browser.close();
-      }
     }
   };
 
@@ -346,13 +367,22 @@ async function runViewerCanary(config) {
   let cleanupCompleted = false;
   
   const performCleanup = async () => {
-    if (cleanupCompleted || !page) return;
+    if (cleanupCompleted) return;
     cleanupCompleted = true;
     
     try {
       log('Timeout approaching - performing cleanup...');
-      await page.click('#stop-viewer-button');
-      log('Stop Viewer button clicked successfully');
+      
+      // Try to stop viewer
+      if (test.page) {
+        try {
+          await test.page.click('#stop-viewer-button');
+          log(`Stop Viewer button clicked successfully`);
+        } catch (error) {
+          log(`Cleanup failed: ${error.message}`);
+        }
+      }
+      
       await new Promise(resolve => setTimeout(resolve, 1000)); // Wait for cleanup
     } catch (error) {
       log(`Cleanup failed: ${error.message}`);
@@ -382,14 +412,23 @@ async function runViewerCanary(config) {
         test.validateEnvironment();
         // await test.waitForChannel();
         
-        browser = await test.createBrowser();
-        page = await browser.newPage();
+        // Create and initialize single browser and page
+        log(`Creating viewer instance...`);
         
-        test.setupConsoleListener(page);
-        await test.initializePage(page);
-        await test.waitForViewerStart(page);
+        test.browser = await test.createBrowser();
+        test.page = await test.browser.newPage();
+        
+        test.setupConsoleListener(test.page);
+        await test.initializePage(test.page);
+        
+        log('Starting viewer...');
+        
+        await test.waitForViewerStart(test.page);
+        
         await test.waitForStorageSession();
-        await test.monitorConnection(page);
+        
+        // Monitor the viewer
+        await test.monitorConnection(test.page);
         
         cleanupCompleted = true; // Mark cleanup as not needed (normal completion)
         return test.getTestResults();
@@ -421,7 +460,9 @@ runViewerCanary({
   region: process.env.AWS_REGION || 'us-west-2',
   duration: 360,
   saveFrames: process.env.SAVE_FRAMES === 'true',
-  clientId: process.env.CLIENT_ID || `test-viewer-${Date.now()}`
+  clientId: process.env.CLIENT_ID || `test-viewer-${Date.now()}`,
+  viewerCount: process.env.VIEWER_COUNT || 1,
+  forceTURN: process.env.FORCE_TURN === 'true'
 }).then(result => {
   process.exit(result.success ? 0 : 1);
 }).catch(error => {
