@@ -407,9 +407,8 @@ pipeline {
                                 string(name: 'RUNNER_LABEL', value: "StorageWithViewer"),
                                 string(name: 'SCENARIO_LABEL', value: "StorageWithViewer"),
                                 string(name: 'AWS_DEFAULT_REGION', value: "us-west-2"),
-                                string(name: 'VIEWER_COUNT', value: "1"),
                             ],
-                            wait: true
+                            wait: false
                         )
 
                         //Storage with two viewers join
@@ -430,9 +429,8 @@ pipeline {
                                 string(name: 'RUNNER_LABEL', value: "StorageTwoViewers"),
                                 string(name: 'SCENARIO_LABEL', value: "StorageTwoViewers"),
                                 string(name: 'AWS_DEFAULT_REGION', value: "us-west-2"),
-                                string(name: 'VIEWER_COUNT', value: "2"),
                             ],
-                            wait: true
+                            wait: false
                         )
                     }
                 }
