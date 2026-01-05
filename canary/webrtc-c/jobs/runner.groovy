@@ -269,6 +269,8 @@ pipeline {
         string(name: 'VIEWER_NODE_LABEL')
         string(name: 'RUNNER_LABEL')
         string(name: 'STORAGE_VIEWER_NODE_LABEL')
+        string(name: 'STORAGE_VIEWER_ONE_NODE_LABEL')
+        string(name: 'STORAGE_VIEWER_TWO_NODE_LABEL')
         string(name: 'SCENARIO_LABEL')
         string(name: 'DURATION_IN_SECONDS')
         string(name: 'VIDEO_CODEC')
@@ -503,7 +505,7 @@ pipeline {
                 }
                 stage('StorageViewer1') {
                     agent {
-                        label params.STORAGE_VIEWER_NODE_LABEL
+                        label params.STORAGE_VIEWER_ONE_NODE_LABEL
                     }
                     steps {
                         script {
@@ -516,11 +518,6 @@ pipeline {
                                     # Wait for StorageMaster to start up
                                     echo "Waiting 1 minute for StorageMaster to start..."
                                     sleep 60
-                                    
-                                    # Add random delay to avoid package manager conflicts
-                                    DELAY=\$((RANDOM % 30 + 10))
-                                    echo "Adding random delay of \$DELAY seconds to avoid conflicts..."
-                                    sleep \$DELAY
                                     
                                     # Install Node.js if not present with retry logic
                                     if ! command -v npm &> /dev/null; then
@@ -566,7 +563,7 @@ pipeline {
                 }
                 stage('StorageViewer2') {
                     agent {
-                        label params.STORAGE_VIEWER_NODE_LABEL
+                        label params.STORAGE_VIEWER_TWO_NODE_LABEL
                     }
                     steps {
                         script {
@@ -579,11 +576,6 @@ pipeline {
                                     # Wait for StorageMaster to start up
                                     echo "Waiting 1 minute for StorageMaster to start..."
                                     sleep 60
-                                    
-                                    # Add longer delay for second viewer to avoid conflicts
-                                    DELAY=\$((RANDOM % 30 + 40))
-                                    echo "Adding random delay of \$DELAY seconds to avoid conflicts..."
-                                    sleep \$DELAY
                                     
                                     # Install Node.js if not present with retry logic
                                     if ! command -v npm &> /dev/null; then
@@ -666,6 +658,8 @@ pipeline {
                       string(name: 'CONSUMER_NODE_LABEL', value: params.CONSUMER_NODE_LABEL),
                       string(name: 'VIEWER_NODE_LABEL', value: params.VIEWER_NODE_LABEL),
                       string(name: 'STORAGE_VIEWER_NODE_LABEL', value: params.STORAGE_VIEWER_NODE_LABEL),
+                      string(name: 'STORAGE_VIEWER_ONE_NODE_LABEL', value: params.STORAGE_VIEWER_NODE_LABEL),
+                      string(name: 'STORAGE_VIEWER_TWO_NODE_LABEL', value: params.STORAGE_VIEWER_NODE_LABEL),
                       string(name: 'RUNNER_LABEL', value: params.RUNNER_LABEL),
                       string(name: 'SCENARIO_LABEL', value: params.SCENARIO_LABEL),
                       string(name: 'DURATION_IN_SECONDS', value: params.DURATION_IN_SECONDS),
