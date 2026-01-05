@@ -515,12 +515,24 @@ pipeline {
                                 sh """ 
                                     # Wait for StorageMaster to start up
                                     echo "Waiting 1 minute for StorageMaster to start..."
-                                    sleep 60                                
-                                    # Install Node.js if not present
+                                    sleep 60
+                                    
+                                    # Add random delay to avoid package manager conflicts
+                                    DELAY=\$((RANDOM % 30 + 10))
+                                    echo "Adding random delay of \$DELAY seconds to avoid conflicts..."
+                                    sleep \$DELAY
+                                    
+                                    # Install Node.js if not present with retry logic
                                     if ! command -v npm &> /dev/null; then
                                         echo "Node.js not found, installing..."
-                                        curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
-                                        sudo apt-get install -y nodejs
+                                        for i in {1..3}; do
+                                            if curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash - && sudo apt-get install -y nodejs; then
+                                                break
+                                            else
+                                                echo "Installation attempt \$i failed, retrying in 10 seconds..."
+                                                sleep 10
+                                            fi
+                                        done
                                         echo "Node.js installation completed"
                                     else
                                         echo "Node.js already installed: \$(node --version)"
@@ -566,12 +578,24 @@ pipeline {
                                 sh """ 
                                     # Wait for StorageMaster to start up
                                     echo "Waiting 1 minute for StorageMaster to start..."
-                                    sleep 60                                
-                                    # Install Node.js if not present
+                                    sleep 60
+                                    
+                                    # Add longer delay for second viewer to avoid conflicts
+                                    DELAY=\$((RANDOM % 30 + 40))
+                                    echo "Adding random delay of \$DELAY seconds to avoid conflicts..."
+                                    sleep \$DELAY
+                                    
+                                    # Install Node.js if not present with retry logic
                                     if ! command -v npm &> /dev/null; then
                                         echo "Node.js not found, installing..."
-                                        curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
-                                        sudo apt-get install -y nodejs
+                                        for i in {1..3}; do
+                                            if curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash - && sudo apt-get install -y nodejs; then
+                                                break
+                                            else
+                                                echo "Installation attempt \$i failed, retrying in 15 seconds..."
+                                                sleep 15
+                                            fi
+                                        done
                                         echo "Node.js installation completed"
                                     else
                                         echo "Node.js already installed: \$(node --version)"
