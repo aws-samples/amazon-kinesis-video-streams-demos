@@ -53,7 +53,7 @@ class ViewerCanaryTest {
         
         const joinTime = Date.now() - this.sessionStartTime;
         await CloudWatchMetrics.publishMsMetric(
-          'StorageSessionJoinTime',
+          'JoinSSAsViewerTime',
           this.config.channelName,
           joinTime
         );
