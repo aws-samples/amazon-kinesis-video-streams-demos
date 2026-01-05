@@ -458,10 +458,9 @@ async function runViewerCanary(config) {
 runViewerCanary({
   channelName: process.env.CANARY_CHANNEL_NAME || 'ScaryTestStream',
   region: process.env.AWS_REGION || 'us-west-2',
-  duration: 360,
+  duration: parseInt(process.env.TEST_DURATION) || 360,
   saveFrames: process.env.SAVE_FRAMES === 'true',
   clientId: process.env.CLIENT_ID || `test-viewer-${Date.now()}`,
-  viewerCount: process.env.VIEWER_COUNT || 1,
   forceTURN: process.env.FORCE_TURN === 'true'
 }).then(result => {
   process.exit(result.success ? 0 : 1);
