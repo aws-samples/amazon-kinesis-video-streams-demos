@@ -300,121 +300,121 @@ pipeline {
             }
         }
 
-        // stage('Build and Run Webrtc Canary') {
-        //     failFast true
-        //     when {
-        //         allOf {
-        //             equals expected: false, actual: params.IS_SIGNALING
-        //             equals expected: false, actual: params.IS_STORAGE
-        //             equals expected: false, actual: params.IS_STORAGE_SINGLE_NODE 
-        //             equals expected: false, actual: params.JS_STORAGE_VIEWER_JOIN
-        //         }
-        //     }
-        //     parallel {
-        //         stage('Master') {
-        //             steps {
-        //                 script {
-        //                     buildPeer(true, params)
-        //                 }
-        //             }
-        //         }
+        stage('Build and Run Webrtc Canary') {
+            failFast true
+            when {
+                allOf {
+                    equals expected: false, actual: params.IS_SIGNALING
+                    equals expected: false, actual: params.IS_STORAGE
+                    equals expected: false, actual: params.IS_STORAGE_SINGLE_NODE 
+                    equals expected: false, actual: params.JS_STORAGE_VIEWER_JOIN
+                }
+            }
+            parallel {
+                stage('Master') {
+                    steps {
+                        script {
+                            buildPeer(true, params)
+                        }
+                    }
+                }
 
-        //         stage('Viewer') {
-        //             agent {
-        //                 label params.VIEWER_NODE_LABEL
-        //             }
+                stage('Viewer') {
+                    agent {
+                        label params.VIEWER_NODE_LABEL
+                    }
 
-        //             steps {
-        //                 script {
-        //                     buildPeer(false, params)
-        //                 }
-        //             }
-        //         }
-        //     }
-        // }
+                    steps {
+                        script {
+                            buildPeer(false, params)
+                        }
+                    }
+                }
+            }
+        }
 
-        // stage('Build and Run Signaling Canary') {
-        //     failFast true
-        //     when {
-        //         allOf {
-        //             equals expected: true, actual: params.IS_SIGNALING
-        //             equals expected: false, actual: params.IS_STORAGE
-        //         }
-        //     }
+        stage('Build and Run Signaling Canary') {
+            failFast true
+            when {
+                allOf {
+                    equals expected: true, actual: params.IS_SIGNALING
+                    equals expected: false, actual: params.IS_STORAGE
+                }
+            }
 
-        //     steps {
-        //         script {
-        //             buildSignaling(params)
-        //         }
-        //     }
-        //     post {
-        //         always {
-        //             script {
-        //                 CACHED_WORKSPACE_ID = "${env.WORKSPACE}"
-        //                 echo "Cached workspace id post job: ${CACHED_WORKSPACE_ID}"
-        //             }
-        //         }
-        //     }
-        // }
+            steps {
+                script {
+                    buildSignaling(params)
+                }
+            }
+            post {
+                always {
+                    script {
+                        CACHED_WORKSPACE_ID = "${env.WORKSPACE}"
+                        echo "Cached workspace id post job: ${CACHED_WORKSPACE_ID}"
+                    }
+                }
+            }
+        }
 
-        // stage('Build and Run Webrtc-Storage Master and Consumer Canaries') {
-        //     failFast true
-        //     when {
-        //         allOf {
-        //             equals expected: false, actual: params.IS_SIGNALING
-        //             equals expected: true, actual: params.IS_STORAGE
-        //             equals expected: false, actual: params.IS_STORAGE_SINGLE_NODE 
-        //         }
-        //     }
-        //     parallel {
-        //         stage('StorageMaster') {
-        //             steps {
-        //                 script {
-        //                     buildStorageCanary(false, params)
-        //                 }
-        //             }
-        //         }
-        //         stage('StorageConsumer') {
-        //              agent {
-        //                 label params.CONSUMER_NODE_LABEL
-        //             }
-        //             steps {
-        //                 script {
-        //                     buildStorageCanary(true, params)
-        //                 }
-        //             }
-        //         }
-        //     }
-        // }
+        stage('Build and Run Webrtc-Storage Master and Consumer Canaries') {
+            failFast true
+            when {
+                allOf {
+                    equals expected: false, actual: params.IS_SIGNALING
+                    equals expected: true, actual: params.IS_STORAGE
+                    equals expected: false, actual: params.IS_STORAGE_SINGLE_NODE 
+                }
+            }
+            parallel {
+                stage('StorageMaster') {
+                    steps {
+                        script {
+                            buildStorageCanary(false, params)
+                        }
+                    }
+                }
+                stage('StorageConsumer') {
+                     agent {
+                        label params.CONSUMER_NODE_LABEL
+                    }
+                    steps {
+                        script {
+                            buildStorageCanary(true, params)
+                        }
+                    }
+                }
+            }
+        }
 
 
-        // stage('Build and Run Webrtc-Storage Master and Consumer Canaries on Same Node') {
-        //     failFast true
-        //     when {
-        //         allOf {
-        //             equals expected: false, actual: params.IS_SIGNALING
-        //             equals expected: true, actual: params.IS_STORAGE
-        //             equals expected: true, actual: params.IS_STORAGE_SINGLE_NODE 
-        //         }
-        //     }
-        //     parallel {
-        //         stage('StorageMaster') {
-        //             steps {
-        //                 script {
-        //                     buildStorageCanary(false, params)
-        //                 }
-        //             }
-        //         }
-        //         stage('StorageConsumer') {
-        //             steps {
-        //                 script {
-        //                     buildStorageCanary(true, params)
-        //                 }
-        //             }
-        //         }
+        stage('Build and Run Webrtc-Storage Master and Consumer Canaries on Same Node') {
+            failFast true
+            when {
+                allOf {
+                    equals expected: false, actual: params.IS_SIGNALING
+                    equals expected: true, actual: params.IS_STORAGE
+                    equals expected: true, actual: params.IS_STORAGE_SINGLE_NODE 
+                }
+            }
+            parallel {
+                stage('StorageMaster') {
+                    steps {
+                        script {
+                            buildStorageCanary(false, params)
+                        }
+                    }
+                }
+                stage('StorageConsumer') {
+                    steps {
+                        script {
+                            buildStorageCanary(true, params)
+                        }
+                    }
+                }
 
-        //     }
-        // }
+            }
+        }
 
         stage('Build and Run Webrtc-storage Viewer') {
             failFast true
