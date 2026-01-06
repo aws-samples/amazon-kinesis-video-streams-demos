@@ -308,6 +308,8 @@ pipeline {
                     equals expected: false, actual: params.IS_STORAGE
                     equals expected: false, actual: params.IS_STORAGE_SINGLE_NODE 
                     equals expected: false, actual: params.JS_STORAGE_VIEWER_JOIN
+                    equals expected: false, actual: params.JS_STORAGE_TWO_VIEWERS
+                    equals expected: false, actual: params.JS_STORAGE_THREE_VIEWERS
                 }
             }
             parallel {
