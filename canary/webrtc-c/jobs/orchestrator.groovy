@@ -425,6 +425,7 @@ pipeline {
                                 booleanParam(name: 'JS_STORAGE_TWO_VIEWERS', value: true),
                                 string(name: 'DURATION_IN_SECONDS', value: STORAGE_WITH_VIEWER_DURATION_IN_SECONDS.toString()),
                                 string(name: 'MASTER_NODE_LABEL', value: "webrtc-storage-master"),
+                                string(name: 'STORAGE_VIEWER_NODE_LABEL', value: "webrtc-storage-viewer"),
                                 string(name: 'STORAGE_VIEWER_ONE_NODE_LABEL', value: "webrtc-storage-multi-viewer-1"),
                                 string(name: 'STORAGE_VIEWER_TWO_NODE_LABEL', value: "webrtc-storage-multi-viewer-2"),
                                 string(name: 'RUNNER_LABEL', value: "StorageTwoViewers"),
