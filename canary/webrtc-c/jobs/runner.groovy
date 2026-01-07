@@ -419,57 +419,71 @@ pipeline {
             }
         }
 
+        stage('Start Continuous StorageMaster') {
+            when {
+                anyOf {
+                    equals expected: true, actual: params.JS_STORAGE_VIEWER_JOIN
+                    equals expected: true, actual: params.JS_STORAGE_TWO_VIEWERS
+                }
+            }
+            agent {
+                label params.MASTER_NODE_LABEL
+            }
+            steps {
+                script {
+                    sh """
+                        export JOB_NAME="${env.JOB_NAME}"
+                        export RUNNER_LABEL="${params.RUNNER_LABEL}"
+                        export AWS_DEFAULT_REGION="${params.AWS_DEFAULT_REGION}"
+                        export DURATION_IN_SECONDS="${params.DURATION_IN_SECONDS * 2}"  # Double duration for continuous operation
+                        export FORCE_TURN="${params.FORCE_TURN}"
+                        
+                        # Start master in background
+                        nohup ./canary/webrtc-c/scripts/setup-storage-master.sh > master.log 2>&1 &
+                        echo \$! > master.pid
+                        
+                        # Wait for master to be ready
+                        sleep 30
+                    """
+                }
+            }
+        }
+
         stage('Build and Run Webrtc-storage Viewer') {
             failFast true
             when {
                 equals expected: true, actual: params.JS_STORAGE_VIEWER_JOIN
             }
-            parallel {
-                stage('StorageMaster') {
-                    agent {
-                        label params.MASTER_NODE_LABEL
-                    }                    
-                    steps {
-                        script {
+            agent {
+                label params.STORAGE_VIEWER_NODE_LABEL
+            }
+            steps {
+                script {
+                    sh """
+                        echo "DEBUG: Checking StorageViewer directory contents"
+                        echo "DEBUG: GIT_HASH parameter: ${params.GIT_HASH}"
+                        git rev-parse HEAD
+                        ls -la ./canary/webrtc-c/scripts/
+                        pwd
+                    """
+                    
+                    try {
+                        sh """
+                            export JOB_NAME="${env.JOB_NAME}"
+                            export RUNNER_LABEL="${params.RUNNER_LABEL}"
+                            export AWS_DEFAULT_REGION="${params.AWS_DEFAULT_REGION}"
+                            export DURATION_IN_SECONDS="${params.DURATION_IN_SECONDS}"
+                            export FORCE_TURN="${params.FORCE_TURN}"
+                            export VIEWER_COUNT="${params.VIEWER_COUNT}"
                             
-                            buildStorageCanary(false, params)
-                        }
-                    }
-                }
-                stage('StorageViewer') {
-                    agent {
-                        label params.STORAGE_VIEWER_NODE_LABEL
-                    }
-                    steps {
-                        script {
-                            
-                            sh """
-                                echo "DEBUG: Checking StorageViewer directory contents"
-                                echo "DEBUG: GIT_HASH parameter: ${params.GIT_HASH}"
-                                git rev-parse HEAD
-                                ls -la ./canary/webrtc-c/scripts/
-                                pwd
-                            """
-                            
-                            try {
-                                sh """
-                                    export JOB_NAME="${env.JOB_NAME}"
-                                    export RUNNER_LABEL="${params.RUNNER_LABEL}"
-                                    export AWS_DEFAULT_REGION="${params.AWS_DEFAULT_REGION}"
-                                    export DURATION_IN_SECONDS="${params.DURATION_IN_SECONDS}"
-                                    export FORCE_TURN="${params.FORCE_TURN}"
-                                    export VIEWER_COUNT="${params.VIEWER_COUNT}"
-                                    
-                                    ./canary/webrtc-c/scripts/setup-storage-viewer.sh
-                                """
-                            } catch (FlowInterruptedException err) {
-                                echo 'Aborted due to cancellation'
-                                throw err
-                            } catch (err) {
-                                HAS_ERROR = true
-                                unstable err.toString()
-                            }
-                        }
+                            ./canary/webrtc-c/scripts/setup-storage-viewer.sh
+                        """
+                    } catch (FlowInterruptedException err) {
+                        echo 'Aborted due to cancellation'
+                        throw err
+                    } catch (err) {
+                        HAS_ERROR = true
+                        unstable err.toString()
                     }
                 }
             }
@@ -481,23 +495,12 @@ pipeline {
                 equals expected: true, actual: params.JS_STORAGE_TWO_VIEWERS
             }
             parallel {
-                stage('StorageMaster') {
-                    agent {
-                        label params.MASTER_NODE_LABEL
-                    }                    
-                    steps {
-                        script {
-                            buildStorageCanary(false, params)
-                        }
-                    }
-                }
                 stage('StorageViewer1') {
                     agent {
                         label params.STORAGE_VIEWER_ONE_NODE_LABEL
                     }
                     steps {
                         script {
-                            
                             try {
                                 sh """
                                     export JOB_NAME="${env.JOB_NAME}"
@@ -543,6 +546,29 @@ pipeline {
                             }
                         }
                     }
+                }
+            }
+        }
+
+        stage('Stop Continuous StorageMaster') {
+            when {
+                anyOf {
+                    equals expected: true, actual: params.JS_STORAGE_VIEWER_JOIN
+                    equals expected: true, actual: params.JS_STORAGE_TWO_VIEWERS
+                }
+            }
+            agent {
+                label params.MASTER_NODE_LABEL
+            }
+            steps {
+                script {
+                    sh """
+                        # Stop the background master process
+                        if [ -f master.pid ]; then
+                            kill \$(cat master.pid) || true
+                            rm -f master.pid
+                        fi
+                    """
                 }
             }
         }
