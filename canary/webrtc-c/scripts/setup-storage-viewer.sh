@@ -1,9 +1,4 @@
 #!/bin/bash
-
-# Wait for StorageMaster to start up
-echo "Waiting 1 minute for StorageMaster to start..."
-sleep 60
-
 # Install Node.js if not present with retry logic
 if ! command -v npm &> /dev/null; then
     echo "Node.js not found, installing..."

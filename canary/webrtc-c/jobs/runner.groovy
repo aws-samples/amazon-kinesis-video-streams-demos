@@ -162,6 +162,48 @@ def buildSignaling(params) {
     }
 }
 
+def runViewerSessions(viewerId = "", waitMinutes = 10) {
+    deleteDir()
+    checkout([$class: 'GitSCM', branches: [[name: params.GIT_HASH ]],
+              userRemoteConfigs: [[url: params.GIT_URL]]])
+    
+    if (params.FIRST_ITERATION) {
+        echo "First iteration - waiting ${waitMinutes} minutes for master to build"
+        sleep waitMinutes * 60
+    }
+    
+    for (int session = 1; session <= 3; session++) {
+        echo "Starting ${viewerId ? viewerId + ' ' : ''}session ${session}/3"
+        
+        try {
+            sh """
+                export JOB_NAME="${env.JOB_NAME}"
+                export RUNNER_LABEL="${params.RUNNER_LABEL}"
+                export AWS_DEFAULT_REGION="${params.AWS_DEFAULT_REGION}"
+                export DURATION_IN_SECONDS="180"
+                export FORCE_TURN="${params.FORCE_TURN}"
+                export VIEWER_COUNT="${params.VIEWER_COUNT ?: ''}"
+                export VIEWER_ID="${viewerId}"
+                export CLIENT_ID="${viewerId ? viewerId.toLowerCase() + '-' : 'viewer-'}session-${session}-${BUILD_NUMBER}"
+                
+                ./canary/webrtc-c/scripts/setup-storage-viewer.sh
+            """
+        } catch (FlowInterruptedException err) {
+            echo 'Aborted due to cancellation'
+            throw err
+        } catch (err) {
+            HAS_ERROR = true
+            unstable err.toString()
+        }
+        
+        if (session < 3) {
+            echo "${viewerId ? viewerId + ' ' : ''}session ${session} completed. Waiting 1 minute before next session."
+            sleep 60
+        }
+    }
+    echo "All 3 ${viewerId ? viewerId + ' ' : ''}sessions completed"
+}
+
 def buildStorageCanary(isConsumer, params) {
     def scripts_dir = !isConsumer ? "$WORKSPACE/canary/webrtc-c/scripts" :
         "$WORKSPACE/canary/webrtc-c/scripts"
@@ -263,6 +305,7 @@ pipeline {
         booleanParam(name: 'FIRST_ITERATION', defaultValue: true)
         booleanParam(name: 'JS_STORAGE_VIEWER_JOIN', defaultValue: false)
         booleanParam(name: 'JS_STORAGE_TWO_VIEWERS', defaultValue: false)
+        booleanParam(name: 'JS_STORAGE_THREE_VIEWERS', defaultValue: false)
     }
     
     // Set the role ARN to environment to avoid string interpolation to follow Jenkins security guidelines.
@@ -309,7 +352,8 @@ pipeline {
                     equals expected: false, actual: params.IS_STORAGE
                     equals expected: false, actual: params.IS_STORAGE_SINGLE_NODE 
                     equals expected: false, actual: params.JS_STORAGE_VIEWER_JOIN
-                    equals expected: false, actual: params.JS_STORAGE_TWO_VIEWERS 
+                    equals expected: false, actual: params.JS_STORAGE_TWO_VIEWERS
+                    equals expected: false, actual: params.JS_STORAGE_THREE_VIEWERS
                 }
             }
             parallel {
@@ -367,7 +411,8 @@ pipeline {
                     equals expected: true, actual: params.IS_STORAGE
                     equals expected: false, actual: params.IS_STORAGE_SINGLE_NODE
                     equals expected: false, actual: params.JS_STORAGE_VIEWER_JOIN
-                    equals expected: false, actual: params.JS_STORAGE_TWO_VIEWERS 
+                    equals expected: false, actual: params.JS_STORAGE_TWO_VIEWERS
+                    equals expected: false, actual: params.JS_STORAGE_THREE_VIEWERS
                 }
             }
             parallel {
@@ -442,45 +487,7 @@ pipeline {
                     }
                     steps {
                         script {
-                            checkout([$class: 'GitSCM', branches: [[name: params.GIT_HASH ]],
-                                      userRemoteConfigs: [[url: params.GIT_URL]]])
-                            
-                            // Wait for master to build on first iteration
-                            if (params.FIRST_ITERATION) {
-                                echo "First iteration - waiting 15 minutes for master to build"
-                                sleep 900
-                            }
-                            
-                            // Run 3 viewer sessions
-                            for (int session = 1; session <= 3; session++) {
-                                echo "Starting viewer session ${session}/3"
-                                
-                                try {
-                                    sh """
-                                        export JOB_NAME="${env.JOB_NAME}"
-                                        export RUNNER_LABEL="${params.RUNNER_LABEL}"
-                                        export AWS_DEFAULT_REGION="${params.AWS_DEFAULT_REGION}"
-                                        export DURATION_IN_SECONDS="180"
-                                        export FORCE_TURN="${params.FORCE_TURN}"
-                                        export VIEWER_COUNT="${params.VIEWER_COUNT}"
-                                        export CLIENT_ID="viewer-session-${session}-${BUILD_NUMBER}"
-                                        
-                                        ./canary/webrtc-c/scripts/setup-storage-viewer.sh
-                                    """
-                                } catch (FlowInterruptedException err) {
-                                    echo 'Aborted due to cancellation'
-                                    throw err
-                                } catch (err) {
-                                    HAS_ERROR = true
-                                    unstable err.toString()
-                                }
-                                
-                                if (session < 3) {
-                                    echo "Session ${session} completed. Waiting 1 minute before next session."
-                                    sleep 60
-                                }
-                            }
-                            echo "All 3 viewer sessions completed"
+                            runViewerSessions("", 21)
                         }
                     }
                 }
@@ -510,45 +517,7 @@ pipeline {
                     }
                     steps {
                         script {
-                            checkout([$class: 'GitSCM', branches: [[name: params.GIT_HASH ]],
-                                      userRemoteConfigs: [[url: params.GIT_URL]]])
-                            
-                            // Wait for master to build on first iteration
-                            if (params.FIRST_ITERATION) {
-                                echo "First iteration - waiting 10 minutes for master to build"
-                                sleep 600
-                            }
-                            
-                            // Run 3 viewer sessions
-                            for (int session = 1; session <= 3; session++) {
-                                echo "Starting Viewer1 session ${session}/3"
-                                
-                                try {
-                                    sh """
-                                        export JOB_NAME="${env.JOB_NAME}"
-                                        export RUNNER_LABEL="${params.RUNNER_LABEL}"
-                                        export AWS_DEFAULT_REGION="${params.AWS_DEFAULT_REGION}"
-                                        export DURATION_IN_SECONDS="180"
-                                        export FORCE_TURN="${params.FORCE_TURN}"
-                                        export VIEWER_ID="Viewer1"
-                                        export CLIENT_ID="viewer-1-session-${session}-${BUILD_NUMBER}"
-                                        
-                                        ./canary/webrtc-c/scripts/setup-storage-viewer.sh
-                                    """
-                                } catch (FlowInterruptedException err) {
-                                    echo 'Aborted due to cancellation'
-                                    throw err
-                                } catch (err) {
-                                    HAS_ERROR = true
-                                    unstable err.toString()
-                                }
-                                
-                                if (session < 3) {
-                                    echo "Viewer1 session ${session} completed. Waiting 1 minute before next session."
-                                    sleep 60
-                                }
-                            }
-                            echo "All 3 Viewer1 sessions completed"
+                            runViewerSessions("Viewer1")
                         }
                     }
                 }
@@ -558,45 +527,57 @@ pipeline {
                     }
                     steps {
                         script {
-                            checkout([$class: 'GitSCM', branches: [[name: params.GIT_HASH ]],
-                                      userRemoteConfigs: [[url: params.GIT_URL]]])
-                            
-                            // Wait for master to build on first iteration
-                            if (params.FIRST_ITERATION) {
-                                echo "First iteration - waiting 10 minutes for master to build"
-                                sleep 600
-                            }
-                            
-                            // Run 3 viewer sessions
-                            for (int session = 1; session <= 3; session++) {
-                                echo "Starting Viewer2 session ${session}/3"
-                                
-                                try {
-                                    sh """
-                                        export JOB_NAME="${env.JOB_NAME}"
-                                        export RUNNER_LABEL="${params.RUNNER_LABEL}"
-                                        export AWS_DEFAULT_REGION="${params.AWS_DEFAULT_REGION}"
-                                        export DURATION_IN_SECONDS="180"
-                                        export FORCE_TURN="${params.FORCE_TURN}"
-                                        export VIEWER_ID="Viewer2"
-                                        export CLIENT_ID="viewer-2-session-${session}-${BUILD_NUMBER}"
-                                        
-                                        ./canary/webrtc-c/scripts/setup-storage-viewer.sh
-                                    """
-                                } catch (FlowInterruptedException err) {
-                                    echo 'Aborted due to cancellation'
-                                    throw err
-                                } catch (err) {
-                                    HAS_ERROR = true
-                                    unstable err.toString()
-                                }
-                                
-                                if (session < 3) {
-                                    echo "Viewer2 session ${session} completed. Waiting 1 minute before next session."
-                                    sleep 60
-                                }
-                            }
-                            echo "All 3 Viewer2 sessions completed"
+                            runViewerSessions("Viewer2")
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Three Viewers with Continuous Master') {
+            when {
+                equals expected: true, actual: params.JS_STORAGE_THREE_VIEWERS
+            }
+            parallel {
+                stage('Continuous StorageMaster') {
+                    agent {
+                        label params.MASTER_NODE_LABEL
+                    }
+                    steps {
+                        script {
+                            def mutableParams = [:] + params
+                            mutableParams.DURATION_IN_SECONDS = (params.DURATION_IN_SECONDS.toInteger() * 4).toString()
+                            buildStorageCanary(false, mutableParams)
+                        }
+                    }
+                }
+                stage('StorageViewer1') {
+                    agent {
+                        label params.STORAGE_VIEWER_ONE_NODE_LABEL
+                    }
+                    steps {
+                        script {
+                            runViewerSessions("Viewer1")
+                        }
+                    }
+                }
+                stage('StorageViewer2') {
+                    agent {
+                        label params.STORAGE_VIEWER_TWO_NODE_LABEL
+                    }
+                    steps {
+                        script {
+                            runViewerSessions("Viewer2")
+                        }
+                    }
+                }
+                stage('StorageViewer3') {
+                    agent {
+                        label params.STORAGE_VIEWER_THREE_NODE_LABEL
+                    }
+                    steps {
+                        script {
+                            runViewerSessions("Viewer3")
                         }
                     }
                 }
@@ -608,6 +589,7 @@ pipeline {
                 anyOf {
                     equals expected: true, actual: params.JS_STORAGE_VIEWER_JOIN
                     equals expected: true, actual: params.JS_STORAGE_TWO_VIEWERS
+                    equals expected: true, actual: params.JS_STORAGE_THREE_VIEWERS
                 }
             }
             agent {

@@ -434,6 +434,32 @@ pipeline {
                             ],
                             wait: false
                         )
+
+                        //Storage with three viewers join
+                        build (
+                            job: NEXT_AVAILABLE_RUNNER,
+                            parameters: COMMON_PARAMS + [
+                                booleanParam(name: 'IS_SIGNALING', value: false),
+                                booleanParam(name: 'IS_STORAGE', value: false),
+                                booleanParam(name: 'IS_STORAGE_SINGLE_NODE', value: false),
+                                booleanParam(name: 'USE_TURN', value: false),
+                                booleanParam(name: 'TRICKLE_ICE', value: false),
+                                booleanParam(name: 'USE_IOT', value: false),
+                                booleanParam(name: 'JS_STORAGE_VIEWER_JOIN', value: false),
+                                booleanParam(name: 'JS_STORAGE_TWO_VIEWERS', value: false),
+                                booleanParam(name: 'JS_STORAGE_THREE_VIEWERS', value: true),
+                                string(name: 'DURATION_IN_SECONDS', value: STORAGE_WITH_VIEWER_DURATION_IN_SECONDS.toString()),
+                                string(name: 'MASTER_NODE_LABEL', value: "webrtc-storage-master-2"),
+                                string(name: 'STORAGE_VIEWER_NODE_LABEL', value: "webrtc-storage-viewer"),
+                                string(name: 'STORAGE_VIEWER_ONE_NODE_LABEL', value: "webrtc-storage-multi-viewer-1"),
+                                string(name: 'STORAGE_VIEWER_TWO_NODE_LABEL', value: "webrtc-storage-multi-viewer-2"),
+                                string(name: 'STORAGE_VIEWER_THREE_NODE_LABEL', value: "webrtc-storage-consumer"),
+                                string(name: 'RUNNER_LABEL', value: "StorageThreeViewers"),
+                                string(name: 'SCENARIO_LABEL', value: "StorageThreeViewers"),
+                                string(name: 'AWS_DEFAULT_REGION', value: "us-west-2"),
+                            ],
+                            wait: false
+                        )
                     }
                 }
 
