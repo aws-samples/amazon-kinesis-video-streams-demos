@@ -333,7 +333,8 @@ pipeline {
                 script {
                     sh """
                         echo "Disk usage before cleanup:"
-                        df -h /tmp
+                        df -h /home/ubuntu/Jenkins
+                        du -sh /home/ubuntu/Jenkins/workspace/ 2>/dev/null || true
                         
                         # Clean old webrtc workspaces (older than 1 hour)
                         find /tmp -name "*webrtc-canary-runner*" -type d -mmin +60 -exec rm -rf {} + 2>/dev/null || true
@@ -345,7 +346,8 @@ pipeline {
                         find /tmp -name "tmp_pack_*" -mmin +30 -delete 2>/dev/null || true
                         
                         echo "Disk usage after cleanup:"
-                        df -h /tmp
+                        df -h /home/ubuntu/Jenkins
+                        du -sh /home/ubuntu/Jenkins/workspace/ 2>/dev/null || true
                     """
                 }
             }
@@ -513,7 +515,7 @@ pipeline {
                     steps {
                         script {
                             def mutableParams = [:] + params
-                            mutableParams.DURATION_IN_SECONDS = (params.DURATION_IN_SECONDS.toInteger() * 4).toString()
+                            mutableParams.DURATION_IN_SECONDS = "1380"
                             buildStorageCanary(false, mutableParams)
                         }
                     }
@@ -543,7 +545,7 @@ pipeline {
                     steps {
                         script {
                             def mutableParams = [:] + params
-                            mutableParams.DURATION_IN_SECONDS = (params.DURATION_IN_SECONDS.toInteger() * 4).toString()
+                            mutableParams.DURATION_IN_SECONDS = "1380"
                             buildStorageCanary(false, mutableParams)
                         }
                     }
@@ -583,7 +585,7 @@ pipeline {
                     steps {
                         script {
                             def mutableParams = [:] + params
-                            mutableParams.DURATION_IN_SECONDS = (params.DURATION_IN_SECONDS.toInteger() * 4).toString()
+                            mutableParams.DURATION_IN_SECONDS = "1380"
                             buildStorageCanary(false, mutableParams)
                         }
                     }
@@ -707,6 +709,37 @@ pipeline {
                     ],
                     wait: false
                 )
+            }
+        }
+    }
+    
+    post {
+        always {
+            script {
+                sh """
+                    echo "Post cleanup - cleaning caches and temp files:"
+                    
+                    # Clean Maven cache
+                    rm -rf ~/.m2/repository/* 2>/dev/null || true
+                    
+                    # Clean Gradle cache
+                    rm -rf ~/.gradle/caches/* 2>/dev/null || true
+                    
+                    # Clean npm cache
+                    rm -rf ~/.npm/_cacache/* 2>/dev/null || true
+                    
+                    # Clean pip cache
+                    rm -rf ~/.cache/pip/* 2>/dev/null || true
+                    
+                    # Clean CMake cache files
+                    find /tmp -name "CMakeCache.txt" -delete 2>/dev/null || true
+                    find /tmp -name "CMakeFiles" -type d -exec rm -rf {} + 2>/dev/null || true
+                    
+                    # Clean any remaining build artifacts
+                    find /tmp -name "*.o" -o -name "*.so" -o -name "*.a" -delete 2>/dev/null || true
+                    
+                    echo "Cache cleanup completed"
+                """
             }
         }
     }

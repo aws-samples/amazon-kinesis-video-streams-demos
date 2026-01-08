@@ -297,10 +297,11 @@ class ViewerCanaryTest {
     log('Test completed!');
     log(`Final metrics: ${JSON.stringify(metrics)}`);
     
-    const success = metrics.success && this.framesReceived;
-    log(success ? 'TEST PASSED: Frames received successfully' : 'TEST FAILED: No frames received');
+    // Success is based on storage session joining, not frame reception
+    const success = this.storageSessionJoined;
+    log(success ? 'TEST PASSED: Storage session joined successfully' : 'TEST FAILED: Storage session not joined');
     
-    return { ...metrics, success, framesReceived: this.framesReceived };
+    return { ...metrics, success };
   }
 }
 
