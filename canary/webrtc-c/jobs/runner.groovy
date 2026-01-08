@@ -419,73 +419,78 @@ pipeline {
             }
         }
 
-        stage('Start Continuous StorageMaster') {
-            when {
-                anyOf {
-                    equals expected: true, actual: params.JS_STORAGE_VIEWER_JOIN
-                    equals expected: true, actual: params.JS_STORAGE_TWO_VIEWERS
-                }
-            }
-            agent {
-                label params.MASTER_NODE_LABEL
-            }
-            steps {
-                script {
-                    def mutableParams = [:] + params   // makes a new mutable map
-                    mutableParams.DURATION_IN_SECONDS =
-                        (params.DURATION_IN_SECONDS.toInteger() * 2).toString()
-
-                    buildStorageCanary(false, mutableParams)
-                }
-            }
-        }
-
-        stage('Build and Run Webrtc-storage Viewer') {
-            failFast true
+        stage('Single Viewer with Continuous Master') {
             when {
                 equals expected: true, actual: params.JS_STORAGE_VIEWER_JOIN
             }
-            agent {
-                label params.STORAGE_VIEWER_NODE_LABEL
-            }
-            steps {
-                script {
-                    sh """
-                        echo "DEBUG: Checking StorageViewer directory contents"
-                        echo "DEBUG: GIT_HASH parameter: ${params.GIT_HASH}"
-                        git rev-parse HEAD
-                        ls -la ./canary/webrtc-c/scripts/
-                        pwd
-                    """
-                    
-                    try {
-                        sh """
-                            export JOB_NAME="${env.JOB_NAME}"
-                            export RUNNER_LABEL="${params.RUNNER_LABEL}"
-                            export AWS_DEFAULT_REGION="${params.AWS_DEFAULT_REGION}"
-                            export DURATION_IN_SECONDS="${params.DURATION_IN_SECONDS}"
-                            export FORCE_TURN="${params.FORCE_TURN}"
-                            export VIEWER_COUNT="${params.VIEWER_COUNT}"
+            parallel {
+                stage('Continuous StorageMaster') {
+                    agent {
+                        label params.MASTER_NODE_LABEL
+                    }
+                    steps {
+                        script {
+                            def mutableParams = [:] + params
+                            mutableParams.DURATION_IN_SECONDS = (params.DURATION_IN_SECONDS.toInteger() * 2).toString()
+                            buildStorageCanary(false, mutableParams)
+                        }
+                    }
+                }
+                stage('StorageViewer') {
+                    agent {
+                        label params.STORAGE_VIEWER_NODE_LABEL
+                    }
+                    steps {
+                        script {
+                            sh """
+                                echo "DEBUG: Checking StorageViewer directory contents"
+                                echo "DEBUG: GIT_HASH parameter: ${params.GIT_HASH}"
+                                git rev-parse HEAD
+                                ls -la ./canary/webrtc-c/scripts/
+                                pwd
+                            """
                             
-                            ./canary/webrtc-c/scripts/setup-storage-viewer.sh
-                        """
-                    } catch (FlowInterruptedException err) {
-                        echo 'Aborted due to cancellation'
-                        throw err
-                    } catch (err) {
-                        HAS_ERROR = true
-                        unstable err.toString()
+                            try {
+                                sh """
+                                    export JOB_NAME="${env.JOB_NAME}"
+                                    export RUNNER_LABEL="${params.RUNNER_LABEL}"
+                                    export AWS_DEFAULT_REGION="${params.AWS_DEFAULT_REGION}"
+                                    export DURATION_IN_SECONDS="${params.DURATION_IN_SECONDS}"
+                                    export FORCE_TURN="${params.FORCE_TURN}"
+                                    export VIEWER_COUNT="${params.VIEWER_COUNT}"
+                                    
+                                    ./canary/webrtc-c/scripts/setup-storage-viewer.sh
+                                """
+                            } catch (FlowInterruptedException err) {
+                                echo 'Aborted due to cancellation'
+                                throw err
+                            } catch (err) {
+                                HAS_ERROR = true
+                                unstable err.toString()
+                            }
+                        }
                     }
                 }
             }
         }
 
-        stage('Build and Run Webrtc-storage Two Viewers') {
-            failFast true
+        stage('Two Viewers with Continuous Master') {
             when {
                 equals expected: true, actual: params.JS_STORAGE_TWO_VIEWERS
             }
             parallel {
+                stage('Continuous StorageMaster') {
+                    agent {
+                        label params.MASTER_NODE_LABEL
+                    }
+                    steps {
+                        script {
+                            def mutableParams = [:] + params
+                            mutableParams.DURATION_IN_SECONDS = (params.DURATION_IN_SECONDS.toInteger() * 2).toString()
+                            buildStorageCanary(false, mutableParams)
+                        }
+                    }
+                }
                 stage('StorageViewer1') {
                     agent {
                         label params.STORAGE_VIEWER_ONE_NODE_LABEL
