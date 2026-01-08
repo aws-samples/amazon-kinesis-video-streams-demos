@@ -442,6 +442,9 @@ pipeline {
                     }
                     steps {
                         script {
+                            checkout([$class: 'GitSCM', branches: [[name: params.GIT_HASH ]],
+                                      userRemoteConfigs: [[url: params.GIT_URL]]])
+                            
                             sh """
                                 echo "DEBUG: Checking StorageViewer directory contents"
                                 echo "DEBUG: GIT_HASH parameter: ${params.GIT_HASH}"
@@ -497,6 +500,9 @@ pipeline {
                     }
                     steps {
                         script {
+                            checkout([$class: 'GitSCM', branches: [[name: params.GIT_HASH ]],
+                                      userRemoteConfigs: [[url: params.GIT_URL]]])
+                            
                             try {
                                 sh """
                                     export JOB_NAME="${env.JOB_NAME}"
@@ -524,7 +530,10 @@ pipeline {
                         label params.STORAGE_VIEWER_TWO_NODE_LABEL
                     }
                     steps {
-                        script {         
+                        script {
+                            checkout([$class: 'GitSCM', branches: [[name: params.GIT_HASH ]],
+                                      userRemoteConfigs: [[url: params.GIT_URL]]])
+                            
                             try {
                                 sh """
                                     export JOB_NAME="${env.JOB_NAME}"
