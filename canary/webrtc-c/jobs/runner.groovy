@@ -431,7 +431,7 @@ pipeline {
                     steps {
                         script {
                             def mutableParams = [:] + params
-                            mutableParams.DURATION_IN_SECONDS = (params.DURATION_IN_SECONDS.toInteger() * 2).toString()
+                            mutableParams.DURATION_IN_SECONDS = (params.DURATION_IN_SECONDS.toInteger() * 4).toString()
                             buildStorageCanary(false, mutableParams)
                         }
                     }
@@ -445,32 +445,42 @@ pipeline {
                             checkout([$class: 'GitSCM', branches: [[name: params.GIT_HASH ]],
                                       userRemoteConfigs: [[url: params.GIT_URL]]])
                             
-                            sh """
-                                echo "DEBUG: Checking StorageViewer directory contents"
-                                echo "DEBUG: GIT_HASH parameter: ${params.GIT_HASH}"
-                                git rev-parse HEAD
-                                ls -la ./canary/webrtc-c/scripts/
-                                pwd
-                            """
-                            
-                            try {
-                                sh """
-                                    export JOB_NAME="${env.JOB_NAME}"
-                                    export RUNNER_LABEL="${params.RUNNER_LABEL}"
-                                    export AWS_DEFAULT_REGION="${params.AWS_DEFAULT_REGION}"
-                                    export DURATION_IN_SECONDS="${params.DURATION_IN_SECONDS}"
-                                    export FORCE_TURN="${params.FORCE_TURN}"
-                                    export VIEWER_COUNT="${params.VIEWER_COUNT}"
-                                    
-                                    ./canary/webrtc-c/scripts/setup-storage-viewer.sh
-                                """
-                            } catch (FlowInterruptedException err) {
-                                echo 'Aborted due to cancellation'
-                                throw err
-                            } catch (err) {
-                                HAS_ERROR = true
-                                unstable err.toString()
+                            // Wait for master to build on first iteration
+                            if (params.FIRST_ITERATION) {
+                                echo "First iteration - waiting 15 minutes for master to build"
+                                sleep 900
                             }
+                            
+                            // Run 3 viewer sessions
+                            for (int session = 1; session <= 3; session++) {
+                                echo "Starting viewer session ${session}/3"
+                                
+                                try {
+                                    sh """
+                                        export JOB_NAME="${env.JOB_NAME}"
+                                        export RUNNER_LABEL="${params.RUNNER_LABEL}"
+                                        export AWS_DEFAULT_REGION="${params.AWS_DEFAULT_REGION}"
+                                        export DURATION_IN_SECONDS="180"
+                                        export FORCE_TURN="${params.FORCE_TURN}"
+                                        export VIEWER_COUNT="${params.VIEWER_COUNT}"
+                                        export CLIENT_ID="viewer-session-${session}-${BUILD_NUMBER}"
+                                        
+                                        ./canary/webrtc-c/scripts/setup-storage-viewer.sh
+                                    """
+                                } catch (FlowInterruptedException err) {
+                                    echo 'Aborted due to cancellation'
+                                    throw err
+                                } catch (err) {
+                                    HAS_ERROR = true
+                                    unstable err.toString()
+                                }
+                                
+                                if (session < 3) {
+                                    echo "Session ${session} completed. Waiting 1 minute before next session."
+                                    sleep 60
+                                }
+                            }
+                            echo "All 3 viewer sessions completed"
                         }
                     }
                 }
@@ -489,7 +499,7 @@ pipeline {
                     steps {
                         script {
                             def mutableParams = [:] + params
-                            mutableParams.DURATION_IN_SECONDS = (params.DURATION_IN_SECONDS.toInteger() * 2).toString()
+                            mutableParams.DURATION_IN_SECONDS = (params.DURATION_IN_SECONDS.toInteger() * 4).toString()
                             buildStorageCanary(false, mutableParams)
                         }
                     }
@@ -503,25 +513,42 @@ pipeline {
                             checkout([$class: 'GitSCM', branches: [[name: params.GIT_HASH ]],
                                       userRemoteConfigs: [[url: params.GIT_URL]]])
                             
-                            try {
-                                sh """
-                                    export JOB_NAME="${env.JOB_NAME}"
-                                    export RUNNER_LABEL="${params.RUNNER_LABEL}"
-                                    export AWS_DEFAULT_REGION="${params.AWS_DEFAULT_REGION}"
-                                    export DURATION_IN_SECONDS="${params.DURATION_IN_SECONDS}"
-                                    export FORCE_TURN="${params.FORCE_TURN}"
-                                    export VIEWER_ID="Viewer1"
-                                    export CLIENT_ID="viewer-1-${BUILD_NUMBER}"
-                                    
-                                    ./canary/webrtc-c/scripts/setup-storage-viewer.sh
-                                """
-                            } catch (FlowInterruptedException err) {
-                                echo 'Aborted due to cancellation'
-                                throw err
-                            } catch (err) {
-                                HAS_ERROR = true
-                                unstable err.toString()
+                            // Wait for master to build on first iteration
+                            if (params.FIRST_ITERATION) {
+                                echo "First iteration - waiting 10 minutes for master to build"
+                                sleep 600
                             }
+                            
+                            // Run 3 viewer sessions
+                            for (int session = 1; session <= 3; session++) {
+                                echo "Starting Viewer1 session ${session}/3"
+                                
+                                try {
+                                    sh """
+                                        export JOB_NAME="${env.JOB_NAME}"
+                                        export RUNNER_LABEL="${params.RUNNER_LABEL}"
+                                        export AWS_DEFAULT_REGION="${params.AWS_DEFAULT_REGION}"
+                                        export DURATION_IN_SECONDS="180"
+                                        export FORCE_TURN="${params.FORCE_TURN}"
+                                        export VIEWER_ID="Viewer1"
+                                        export CLIENT_ID="viewer-1-session-${session}-${BUILD_NUMBER}"
+                                        
+                                        ./canary/webrtc-c/scripts/setup-storage-viewer.sh
+                                    """
+                                } catch (FlowInterruptedException err) {
+                                    echo 'Aborted due to cancellation'
+                                    throw err
+                                } catch (err) {
+                                    HAS_ERROR = true
+                                    unstable err.toString()
+                                }
+                                
+                                if (session < 3) {
+                                    echo "Viewer1 session ${session} completed. Waiting 1 minute before next session."
+                                    sleep 60
+                                }
+                            }
+                            echo "All 3 Viewer1 sessions completed"
                         }
                     }
                 }
@@ -534,25 +561,42 @@ pipeline {
                             checkout([$class: 'GitSCM', branches: [[name: params.GIT_HASH ]],
                                       userRemoteConfigs: [[url: params.GIT_URL]]])
                             
-                            try {
-                                sh """
-                                    export JOB_NAME="${env.JOB_NAME}"
-                                    export RUNNER_LABEL="${params.RUNNER_LABEL}"
-                                    export AWS_DEFAULT_REGION="${params.AWS_DEFAULT_REGION}"
-                                    export DURATION_IN_SECONDS="${params.DURATION_IN_SECONDS}"
-                                    export FORCE_TURN="${params.FORCE_TURN}"
-                                    export VIEWER_ID="Viewer2"
-                                    export CLIENT_ID="viewer-2-${BUILD_NUMBER}"
-                                    
-                                    ./canary/webrtc-c/scripts/setup-storage-viewer.sh
-                                """
-                            } catch (FlowInterruptedException err) {
-                                echo 'Aborted due to cancellation'
-                                throw err
-                            } catch (err) {
-                                HAS_ERROR = true
-                                unstable err.toString()
+                            // Wait for master to build on first iteration
+                            if (params.FIRST_ITERATION) {
+                                echo "First iteration - waiting 10 minutes for master to build"
+                                sleep 600
                             }
+                            
+                            // Run 3 viewer sessions
+                            for (int session = 1; session <= 3; session++) {
+                                echo "Starting Viewer2 session ${session}/3"
+                                
+                                try {
+                                    sh """
+                                        export JOB_NAME="${env.JOB_NAME}"
+                                        export RUNNER_LABEL="${params.RUNNER_LABEL}"
+                                        export AWS_DEFAULT_REGION="${params.AWS_DEFAULT_REGION}"
+                                        export DURATION_IN_SECONDS="180"
+                                        export FORCE_TURN="${params.FORCE_TURN}"
+                                        export VIEWER_ID="Viewer2"
+                                        export CLIENT_ID="viewer-2-session-${session}-${BUILD_NUMBER}"
+                                        
+                                        ./canary/webrtc-c/scripts/setup-storage-viewer.sh
+                                    """
+                                } catch (FlowInterruptedException err) {
+                                    echo 'Aborted due to cancellation'
+                                    throw err
+                                } catch (err) {
+                                    HAS_ERROR = true
+                                    unstable err.toString()
+                                }
+                                
+                                if (session < 3) {
+                                    echo "Viewer2 session ${session} completed. Waiting 1 minute before next session."
+                                    sleep 60
+                                }
+                            }
+                            echo "All 3 Viewer2 sessions completed"
                         }
                     }
                 }
