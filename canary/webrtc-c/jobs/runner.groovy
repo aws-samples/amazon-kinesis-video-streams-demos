@@ -162,7 +162,7 @@ def buildSignaling(params) {
     }
 }
 
-def runViewerSessions(viewerId = "", waitMinutes = 10) {
+def runViewerSessions(viewerId = "", waitMinutes = 10, viewerCount = "1") {
     deleteDir()
     checkout([$class: 'GitSCM', branches: [[name: params.GIT_HASH ]],
               userRemoteConfigs: [[url: params.GIT_URL]]])
@@ -182,7 +182,7 @@ def runViewerSessions(viewerId = "", waitMinutes = 10) {
                 export AWS_DEFAULT_REGION="${params.AWS_DEFAULT_REGION}"
                 export DURATION_IN_SECONDS="180"
                 export FORCE_TURN="${params.FORCE_TURN}"
-                export VIEWER_COUNT="${params.VIEWER_COUNT ?: ''}"
+                export VIEWER_COUNT="${viewerCount}"
                 export VIEWER_ID="${viewerId}"
                 export CLIENT_ID="${viewerId ? viewerId.toLowerCase() + '-' : 'viewer-'}session-${session}-${BUILD_NUMBER}"
                 
@@ -295,6 +295,11 @@ pipeline {
         string(name: 'MASTER_NODE_LABEL')
         string(name: 'CONSUMER_NODE_LABEL')
         string(name: 'VIEWER_NODE_LABEL')
+        string(name: 'STORAGE_VIEWER_NODE_LABEL')
+        string(name: 'STORAGE_VIEWER_ONE_NODE_LABEL')
+        string(name: 'STORAGE_VIEWER_TWO_NODE_LABEL')
+        string(name: 'STORAGE_VIEWER_THREE_NODE_LABEL')
+        string(name: 'VIEWER_COUNT')
         string(name: 'RUNNER_LABEL')
         string(name: 'SCENARIO_LABEL')
         string(name: 'DURATION_IN_SECONDS')
@@ -487,7 +492,7 @@ pipeline {
                     }
                     steps {
                         script {
-                            runViewerSessions("", 21)
+                            runViewerSessions("", 21, "1")
                         }
                     }
                 }
@@ -517,7 +522,7 @@ pipeline {
                     }
                     steps {
                         script {
-                            runViewerSessions("Viewer1")
+                            runViewerSessions("Viewer1", 10, "2")
                         }
                     }
                 }
@@ -527,7 +532,7 @@ pipeline {
                     }
                     steps {
                         script {
-                            runViewerSessions("Viewer2")
+                            runViewerSessions("Viewer2", 10, "2")
                         }
                     }
                 }
@@ -557,7 +562,7 @@ pipeline {
                     }
                     steps {
                         script {
-                            runViewerSessions("Viewer1")
+                            runViewerSessions("Viewer1", 10, "3")
                         }
                     }
                 }
@@ -567,7 +572,7 @@ pipeline {
                     }
                     steps {
                         script {
-                            runViewerSessions("Viewer2")
+                            runViewerSessions("Viewer2", 10, "3")
                         }
                     }
                 }
@@ -577,7 +582,7 @@ pipeline {
                     }
                     steps {
                         script {
-                            runViewerSessions("Viewer3")
+                            runViewerSessions("Viewer3", 10, "3")
                         }
                     }
                 }
@@ -654,6 +659,11 @@ pipeline {
                       string(name: 'MASTER_NODE_LABEL', value: params.MASTER_NODE_LABEL),
                       string(name: 'CONSUMER_NODE_LABEL', value: params.CONSUMER_NODE_LABEL),
                       string(name: 'VIEWER_NODE_LABEL', value: params.VIEWER_NODE_LABEL),
+                      string(name: 'STORAGE_VIEWER_NODE_LABEL', value: params.STORAGE_VIEWER_NODE_LABEL),
+                      string(name: 'STORAGE_VIEWER_ONE_NODE_LABEL', value: params.STORAGE_VIEWER_ONE_NODE_LABEL),
+                      string(name: 'STORAGE_VIEWER_TWO_NODE_LABEL', value: params.STORAGE_VIEWER_TWO_NODE_LABEL),
+                      string(name: 'STORAGE_VIEWER_THREE_NODE_LABEL', value: params.STORAGE_VIEWER_THREE_NODE_LABEL),
+                      string(name: 'VIEWER_COUNT', value: params.VIEWER_COUNT),
                       string(name: 'RUNNER_LABEL', value: params.RUNNER_LABEL),
                       string(name: 'SCENARIO_LABEL', value: params.SCENARIO_LABEL),
                       string(name: 'DURATION_IN_SECONDS', value: params.DURATION_IN_SECONDS),
