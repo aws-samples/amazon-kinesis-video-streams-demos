@@ -166,45 +166,50 @@ def runViewerSessions(viewerId = "", waitMinutes = 10, viewerCount = "1") {
     // Create unique workspace for each viewer to prevent Git conflicts
     def workspaceName = "${env.JOB_NAME}-${viewerId ?: 'viewer'}-${BUILD_NUMBER}"
     ws(workspaceName) {
-        deleteDir()
-        checkout([$class: 'GitSCM', branches: [[name: params.GIT_HASH ]],
-                  userRemoteConfigs: [[url: params.GIT_URL]]])
-        
-        if (params.FIRST_ITERATION) {
-            echo "First iteration - waiting ${waitMinutes} minutes for master to build"
-            sleep waitMinutes * 60
-        }
-        
-        for (int session = 1; session <= 3; session++) {
-            echo "Starting ${viewerId ? viewerId + ' ' : ''}session ${session}/3"
+        try {
+            deleteDir()
+            checkout([$class: 'GitSCM', branches: [[name: params.GIT_HASH ]],
+                      userRemoteConfigs: [[url: params.GIT_URL]]])
             
-            try {
-                sh """
-                    export JOB_NAME="${env.JOB_NAME}"
-                    export RUNNER_LABEL="${params.RUNNER_LABEL}"
-                    export AWS_DEFAULT_REGION="${params.AWS_DEFAULT_REGION}"
-                    export DURATION_IN_SECONDS="180"
-                    export FORCE_TURN="${params.FORCE_TURN}"
-                    export VIEWER_COUNT="${viewerCount}"
-                    export VIEWER_ID="${viewerId}"
-                    export CLIENT_ID="${viewerId ? viewerId.toLowerCase() + '-' : 'viewer-'}session-${session}-${BUILD_NUMBER}"
-                    
-                    ./canary/webrtc-c/scripts/setup-storage-viewer.sh
-                """
-            } catch (FlowInterruptedException err) {
-                echo 'Aborted due to cancellation'
-                throw err
-            } catch (err) {
-                HAS_ERROR = true
-                unstable err.toString()
+            if (params.FIRST_ITERATION) {
+                echo "First iteration - waiting ${waitMinutes} minutes for master to build"
+                sleep waitMinutes * 60
             }
             
-            if (session < 3) {
-                echo "${viewerId ? viewerId + ' ' : ''}session ${session} completed. Waiting 1 minute before next session."
-                sleep 60
+            for (int session = 1; session <= 3; session++) {
+                echo "Starting ${viewerId ? viewerId + ' ' : ''}session ${session}/3"
+                
+                try {
+                    sh """
+                        export JOB_NAME="${env.JOB_NAME}"
+                        export RUNNER_LABEL="${params.RUNNER_LABEL}"
+                        export AWS_DEFAULT_REGION="${params.AWS_DEFAULT_REGION}"
+                        export DURATION_IN_SECONDS="180"
+                        export FORCE_TURN="${params.FORCE_TURN}"
+                        export VIEWER_COUNT="${viewerCount}"
+                        export VIEWER_ID="${viewerId}"
+                        export CLIENT_ID="${viewerId ? viewerId.toLowerCase() + '-' : 'viewer-'}session-${session}-${BUILD_NUMBER}"
+                        
+                        ./canary/webrtc-c/scripts/setup-storage-viewer.sh
+                    """
+                } catch (FlowInterruptedException err) {
+                    echo 'Aborted due to cancellation'
+                    throw err
+                } catch (err) {
+                    HAS_ERROR = true
+                    unstable err.toString()
+                }
+                
+                if (session < 3) {
+                    echo "${viewerId ? viewerId + ' ' : ''}session ${session} completed. Waiting 1 minute before next session."
+                    sleep 60
+                }
             }
+            echo "All 3 ${viewerId ? viewerId + ' ' : ''}sessions completed"
+        } finally {
+            // Ensure complete cleanup
+            deleteDir()
         }
-        echo "All 3 ${viewerId ? viewerId + ' ' : ''}sessions completed"
     }
 }
 
@@ -323,6 +328,29 @@ pipeline {
     }
 
     stages {
+        stage('Pre Cleanup') {
+            steps {
+                script {
+                    sh """
+                        echo "Disk usage before cleanup:"
+                        df -h /tmp
+                        
+                        # Clean old webrtc workspaces (older than 1 hour)
+                        find /tmp -name "*webrtc-canary-runner*" -type d -mmin +60 -exec rm -rf {} + 2>/dev/null || true
+                        
+                        # Clean Jenkins workspace temp files
+                        find /tmp -name "jenkins-*" -type d -mtime +1 -exec rm -rf {} + 2>/dev/null || true
+                        
+                        # Clean any leftover Git pack files
+                        find /tmp -name "tmp_pack_*" -mmin +30 -delete 2>/dev/null || true
+                        
+                        echo "Disk usage after cleanup:"
+                        df -h /tmp
+                    """
+                }
+            }
+        }
+
         stage('Fetch STS credentials and export to env vars') {
             steps {
                 script {
