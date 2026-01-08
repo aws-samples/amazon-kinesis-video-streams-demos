@@ -11,7 +11,10 @@ function log(message) {
 class ViewerCanaryTest {
   constructor(config) {
     this.config = config;
-    log(`Initializing test with single viewer`);
+    this.viewerId = process.env.VIEWER_ID || 'Viewer1';
+    this.clientId = process.env.CLIENT_ID || `viewer-${Date.now()}`;
+    
+    log(`Initializing test with ${this.viewerId} (${this.clientId})`);
     
     this.sessionStartTime = Date.now();
     this.storageSessionJoined = false;
@@ -53,7 +56,7 @@ class ViewerCanaryTest {
         
         const joinTime = Date.now() - this.sessionStartTime;
         await CloudWatchMetrics.publishMsMetric(
-          'JoinSSAsViewerTime',
+          `JoinSSAsViewerTime_${this.viewerId}`,
           this.config.channelName,
           joinTime
         );
@@ -235,7 +238,7 @@ class ViewerCanaryTest {
     
     const frameDetectionTime = Date.now() - this.sessionStartTime;
     await CloudWatchMetrics.publishMsMetric(
-      'TimeToFirstFrame',
+      `TimeToFirstFrame_${this.viewerId}`,
       this.config.channelName,
       frameDetectionTime
     );

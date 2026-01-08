@@ -431,20 +431,11 @@ pipeline {
             }
             steps {
                 script {
-                    sh """
-                        export JOB_NAME="${env.JOB_NAME}"
-                        export RUNNER_LABEL="${params.RUNNER_LABEL}"
-                        export AWS_DEFAULT_REGION="${params.AWS_DEFAULT_REGION}"
-                        export DURATION_IN_SECONDS="${params.DURATION_IN_SECONDS * 2}"  # Double duration for continuous operation
-                        export FORCE_TURN="${params.FORCE_TURN}"
-                        
-                        # Start master in background
-                        nohup ./canary/webrtc-c/scripts/setup-storage-master.sh > master.log 2>&1 &
-                        echo \$! > master.pid
-                        
-                        # Wait for master to be ready
-                        sleep 30
-                    """
+                    def mutableParams = [:] + params   // makes a new mutable map
+                    mutableParams.DURATION_IN_SECONDS =
+                        (params.DURATION_IN_SECONDS.toInteger() * 2).toString()
+
+                    buildStorageCanary(false, mutableParams)
                 }
             }
         }
@@ -508,6 +499,8 @@ pipeline {
                                     export AWS_DEFAULT_REGION="${params.AWS_DEFAULT_REGION}"
                                     export DURATION_IN_SECONDS="${params.DURATION_IN_SECONDS}"
                                     export FORCE_TURN="${params.FORCE_TURN}"
+                                    export VIEWER_ID="Viewer1"
+                                    export CLIENT_ID="viewer-1-${BUILD_NUMBER}"
                                     
                                     ./canary/webrtc-c/scripts/setup-storage-viewer.sh
                                 """
@@ -534,6 +527,8 @@ pipeline {
                                     export AWS_DEFAULT_REGION="${params.AWS_DEFAULT_REGION}"
                                     export DURATION_IN_SECONDS="${params.DURATION_IN_SECONDS}"
                                     export FORCE_TURN="${params.FORCE_TURN}"
+                                    export VIEWER_ID="Viewer2"
+                                    export CLIENT_ID="viewer-2-${BUILD_NUMBER}"
                                     
                                     ./canary/webrtc-c/scripts/setup-storage-viewer.sh
                                 """
