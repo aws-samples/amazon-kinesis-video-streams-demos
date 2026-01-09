@@ -2,6 +2,11 @@
 # Install Node.js if not present with retry logic
 if ! command -v npm &> /dev/null; then
     echo "Node.js not found, installing..."
+    
+    # Remove conflicting packages first
+    sudo apt-get remove -y libnode72 nodejs 2>/dev/null || true
+    sudo apt-get autoremove -y 2>/dev/null || true
+    
     for i in {1..3}; do
         if curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash - && sudo apt-get install -y nodejs; then
             break
@@ -14,6 +19,13 @@ if ! command -v npm &> /dev/null; then
 else
     echo "Node.js already installed: $(node --version)"
 fi
+
+# Verify npm is available after installation
+if ! command -v npm &> /dev/null; then
+    echo "ERROR: npm command not found after installation. Node.js installation failed."
+    exit 1
+fi
+echo "npm verified: $(npm --version)"
 
 cd ./canary/webrtc-c/scripts || { echo "ERROR: Failed to change directory to ./canary/webrtc-c/scripts"; exit 1; }
 
