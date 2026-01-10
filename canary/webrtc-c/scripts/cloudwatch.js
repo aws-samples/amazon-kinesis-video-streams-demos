@@ -12,12 +12,30 @@ class CloudWatchMetrics {
             return msValue;
         }
 
+        const dimensions = [{
+            Name: 'StorageWithViewerChannelName',
+            Value: channelName,
+        }];
+        
+        // Add JobName dimension if available
+        if (process.env.JOB_NAME) {
+            dimensions.push({
+                Name: 'JobName',
+                Value: process.env.JOB_NAME
+            });
+        }
+        
+        // Add RunnerLabel dimension if available
+        if (process.env.RUNNER_LABEL) {
+            dimensions.push({
+                Name: 'RunnerLabel',
+                Value: process.env.RUNNER_LABEL
+            });
+        }
+
         const msMetric = {
             MetricName: metricName,
-            Dimensions: [{
-                Name: 'StorageWithViewerChannelName',
-                Value: channelName,
-            }],
+            Dimensions: dimensions,
             Timestamp: new Date(when),
             Value: msValue,
             Unit: 'Milliseconds'

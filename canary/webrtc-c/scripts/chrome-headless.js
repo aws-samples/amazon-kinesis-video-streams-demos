@@ -248,6 +248,14 @@ class ViewerCanaryTest {
 
   async monitorConnection(page) {
     log('Storage session joined! Now monitoring connection state...');
+    
+    // Start timer immediately since we already joined the storage session
+    this.timerStarted = true;
+    log('Storage session joined, running test for 45 seconds...');
+    setTimeout(() => {
+      this.testCompleted = true;
+    }, 45000);
+    
     let lastStatusLog = 0;
     const statusLogInterval = 10000;
     
@@ -256,16 +264,6 @@ class ViewerCanaryTest {
       
       if (frameStats.hasActiveVideo && !this.framesReceived) {
         await this.handleVideoDetection(page);
-      }
-      
-      if (frameStats.storageSessionActive && !this.timerStarted) {
-        log('Storage session active!');
-        this.timerStarted = true;
-        
-        log(`Storage session active, running test for 20 seconds...`);
-        setTimeout(() => {
-          this.testCompleted = true;
-        }, 20000);
       }
       
       if (!frameStats.viewerExists) {
