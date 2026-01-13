@@ -23,6 +23,10 @@ class ViewerCanaryTest {
     this.testCompleted = false;
     this.timerStarted = false;
     
+    // Tracking for Offer Received to Answer Sent Time metric
+    this.offerReceivedTime = null;
+    this.answerSentTime = null;
+    
     this.browser = null;
     this.page = null;
   }
@@ -43,6 +47,30 @@ class ViewerCanaryTest {
     page.on('console', async (msg) => {
       const text = msg.text();
       log(`PAGE: ${text}`);
+      
+      // Track SDP offer received
+      if (text.includes('[VIEWER] Received SDP offer from remote')) {
+        this.offerReceivedTime = Date.now();
+        log('SDP offer received timestamp captured');
+      }
+      
+      // Track SDP answer sent and calculate metric
+      if (text.includes('[VIEWER] Sending SDP answer to remote')) {
+        this.answerSentTime = Date.now();
+        log('SDP answer sent timestamp captured');
+        
+        // Calculate and publish the Offer Received to Answer Sent Time metric
+        if (this.offerReceivedTime && this.answerSentTime) {
+          const offerToAnswerTime = this.answerSentTime - this.offerReceivedTime;
+          log(`Offer to Answer time: ${offerToAnswerTime}ms`);
+          
+          await CloudWatchMetrics.publishMsMetric(
+            `OfferReceivedToAnswerSentTime_${this.viewerId}`,
+            this.config.channelName,
+            offerToAnswerTime
+          );
+        }
+      }
       
       if (text.includes('Successfully joined the storage session')) {
         log('Storage session joined - ready to monitor frames!');
