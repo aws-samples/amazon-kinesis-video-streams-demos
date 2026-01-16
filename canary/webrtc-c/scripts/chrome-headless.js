@@ -23,9 +23,21 @@ class ViewerCanaryTest {
     this.testCompleted = false;
     this.timerStarted = false;
     
-    // Tracking for Offer Received to Answer Sent Time metric
+    // Comprehensive timing tracking for WebRTC connection stages
     this.offerReceivedTime = null;
     this.answerSentTime = null;
+    this.firstIceCandidateReceivedTime = null;
+    this.firstIceCandidateSentTime = null;
+    this.allIceCandidatesGeneratedTime = null;
+    this.peerConnectionEstablishedTime = null;
+    
+    // Flags to track first occurrences
+    this.hasReceivedFirstIceCandidate = false;
+    this.hasSentFirstIceCandidate = false;
+    
+    // WebRTC connection retry tracking (internal viewer retries)
+    this.webrtcRetryCount = 0;
+    this.hadWebRTCRetries = false;
     
     this.browser = null;
     this.page = null;
@@ -54,7 +66,7 @@ class ViewerCanaryTest {
         log('SDP offer received timestamp captured');
       }
       
-      // Track SDP answer sent and calculate metric
+      // Track SDP answer sent and calculate offer-to-answer metric
       if (text.includes('[VIEWER] Sending SDP answer to remote')) {
         this.answerSentTime = Date.now();
         log('SDP answer sent timestamp captured');
@@ -70,6 +82,99 @@ class ViewerCanaryTest {
             offerToAnswerTime
           );
         }
+      }
+      
+      // Track first ICE candidate received from remote
+      if (text.includes('[VIEWER] Received ICE candidate from remote') && !this.hasReceivedFirstIceCandidate) {
+        this.firstIceCandidateReceivedTime = Date.now();
+        this.hasReceivedFirstIceCandidate = true;
+        log('First ICE candidate received timestamp captured');
+        
+        // Calculate answer-to-first-ice-received metric
+        if (this.answerSentTime && this.firstIceCandidateReceivedTime) {
+          const answerToFirstIceTime = this.firstIceCandidateReceivedTime - this.answerSentTime;
+          log(`Answer Sent to First ICE Received time: ${answerToFirstIceTime}ms`);
+          
+          await CloudWatchMetrics.publishMsMetric(
+            `AnswerSentToFirstIceReceivedTime_${this.viewerId}`,
+            this.config.channelName,
+            answerToFirstIceTime
+          );
+        }
+      }
+      
+      // Track first ICE candidate sent to remote
+      if (text.includes('[VIEWER] Sending ICE candidate to remote') && !this.hasSentFirstIceCandidate) {
+        this.firstIceCandidateSentTime = Date.now();
+        this.hasSentFirstIceCandidate = true;
+        log('First ICE candidate sent timestamp captured');
+        
+        // Calculate first-ice-received-to-first-ice-sent metric
+        if (this.firstIceCandidateReceivedTime && this.firstIceCandidateSentTime) {
+          const firstIceReceivedToSentTime = this.firstIceCandidateSentTime - this.firstIceCandidateReceivedTime;
+          log(`First ICE Received to First ICE Sent time: ${firstIceReceivedToSentTime}ms`);
+          
+          await CloudWatchMetrics.publishMsMetric(
+            `FirstIceReceivedToFirstIceSentTime_${this.viewerId}`,
+            this.config.channelName,
+            firstIceReceivedToSentTime
+          );
+        }
+      }
+      
+      // Track when all ICE candidates are generated
+      if (text.includes('[VIEWER] All ICE candidates have been generated for remote')) {
+        this.allIceCandidatesGeneratedTime = Date.now();
+        log('All ICE candidates generated timestamp captured');
+        
+        // Calculate first-ice-sent-to-all-ice-generated metric
+        if (this.firstIceCandidateSentTime && this.allIceCandidatesGeneratedTime) {
+          const firstIceSentToAllGeneratedTime = this.allIceCandidatesGeneratedTime - this.firstIceCandidateSentTime;
+          log(`First ICE Sent to All ICE Generated time: ${firstIceSentToAllGeneratedTime}ms`);
+          
+          await CloudWatchMetrics.publishMsMetric(
+            `FirstIceSentToAllIceGeneratedTime_${this.viewerId}`,
+            this.config.channelName,
+            firstIceSentToAllGeneratedTime
+          );
+        }
+      }
+      
+      // Track peer connection establishment
+      if (text.includes('[VIEWER] Connection to peer successful!')) {
+        this.peerConnectionEstablishedTime = Date.now();
+        log('Peer connection established timestamp captured');
+        
+        // Calculate all-ice-generated-to-connection-established metric
+        if (this.allIceCandidatesGeneratedTime && this.peerConnectionEstablishedTime) {
+          const allIceToConnectionTime = this.peerConnectionEstablishedTime - this.allIceCandidatesGeneratedTime;
+          log(`All ICE Generated to Connection Established time: ${allIceToConnectionTime}ms`);
+          
+          await CloudWatchMetrics.publishMsMetric(
+            `AllIceGeneratedToConnectionEstablishedTime_${this.viewerId}`,
+            this.config.channelName,
+            allIceToConnectionTime
+          );
+        }
+        
+        // Calculate total connection establishment time (offer to peer connection)
+        if (this.offerReceivedTime && this.peerConnectionEstablishedTime) {
+          const totalConnectionTime = this.peerConnectionEstablishedTime - this.offerReceivedTime;
+          log(`Total Connection Establishment time (Offer to Peer Connection): ${totalConnectionTime}ms`);
+          
+          await CloudWatchMetrics.publishMsMetric(
+            `TotalConnectionEstablishmentTime_${this.viewerId}`,
+            this.config.channelName,
+            totalConnectionTime
+          );
+        }
+      }
+      
+      // Track WebRTC connection retries
+      if (text.includes('[ERROR] [VIEWER] Connection failed after 30 seconds, will enter retry.')) {
+        this.webrtcRetryCount++;
+        this.hadWebRTCRetries = true;
+        log(`WebRTC connection retry detected! Total retries: ${this.webrtcRetryCount}`);
       }
       
       if (text.includes('Successfully joined the storage session')) {
@@ -137,42 +242,32 @@ class ViewerCanaryTest {
 
   async waitForViewerStart(page) {
     log('Waiting for viewer to start...');
-    const maxRetries = 3;
+    const startTimeout = 60000;
+    const startTime = Date.now();
     
-    for (let retry = 0; retry < maxRetries; retry++) {
-      if (retry > 0) {
-        log(`Retry ${retry}: Restarting viewer...`);
-        await page.click('#viewer-button');
+    while ((Date.now() - startTime) < startTimeout) {
+      const status = await page.evaluate(() => ({
+        viewerExists: !!(window.viewer),
+        connectionState: window.viewer?.pc?.iceConnectionState,
+        signalingState: window.viewer?.pc?.signalingState,
+        error: window.viewer?.error
+      }));
+      
+      if (status.viewerExists && !status.error) {
+        log('Viewer started successfully!');
+        log(`Connection state: ${status.connectionState}`);
+        log(`Signaling state: ${status.signalingState}`);
+        return true;
       }
       
-      const startTimeout = 60000;
-      const startTime = Date.now();
-      
-      while ((Date.now() - startTime) < startTimeout) {
-        const status = await page.evaluate(() => ({
-          viewerExists: !!(window.viewer),
-          connectionState: window.viewer?.pc?.iceConnectionState,
-          signalingState: window.viewer?.pc?.signalingState,
-          error: window.viewer?.error
-        }));
-        
-        if (status.viewerExists && !status.error) {
-          log('Viewer started successfully!');
-          log(`Connection state: ${status.connectionState}`);
-          log(`Signaling state: ${status.signalingState}`);
-          return true;
-        }
-        
-        if (status.error) {
-          log('Viewer error detected, will retry...');
-          break;
-        }
-        
-        await new Promise(resolve => setTimeout(resolve, 1000));
+      if (status.error) {
+        throw new Error(`Viewer error: ${status.error}`);
       }
+      
+      await new Promise(resolve => setTimeout(resolve, 1000));
     }
     
-    throw new Error('Viewer failed to start after 3 retries');
+    throw new Error('Viewer failed to start within 60 seconds');
   }
 
   async waitForStorageSession() {
@@ -311,7 +406,7 @@ class ViewerCanaryTest {
     }
   }
 
-  getTestResults() {
+  async getTestResults() {
     const metrics = {
       success: this.storageSessionJoined,
       storageSessionJoined: this.storageSessionJoined,
@@ -322,6 +417,23 @@ class ViewerCanaryTest {
     log(metrics.success ? 'TEST PASSED: Storage session joined successfully' : 'TEST FAILED: Storage session not joined');
     log('Test completed!');
     log(`Final metrics: ${JSON.stringify(metrics)}`);
+    
+    // Publish success rate metric (100% for success, 0% for failure)
+    const successRate = this.storageSessionJoined ? 100 : 0;
+    await CloudWatchMetrics.publishPercentageMetric(
+      `StorageSessionSuccessRate_${this.viewerId}`,
+      this.config.channelName,
+      successRate
+    );
+    
+    // Publish WebRTC connection retry count metric
+    await CloudWatchMetrics.publishCountMetric(
+      `WebRTCConnectionRetryCount_${this.viewerId}`,
+      this.config.channelName,
+      this.webrtcRetryCount
+    );
+    
+    log(`WebRTC Connection Retry Summary: Total retries: ${this.webrtcRetryCount}, Had retries: ${this.hadWebRTCRetries}`);
     
     // Success is based on storage session joining, not frame reception
     const success = this.storageSessionJoined;
@@ -461,7 +573,7 @@ async function runViewerCanary(config) {
         await test.monitorConnection(test.page);
         
         cleanupCompleted = true; // Mark cleanup as not needed (normal completion)
-        return test.getTestResults();
+        return await test.getTestResults();
       })(),
       cleanupPromise,
       hardTimeoutPromise
