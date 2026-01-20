@@ -329,23 +329,32 @@ pipeline {
 
     stages {
         stage('Pre Cleanup') {
+            when {
+                anyOf {
+                    equals expected: true, actual: params.JS_STORAGE_VIEWER_JOIN
+                    equals expected: true, actual: params.JS_STORAGE_TWO_VIEWERS
+                    equals expected: true, actual: params.JS_STORAGE_THREE_VIEWERS
+                }
+            }
             steps {
                 script {
                     sh """
-                        echo "Disk usage before cleanup:"
+                        echo "Cleaning up JS storage job artifacts - Disk usage before cleanup:"
                         df -h /home/ubuntu/Jenkins
                         du -sh /home/ubuntu/Jenkins/workspace/ 2>/dev/null || true
                         
-                        # Clean old webrtc workspaces (older than 1 hour)
-                        find /tmp -name "*webrtc-canary-runner*" -type d -mmin +60 -exec rm -rf {} + 2>/dev/null || true
+                        # Only clean JS-related workspaces and viewer sessions
+                        find /tmp -name "*storage*viewer*" -type d -mmin +60 -exec rm -rf {} + 2>/dev/null || true
+                        find /tmp -name "*webrtc-canary-runner*viewer*" -type d -mmin +60 -exec rm -rf {} + 2>/dev/null || true
                         
-                        # Clean Jenkins workspace temp files
+                        # Clean JS/Node related temp files that viewer sessions create
                         find /tmp -name "jenkins-*" -type d -mtime +1 -exec rm -rf {} + 2>/dev/null || true
-                        
-                        # Clean any leftover Git pack files
                         find /tmp -name "tmp_pack_*" -mmin +30 -delete 2>/dev/null || true
                         
-                        echo "Disk usage after cleanup:"
+                        # Clean npm/node caches that JS jobs create
+                        rm -rf ~/.npm/_cacache/* 2>/dev/null || true
+                        
+                        echo "JS storage cleanup completed - Disk usage after cleanup:"
                         df -h /home/ubuntu/Jenkins
                         du -sh /home/ubuntu/Jenkins/workspace/ 2>/dev/null || true
                     """
@@ -716,30 +725,35 @@ pipeline {
     post {
         always {
             script {
-                sh """
-                    echo "Post cleanup - cleaning caches and temp files:"
-                    
-                    # Clean Maven cache
-                    rm -rf ~/.m2/repository/* 2>/dev/null || true
-                    
-                    # Clean Gradle cache
-                    rm -rf ~/.gradle/caches/* 2>/dev/null || true
-                    
-                    # Clean npm cache
-                    rm -rf ~/.npm/_cacache/* 2>/dev/null || true
-                    
-                    # Clean pip cache
-                    rm -rf ~/.cache/pip/* 2>/dev/null || true
-                    
-                    # Clean CMake cache files
-                    find /tmp -name "CMakeCache.txt" -delete 2>/dev/null || true
-                    find /tmp -name "CMakeFiles" -type d -exec rm -rf {} + 2>/dev/null || true
-                    
-                    # Clean any remaining build artifacts
-                    find /tmp -name "*.o" -o -name "*.so" -o -name "*.a" -delete 2>/dev/null || true
-                    
-                    echo "Cache cleanup completed"
-                """
+                // Only perform aggressive post cleanup for JS storage jobs to avoid disk space issues
+                if (params.JS_STORAGE_VIEWER_JOIN || params.JS_STORAGE_TWO_VIEWERS || params.JS_STORAGE_THREE_VIEWERS) {
+                    sh """
+                        echo "Post cleanup for JS storage jobs - cleaning caches and temp files:"
+                        
+                        # Clean Maven cache (Java consumer projects)
+                        rm -rf ~/.m2/repository/* 2>/dev/null || true
+                        
+                        # Clean Gradle cache
+                        rm -rf ~/.gradle/caches/* 2>/dev/null || true
+                        
+                        # Clean npm cache (JS viewer sessions)
+                        rm -rf ~/.npm/_cacache/* 2>/dev/null || true
+                        
+                        # Clean pip cache
+                        rm -rf ~/.cache/pip/* 2>/dev/null || true
+                        
+                        # Clean CMake cache files
+                        find /tmp -name "CMakeCache.txt" -delete 2>/dev/null || true
+                        find /tmp -name "CMakeFiles" -type d -exec rm -rf {} + 2>/dev/null || true
+                        
+                        # Clean any remaining build artifacts
+                        find /tmp -name "*.o" -o -name "*.so" -o -name "*.a" -delete 2>/dev/null || true
+                        
+                        echo "JS storage job cache cleanup completed"
+                    """
+                } else {
+                    echo "Standard job completed - skipping aggressive cache cleanup to preserve job state for rescheduling"
+                }
             }
         }
     }
