@@ -212,6 +212,7 @@ class ViewerCanaryTest {
       sessionToken: process.env.AWS_SESSION_TOKEN || '',
       sendVideo: this.config.sendVideo || 'false',
       sendAudio: this.config.sendAudio || 'false',
+      useTrickleICE: 'true',
     });
     
     // Add forceTURN parameter if configured
