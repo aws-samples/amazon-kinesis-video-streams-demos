@@ -20,6 +20,8 @@ def buildWebRTCProject(useMbedTLS, thing_prefix) {
         chmod a+x cert_setup.sh &&
         ./cert_setup.sh ${thing_prefix} &&
         cd .. &&
+        echo "Cleaning up build and open-source directories..." &&
+        rm -rf build open-source &&
         mkdir -p build &&
         cd build &&
         ${configureCmd} &&
