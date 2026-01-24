@@ -224,8 +224,8 @@ class ViewerCanaryTest {
   }
 
   async waitForChannel() {
-    log('Waiting 2 minutes for master to create channel...');
-    await new Promise(resolve => setTimeout(resolve, 120000));
+    log('Waiting 40 minutes for master to create channel...');
+    await new Promise(resolve => setTimeout(resolve, 240000));
   }
 
   async initializePage(page) {
