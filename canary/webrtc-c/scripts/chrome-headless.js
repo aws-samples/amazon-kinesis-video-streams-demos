@@ -223,11 +223,6 @@ class ViewerCanaryTest {
     return `https://awslabs.github.io/amazon-kinesis-video-streams-webrtc-sdk-js/examples/index.html?${params}`;
   }
 
-  async waitForChannel() {
-    log('Waiting 40 minutes for master to create channel...');
-    await new Promise(resolve => setTimeout(resolve, 240000));
-  }
-
   async initializePage(page) {
     const url = this.buildTestUrl();
     log(`Opening URL: ${url}`);
@@ -553,7 +548,6 @@ async function runViewerCanary(config) {
       (async () => {
         await test.initializeCloudWatch();
         test.validateEnvironment();
-        // await test.waitForChannel();
         
         // Create and initialize single browser and page
         log(`Creating viewer instance...`);

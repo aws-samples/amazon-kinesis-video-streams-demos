@@ -535,7 +535,7 @@ pipeline {
                     }
                     steps {
                         script {
-                            runViewerSessions("", 21, "1")
+                            runViewerSessions("", 55, "1")
                         }
                     }
                 }
@@ -565,7 +565,7 @@ pipeline {
                     }
                     steps {
                         script {
-                            runViewerSessions("Viewer1", 10, "2")
+                            runViewerSessions("Viewer1", 55, "2")
                         }
                     }
                 }
@@ -575,7 +575,7 @@ pipeline {
                     }
                     steps {
                         script {
-                            runViewerSessions("Viewer2", 10, "2")
+                            runViewerSessions("Viewer2", 55, "2")
                         }
                     }
                 }
@@ -605,7 +605,7 @@ pipeline {
                     }
                     steps {
                         script {
-                            runViewerSessions("Viewer1", 10, "3")
+                            runViewerSessions("Viewer1", 55, "3")
                         }
                     }
                 }
@@ -615,7 +615,7 @@ pipeline {
                     }
                     steps {
                         script {
-                            runViewerSessions("Viewer2", 10, "3")
+                            runViewerSessions("Viewer2", 55, "3")
                         }
                     }
                 }
@@ -625,7 +625,7 @@ pipeline {
                     }
                     steps {
                         script {
-                            runViewerSessions("Viewer3", 10, "3")
+                            runViewerSessions("Viewer3", 55, "3")
                         }
                     }
                 }
