@@ -721,40 +721,4 @@ pipeline {
             }
         }
     }
-    
-    post {
-        always {
-            script {
-                // Only perform aggressive post cleanup for JS storage jobs to avoid disk space issues
-                if (params.JS_STORAGE_VIEWER_JOIN || params.JS_STORAGE_TWO_VIEWERS || params.JS_STORAGE_THREE_VIEWERS) {
-                    sh """
-                        echo "Post cleanup for JS storage jobs - cleaning caches and temp files:"
-                        
-                        # Clean Maven cache (Java consumer projects)
-                        rm -rf ~/.m2/repository/* 2>/dev/null || true
-                        
-                        # Clean Gradle cache
-                        rm -rf ~/.gradle/caches/* 2>/dev/null || true
-                        
-                        # Clean npm cache (JS viewer sessions)
-                        rm -rf ~/.npm/_cacache/* 2>/dev/null || true
-                        
-                        # Clean pip cache
-                        rm -rf ~/.cache/pip/* 2>/dev/null || true
-                        
-                        # Clean CMake cache files
-                        find /tmp -name "CMakeCache.txt" -delete 2>/dev/null || true
-                        find /tmp -name "CMakeFiles" -type d -exec rm -rf {} + 2>/dev/null || true
-                        
-                        # Clean any remaining build artifacts
-                        find /tmp -name "*.o" -o -name "*.so" -o -name "*.a" -delete 2>/dev/null || true
-                        
-                        echo "JS storage job cache cleanup completed"
-                    """
-                } else {
-                    echo "Standard job completed - skipping aggressive cache cleanup to preserve job state for rescheduling"
-                }
-            }
-        }
-    }
 }
