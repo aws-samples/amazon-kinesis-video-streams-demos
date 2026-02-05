@@ -4,9 +4,13 @@ on:
   push:
     branches:
       - master
+    paths:
+      - canary
   pull_request:
     branches:
       - master
+    paths:
+      - canary
 
 env:
   DEBIAN_FRONTEND: noninteractive
