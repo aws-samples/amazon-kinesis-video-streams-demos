@@ -49,16 +49,6 @@ def runClient(isProducer, params) {
         'JAVA_HOME': "/usr/lib/jvm/default-java",
         'M2_HOME': "/usr/share/maven"
     ].collect({k,v -> "${k}=${v}" })
-
-    // TODO: get the branch and version from orchestrator
-    if (params.FIRST_ITERATION) {
-
-        // TODO: Move to deletDir(). deleteDir() causes an exception right now 
-        sh """
-            cd $WORKSPACE
-            rm -rf *
-        """
-    }
     
     def consumerStartUpDelay = 45
     echo "NODE_NAME = ${env.NODE_NAME}"
