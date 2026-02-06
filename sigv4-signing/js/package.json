@@ -9,8 +9,8 @@
     "@aws-sdk/signature-v4": "^3.0.0",
     "@aws-crypto/sha256-js": "^5.0.0",
     "@aws-sdk/protocol-http": "^3.0.0",
-    "@aws-sdk/credential-providers": "^3.0.0",
-    "@aws-sdk/client-kinesis-video": "^3.0.0",
+    "@aws-sdk/credential-providers": "^3.985.0",
+    "@aws-sdk/client-kinesis-video": "^3.985.0",
     "ws": "^8.0.0"
   }
 }
