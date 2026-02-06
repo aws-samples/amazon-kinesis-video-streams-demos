@@ -329,34 +329,34 @@ pipeline {
 
     stages {
         stage('Pre Cleanup') {
-            when {
-                anyOf {
-                    equals expected: true, actual: params.JS_STORAGE_VIEWER_JOIN
-                    equals expected: true, actual: params.JS_STORAGE_TWO_VIEWERS
-                    equals expected: true, actual: params.JS_STORAGE_THREE_VIEWERS
-                }
-            }
             steps {
                 script {
                     sh """
-                        echo "Cleaning up JS storage job artifacts - Disk usage before cleanup:"
-                        df -h /home/ubuntu/Jenkins
-                        du -sh /home/ubuntu/Jenkins/workspace/ 2>/dev/null || true
+                        echo "Cleaning up workspace artifacts - Disk usage before cleanup:"
+                        df -h
                         
-                        # Only clean JS-related workspaces and viewer sessions
+                        # Clean all @tmp directories older than 1 hour
+                        find ~/Jenkins -name "*@tmp" -type d -mmin +60 -exec rm -rf {} + 2>/dev/null || true
+                        
+                        # Keep only last 10 workspace directories per job
+                        cd ~/Jenkins 2>/dev/null || true
+                        ls -t | grep "webrtc-canary-runner" | grep -v "@tmp" | tail -n +11 | xargs -I {} rm -rf {} 2>/dev/null || true
+                        
+                        # Clean Puppeteer cache (keep only latest Chrome)
+                        find ~/.cache/puppeteer -type d -name "linux-*" 2>/dev/null | sort -r | tail -n +2 | xargs rm -rf 2>/dev/null || true
+                        
+                        # Clean npm cache if over 200MB
+                        if [ -d ~/.npm ] && [ \$(du -sm ~/.npm 2>/dev/null | cut -f1) -gt 200 ]; then
+                            npm cache clean --force 2>/dev/null || true
+                        fi
+                        
+                        # Clean temp files
                         find /tmp -name "*storage*viewer*" -type d -mmin +60 -exec rm -rf {} + 2>/dev/null || true
-                        find /tmp -name "*webrtc-canary-runner*viewer*" -type d -mmin +60 -exec rm -rf {} + 2>/dev/null || true
-                        
-                        # Clean JS/Node related temp files that viewer sessions create
+                        find /tmp -name "*webrtc-canary-runner*" -type d -mmin +60 -exec rm -rf {} + 2>/dev/null || true
                         find /tmp -name "jenkins-*" -type d -mtime +1 -exec rm -rf {} + 2>/dev/null || true
-                        find /tmp -name "tmp_pack_*" -mmin +30 -delete 2>/dev/null || true
                         
-                        # Clean npm/node caches that JS jobs create
-                        rm -rf ~/.npm/_cacache/* 2>/dev/null || true
-                        
-                        echo "JS storage cleanup completed - Disk usage after cleanup:"
-                        df -h /home/ubuntu/Jenkins
-                        du -sh /home/ubuntu/Jenkins/workspace/ 2>/dev/null || true
+                        echo "Cleanup completed - Disk usage after cleanup:"
+                        df -h
                     """
                 }
             }
@@ -718,6 +718,17 @@ pipeline {
                     ],
                     wait: false
                 )
+            }
+        }
+    }
+    
+    post {
+        always {
+            script {
+                sh """
+                    echo "Post-build cleanup - removing current workspace @tmp directory"
+                    rm -rf ${env.WORKSPACE}@tmp 2>/dev/null || true
+                """
             }
         }
     }
