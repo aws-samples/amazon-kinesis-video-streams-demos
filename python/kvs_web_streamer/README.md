@@ -90,6 +90,8 @@ This runs the simple example that:
 3. Waits for viewer connection
 4. Streams received video to KVS
 
+See also: [limitations](#limitations) for this demo application.
+
 #### Setup Viewer
 
 1. Open https://awslabs.github.io/amazon-kinesis-video-streams-webrtc-sdk-js/examples/index.html and fill in the details to the same signaling channel. The signaling channel must be in the same region, and configured for peer-to-peer mode (not WebRTC ingestion mode).
@@ -109,20 +111,13 @@ This runs the simple example that:
 
 ### Advanced Examples
 
-The `sample_ingestion_client.py` contains 10 different usage examples:
+The `sample_ingestion_client.py` contains various usage examples.
 
-1. **Simple Streaming** - Basic setup with defaults
-2. **Builder Pattern** - Fluent API for configuration
-3. **Configuration Presets** - Pre-defined settings (low latency, high quality, etc.)
-4. **Multi-stream** - Manage multiple concurrent streams
-5. **Event Monitoring** - Subscribe to stream lifecycle events
-6. **Metrics Collection** - Track performance metrics
-7. **Production Setup** - Production-ready configuration
-8. **Dynamic Management** - Add/remove streams on the fly
-9. **Environment Config** - Load everything from `.env`
-10. **Config Persistence** - Save/load configurations to JSON
+See also: [limitations](#limitations) for this demo application.
 
 ### Configuration Presets
+
+Use various preset configurations.
 
 ```python
 from common.config import ConfigPresets
@@ -135,10 +130,9 @@ config = ConfigPresets.high_quality("channel", "stream")
 
 # Mobile optimized (low bandwidth)
 config = ConfigPresets.mobile_optimized("channel", "stream")
-
-# Production ready
-config = ConfigPresets.production("channel", "stream")
 ```
+
+See also: [limitations](#limitations) for this demo application.
 
 ## Project Structure
 
@@ -189,6 +183,8 @@ bus.subscribe(StreamEvent.ERROR,
               lambda e: print(f"Error: {e.data}"))
 ```
 
+See also: [limitations](#limitations) for this demo application.
+
 ## Troubleshooting
 
 ### Connection Issues
@@ -197,6 +193,7 @@ bus.subscribe(StreamEvent.ERROR,
 - Check KVS channel and stream names exist and in the same region
 - Ensure proper IAM permissions
 - Check the browser supports H.264, Constrained Baseline Level 3.1 Profile (42e01f)
+- Check firewall rules
 
 ### Video Quality Issues
 
@@ -215,26 +212,6 @@ bus.subscribe(StreamEvent.ERROR,
 - **H.264 Only**: Only H.264 codec is supported
 - **Browser Compatibility**: Requires WebRTC-compatible browser, not guaranteed to work across all browsers.
 - **Demo Status**: This is a demo; additional testing required for production use
-
-## Development
-
-### Adding Custom Configuration
-
-```python
-from common.config import StreamConfig
-
-config = StreamConfig(
-    channel_name="my-channel",
-    stream_name="my-stream",
-    region="us-west-2",
-    width=1280,
-    height=720,
-    cluster_duration_ms=1500
-)
-
-config.validate()
-config.to_file("my_config.json")
-```
 
 ## License
 
