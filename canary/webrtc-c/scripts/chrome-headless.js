@@ -35,6 +35,14 @@ class ViewerCanaryTest {
     this.hasReceivedFirstIceCandidate = false;
     this.hasSentFirstIceCandidate = false;
     
+    // ICE candidate type tracking
+    this.firstHostCandidateTime = null;
+    this.firstSrflxCandidateTime = null;
+    this.firstRelayCandidateTime = null;
+    this.hasGeneratedHostCandidate = false;
+    this.hasGeneratedSrflxCandidate = false;
+    this.hasGeneratedRelayCandidate = false;
+    
     // WebRTC connection retry tracking (internal viewer retries)
     this.webrtcRetryCount = 0;
     this.hadWebRTCRetries = false;
@@ -46,6 +54,27 @@ class ViewerCanaryTest {
   async initializeCloudWatch() {
     const cwClient = new CloudWatchClient({ region: this.config.region || 'us-west-2' });
     CloudWatchMetrics.init(cwClient);
+  }
+
+  // Helper function to extract ICE candidate type from candidate string
+  extractIceCandidateType(text) {
+    // Look for DEBUG log containing ICE candidate details
+    if (!text.includes('[DEBUG] [VIEWER] ICE candidate:')) {
+      return null;
+    }
+    
+    // Extract candidate string from the log
+    // Example: candidate:2220892825 1 udp 2122260223 192.168.1.142 55262 typ host generation 0 ufrag mnD0
+    const candidateMatch = text.match(/candidate:.*?typ\s+(\w+)/);
+    if (candidateMatch && candidateMatch[1]) {
+      const candidateType = candidateMatch[1].toLowerCase();
+      // Return standardized candidate types
+      if (candidateType === 'host') return 'host';
+      if (candidateType === 'srflx') return 'srflx';  
+      if (candidateType === 'relay') return 'relay';
+    }
+    
+    return null;
   }
 
   async createBrowser() {
@@ -118,6 +147,51 @@ class ViewerCanaryTest {
             `FirstIceReceivedToFirstIceSentTime_${this.viewerId}`,
             this.config.channelName,
             firstIceReceivedToSentTime
+          );
+        }
+      }
+      
+      // Track specific ICE candidate types (host, srflx, relay)
+      const candidateType = this.extractIceCandidateType(text);
+      if (candidateType && this.answerSentTime) {
+        const currentTime = Date.now();
+        
+        if (candidateType === 'host' && !this.hasGeneratedHostCandidate) {
+          this.firstHostCandidateTime = currentTime;
+          this.hasGeneratedHostCandidate = true;
+          const timeToHostCandidate = currentTime - this.answerSentTime;
+          log(`First HOST candidate generated: ${timeToHostCandidate}ms after answer sent`);
+          
+          await CloudWatchMetrics.publishMsMetric(
+            `TimeToFirstHostCandidate_${this.viewerId}`,
+            this.config.channelName,
+            timeToHostCandidate
+          );
+        }
+        
+        if (candidateType === 'srflx' && !this.hasGeneratedSrflxCandidate) {
+          this.firstSrflxCandidateTime = currentTime;
+          this.hasGeneratedSrflxCandidate = true;
+          const timeToSrflxCandidate = currentTime - this.answerSentTime;
+          log(`First SRFLX candidate generated: ${timeToSrflxCandidate}ms after answer sent`);
+          
+          await CloudWatchMetrics.publishMsMetric(
+            `TimeToFirstSrflxCandidate_${this.viewerId}`,
+            this.config.channelName,
+            timeToSrflxCandidate
+          );
+        }
+        
+        if (candidateType === 'relay' && !this.hasGeneratedRelayCandidate) {
+          this.firstRelayCandidateTime = currentTime;
+          this.hasGeneratedRelayCandidate = true;
+          const timeToRelayCandidate = currentTime - this.answerSentTime;
+          log(`First RELAY candidate generated: ${timeToRelayCandidate}ms after answer sent`);
+          
+          await CloudWatchMetrics.publishMsMetric(
+            `TimeToFirstRelayCandidate_${this.viewerId}`,
+            this.config.channelName,
+            timeToRelayCandidate
           );
         }
       }
@@ -218,6 +292,11 @@ class ViewerCanaryTest {
     // Add forceTURN parameter if configured
     if (this.config.forceTURN === true) {
       params.set('forceTURN', 'true');
+    }
+    
+    // Add endpoint parameter if configured
+    if (this.config.endpoint) {
+      params.set('endpoint', this.config.endpoint);
     }
     
     return `https://awslabs.github.io/amazon-kinesis-video-streams-webrtc-sdk-js/examples/index.html?${params}`;
@@ -598,7 +677,8 @@ runViewerCanary({
   duration: parseInt(process.env.TEST_DURATION) || 360,
   saveFrames: process.env.SAVE_FRAMES === 'true',
   clientId: process.env.CLIENT_ID || `test-viewer-${Date.now()}`,
-  forceTURN: process.env.FORCE_TURN === 'true'
+  forceTURN: process.env.FORCE_TURN === 'true',
+  endpoint: process.env.ENDPOINT || ''
 }).then(result => {
   process.exit(result.success ? 0 : 1);
 }).catch(error => {
