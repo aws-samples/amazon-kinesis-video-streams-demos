@@ -13,8 +13,9 @@ class ViewerCanaryTest {
     this.config = config;
     this.viewerId = process.env.VIEWER_ID || 'Viewer1';
     this.clientId = process.env.CLIENT_ID || `viewer-${Date.now()}`;
+    this.metricSuffix = config.metricSuffix || '';
     
-    log(`Initializing test with ${this.viewerId} (${this.clientId})`);
+    log(`Initializing test with ${this.viewerId} (${this.clientId})${this.metricSuffix ? `, metric suffix: ${this.metricSuffix}` : ''}`);
     
     this.sessionStartTime = Date.now();
     this.storageSessionJoined = false;
@@ -54,6 +55,11 @@ class ViewerCanaryTest {
   async initializeCloudWatch() {
     const cwClient = new CloudWatchClient({ region: this.config.region || 'us-west-2' });
     CloudWatchMetrics.init(cwClient);
+  }
+
+  // Helper to generate metric name with optional suffix
+  getMetricName(baseName) {
+    return `${baseName}_${this.viewerId}${this.metricSuffix}`;
   }
 
   // Helper function to extract ICE candidate type from candidate string
@@ -106,7 +112,7 @@ class ViewerCanaryTest {
           log(`Offer to Answer time: ${offerToAnswerTime}ms`);
           
           await CloudWatchMetrics.publishMsMetric(
-            `OfferReceivedToAnswerSentTime_${this.viewerId}`,
+            this.getMetricName('OfferReceivedToAnswerSentTime'),
             this.config.channelName,
             offerToAnswerTime
           );
@@ -125,7 +131,7 @@ class ViewerCanaryTest {
           log(`Answer Sent to First ICE Received time: ${answerToFirstIceTime}ms`);
           
           await CloudWatchMetrics.publishMsMetric(
-            `AnswerSentToFirstIceReceivedTime_${this.viewerId}`,
+            this.getMetricName('AnswerSentToFirstIceReceivedTime'),
             this.config.channelName,
             answerToFirstIceTime
           );
@@ -144,7 +150,7 @@ class ViewerCanaryTest {
           log(`First ICE Received to First ICE Sent time: ${firstIceReceivedToSentTime}ms`);
           
           await CloudWatchMetrics.publishMsMetric(
-            `FirstIceReceivedToFirstIceSentTime_${this.viewerId}`,
+            this.getMetricName('FirstIceReceivedToFirstIceSentTime'),
             this.config.channelName,
             firstIceReceivedToSentTime
           );
@@ -163,7 +169,7 @@ class ViewerCanaryTest {
           log(`First HOST candidate generated: ${timeToHostCandidate}ms after answer sent`);
           
           await CloudWatchMetrics.publishMsMetric(
-            `TimeToFirstHostCandidate_${this.viewerId}`,
+            this.getMetricName('TimeToFirstHostCandidate'),
             this.config.channelName,
             timeToHostCandidate
           );
@@ -176,7 +182,7 @@ class ViewerCanaryTest {
           log(`First SRFLX candidate generated: ${timeToSrflxCandidate}ms after answer sent`);
           
           await CloudWatchMetrics.publishMsMetric(
-            `TimeToFirstSrflxCandidate_${this.viewerId}`,
+            this.getMetricName('TimeToFirstSrflxCandidate'),
             this.config.channelName,
             timeToSrflxCandidate
           );
@@ -189,7 +195,7 @@ class ViewerCanaryTest {
           log(`First RELAY candidate generated: ${timeToRelayCandidate}ms after answer sent`);
           
           await CloudWatchMetrics.publishMsMetric(
-            `TimeToFirstRelayCandidate_${this.viewerId}`,
+            this.getMetricName('TimeToFirstRelayCandidate'),
             this.config.channelName,
             timeToRelayCandidate
           );
@@ -207,7 +213,7 @@ class ViewerCanaryTest {
           log(`First ICE Sent to All ICE Generated time: ${firstIceSentToAllGeneratedTime}ms`);
           
           await CloudWatchMetrics.publishMsMetric(
-            `FirstIceSentToAllIceGeneratedTime_${this.viewerId}`,
+            this.getMetricName('FirstIceSentToAllIceGeneratedTime'),
             this.config.channelName,
             firstIceSentToAllGeneratedTime
           );
@@ -225,7 +231,7 @@ class ViewerCanaryTest {
           log(`All ICE Generated to Connection Established time: ${allIceToConnectionTime}ms`);
           
           await CloudWatchMetrics.publishMsMetric(
-            `AllIceGeneratedToConnectionEstablishedTime_${this.viewerId}`,
+            this.getMetricName('AllIceGeneratedToConnectionEstablishedTime'),
             this.config.channelName,
             allIceToConnectionTime
           );
@@ -237,7 +243,7 @@ class ViewerCanaryTest {
           log(`Total Connection Establishment time (Offer to Peer Connection): ${totalConnectionTime}ms`);
           
           await CloudWatchMetrics.publishMsMetric(
-            `TotalConnectionEstablishmentTime_${this.viewerId}`,
+            this.getMetricName('TotalConnectionEstablishmentTime'),
             this.config.channelName,
             totalConnectionTime
           );
@@ -263,7 +269,7 @@ class ViewerCanaryTest {
         
         const joinTime = Date.now() - this.sessionStartTime;
         await CloudWatchMetrics.publishMsMetric(
-          `JoinSSAsViewerTime_${this.viewerId}`,
+          this.getMetricName('JoinSSAsViewerTime'),
           this.config.channelName,
           joinTime
         );
@@ -436,7 +442,7 @@ class ViewerCanaryTest {
     
     const frameDetectionTime = Date.now() - this.sessionStartTime;
     await CloudWatchMetrics.publishMsMetric(
-      `TimeToFirstFrame_${this.viewerId}`,
+      this.getMetricName('TimeToFirstFrame'),
       this.config.channelName,
       frameDetectionTime
     );
@@ -496,14 +502,14 @@ class ViewerCanaryTest {
     // Publish success rate metric (100% for success, 0% for failure)
     const successRate = this.storageSessionJoined ? 100 : 0;
     await CloudWatchMetrics.publishPercentageMetric(
-      `StorageSessionSuccessRate_${this.viewerId}`,
+      this.getMetricName('StorageSessionSuccessRate'),
       this.config.channelName,
       successRate
     );
     
     // Publish WebRTC connection retry count metric
     await CloudWatchMetrics.publishCountMetric(
-      `WebRTCConnectionRetryCount_${this.viewerId}`,
+      this.getMetricName('WebRTCConnectionRetryCount'),
       this.config.channelName,
       this.webrtcRetryCount
     );
@@ -678,7 +684,8 @@ runViewerCanary({
   saveFrames: process.env.SAVE_FRAMES === 'true',
   clientId: process.env.CLIENT_ID || `test-viewer-${Date.now()}`,
   forceTURN: process.env.FORCE_TURN === 'true',
-  endpoint: process.env.ENDPOINT || ''
+  endpoint: process.env.ENDPOINT || '',
+  metricSuffix: process.env.METRIC_SUFFIX || ''
 }).then(result => {
   process.exit(result.success ? 0 : 1);
 }).catch(error => {

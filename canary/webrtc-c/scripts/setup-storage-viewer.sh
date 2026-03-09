@@ -39,5 +39,17 @@ export CANARY_CHANNEL_NAME="${JOB_NAME}-${RUNNER_LABEL}"
 export AWS_REGION="${AWS_DEFAULT_REGION}"
 export TEST_DURATION="${DURATION_IN_SECONDS}"
 
+# Set endpoint if provided (defaults to empty)
+if [ -n "${ENDPOINT}" ]; then
+    export ENDPOINT="${ENDPOINT}"
+    echo "Using custom endpoint: ${ENDPOINT}"
+fi
+
+# Set metric suffix if provided (defaults to empty)
+if [ -n "${METRIC_SUFFIX}" ]; then
+    export METRIC_SUFFIX="${METRIC_SUFFIX}"
+    echo "Using metric suffix: ${METRIC_SUFFIX}"
+fi
+
 # Run storage viewer test
 node chrome-headless.js || { echo "ERROR: Chrome headless test failed"; exit 1; }

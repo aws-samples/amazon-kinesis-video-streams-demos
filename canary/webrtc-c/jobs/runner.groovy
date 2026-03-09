@@ -189,6 +189,8 @@ def runViewerSessions(viewerId = "", waitMinutes = 10, viewerCount = "1") {
                         export VIEWER_COUNT="${viewerCount}"
                         export VIEWER_ID="${viewerId}"
                         export CLIENT_ID="${viewerId ? viewerId.toLowerCase() + '-' : 'viewer-'}session-${session}-${BUILD_NUMBER}"
+                        export ENDPOINT="${params.ENDPOINT ?: ''}"
+                        export METRIC_SUFFIX="${params.METRIC_SUFFIX ?: ''}"
                         
                         ./canary/webrtc-c/scripts/setup-storage-viewer.sh
                     """
@@ -320,6 +322,8 @@ pipeline {
         booleanParam(name: 'JS_STORAGE_VIEWER_JOIN', defaultValue: false)
         booleanParam(name: 'JS_STORAGE_TWO_VIEWERS', defaultValue: false)
         booleanParam(name: 'JS_STORAGE_THREE_VIEWERS', defaultValue: false)
+        string(name: 'ENDPOINT', defaultValue: '')
+        string(name: 'METRIC_SUFFIX', defaultValue: '')
     }
     
     // Set the role ARN to environment to avoid string interpolation to follow Jenkins security guidelines.
@@ -714,6 +718,8 @@ pipeline {
                       string(name: 'MIN_RETRY_DELAY_IN_SECONDS', value: params.MIN_RETRY_DELAY_IN_SECONDS),
                       string(name: 'GIT_URL', value: params.GIT_URL),
                       string(name: 'GIT_HASH', value: params.GIT_HASH),
+                      string(name: 'ENDPOINT', value: params.ENDPOINT),
+                      string(name: 'METRIC_SUFFIX', value: params.METRIC_SUFFIX),
                       booleanParam(name: 'FIRST_ITERATION', value: false)
                     ],
                     wait: false
