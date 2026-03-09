@@ -244,7 +244,9 @@ def buildStorageCanary(isConsumer, params) {
       'CANARY_LOG_STREAM_NAME': "${params.RUNNER_LABEL}-StorageMaster-${START_TIMESTAMP}",
       'CANARY_CLIENT_ID': "Master",
       'CANARY_IS_MASTER': true,
-      'CANARY_CHANNEL_NAME': "${env.JOB_NAME}-${params.RUNNER_LABEL}"
+      'CANARY_CHANNEL_NAME': "${env.JOB_NAME}-${params.RUNNER_LABEL}",
+      'AWS_DEFAULT_REGION': params.AWS_DEFAULT_REGION,
+      'CONTROL_PLANE_URI': params.ENDPOINT ?: ''
     ]
 
     def consumerEnvs = [
