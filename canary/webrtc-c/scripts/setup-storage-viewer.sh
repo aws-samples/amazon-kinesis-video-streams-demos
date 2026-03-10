@@ -39,10 +39,15 @@ export CANARY_CHANNEL_NAME="${JOB_NAME}-${RUNNER_LABEL}"
 export AWS_REGION="${AWS_DEFAULT_REGION}"
 export TEST_DURATION="${DURATION_IN_SECONDS}"
 
+# Debug: Show what ENDPOINT value we received
+echo "DEBUG: ENDPOINT env var = '${ENDPOINT}'"
+
 # Set endpoint if provided (defaults to empty)
 if [ -n "${ENDPOINT}" ]; then
     export ENDPOINT="${ENDPOINT}"
     echo "Using custom endpoint: ${ENDPOINT}"
+else
+    echo "No custom endpoint provided, using default"
 fi
 
 # Set metric suffix if provided (defaults to empty)
