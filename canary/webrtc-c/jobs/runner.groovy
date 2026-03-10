@@ -171,7 +171,7 @@ def runViewerSessions(viewerId = "", waitMinutes = 10, viewerCount = "1") {
             checkout([$class: 'GitSCM', branches: [[name: params.GIT_HASH ]],
                       userRemoteConfigs: [[url: params.GIT_URL]]])
             
-            if (params.FIRST_ITERATION) {
+            if (params.FIRST_ITERATION && waitMinutes > 0) {
                 echo "First iteration - waiting ${waitMinutes} minutes for master to build"
                 sleep waitMinutes * 60
             }
@@ -550,7 +550,8 @@ pipeline {
                     }
                     steps {
                         script {
-                            runViewerSessions("", params.VIEWER_WAIT_MINUTES?.toInteger() ?: 55, "1")
+                            def waitMins = params.VIEWER_WAIT_MINUTES != null ? params.VIEWER_WAIT_MINUTES.toInteger() : 55
+                            runViewerSessions("", waitMins, "1")
                         }
                     }
                 }
@@ -580,7 +581,8 @@ pipeline {
                     }
                     steps {
                         script {
-                            runViewerSessions("Viewer1", params.VIEWER_WAIT_MINUTES?.toInteger() ?: 55, "2")
+                            def waitMins = params.VIEWER_WAIT_MINUTES != null ? params.VIEWER_WAIT_MINUTES.toInteger() : 55
+                            runViewerSessions("Viewer1", waitMins, "2")
                         }
                     }
                 }
@@ -590,7 +592,8 @@ pipeline {
                     }
                     steps {
                         script {
-                            runViewerSessions("Viewer2", params.VIEWER_WAIT_MINUTES?.toInteger() ?: 55, "2")
+                            def waitMins = params.VIEWER_WAIT_MINUTES != null ? params.VIEWER_WAIT_MINUTES.toInteger() : 55
+                            runViewerSessions("Viewer2", waitMins, "2")
                         }
                     }
                 }
@@ -620,7 +623,8 @@ pipeline {
                     }
                     steps {
                         script {
-                            runViewerSessions("Viewer1", params.VIEWER_WAIT_MINUTES?.toInteger() ?: 55, "3")
+                            def waitMins = params.VIEWER_WAIT_MINUTES != null ? params.VIEWER_WAIT_MINUTES.toInteger() : 55
+                            runViewerSessions("Viewer1", waitMins, "3")
                         }
                     }
                 }
@@ -630,7 +634,8 @@ pipeline {
                     }
                     steps {
                         script {
-                            runViewerSessions("Viewer2", params.VIEWER_WAIT_MINUTES?.toInteger() ?: 55, "3")
+                            def waitMins = params.VIEWER_WAIT_MINUTES != null ? params.VIEWER_WAIT_MINUTES.toInteger() : 55
+                            runViewerSessions("Viewer2", waitMins, "3")
                         }
                     }
                 }
@@ -640,7 +645,8 @@ pipeline {
                     }
                     steps {
                         script {
-                            runViewerSessions("Viewer3", params.VIEWER_WAIT_MINUTES?.toInteger() ?: 55, "3")
+                            def waitMins = params.VIEWER_WAIT_MINUTES != null ? params.VIEWER_WAIT_MINUTES.toInteger() : 55
+                            runViewerSessions("Viewer3", waitMins, "3")
                         }
                     }
                 }
