@@ -172,7 +172,7 @@ def runViewerSessions(viewerId = "", waitMinutes = 10, viewerCount = "1") {
                       userRemoteConfigs: [[url: params.GIT_URL]]])
             
             if (params.FIRST_ITERATION && waitMinutes > 0) {
-                echo "First iteration - waiting ${waitMinutes} minutes for master to build"
+                echo "First iteration - waiting ${waitMinutes} minutes hello for master to build"
                 sleep waitMinutes * 60
             }
             
