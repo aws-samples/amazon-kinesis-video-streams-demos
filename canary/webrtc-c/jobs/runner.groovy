@@ -326,6 +326,7 @@ pipeline {
         booleanParam(name: 'JS_STORAGE_THREE_VIEWERS', defaultValue: false)
         string(name: 'ENDPOINT', defaultValue: '')
         string(name: 'METRIC_SUFFIX', defaultValue: '')
+        string(name: 'VIEWER_WAIT_MINUTES', defaultValue: '55')
     }
     
     // Set the role ARN to environment to avoid string interpolation to follow Jenkins security guidelines.
@@ -541,7 +542,7 @@ pipeline {
                     }
                     steps {
                         script {
-                            runViewerSessions("", 55, "1")
+                            runViewerSessions("", params.VIEWER_WAIT_MINUTES?.toInteger() ?: 55, "1")
                         }
                     }
                 }
@@ -571,7 +572,7 @@ pipeline {
                     }
                     steps {
                         script {
-                            runViewerSessions("Viewer1", 55, "2")
+                            runViewerSessions("Viewer1", params.VIEWER_WAIT_MINUTES?.toInteger() ?: 55, "2")
                         }
                     }
                 }
@@ -581,7 +582,7 @@ pipeline {
                     }
                     steps {
                         script {
-                            runViewerSessions("Viewer2", 55, "2")
+                            runViewerSessions("Viewer2", params.VIEWER_WAIT_MINUTES?.toInteger() ?: 55, "2")
                         }
                     }
                 }
@@ -611,7 +612,7 @@ pipeline {
                     }
                     steps {
                         script {
-                            runViewerSessions("Viewer1", 55, "3")
+                            runViewerSessions("Viewer1", params.VIEWER_WAIT_MINUTES?.toInteger() ?: 55, "3")
                         }
                     }
                 }
@@ -621,7 +622,7 @@ pipeline {
                     }
                     steps {
                         script {
-                            runViewerSessions("Viewer2", 55, "3")
+                            runViewerSessions("Viewer2", params.VIEWER_WAIT_MINUTES?.toInteger() ?: 55, "3")
                         }
                     }
                 }
@@ -631,7 +632,7 @@ pipeline {
                     }
                     steps {
                         script {
-                            runViewerSessions("Viewer3", 55, "3")
+                            runViewerSessions("Viewer3", params.VIEWER_WAIT_MINUTES?.toInteger() ?: 55, "3")
                         }
                     }
                 }
@@ -722,6 +723,7 @@ pipeline {
                       string(name: 'GIT_HASH', value: params.GIT_HASH),
                       string(name: 'ENDPOINT', value: params.ENDPOINT),
                       string(name: 'METRIC_SUFFIX', value: params.METRIC_SUFFIX),
+                      string(name: 'VIEWER_WAIT_MINUTES', value: params.VIEWER_WAIT_MINUTES),
                       booleanParam(name: 'FIRST_ITERATION', value: false)
                     ],
                     wait: false

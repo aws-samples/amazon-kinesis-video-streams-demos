@@ -293,16 +293,12 @@ class ViewerCanaryTest {
       sendVideo: this.config.sendVideo || 'false',
       sendAudio: this.config.sendAudio || 'false',
       useTrickleICE: 'true',
+      endpoint: this.config.endpoint || '',
     });
     
     // Add forceTURN parameter if configured
     if (this.config.forceTURN === true) {
       params.set('forceTURN', 'true');
-    }
-    
-    // Add endpoint parameter if configured
-    if (this.config.endpoint) {
-      params.set('endpoint', this.config.endpoint);
     }
     
     return `https://awslabs.github.io/amazon-kinesis-video-streams-webrtc-sdk-js/examples/index.html?${params}`;
