@@ -93,8 +93,7 @@ pipelineJob("${NAMESPACE}-runner") {
     }
 }
 
-echo "Gamma seed completed! Created jobs:"
-echo "  - ${NAMESPACE}-orchestrator"
-echo "  - ${NAMESPACE}-runner"
-echo ""
-echo "To run gamma tests, go to ${NAMESPACE}-orchestrator and click 'Build with Parameters'"
+// Gamma seed completed! Created jobs:
+//   - webrtc-gamma-orchestrator
+//   - webrtc-gamma-runner
+// To run gamma tests, go to webrtc-gamma-orchestrator and click 'Build with Parameters'
