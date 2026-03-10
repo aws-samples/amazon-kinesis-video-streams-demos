@@ -70,7 +70,7 @@ pipelineJob("${NAMESPACE}-orchestrator") {
     }
     definition {
         cps {
-            script(readFileFromWorkspace("${JOBS_DIR}/gamma-orchestrator.groovy"))
+            script(readFileFromWorkspace("${JOBS_DIR}/gamma_orchestrator.groovy"))
             sandbox()
         }
     }
@@ -87,7 +87,7 @@ pipelineJob("${NAMESPACE}-runner") {
     }
     definition {
         cps {
-            script(readFileFromWorkspace("${JOBS_DIR}/gamma-runner.groovy"))
+            script(readFileFromWorkspace("${JOBS_DIR}/gamma_runner.groovy"))
             sandbox()
         }
     }
