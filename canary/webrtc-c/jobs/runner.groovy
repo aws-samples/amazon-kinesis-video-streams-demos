@@ -176,8 +176,14 @@ def runViewerSessions(viewerId = "", waitMinutes = 10, viewerCount = "1") {
                 sleep waitMinutes * 60
             }
             
+            // Capture endpoint value before loop to ensure it's available
+            def endpointValue = params.ENDPOINT ?: ''
+            def metricSuffixValue = params.METRIC_SUFFIX ?: ''
+            
             for (int session = 1; session <= 3; session++) {
                 echo "Starting ${viewerId ? viewerId + ' ' : ''}session ${session}/3"
+                echo "DEBUG: ENDPOINT value = '${endpointValue}'"
+                echo "DEBUG: METRIC_SUFFIX value = '${metricSuffixValue}'"
                 
                 try {
                     sh """
@@ -189,8 +195,10 @@ def runViewerSessions(viewerId = "", waitMinutes = 10, viewerCount = "1") {
                         export VIEWER_COUNT="${viewerCount}"
                         export VIEWER_ID="${viewerId}"
                         export CLIENT_ID="${viewerId ? viewerId.toLowerCase() + '-' : 'viewer-'}session-${session}-${BUILD_NUMBER}"
-                        export ENDPOINT="${params.ENDPOINT ?: ''}"
-                        export METRIC_SUFFIX="${params.METRIC_SUFFIX ?: ''}"
+                        export ENDPOINT="${endpointValue}"
+                        export METRIC_SUFFIX="${metricSuffixValue}"
+                        
+                        echo "Shell ENDPOINT: \$ENDPOINT"
                         
                         ./canary/webrtc-c/scripts/setup-storage-viewer.sh
                     """
