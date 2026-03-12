@@ -85,12 +85,16 @@ def runViewerSessions(viewerId = "", waitMinutes = 2, viewerCount = "1", stagger
             for (int session = 1; session <= 3; session++) {
                 echo "Starting ${viewerId ? viewerId + ' ' : ''}session ${session}/3"
                 
+                def viewerSessionDuration = (params.VIEWER_SESSION_DURATION_SECONDS != null && params.VIEWER_SESSION_DURATION_SECONDS.toString().trim() != '') 
+                    ? params.VIEWER_SESSION_DURATION_SECONDS 
+                    : '600'
+                
                 try {
                     sh """
                         export JOB_NAME="${env.JOB_NAME}"
                         export RUNNER_LABEL="${params.RUNNER_LABEL}"
                         export AWS_DEFAULT_REGION="${params.AWS_DEFAULT_REGION}"
-                        export DURATION_IN_SECONDS="180"
+                        export DURATION_IN_SECONDS="${viewerSessionDuration}"
                         export FORCE_TURN="${params.FORCE_TURN ?: 'false'}"
                         export VIEWER_COUNT="${viewerCount}"
                         export VIEWER_ID="${viewerId}"
@@ -190,6 +194,7 @@ pipeline {
         string(name: 'ENDPOINT', defaultValue: '', description: 'Custom endpoint URL (e.g., gamma endpoint)')
         string(name: 'METRIC_SUFFIX', defaultValue: '-gamma')
         string(name: 'VIEWER_WAIT_MINUTES', defaultValue: '2', description: 'Minutes to wait for master to build')
+        string(name: 'VIEWER_SESSION_DURATION_SECONDS', defaultValue: '600', description: 'Duration in seconds for each viewer session (default 10 minutes)')
         booleanParam(name: 'DEBUG_LOG_SDP', defaultValue: true)
         booleanParam(name: 'FIRST_ITERATION', defaultValue: true)
         booleanParam(name: 'JS_STORAGE_VIEWER_JOIN', defaultValue: false)
@@ -422,6 +427,7 @@ pipeline {
                         string(name: 'ENDPOINT', value: params.ENDPOINT),
                         string(name: 'METRIC_SUFFIX', value: params.METRIC_SUFFIX),
                         string(name: 'VIEWER_WAIT_MINUTES', value: params.VIEWER_WAIT_MINUTES),
+                        string(name: 'VIEWER_SESSION_DURATION_SECONDS', value: params.VIEWER_SESSION_DURATION_SECONDS),
                         booleanParam(name: 'DEBUG_LOG_SDP', value: params.DEBUG_LOG_SDP),
                         booleanParam(name: 'FIRST_ITERATION', value: false),
                         booleanParam(name: 'JS_STORAGE_VIEWER_JOIN', value: params.JS_STORAGE_VIEWER_JOIN),

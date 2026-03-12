@@ -48,6 +48,15 @@ class ViewerCanaryTest {
     this.webrtcRetryCount = 0;
     this.hadWebRTCRetries = false;
     
+    // Storage session join failure tracking - sequence detection
+    // Failure is confirmed when these 3 logs appear consecutively:
+    // 1. [VIEWER] Error joining storage session as viewer
+    // 2. [VIEWER] Stopping VIEWER connection
+    // 3. [VIEWER] Disconnected from signaling channel
+    this.storageSessionJoinFailed = false;
+    this.viewerDisconnected = false;
+    this.failureSequenceStep = 0; // Track which step of the failure sequence we're at
+    
     this.browser = null;
     this.page = null;
   }
@@ -257,6 +266,27 @@ class ViewerCanaryTest {
         log(`WebRTC connection retry detected! Total retries: ${this.webrtcRetryCount}`);
       }
       
+      // Detect storage session join error (single failure or retry failure)
+      if (text.includes('[VIEWER] Error joining storage session as viewer')) {
+        log('Storage session join error detected!');
+        this.storageSessionJoinFailed = true;
+        this.storageSessionJoined = false;
+      }
+      
+      // Detect storage session join failure after all retries exhausted
+      if (text.includes('Stopping the application after 5 failed attempts to connect to the storage session')) {
+        log('Storage session join FAILED after 5 retry attempts!');
+        this.storageSessionJoinFailed = true;
+        this.storageSessionJoined = false;
+      }
+      
+      // Detect viewer disconnection (signals end of failed session)
+      if (text.includes('[VIEWER] Stopping VIEWER connection') || 
+          text.includes('[VIEWER] Disconnected from signaling channel')) {
+        log('Viewer disconnection detected!');
+        this.viewerDisconnected = true;
+      }
+      
       if (text.includes('Successfully joined the storage session')) {
         log('Storage session joined - ready to monitor frames!');
         this.storageSessionJoined = true;
@@ -347,17 +377,34 @@ class ViewerCanaryTest {
     throw new Error('Viewer failed to start within 60 seconds');
   }
 
-  async waitForStorageSession() {
-    log('Waiting for storage session to be joined...');
-    const sessionTimeout = 180000;
+  async waitForStorageSessionOrFailure() {
+    log('Waiting for storage session to be joined or failure...');
     
-    while (!this.storageSessionJoined && (Date.now() - this.sessionStartTime) < sessionTimeout) {
+    // Wait until either:
+    // 1. Storage session is successfully joined
+    // 2. Storage session join failed AND viewer disconnected (failure complete)
+    // 3. Hard timeout reached
+    const hardTimeout = this.config.duration * 1000;
+    
+    while ((Date.now() - this.sessionStartTime) < hardTimeout) {
+      // Success case: storage session joined
+      if (this.storageSessionJoined) {
+        log('Storage session joined successfully!');
+        return { success: true };
+      }
+      
+      // Failure case: join failed and viewer disconnected
+      if (this.storageSessionJoinFailed && this.viewerDisconnected) {
+        log('Storage session join failed and viewer disconnected - failure complete');
+        return { success: false, reason: 'join_failed' };
+      }
+      
       await new Promise(resolve => setTimeout(resolve, 1000));
     }
     
-    if (!this.storageSessionJoined) {
-      throw new Error('Storage session not joined within 180 seconds');
-    }
+    // Timeout reached without success or complete failure
+    log('Timeout reached waiting for storage session');
+    return { success: false, reason: 'timeout' };
   }
 
   async getFrameStats(page) {
@@ -643,10 +690,16 @@ async function runViewerCanary(config) {
         
         await test.waitForViewerStart(test.page);
         
-        await test.waitForStorageSession();
+        // Wait for storage session join or failure
+        const sessionResult = await test.waitForStorageSessionOrFailure();
         
-        // Monitor the viewer
-        await test.monitorConnection(test.page);
+        if (sessionResult.success) {
+          // Success: monitor connection briefly then complete
+          await test.monitorConnection(test.page);
+        } else {
+          // Failure: session result already captured, just log
+          log(`Storage session failed: ${sessionResult.reason}`);
+        }
         
         cleanupCompleted = true; // Mark cleanup as not needed (normal completion)
         return await test.getTestResults();

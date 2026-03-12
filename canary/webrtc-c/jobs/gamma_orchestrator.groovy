@@ -46,6 +46,11 @@ pipeline {
             defaultValue: '2',
             description: 'Minutes to wait for master to build before starting viewers (0 = no wait)'
         )
+        string(
+            name: 'VIEWER_SESSION_DURATION_SECONDS',
+            defaultValue: '600',
+            description: 'Duration in seconds for each viewer session (default 10 minutes)'
+        )
         booleanParam(
             name: 'RUN_STORAGE_WITH_VIEWER',
             defaultValue: true,
@@ -147,6 +152,7 @@ pipeline {
                                     string(name: 'ENDPOINT', value: params.ENDPOINT),
                                     string(name: 'METRIC_SUFFIX', value: "-gamma"),
                                     string(name: 'VIEWER_WAIT_MINUTES', value: params.VIEWER_WAIT_MINUTES),
+                                    string(name: 'VIEWER_SESSION_DURATION_SECONDS', value: params.VIEWER_SESSION_DURATION_SECONDS),
                                     booleanParam(name: 'FIRST_ITERATION', value: true),
                                     booleanParam(name: 'RESCHEDULE', value: params.RESCHEDULE),
                                 ],
@@ -186,6 +192,7 @@ pipeline {
                                     string(name: 'ENDPOINT', value: params.ENDPOINT),
                                     string(name: 'METRIC_SUFFIX', value: "-gamma"),
                                     string(name: 'VIEWER_WAIT_MINUTES', value: params.VIEWER_WAIT_MINUTES),
+                                    string(name: 'VIEWER_SESSION_DURATION_SECONDS', value: params.VIEWER_SESSION_DURATION_SECONDS),
                                     booleanParam(name: 'FIRST_ITERATION', value: true),
                                     booleanParam(name: 'RESCHEDULE', value: params.RESCHEDULE),
                                 ],
@@ -226,6 +233,7 @@ pipeline {
                                     string(name: 'ENDPOINT', value: params.ENDPOINT),
                                     string(name: 'METRIC_SUFFIX', value: "-gamma"),
                                     string(name: 'VIEWER_WAIT_MINUTES', value: params.VIEWER_WAIT_MINUTES),
+                                    string(name: 'VIEWER_SESSION_DURATION_SECONDS', value: params.VIEWER_SESSION_DURATION_SECONDS),
                                     booleanParam(name: 'FIRST_ITERATION', value: true),
                                     booleanParam(name: 'RESCHEDULE', value: params.RESCHEDULE),
                                 ],
