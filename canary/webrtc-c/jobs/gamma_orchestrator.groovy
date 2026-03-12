@@ -66,6 +66,11 @@ pipeline {
             defaultValue: GIT_HASH,
             description: 'Git branch/tag/commit to use'
         )
+        booleanParam(
+            name: 'RESCHEDULE',
+            defaultValue: false,
+            description: 'Enable continuous testing (reschedule after each run completes)'
+        )
     }
 
     options {
@@ -143,7 +148,7 @@ pipeline {
                                     string(name: 'METRIC_SUFFIX', value: "-gamma"),
                                     string(name: 'VIEWER_WAIT_MINUTES', value: params.VIEWER_WAIT_MINUTES),
                                     booleanParam(name: 'FIRST_ITERATION', value: true),
-                                    booleanParam(name: 'RESCHEDULE', value: false),
+                                    booleanParam(name: 'RESCHEDULE', value: params.RESCHEDULE),
                                 ],
                                 wait: true,
                                 propagate: false
@@ -182,7 +187,7 @@ pipeline {
                                     string(name: 'METRIC_SUFFIX', value: "-gamma"),
                                     string(name: 'VIEWER_WAIT_MINUTES', value: params.VIEWER_WAIT_MINUTES),
                                     booleanParam(name: 'FIRST_ITERATION', value: true),
-                                    booleanParam(name: 'RESCHEDULE', value: false),
+                                    booleanParam(name: 'RESCHEDULE', value: params.RESCHEDULE),
                                 ],
                                 wait: true,
                                 propagate: false
@@ -222,7 +227,7 @@ pipeline {
                                     string(name: 'METRIC_SUFFIX', value: "-gamma"),
                                     string(name: 'VIEWER_WAIT_MINUTES', value: params.VIEWER_WAIT_MINUTES),
                                     booleanParam(name: 'FIRST_ITERATION', value: true),
-                                    booleanParam(name: 'RESCHEDULE', value: false),
+                                    booleanParam(name: 'RESCHEDULE', value: params.RESCHEDULE),
                                 ],
                                 wait: true,
                                 propagate: false
