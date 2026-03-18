@@ -23,7 +23,7 @@ class ViewerCanaryTest {
     this.framesReceived = false;
     this.testCompleted = false;
     this.timerStarted = false;
-    
+
     // Comprehensive timing tracking for WebRTC connection stages
     this.offerReceivedTime = null;
     this.answerSentTime = null;
@@ -104,10 +104,30 @@ class ViewerCanaryTest {
       const text = msg.text();
       log(`PAGE: ${text}`);
       
-      // Track SDP offer received
+      // Track SDP offer received — this means JoinStorageSessionAsViewer succeeded
+      // (the media server sent an SDP offer back over the signaling channel)
       if (text.includes('[VIEWER] Received SDP offer from remote')) {
         this.offerReceivedTime = Date.now();
         log('SDP offer received timestamp captured');
+
+        // Push JoinSSAsViewerAvailability = 1 (this attempt succeeded)
+        log('JoinStorageSessionAsViewer attempt succeeded — pushing availability = 1');
+        await CloudWatchMetrics.publishCountMetric(
+          this.getMetricName('JoinSSAsViewerAvailability'),
+          this.config.channelName,
+          1
+        );
+      }
+
+      // Track JoinStorageSessionAsViewer retry failure — each retry is a failed attempt
+      // This log means the API call did not result in an SDP offer from the media server
+      if (text.includes('Did not receive SDP offer from Media Service. Retrying...')) {
+        log('JoinStorageSessionAsViewer attempt failed (no SDP offer) — pushing availability = 0');
+        await CloudWatchMetrics.publishCountMetric(
+          this.getMetricName('JoinSSAsViewerAvailability'),
+          this.config.channelName,
+          0
+        );
       }
       
       // Track SDP answer sent and calculate offer-to-answer metric
