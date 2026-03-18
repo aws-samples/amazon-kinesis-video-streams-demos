@@ -1122,7 +1122,17 @@ STATUS initSignaling(PSampleConfiguration pSampleConfiguration, PCHAR clientId)
     pSampleConfiguration->onDataChannel = onDataChannel;
 #endif
 
-    CHK_STATUS(signalingClientConnectSync(pSampleConfiguration->signalingClientHandle));
+    retStatus = signalingClientConnectSync(pSampleConfiguration->signalingClientHandle);
+    if (pSampleConfiguration->channelInfo.useMediaStorage) {
+        if (STATUS_SUCCEEDED(retStatus)) {
+            DLOGI("[KVS Master] JoinStorageSession call succeeded (initial)");
+            Canary::Cloudwatch::getInstance().monitoring.pushJoinStorageSessionAvailability(1.0);
+        } else {
+            DLOGE("[KVS Master] JoinStorageSession call failed (initial) with 0x%08x", retStatus);
+            Canary::Cloudwatch::getInstance().monitoring.pushJoinStorageSessionAvailability(0.0);
+        }
+    }
+    CHK_STATUS(retStatus);
 
     signalingClientGetMetrics(pSampleConfiguration->signalingClientHandle, &signalingClientMetrics);
 
@@ -1511,7 +1521,15 @@ STATUS sessionCleanupWait(PSampleConfiguration pSampleConfiguration)
             // offer.  The signalingClientConnectSync call will result in a JoinSession API call being made.
             CHK_STATUS(signalingClientDisconnectSync(pSampleConfiguration->signalingClientHandle));
             CHK_STATUS(signalingClientFetchSync(pSampleConfiguration->signalingClientHandle));
-            CHK_STATUS(signalingClientConnectSync(pSampleConfiguration->signalingClientHandle));
+            retStatus = signalingClientConnectSync(pSampleConfiguration->signalingClientHandle);
+            if (STATUS_SUCCEEDED(retStatus)) {
+                DLOGI("[KVS Master] JoinStorageSession call succeeded (reconnect)");
+                Canary::Cloudwatch::getInstance().monitoring.pushJoinStorageSessionAvailability(1.0);
+            } else {
+                DLOGE("[KVS Master] JoinStorageSession call failed (reconnect) with 0x%08x", retStatus);
+                Canary::Cloudwatch::getInstance().monitoring.pushJoinStorageSessionAvailability(0.0);
+            }
+            CHK_STATUS(retStatus);
             sessionFreed = FALSE;
         }
 

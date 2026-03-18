@@ -454,4 +454,15 @@ VOID CloudwatchMonitoring::pushRetryCount(UINT32 retryCount)
     this->push(currentRetryCountDatum);
 }
 
+VOID CloudwatchMonitoring::pushJoinStorageSessionAvailability(DOUBLE availability)
+{
+    MetricDatum datum;
+
+    datum.SetMetricName("JoinStorageSessionAvailability");
+    datum.SetValue(availability);
+    datum.SetUnit(Aws::CloudWatch::Model::StandardUnit::None);
+
+    this->push(datum);
+}
+
 } // namespace Canary
