@@ -61,7 +61,7 @@ INT32 main(INT32 argc, CHAR* argv[])
     // JoinStorageSession will then use the data plane endpoint returned by GetSignalingChannelEndpoint.
     pControlPlaneUri = GETENV(CONTROL_PLANE_URI_ENV_VAR);
     if (pControlPlaneUri != NULL && pControlPlaneUri[0] != '\0') {
-        SNPRINTF(controlPlaneUrl, MAX_CONTROL_PLANE_URI_CHAR_LEN, "%s%s", CONTROL_PLANE_URI_PREFIX, pControlPlaneUri);
+        SNPRINTF(controlPlaneUrl, MAX_CONTROL_PLANE_URI_CHAR_LEN, "%s", pControlPlaneUri);
         pSampleConfiguration->channelInfo.pControlPlaneUrl = controlPlaneUrl;
         DLOGI("[KVS Master] Using custom control plane URL: %s", controlPlaneUrl);
     } else {
