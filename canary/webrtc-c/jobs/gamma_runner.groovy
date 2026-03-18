@@ -57,9 +57,9 @@ def runViewerSessions(viewerId = "", waitMinutes = 2, viewerCount = "1", stagger
             checkout([$class: 'GitSCM', branches: [[name: params.GIT_HASH]],
                       userRemoteConfigs: [[url: params.GIT_URL]]])
             
-            // Wait for master to build if this is the first iteration
-            if (params.FIRST_ITERATION && waitMinutes > 0) {
-                echo "First iteration - waiting ${waitMinutes} minutes for master to build"
+            // Wait for master to build before starting viewers
+            if (waitMinutes > 0) {
+                echo "Waiting ${waitMinutes} minutes for master to build"
                 sleep waitMinutes * 60
             }
             

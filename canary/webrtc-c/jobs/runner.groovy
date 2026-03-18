@@ -171,8 +171,8 @@ def runViewerSessions(viewerId = "", waitMinutes = 10, viewerCount = "1", stagge
             checkout([$class: 'GitSCM', branches: [[name: params.GIT_HASH ]],
                       userRemoteConfigs: [[url: params.GIT_URL]]])
             
-            if (params.FIRST_ITERATION && waitMinutes > 0) {
-                echo "First iteration - waiting ${waitMinutes} minutes for master to build"
+            if (waitMinutes > 0) {
+                echo "Waiting ${waitMinutes} minutes for master to build"
                 sleep waitMinutes * 60
             }
             
@@ -556,8 +556,7 @@ pipeline {
                     }
                     steps {
                         script {
-                            def waitMins = params.VIEWER_WAIT_MINUTES != null ? params.VIEWER_WAIT_MINUTES.toInteger() : 55
-                            runViewerSessions("", waitMins, "1")
+                            runViewerSessions("", 30, "1")
                         }
                     }
                 }
@@ -587,9 +586,8 @@ pipeline {
                     }
                     steps {
                         script {
-                            def waitMins = params.VIEWER_WAIT_MINUTES != null ? params.VIEWER_WAIT_MINUTES.toInteger() : 55
                             // Viewer1 starts immediately (0 second stagger)
-                            runViewerSessions("Viewer1", waitMins, "2", 0)
+                            runViewerSessions("Viewer1", 30, "2", 0)
                         }
                     }
                 }
@@ -599,9 +597,8 @@ pipeline {
                     }
                     steps {
                         script {
-                            def waitMins = params.VIEWER_WAIT_MINUTES != null ? params.VIEWER_WAIT_MINUTES.toInteger() : 55
                             // Viewer2 starts 15 seconds after Viewer1
-                            runViewerSessions("Viewer2", waitMins, "2", 15)
+                            runViewerSessions("Viewer2", 30, "2", 15)
                         }
                     }
                 }
@@ -631,9 +628,8 @@ pipeline {
                     }
                     steps {
                         script {
-                            def waitMins = params.VIEWER_WAIT_MINUTES != null ? params.VIEWER_WAIT_MINUTES.toInteger() : 55
                             // Viewer1 starts immediately (0 second stagger)
-                            runViewerSessions("Viewer1", waitMins, "3", 0)
+                            runViewerSessions("Viewer1", 30, "3", 0)
                         }
                     }
                 }
@@ -643,9 +639,8 @@ pipeline {
                     }
                     steps {
                         script {
-                            def waitMins = params.VIEWER_WAIT_MINUTES != null ? params.VIEWER_WAIT_MINUTES.toInteger() : 55
                             // Viewer2 starts 15 seconds after Viewer1
-                            runViewerSessions("Viewer2", waitMins, "3", 15)
+                            runViewerSessions("Viewer2", 30, "3", 15)
                         }
                     }
                 }
@@ -655,9 +650,8 @@ pipeline {
                     }
                     steps {
                         script {
-                            def waitMins = params.VIEWER_WAIT_MINUTES != null ? params.VIEWER_WAIT_MINUTES.toInteger() : 55
                             // Viewer3 starts 30 seconds after Viewer1
-                            runViewerSessions("Viewer3", waitMins, "3", 30)
+                            runViewerSessions("Viewer3", 30, "3", 30)
                         }
                     }
                 }

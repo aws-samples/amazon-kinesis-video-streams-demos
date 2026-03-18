@@ -10,6 +10,8 @@ INT32 main(INT32 argc, CHAR* argv[])
     UINT32 frameSize;
     PSampleConfiguration pSampleConfiguration = NULL;
     PCHAR pChannelName;
+    PCHAR pControlPlaneUri = NULL;
+    CHAR controlPlaneUrl[MAX_CONTROL_PLANE_URI_CHAR_LEN];
     SignalingClientMetrics signalingClientMetrics;
     signalingClientMetrics.version = SIGNALING_CLIENT_METRICS_CURRENT_VERSION;
 
@@ -52,6 +54,19 @@ INT32 main(INT32 argc, CHAR* argv[])
 
     // Set sample to use storage mode
     pSampleConfiguration->channelInfo.useMediaStorage = TRUE;
+
+    // Set custom control plane URL if CONTROL_PLANE_URI is provided (e.g., for gamma testing).
+    // This overrides the default control plane URL so that all control plane API calls
+    // (DescribeSignalingChannel, GetSignalingChannelEndpoint, etc.) go to the custom endpoint.
+    // JoinStorageSession will then use the data plane endpoint returned by GetSignalingChannelEndpoint.
+    pControlPlaneUri = GETENV(CONTROL_PLANE_URI_ENV_VAR);
+    if (pControlPlaneUri != NULL && pControlPlaneUri[0] != '\0') {
+        SNPRINTF(controlPlaneUrl, MAX_CONTROL_PLANE_URI_CHAR_LEN, "%s%s", CONTROL_PLANE_URI_PREFIX, pControlPlaneUri);
+        pSampleConfiguration->channelInfo.pControlPlaneUrl = controlPlaneUrl;
+        DLOGI("[KVS Master] Using custom control plane URL: %s", controlPlaneUrl);
+    } else {
+        DLOGI("[KVS Master] No custom control plane URL set, using default");
+    }
 
     // Initialize storage disconnected timestamp
     pSampleConfiguration->storageDisconnectedTime = 0;
