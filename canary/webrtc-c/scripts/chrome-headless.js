@@ -253,6 +253,14 @@ class ViewerCanaryTest {
       if (text.includes('[VIEWER] Connection to peer successful!')) {
         this.peerConnectionEstablishedTime = Date.now();
         log('Peer connection established timestamp captured');
+
+        // Push PeerConnectionAvailability = 1 (ICE candidate pair selected, connection established)
+        log('Peer connection to media server succeeded — pushing PeerConnectionAvailability = 1');
+        await CloudWatchMetrics.publishCountMetric(
+          this.getMetricName('PeerConnectionAvailability'),
+          this.config.channelName,
+          1
+        );
         
         // Calculate all-ice-generated-to-connection-established metric
         if (this.allIceCandidatesGeneratedTime && this.peerConnectionEstablishedTime) {
@@ -279,11 +287,30 @@ class ViewerCanaryTest {
         }
       }
       
-      // Track WebRTC connection retries
+      // Track WebRTC connection retries and peer connection failure (30s timeout)
       if (text.includes('[ERROR] [VIEWER] Connection failed after 30 seconds, will enter retry.')) {
         this.webrtcRetryCount++;
         this.hadWebRTCRetries = true;
         log(`WebRTC connection retry detected! Total retries: ${this.webrtcRetryCount}`);
+
+        // Push PeerConnectionAvailability = 0 (peer connection stuck in "connecting", timed out)
+        log('Peer connection timed out after 30s — pushing PeerConnectionAvailability = 0');
+        await CloudWatchMetrics.publishCountMetric(
+          this.getMetricName('PeerConnectionAvailability'),
+          this.config.channelName,
+          0
+        );
+      }
+
+      // Track peer connection state explicitly transitioning to "failed" (ICE connectivity check failed)
+      // This is mutually exclusive with the 30s timeout above — covers the case where ICE fails outright
+      if (text.includes('[VIEWER] PeerConnection state: failed')) {
+        log('Peer connection state transitioned to FAILED — pushing PeerConnectionAvailability = 0');
+        await CloudWatchMetrics.publishCountMetric(
+          this.getMetricName('PeerConnectionAvailability'),
+          this.config.channelName,
+          0
+        );
       }
       
       // Detect storage session join error (single failure or retry failure)

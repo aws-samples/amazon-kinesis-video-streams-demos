@@ -465,4 +465,15 @@ VOID CloudwatchMonitoring::pushJoinStorageSessionAvailability(DOUBLE availabilit
     this->push(datum);
 }
 
+VOID CloudwatchMonitoring::pushPeerConnectionAvailability(DOUBLE availability)
+{
+    MetricDatum datum;
+
+    datum.SetMetricName("PeerConnectionAvailability");
+    datum.SetValue(availability);
+    datum.SetUnit(Aws::CloudWatch::Model::StandardUnit::None);
+
+    this->push(datum);
+}
+
 } // namespace Canary

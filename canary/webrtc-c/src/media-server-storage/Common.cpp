@@ -283,6 +283,9 @@ VOID onConnectionStateChange(UINT64 customData, RTC_PEER_CONNECTION_STATE newSta
             if (STATUS_FAILED(retStatus = logSelectedIceCandidatesInformation(pSampleStreamingSession))) {
                 DLOGW("Failed to get information about selected Ice candidates: 0x%08x", retStatus);
             }
+
+            DLOGI("[Canary] Peer connection established successfully — pushing PeerConnectionAvailability = 1");
+            Canary::Cloudwatch::getInstance().monitoring.pushPeerConnectionAvailability(1.0);
             
             pSampleStreamingSession->canaryOutgoingRTPMetricsContext.prevTs = GETTIME();
             pSampleStreamingSession->canaryOutgoingRTPMetricsContext.prevFramesDiscardedOnSend = 0;
@@ -292,6 +295,8 @@ VOID onConnectionStateChange(UINT64 customData, RTC_PEER_CONNECTION_STATE newSta
             CHK_STATUS(initMetricsTimers(pSampleStreamingSession));
             break;
         case RTC_PEER_CONNECTION_STATE_FAILED:
+            DLOGE("[Canary] Peer connection FAILED — pushing PeerConnectionAvailability = 0");
+            Canary::Cloudwatch::getInstance().monitoring.pushPeerConnectionAvailability(0.0);
             // explicit fallthrough
         case RTC_PEER_CONNECTION_STATE_CLOSED:
             // explicit fallthrough

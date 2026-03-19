@@ -26,6 +26,7 @@ class CloudwatchMonitoring {
     VOID pushStorageDisconnectToFrameSentTime(UINT64, Aws::CloudWatch::Model::StandardUnit);
     VOID pushJoinSessionTime(UINT64, Aws::CloudWatch::Model::StandardUnit);
     VOID pushJoinStorageSessionAvailability(DOUBLE);
+    VOID pushPeerConnectionAvailability(DOUBLE);
 
   private:
     Dimension channelDimension;
