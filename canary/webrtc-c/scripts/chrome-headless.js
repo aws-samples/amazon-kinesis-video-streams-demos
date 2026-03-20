@@ -129,6 +129,18 @@ class ViewerCanaryTest {
           0
         );
       }
+
+      // Track JoinStorageSession HTTP timeout — the API call did not complete within 6000ms
+      // Log: "TimeoutError: Request did not complete within 6000 ms"
+      // This fires once per timed-out API call attempt, before the retry log above
+      if (text.includes('TimeoutError: Request did not complete within')) {
+        log('JoinStorageSession API call timed out — pushing JoinSSAsViewerTimeout = 1');
+        await CloudWatchMetrics.publishCountMetric(
+          this.getMetricName('JoinSSAsViewerTimeout'),
+          this.config.channelName,
+          1
+        );
+      }
       
       // Track SDP answer sent and calculate offer-to-answer metric
       if (text.includes('[VIEWER] Sending SDP answer to remote')) {

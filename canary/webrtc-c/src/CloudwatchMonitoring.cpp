@@ -476,4 +476,15 @@ VOID CloudwatchMonitoring::pushPeerConnectionAvailability(DOUBLE availability)
     this->push(datum);
 }
 
+VOID CloudwatchMonitoring::pushCMasterRetryCount(UINT32 retryCount)
+{
+    MetricDatum datum;
+
+    datum.SetMetricName("CMasterRetryCount");
+    datum.SetValue(retryCount);
+    datum.SetUnit(Aws::CloudWatch::Model::StandardUnit::Count);
+
+    this->push(datum);
+}
+
 } // namespace Canary

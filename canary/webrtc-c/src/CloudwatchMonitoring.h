@@ -27,6 +27,7 @@ class CloudwatchMonitoring {
     VOID pushJoinSessionTime(UINT64, Aws::CloudWatch::Model::StandardUnit);
     VOID pushJoinStorageSessionAvailability(DOUBLE);
     VOID pushPeerConnectionAvailability(DOUBLE);
+    VOID pushCMasterRetryCount(UINT32);
 
   private:
     Dimension channelDimension;

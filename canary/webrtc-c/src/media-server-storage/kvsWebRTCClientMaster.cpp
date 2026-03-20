@@ -112,6 +112,21 @@ CleanUp:
     if (initialized) {
         Canary::Cloudwatch::getInstance().monitoring.pushExitStatus(retStatus);
     }
+
+    // Fetch signaling client metrics before CloudWatch deinit so we can push CMasterRetryCount
+    if (pSampleConfiguration != NULL) {
+        STATUS metricsStatus = signalingClientGetMetrics(pSampleConfiguration->signalingClientHandle, &signalingClientMetrics);
+        if (metricsStatus == STATUS_SUCCESS) {
+            logSignalingClientStats(&signalingClientMetrics);
+            if (initialized) {
+                DLOGI("[KVS Master] Pushing CMasterRetryCount: %d", signalingClientMetrics.signalingClientStats.apiCallRetryCount);
+                Canary::Cloudwatch::getInstance().monitoring.pushCMasterRetryCount(signalingClientMetrics.signalingClientStats.apiCallRetryCount);
+            }
+        } else {
+            DLOGE("[KVS Master] signalingClientGetMetrics() operation returned status code: 0x%08x", metricsStatus);
+        }
+    }
+
     Canary::Cloudwatch::deinit();
 
     DLOGI("[KVS Master] Cleaning up....");
@@ -121,13 +136,6 @@ CleanUp:
 
         if (pSampleConfiguration->mediaSenderTid != INVALID_TID_VALUE) {
             THREAD_JOIN(pSampleConfiguration->mediaSenderTid, NULL);
-        }
-
-        retStatus = signalingClientGetMetrics(pSampleConfiguration->signalingClientHandle, &signalingClientMetrics);
-        if (retStatus == STATUS_SUCCESS) {
-            logSignalingClientStats(&signalingClientMetrics);
-        } else {
-            DLOGE("[KVS Master] signalingClientGetMetrics() operation returned status code: 0x%08x", retStatus);
         }
         retStatus = freeSignalingClient(&pSampleConfiguration->signalingClientHandle);
         if (retStatus != STATUS_SUCCESS) {
