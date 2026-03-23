@@ -4,6 +4,19 @@
 
 PSampleConfiguration gSampleConfiguration = NULL;
 
+// Counter for signalingClientConnectSync() timeouts (STATUS_OPERATION_TIMED_OUT = 0x0000000f).
+// This covers the entire signalingClientConnectSync() call which includes WebSocket connect,
+// JoinStorageSession API call, and waiting for SDP offer — not exclusively JoinStorageSession.
+UINT32 gConnectSyncTimeoutCount = 0;
+
+// Counter for unexpected peer connection disconnections.
+// Only incremented when RTC_PEER_CONNECTION_STATE_FAILED or RTC_PEER_CONNECTION_STATE_DISCONNECTED
+// fires AFTER the peer connection was already in CONNECTED state.
+// CLOSED is NOT counted (it's the expected ~1hr backend session termination).
+// If FAILED/DISCONNECTED fires before ever reaching CONNECTED, it is NOT counted
+// (that's a normal connection failure, not an unexpected disconnection).
+UINT32 gCMasterUnexpectedDisconnectionCount = 0;
+
 // To ensure we don't try to send outbound RTP metrics during freeing of session.
 MUTEX sessionCoummunalLock = MUTEX_CREATE(FALSE);
 
@@ -301,6 +314,17 @@ VOID onConnectionStateChange(UINT64 customData, RTC_PEER_CONNECTION_STATE newSta
         case RTC_PEER_CONNECTION_STATE_CLOSED:
             // explicit fallthrough
         case RTC_PEER_CONNECTION_STATE_DISCONNECTED:
+            // Count as unexpected disconnection if we were previously CONNECTED and the state
+            // is FAILED or DISCONNECTED. CLOSED is expected (backend terminates storage sessions
+            // after ~1 hour), so we don't count it.
+            // DISCONNECTED also terminates the session in this code (sets terminateFlag = TRUE),
+            // so it's effectively an unexpected termination if we were connected.
+            if ((newState == RTC_PEER_CONNECTION_STATE_FAILED || newState == RTC_PEER_CONNECTION_STATE_DISCONNECTED) &&
+                ATOMIC_LOAD_BOOL(&pSampleConfiguration->connected)) {
+                gCMasterUnexpectedDisconnectionCount++;
+                DLOGE("[Canary] Unexpected disconnection detected (was CONNECTED, now state %u). Count: %u",
+                      newState, gCMasterUnexpectedDisconnectionCount);
+            }
             DLOGD("p2p connection disconnected");
             ATOMIC_STORE_BOOL(&pSampleStreamingSession->terminateFlag, TRUE);
             CVAR_BROADCAST(pSampleConfiguration->cvar);
@@ -1126,7 +1150,6 @@ STATUS initSignaling(PSampleConfiguration pSampleConfiguration, PCHAR clientId)
 #ifdef ENABLE_DATA_CHANNEL
     pSampleConfiguration->onDataChannel = onDataChannel;
 #endif
-
     retStatus = signalingClientConnectSync(pSampleConfiguration->signalingClientHandle);
     if (pSampleConfiguration->channelInfo.useMediaStorage) {
         if (STATUS_SUCCEEDED(retStatus)) {
@@ -1135,6 +1158,10 @@ STATUS initSignaling(PSampleConfiguration pSampleConfiguration, PCHAR clientId)
         } else {
             DLOGE("[KVS Master] JoinStorageSession call failed (initial) with 0x%08x", retStatus);
             Canary::Cloudwatch::getInstance().monitoring.pushJoinStorageSessionAvailability(0.0);
+            if (retStatus == STATUS_OPERATION_TIMED_OUT) {
+                gConnectSyncTimeoutCount++;
+                DLOGE("[KVS Master] signalingClientConnectSync timed out (initial). Timeout count: %u", gConnectSyncTimeoutCount);
+            }
         }
     }
     CHK_STATUS(retStatus);
@@ -1533,6 +1560,10 @@ STATUS sessionCleanupWait(PSampleConfiguration pSampleConfiguration)
             } else {
                 DLOGE("[KVS Master] JoinStorageSession call failed (reconnect) with 0x%08x", retStatus);
                 Canary::Cloudwatch::getInstance().monitoring.pushJoinStorageSessionAvailability(0.0);
+                if (retStatus == STATUS_OPERATION_TIMED_OUT) {
+                    gConnectSyncTimeoutCount++;
+                    DLOGE("[KVS Master] signalingClientConnectSync timed out (reconnect). Timeout count: %u", gConnectSyncTimeoutCount);
+                }
             }
             CHK_STATUS(retStatus);
             sessionFreed = FALSE;

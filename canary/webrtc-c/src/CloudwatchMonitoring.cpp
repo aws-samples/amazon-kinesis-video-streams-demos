@@ -487,4 +487,26 @@ VOID CloudwatchMonitoring::pushCMasterRetryCount(UINT32 retryCount)
     this->push(datum);
 }
 
+VOID CloudwatchMonitoring::pushConnectSyncTimeoutCount(UINT32 timeoutCount)
+{
+    MetricDatum datum;
+
+    datum.SetMetricName("ConnectSyncTimeoutCount");
+    datum.SetValue(timeoutCount);
+    datum.SetUnit(Aws::CloudWatch::Model::StandardUnit::Count);
+
+    this->push(datum);
+}
+
+VOID CloudwatchMonitoring::pushCMasterUnexpectedDisconnection(UINT32 disconnectionCount)
+{
+    MetricDatum datum;
+
+    datum.SetMetricName("CMasterUnexpectedDisconnection");
+    datum.SetValue(disconnectionCount);
+    datum.SetUnit(Aws::CloudWatch::Model::StandardUnit::Count);
+
+    this->push(datum);
+}
+
 } // namespace Canary

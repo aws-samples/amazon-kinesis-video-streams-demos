@@ -28,6 +28,8 @@ class CloudwatchMonitoring {
     VOID pushJoinStorageSessionAvailability(DOUBLE);
     VOID pushPeerConnectionAvailability(DOUBLE);
     VOID pushCMasterRetryCount(UINT32);
+    VOID pushConnectSyncTimeoutCount(UINT32);
+    VOID pushCMasterUnexpectedDisconnection(UINT32);
 
   private:
     Dimension channelDimension;

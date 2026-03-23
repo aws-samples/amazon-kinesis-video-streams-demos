@@ -47,6 +47,10 @@ class ViewerCanaryTest {
     // WebRTC connection retry tracking (internal viewer retries)
     this.webrtcRetryCount = 0;
     this.hadWebRTCRetries = false;
+
+    // Unexpected disconnect tracking — after peer connection was successfully established
+    this.peerConnectionEstablished = false;
+    this.unexpectedDisconnectCount = 0;
     
     // Storage session join failure tracking - sequence detection
     // Failure is confirmed when these 3 logs appear consecutively:
@@ -264,6 +268,7 @@ class ViewerCanaryTest {
       // Track peer connection establishment
       if (text.includes('[VIEWER] Connection to peer successful!')) {
         this.peerConnectionEstablishedTime = Date.now();
+        this.peerConnectionEstablished = true;
         log('Peer connection established timestamp captured');
 
         // Push PeerConnectionAvailability = 1 (ICE candidate pair selected, connection established)
@@ -322,6 +327,29 @@ class ViewerCanaryTest {
           this.getMetricName('PeerConnectionAvailability'),
           this.config.channelName,
           0
+        );
+
+        // If peer connection was previously established, this is an unexpected disconnect
+        if (this.peerConnectionEstablished) {
+          this.unexpectedDisconnectCount++;
+          log(`Unexpected disconnect detected (failed after connected)! Count: ${this.unexpectedDisconnectCount}`);
+          await CloudWatchMetrics.publishCountMetric(
+            this.getMetricName('UnexpectedDisconnect'),
+            this.config.channelName,
+            1
+          );
+        }
+      }
+
+      // Track peer connection state transitioning to "disconnected" after being connected
+      // This indicates ICE connectivity was lost (e.g., network issue, media server dropped)
+      if (text.includes('[VIEWER] PeerConnection state: disconnected') && this.peerConnectionEstablished) {
+        this.unexpectedDisconnectCount++;
+        log(`Unexpected disconnect detected (disconnected after connected)! Count: ${this.unexpectedDisconnectCount}`);
+        await CloudWatchMetrics.publishCountMetric(
+          this.getMetricName('UnexpectedDisconnect'),
+          this.config.channelName,
+          1
         );
       }
       
@@ -557,10 +585,11 @@ class ViewerCanaryTest {
     
     // Start timer immediately since we already joined the storage session
     this.timerStarted = true;
-    log('Storage session joined, running test for 45 seconds...');
+    const monitorDurationMs = 180000; // 3 minutes
+    log(`Storage session joined, monitoring connection for ${monitorDurationMs / 1000} seconds...`);
     setTimeout(() => {
       this.testCompleted = true;
-    }, 45000);
+    }, monitorDurationMs);
     
     let lastStatusLog = 0;
     const statusLogInterval = 10000;
@@ -617,6 +646,14 @@ class ViewerCanaryTest {
     );
     
     log(`WebRTC Connection Retry Summary: Total retries: ${this.webrtcRetryCount}, Had retries: ${this.hadWebRTCRetries}`);
+    
+    // Publish unexpected disconnect count (0 means stable connection throughout monitoring)
+    await CloudWatchMetrics.publishCountMetric(
+      this.getMetricName('UnexpectedDisconnectCount'),
+      this.config.channelName,
+      this.unexpectedDisconnectCount
+    );
+    log(`Unexpected Disconnect Summary: Total disconnects after connection: ${this.unexpectedDisconnectCount}`);
     
     // Success is based on storage session joining, not frame reception
     const success = this.storageSessionJoined;
