@@ -1,12 +1,33 @@
 const puppeteer = require('puppeteer');
 const { CloudWatchClient } = require('@aws-sdk/client-cloudwatch');
-const { CloudWatchMetrics } = require('./cloudwatch');
+const { CloudWatchMetrics, CloudWatchLogger } = require('./cloudwatch');
 const fs = require('fs');
 
 function log(message) {
   const timestamp = new Date().toISOString();
-  console.log(`[${timestamp}] ${message}`);
+  const formatted = `[${timestamp}] ${message}`;
+  console.log(formatted);
+  CloudWatchLogger.log(formatted);
 }
+
+// Capture unhandled errors and flush logs before dying
+process.on('unhandledRejection', async (reason) => {
+  log(`FATAL: Unhandled rejection: ${reason}`);
+  await CloudWatchLogger.shutdown();
+  process.exit(1);
+});
+
+process.on('uncaughtException', async (err) => {
+  log(`FATAL: Uncaught exception: ${err.message}\n${err.stack}`);
+  await CloudWatchLogger.shutdown();
+  process.exit(1);
+});
+
+process.on('SIGTERM', async () => {
+  log('Received SIGTERM — flushing logs before exit');
+  await CloudWatchLogger.shutdown();
+  process.exit(143);
+});
 
 class ViewerCanaryTest {
   constructor(config) {
@@ -66,8 +87,15 @@ class ViewerCanaryTest {
   }
 
   async initializeCloudWatch() {
-    const cwClient = new CloudWatchClient({ region: this.config.region || 'us-west-2' });
+    const region = this.config.region || 'us-west-2';
+    const cwClient = new CloudWatchClient({ region });
     CloudWatchMetrics.init(cwClient);
+
+    // Initialize CloudWatch Logs — uses same log group as the C master canary
+    const logGroupName = process.env.CANARY_LOG_GROUP_NAME || '';
+    const logStreamName = process.env.CANARY_LOG_STREAM_NAME ||
+      `${process.env.RUNNER_LABEL || 'StorageViewer'}-${this.viewerId}-JSViewer-${Date.now()}`;
+    await CloudWatchLogger.init(region, logGroupName, logStreamName);
   }
 
   // Helper to generate metric name with optional suffix
@@ -831,9 +859,11 @@ runViewerCanary({
   forceTURN: process.env.FORCE_TURN === 'true',
   endpoint: process.env.ENDPOINT || '',
   metricSuffix: process.env.METRIC_SUFFIX || ''
-}).then(result => {
+}).then(async (result) => {
+  await CloudWatchLogger.shutdown();
   process.exit(result.success ? 0 : 1);
-}).catch(error => {
+}).catch(async (error) => {
   log(`Test failed with error: ${error.message}`);
+  await CloudWatchLogger.shutdown();
   process.exit(1);
 });

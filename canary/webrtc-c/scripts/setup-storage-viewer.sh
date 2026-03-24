@@ -29,15 +29,31 @@ echo "npm verified: $(npm --version)"
 
 cd ./canary/webrtc-c/scripts || { echo "ERROR: Failed to change directory to ./canary/webrtc-c/scripts"; exit 1; }
 
-# Install Node.js dependencies if not exists
-if [ ! -d "node_modules" ]; then
-    npm install puppeteer @aws-sdk/client-cloudwatch || { echo "ERROR: Failed to install Node.js dependencies"; exit 1; }
+# Install missing Node.js dependencies
+REQUIRED_PACKAGES="puppeteer @aws-sdk/client-cloudwatch @aws-sdk/client-cloudwatch-logs"
+MISSING_PACKAGES=""
+for pkg in $REQUIRED_PACKAGES; do
+    # Convert scoped package name to node_modules path (e.g., @aws-sdk/client-cloudwatch -> @aws-sdk/client-cloudwatch)
+    if [ ! -d "node_modules/$pkg" ]; then
+        MISSING_PACKAGES="$MISSING_PACKAGES $pkg"
+    fi
+done
+
+if [ -n "$MISSING_PACKAGES" ]; then
+    echo "Installing missing packages:$MISSING_PACKAGES"
+    npm install $MISSING_PACKAGES || { echo "ERROR: Failed to install Node.js dependencies"; exit 1; }
+else
+    echo "All Node.js dependencies already installed"
 fi
 
 # Set environment variables for the test
 export CANARY_CHANNEL_NAME="${JOB_NAME}-${RUNNER_LABEL}"
 export AWS_REGION="${AWS_DEFAULT_REGION}"
 export TEST_DURATION="${DURATION_IN_SECONDS}"
+
+# CloudWatch Logs configuration — uses same log group as the C master canary
+export CANARY_LOG_GROUP_NAME="${LOG_GROUP_NAME:-WebrtcSDK}"
+export CANARY_LOG_STREAM_NAME="${RUNNER_LABEL}-${VIEWER_ID:-Viewer}-JSViewer-$(date +%s%3N)"
 
 # Debug: Show what ENDPOINT value we received
 echo "DEBUG: ENDPOINT env var = '${ENDPOINT}'"
