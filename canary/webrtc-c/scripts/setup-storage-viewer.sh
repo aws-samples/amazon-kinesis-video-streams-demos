@@ -29,7 +29,15 @@ echo "npm verified: $(npm --version)"
 
 cd ./canary/webrtc-c/scripts || { echo "ERROR: Failed to change directory to ./canary/webrtc-c/scripts"; exit 1; }
 
-# Always run npm install to ensure all dependencies are up to date
+# Skip Puppeteer's Chrome download if it's already cached from a previous run.
+# This avoids re-downloading ~200MB every run and prevents failures from corrupted downloads.
+# If the cache doesn't exist yet, let Puppeteer download it.
+if [ -d "$HOME/.cache/puppeteer/chrome" ]; then
+    echo "Puppeteer Chrome cache found, skipping download"
+    export PUPPETEER_SKIP_DOWNLOAD=true
+else
+    echo "No Puppeteer Chrome cache found, will download"
+fi
 npm install || { echo "ERROR: Failed to install Node.js dependencies"; exit 1; }
 
 # Set environment variables for the test
