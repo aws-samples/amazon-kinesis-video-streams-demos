@@ -136,7 +136,22 @@ class ViewerCanaryTest {
 
   setupConsoleListener(page) {
     page.on('console', async (msg) => {
-      const text = msg.text();
+      // Serialize all arguments so objects show as JSON instead of [object Object]
+      let text;
+      try {
+        const args = msg.args();
+        const parts = await Promise.all(args.map(async (arg) => {
+          try {
+            const val = await arg.jsonValue();
+            return typeof val === 'object' ? JSON.stringify(val) : String(val);
+          } catch {
+            return arg.toString();
+          }
+        }));
+        text = parts.join(' ');
+      } catch {
+        text = msg.text();
+      }
       log(`PAGE: ${text}`);
       
       // Track SDP offer received — this means JoinStorageSessionAsViewer succeeded
