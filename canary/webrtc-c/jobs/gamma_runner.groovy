@@ -180,7 +180,7 @@ pipeline {
     parameters {
         string(name: 'AWS_KVS_LOG_LEVEL', defaultValue: '2')
         string(name: 'LOG_GROUP_NAME', defaultValue: 'WebrtcSDK')
-        string(name: 'MASTER_NODE_LABEL', defaultValue: 'webrtc-storage-master-2')
+        string(name: 'MASTER_NODE_LABEL', defaultValue: 'webrtc-storage-master')
         string(name: 'STORAGE_VIEWER_NODE_LABEL', defaultValue: 'webrtc-storage-viewer')
         string(name: 'STORAGE_VIEWER_ONE_NODE_LABEL', defaultValue: 'webrtc-storage-multi-viewer-1')
         string(name: 'STORAGE_VIEWER_TWO_NODE_LABEL', defaultValue: 'webrtc-storage-multi-viewer-2')
