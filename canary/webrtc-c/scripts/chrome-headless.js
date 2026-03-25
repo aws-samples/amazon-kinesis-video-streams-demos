@@ -68,6 +68,9 @@ class ViewerCanaryTest {
     // WebRTC connection retry tracking (internal viewer retries)
     this.webrtcRetryCount = 0;
     this.hadWebRTCRetries = false;
+    
+    // JoinStorageSessionAsViewer retry tracking
+    this.joinSSRetryCount = 0;
 
     // Unexpected disconnect tracking — after peer connection was successfully established
     this.peerConnectionEstablished = false;
@@ -154,7 +157,8 @@ class ViewerCanaryTest {
       // Track JoinStorageSessionAsViewer retry failure — each retry is a failed attempt
       // This log means the API call did not result in an SDP offer from the media server
       if (text.includes('Did not receive SDP offer from Media Service. Retrying...')) {
-        log('JoinStorageSessionAsViewer attempt failed (no SDP offer) — pushing availability = 0');
+        this.joinSSRetryCount++;
+        log(`JoinStorageSessionAsViewer attempt failed (no SDP offer) — retry count: ${this.joinSSRetryCount}, pushing availability = 0`);
         await CloudWatchMetrics.publishCountMetric(
           this.getMetricName('JoinSSAsViewerAvailability'),
           this.config.channelName,
@@ -333,7 +337,7 @@ class ViewerCanaryTest {
       }
       
       // Track WebRTC connection retries and peer connection failure (30s timeout)
-      if (text.includes('[ERROR] [VIEWER] Connection failed after 30 seconds, will enter retry.')) {
+      if (text.includes('[VIEWER] Connection failed after 30 seconds, will enter retry.')) {
         this.webrtcRetryCount++;
         this.hadWebRTCRetries = true;
         log(`WebRTC connection retry detected! Total retries: ${this.webrtcRetryCount}`);
@@ -674,6 +678,14 @@ class ViewerCanaryTest {
     );
     
     log(`WebRTC Connection Retry Summary: Total retries: ${this.webrtcRetryCount}, Had retries: ${this.hadWebRTCRetries}`);
+    
+    // Publish JoinStorageSessionAsViewer retry count (no SDP offer received, had to retry)
+    await CloudWatchMetrics.publishCountMetric(
+      this.getMetricName('JoinSSAsViewerRetryCount'),
+      this.config.channelName,
+      this.joinSSRetryCount
+    );
+    log(`JoinSSAsViewer Retry Summary: Total retries: ${this.joinSSRetryCount}`);
     
     // Publish unexpected disconnect count (0 means stable connection throughout monitoring)
     await CloudWatchMetrics.publishCountMetric(
