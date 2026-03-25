@@ -544,8 +544,12 @@ pipeline {
                     }
                     steps {
                         script {
+                            def viewerWaitMin = 30
+                            def sessionDurationSec = 180
+                            // Master duration = viewer wait + 3 sessions + 2 inter-session gaps + 10 min buffer
+                            def masterDuration = (viewerWaitMin * 60) + (3 * sessionDurationSec) + (2 * 60) + 600
                             def mutableParams = [:] + params
-                            mutableParams.DURATION_IN_SECONDS = "1380"
+                            mutableParams.DURATION_IN_SECONDS = "${masterDuration}"
                             buildStorageCanary(false, mutableParams)
                         }
                     }
@@ -574,8 +578,12 @@ pipeline {
                     }
                     steps {
                         script {
+                            def viewerWaitMin = 30
+                            def sessionDurationSec = 180
+                            // Master duration = viewer wait + 3 sessions + 2 inter-session gaps + 10 min buffer
+                            def masterDuration = (viewerWaitMin * 60) + (3 * sessionDurationSec) + (2 * 60) + 600
                             def mutableParams = [:] + params
-                            mutableParams.DURATION_IN_SECONDS = "1380"
+                            mutableParams.DURATION_IN_SECONDS = "${masterDuration}"
                             buildStorageCanary(false, mutableParams)
                         }
                     }
@@ -616,8 +624,12 @@ pipeline {
                     }
                     steps {
                         script {
+                            def viewerWaitMin = 30
+                            def sessionDurationSec = 180
+                            // Master duration = viewer wait + 3 sessions + 2 inter-session gaps + 10 min buffer
+                            def masterDuration = (viewerWaitMin * 60) + (3 * sessionDurationSec) + (2 * 60) + 600
                             def mutableParams = [:] + params
-                            mutableParams.DURATION_IN_SECONDS = "1380"
+                            mutableParams.DURATION_IN_SECONDS = "${masterDuration}"
                             buildStorageCanary(false, mutableParams)
                         }
                     }
