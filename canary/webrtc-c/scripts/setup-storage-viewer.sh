@@ -29,16 +29,20 @@ echo "npm verified: $(npm --version)"
 
 cd ./canary/webrtc-c/scripts || { echo "ERROR: Failed to change directory to ./canary/webrtc-c/scripts"; exit 1; }
 
-# Skip Puppeteer's Chrome download if it's already cached from a previous run.
-# This avoids re-downloading ~200MB every run and prevents failures from corrupted downloads.
-# If the cache doesn't exist yet, let Puppeteer download it.
-if [ -d "$HOME/.cache/puppeteer/chrome" ]; then
-    echo "Puppeteer Chrome cache found, skipping download"
-    export PUPPETEER_SKIP_DOWNLOAD=true
-else
-    echo "No Puppeteer Chrome cache found, will download"
-fi
 npm install || { echo "ERROR: Failed to install Node.js dependencies"; exit 1; }
+
+# Verify Puppeteer can find Chrome. If the cached version doesn't match what
+# Puppeteer expects (e.g., after a Puppeteer upgrade), force-install the correct one.
+CHROME_PATH=$(node -e "try { console.log(require('puppeteer').executablePath()) } catch(e) { console.log('') }" 2>/dev/null)
+if [ -z "$CHROME_PATH" ] || [ ! -f "$CHROME_PATH" ]; then
+    echo "Puppeteer Chrome not found or version mismatch, installing correct version..."
+    # Clear stale cache to avoid disk bloat
+    rm -rf "$HOME/.cache/puppeteer/chrome" 2>/dev/null || true
+    npx puppeteer browsers install chrome || { echo "ERROR: Failed to install Chrome for Puppeteer"; exit 1; }
+    echo "Chrome installed successfully"
+else
+    echo "Puppeteer Chrome verified at: $CHROME_PATH"
+fi
 
 # Set environment variables for the test
 export CANARY_CHANNEL_NAME="${JOB_NAME}-${RUNNER_LABEL}"
