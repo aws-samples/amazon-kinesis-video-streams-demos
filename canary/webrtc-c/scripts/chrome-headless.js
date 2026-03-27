@@ -46,6 +46,7 @@ class ViewerCanaryTest {
     this.timerStarted = false;
 
     // Comprehensive timing tracking for WebRTC connection stages
+    this.joinSSCallTime = null;
     this.offerReceivedTime = null;
     this.answerSentTime = null;
     this.firstIceCandidateReceivedTime = null;
@@ -154,11 +155,30 @@ class ViewerCanaryTest {
       }
       log(`PAGE: ${text}`);
       
+      // Track when JoinStorageSessionAsViewer API is called
+      if (text.includes('[VIEWER] Joining storage session as viewer')) {
+        this.joinSSCallTime = Date.now();
+        log('JoinStorageSessionAsViewer call timestamp captured');
+      }
+
       // Track SDP offer received — this means JoinStorageSessionAsViewer succeeded
       // (the media server sent an SDP offer back over the signaling channel)
       if (text.includes('[VIEWER] Received SDP offer from remote')) {
         this.offerReceivedTime = Date.now();
         log('SDP offer received timestamp captured');
+
+        // Calculate and publish JoinSSCallToOfferReceived metric
+        // Measures time from calling JoinStorageSessionAsViewer to receiving SDP offer
+        if (this.joinSSCallTime && this.offerReceivedTime) {
+          const joinSSToOfferTime = this.offerReceivedTime - this.joinSSCallTime;
+          log(`JoinSSCallToOfferReceived time: ${joinSSToOfferTime}ms`);
+          
+          await CloudWatchMetrics.publishMsMetric(
+            this.getMetricName('JoinSSCallToOfferReceived'),
+            this.config.channelName,
+            joinSSToOfferTime
+          );
+        }
 
         // Push JoinSSAsViewerAvailability = 1 (this attempt succeeded)
         log('JoinStorageSessionAsViewer attempt succeeded — pushing availability = 1');
