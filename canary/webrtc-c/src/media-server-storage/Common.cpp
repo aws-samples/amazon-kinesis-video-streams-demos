@@ -4,10 +4,11 @@
 
 PSampleConfiguration gSampleConfiguration = NULL;
 
-// Counter for signalingClientConnectSync() timeouts (STATUS_OPERATION_TIMED_OUT = 0x0000000f).
-// This covers the entire signalingClientConnectSync() call which includes WebSocket connect,
-// JoinStorageSession API call, and waiting for SDP offer — not exclusively JoinStorageSession.
-UINT32 gConnectSyncTimeoutCount = 0;
+// Counter for JoinStorageSession timeouts (STATUS_OPERATION_TIMED_OUT = 0x0000000f).
+// Incremented each time signalingClientConnectSync() times out during the JoinStorageSession flow.
+// The signalingClientConnectSync() call includes WebSocket connect, JoinStorageSession API call,
+// and waiting for SDP offer.
+UINT32 gJoinSSTimeoutCount = 0;
 
 // Counter for unexpected peer connection disconnections.
 // Only incremented when RTC_PEER_CONNECTION_STATE_FAILED or RTC_PEER_CONNECTION_STATE_DISCONNECTED
@@ -1159,8 +1160,8 @@ STATUS initSignaling(PSampleConfiguration pSampleConfiguration, PCHAR clientId)
             DLOGE("[KVS Master] JoinStorageSession call failed (initial) with 0x%08x", retStatus);
             Canary::Cloudwatch::getInstance().monitoring.pushJoinStorageSessionAvailability(0.0);
             if (retStatus == STATUS_OPERATION_TIMED_OUT) {
-                gConnectSyncTimeoutCount++;
-                DLOGE("[KVS Master] signalingClientConnectSync timed out (initial). Timeout count: %u", gConnectSyncTimeoutCount);
+                gJoinSSTimeoutCount++;
+                DLOGE("[KVS Master] JoinStorageSession timed out (initial). Timeout count: %u", gJoinSSTimeoutCount);
             }
         }
     }
@@ -1561,8 +1562,8 @@ STATUS sessionCleanupWait(PSampleConfiguration pSampleConfiguration)
                 DLOGE("[KVS Master] JoinStorageSession call failed (reconnect) with 0x%08x", retStatus);
                 Canary::Cloudwatch::getInstance().monitoring.pushJoinStorageSessionAvailability(0.0);
                 if (retStatus == STATUS_OPERATION_TIMED_OUT) {
-                    gConnectSyncTimeoutCount++;
-                    DLOGE("[KVS Master] signalingClientConnectSync timed out (reconnect). Timeout count: %u", gConnectSyncTimeoutCount);
+                    gJoinSSTimeoutCount++;
+                    DLOGE("[KVS Master] JoinStorageSession timed out (reconnect). Timeout count: %u", gJoinSSTimeoutCount);
                 }
             }
             CHK_STATUS(retStatus);

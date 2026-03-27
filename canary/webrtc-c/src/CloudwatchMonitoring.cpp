@@ -487,11 +487,11 @@ VOID CloudwatchMonitoring::pushCMasterRetryCount(UINT32 retryCount)
     this->push(datum);
 }
 
-VOID CloudwatchMonitoring::pushConnectSyncTimeoutCount(UINT32 timeoutCount)
+VOID CloudwatchMonitoring::pushJoinSSTimeout(UINT32 timeoutCount)
 {
     MetricDatum datum;
 
-    datum.SetMetricName("ConnectSyncTimeoutCount");
+    datum.SetMetricName("JoinSSTimeout");
     datum.SetValue(timeoutCount);
     datum.SetUnit(Aws::CloudWatch::Model::StandardUnit::Count);
 

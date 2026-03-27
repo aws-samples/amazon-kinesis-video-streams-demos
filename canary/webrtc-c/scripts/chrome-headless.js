@@ -167,6 +167,16 @@ class ViewerCanaryTest {
           this.config.channelName,
           1
         );
+
+        // Push JoinSSAsViewerTimeout = 0 (this attempt did NOT time out)
+        // This ensures CloudWatch has data points during healthy periods,
+        // not just when timeouts occur.
+        log('JoinStorageSessionAsViewer succeeded without timeout — pushing JoinSSAsViewerTimeout = 0');
+        await CloudWatchMetrics.publishCountMetric(
+          this.getMetricName('JoinSSAsViewerTimeout'),
+          this.config.channelName,
+          0
+        );
       }
 
       // Track JoinStorageSessionAsViewer retry failure — each retry is a failed attempt

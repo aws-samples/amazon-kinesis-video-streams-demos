@@ -196,7 +196,7 @@ def runViewerSessions(viewerId = "", waitMinutes = 10, viewerCount = "1", stagge
                         export JOB_NAME="${env.JOB_NAME}"
                         export RUNNER_LABEL="${params.RUNNER_LABEL}"
                         export AWS_DEFAULT_REGION="${params.AWS_DEFAULT_REGION}"
-                        export DURATION_IN_SECONDS="180"
+                        export DURATION_IN_SECONDS="${(params.VIEWER_SESSION_DURATION_SECONDS != null && params.VIEWER_SESSION_DURATION_SECONDS.toString().trim() != '') ? params.VIEWER_SESSION_DURATION_SECONDS : '600'}"
                         export FORCE_TURN="${params.FORCE_TURN}"
                         export VIEWER_COUNT="${viewerCount}"
                         export VIEWER_ID="${viewerId}"
@@ -341,6 +341,7 @@ pipeline {
         string(name: 'ENDPOINT', defaultValue: '')
         string(name: 'METRIC_SUFFIX', defaultValue: '')
         string(name: 'VIEWER_WAIT_MINUTES', defaultValue: '55')
+        string(name: 'VIEWER_SESSION_DURATION_SECONDS', defaultValue: '600', description: 'Duration in seconds for each viewer session (default 10 minutes)')
     }
     
     // Set the role ARN to environment to avoid string interpolation to follow Jenkins security guidelines.
@@ -544,8 +545,8 @@ pipeline {
                     }
                     steps {
                         script {
-                            def viewerWaitMin = 30
-                            def sessionDurationSec = 180
+                            def viewerWaitMin = (params.VIEWER_WAIT_MINUTES != null && params.VIEWER_WAIT_MINUTES.toString().trim() != '') ? params.VIEWER_WAIT_MINUTES.toInteger() : 55
+                            def sessionDurationSec = (params.VIEWER_SESSION_DURATION_SECONDS != null && params.VIEWER_SESSION_DURATION_SECONDS.toString().trim() != '') ? params.VIEWER_SESSION_DURATION_SECONDS.toInteger() : 600
                             // Master duration = viewer wait + 3 sessions + 2 inter-session gaps + 10 min buffer
                             def masterDuration = (viewerWaitMin * 60) + (3 * sessionDurationSec) + (2 * 60) + 600
                             def mutableParams = [:] + params
@@ -560,7 +561,8 @@ pipeline {
                     }
                     steps {
                         script {
-                            runViewerSessions("", 30, "1")
+                            def waitMins = (params.VIEWER_WAIT_MINUTES != null && params.VIEWER_WAIT_MINUTES.toString().trim() != '') ? params.VIEWER_WAIT_MINUTES.toInteger() : 55
+                            runViewerSessions("", waitMins, "1")
                         }
                     }
                 }
@@ -578,8 +580,8 @@ pipeline {
                     }
                     steps {
                         script {
-                            def viewerWaitMin = 30
-                            def sessionDurationSec = 180
+                            def viewerWaitMin = (params.VIEWER_WAIT_MINUTES != null && params.VIEWER_WAIT_MINUTES.toString().trim() != '') ? params.VIEWER_WAIT_MINUTES.toInteger() : 55
+                            def sessionDurationSec = (params.VIEWER_SESSION_DURATION_SECONDS != null && params.VIEWER_SESSION_DURATION_SECONDS.toString().trim() != '') ? params.VIEWER_SESSION_DURATION_SECONDS.toInteger() : 600
                             // Master duration = viewer wait + 3 sessions + 2 inter-session gaps + 10 min buffer
                             def masterDuration = (viewerWaitMin * 60) + (3 * sessionDurationSec) + (2 * 60) + 600
                             def mutableParams = [:] + params
@@ -594,8 +596,9 @@ pipeline {
                     }
                     steps {
                         script {
+                            def waitMins = (params.VIEWER_WAIT_MINUTES != null && params.VIEWER_WAIT_MINUTES.toString().trim() != '') ? params.VIEWER_WAIT_MINUTES.toInteger() : 55
                             // Viewer1 starts immediately (0 second stagger)
-                            runViewerSessions("Viewer1", 30, "2", 0)
+                            runViewerSessions("Viewer1", waitMins, "2", 0)
                         }
                     }
                 }
@@ -605,8 +608,9 @@ pipeline {
                     }
                     steps {
                         script {
+                            def waitMins = (params.VIEWER_WAIT_MINUTES != null && params.VIEWER_WAIT_MINUTES.toString().trim() != '') ? params.VIEWER_WAIT_MINUTES.toInteger() : 55
                             // Viewer2 starts 15 seconds after Viewer1
-                            runViewerSessions("Viewer2", 30, "2", 15)
+                            runViewerSessions("Viewer2", waitMins, "2", 15)
                         }
                     }
                 }
@@ -624,8 +628,8 @@ pipeline {
                     }
                     steps {
                         script {
-                            def viewerWaitMin = 30
-                            def sessionDurationSec = 180
+                            def viewerWaitMin = (params.VIEWER_WAIT_MINUTES != null && params.VIEWER_WAIT_MINUTES.toString().trim() != '') ? params.VIEWER_WAIT_MINUTES.toInteger() : 55
+                            def sessionDurationSec = (params.VIEWER_SESSION_DURATION_SECONDS != null && params.VIEWER_SESSION_DURATION_SECONDS.toString().trim() != '') ? params.VIEWER_SESSION_DURATION_SECONDS.toInteger() : 600
                             // Master duration = viewer wait + 3 sessions + 2 inter-session gaps + 10 min buffer
                             def masterDuration = (viewerWaitMin * 60) + (3 * sessionDurationSec) + (2 * 60) + 600
                             def mutableParams = [:] + params
@@ -640,8 +644,9 @@ pipeline {
                     }
                     steps {
                         script {
+                            def waitMins = (params.VIEWER_WAIT_MINUTES != null && params.VIEWER_WAIT_MINUTES.toString().trim() != '') ? params.VIEWER_WAIT_MINUTES.toInteger() : 55
                             // Viewer1 starts immediately (0 second stagger)
-                            runViewerSessions("Viewer1", 30, "3", 0)
+                            runViewerSessions("Viewer1", waitMins, "3", 0)
                         }
                     }
                 }
@@ -651,8 +656,9 @@ pipeline {
                     }
                     steps {
                         script {
+                            def waitMins = (params.VIEWER_WAIT_MINUTES != null && params.VIEWER_WAIT_MINUTES.toString().trim() != '') ? params.VIEWER_WAIT_MINUTES.toInteger() : 55
                             // Viewer2 starts 15 seconds after Viewer1
-                            runViewerSessions("Viewer2", 30, "3", 15)
+                            runViewerSessions("Viewer2", waitMins, "3", 15)
                         }
                     }
                 }
@@ -662,8 +668,9 @@ pipeline {
                     }
                     steps {
                         script {
+                            def waitMins = (params.VIEWER_WAIT_MINUTES != null && params.VIEWER_WAIT_MINUTES.toString().trim() != '') ? params.VIEWER_WAIT_MINUTES.toInteger() : 55
                             // Viewer3 starts 30 seconds after Viewer1
-                            runViewerSessions("Viewer3", 30, "3", 30)
+                            runViewerSessions("Viewer3", waitMins, "3", 30)
                         }
                     }
                 }
@@ -755,6 +762,7 @@ pipeline {
                       string(name: 'ENDPOINT', value: params.ENDPOINT),
                       string(name: 'METRIC_SUFFIX', value: params.METRIC_SUFFIX),
                       string(name: 'VIEWER_WAIT_MINUTES', value: params.VIEWER_WAIT_MINUTES),
+                      string(name: 'VIEWER_SESSION_DURATION_SECONDS', value: params.VIEWER_SESSION_DURATION_SECONDS),
                       booleanParam(name: 'FIRST_ITERATION', value: false)
                     ],
                     wait: false

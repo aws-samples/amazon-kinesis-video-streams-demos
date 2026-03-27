@@ -3,6 +3,8 @@
 
 
 extern PSampleConfiguration gSampleConfiguration;
+extern UINT32 gJoinSSTimeoutCount;
+extern UINT32 gCMasterUnexpectedDisconnectionCount;
 
 INT32 main(INT32 argc, CHAR* argv[])
 {
@@ -111,6 +113,14 @@ CleanUp:
     DLOGI("Exiting with 0x%08x", retStatus);
     if (initialized) {
         Canary::Cloudwatch::getInstance().monitoring.pushExitStatus(retStatus);
+
+        // Push cumulative JoinStorageSession timeout count (0 if no timeouts occurred)
+        DLOGI("[KVS Master] Pushing JoinSSTimeout: %u", gJoinSSTimeoutCount);
+        Canary::Cloudwatch::getInstance().monitoring.pushJoinSSTimeout(gJoinSSTimeoutCount);
+
+        // Push cumulative unexpected disconnection count (0 if none occurred)
+        DLOGI("[KVS Master] Pushing CMasterUnexpectedDisconnection: %u", gCMasterUnexpectedDisconnectionCount);
+        Canary::Cloudwatch::getInstance().monitoring.pushCMasterUnexpectedDisconnection(gCMasterUnexpectedDisconnectionCount);
     }
 
     // Fetch signaling client metrics before CloudWatch deinit so we can push CMasterRetryCount
