@@ -467,6 +467,18 @@ class ViewerCanaryTest {
           this.config.channelName,
           joinTime
         );
+
+        // Publish JoinSSCallToSessionJoined metric — time from calling
+        // JoinStorageSessionAsViewer to successfully joining the storage session
+        if (this.joinSSCallTime) {
+          const joinSSCallToSessionJoined = Date.now() - this.joinSSCallTime;
+          log(`JoinSSCallToSessionJoined time: ${joinSSCallToSessionJoined}ms`);
+          await CloudWatchMetrics.publishMsMetric(
+            this.getMetricName('JoinSSCallToSessionJoined'),
+            this.config.channelName,
+            joinSSCallToSessionJoined
+          );
+        }
       }
     });
   }
