@@ -29,6 +29,7 @@ class CloudwatchMonitoring {
     VOID pushPeerConnectionAvailability(DOUBLE);
     VOID pushCMasterRetryCount(UINT32);
     VOID pushJoinSSTimeout(UINT32);
+    VOID pushJoinSSCallToSessionJoined(UINT64, Aws::CloudWatch::Model::StandardUnit);
     VOID pushCMasterUnexpectedDisconnection(UINT32);
 
   private:

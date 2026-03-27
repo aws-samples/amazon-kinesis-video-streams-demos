@@ -138,6 +138,7 @@ typedef struct {
 
     std::atomic<UINT64> storageDisconnectedTime;
     UINT64 offerReceiveTimestamp;
+    UINT64 joinSSCallStartTime;
     UINT64 sampleDuration;
     PCHAR fristFrameSentTSFileName;
     UINT64 startTime;

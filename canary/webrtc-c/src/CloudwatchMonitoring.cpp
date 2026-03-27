@@ -498,6 +498,17 @@ VOID CloudwatchMonitoring::pushJoinSSTimeout(UINT32 timeoutCount)
     this->push(datum);
 }
 
+VOID CloudwatchMonitoring::pushJoinSSCallToSessionJoined(UINT64 duration, Aws::CloudWatch::Model::StandardUnit unit)
+{
+    MetricDatum datum;
+
+    datum.SetMetricName("JoinSSCallToSessionJoined");
+    datum.SetValue(duration);
+    datum.SetUnit(unit);
+
+    this->push(datum);
+}
+
 VOID CloudwatchMonitoring::pushCMasterUnexpectedDisconnection(UINT32 disconnectionCount)
 {
     MetricDatum datum;

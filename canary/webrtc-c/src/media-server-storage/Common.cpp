@@ -300,6 +300,13 @@ VOID onConnectionStateChange(UINT64 customData, RTC_PEER_CONNECTION_STATE newSta
 
             DLOGI("[Canary] Peer connection established successfully — pushing PeerConnectionAvailability = 1");
             Canary::Cloudwatch::getInstance().monitoring.pushPeerConnectionAvailability(1.0);
+
+            // Push JoinSSCallToSessionJoined metric — time from signalingClientConnectSync() call to peer connection established
+            if (pSampleConfiguration->joinSSCallStartTime != 0) {
+                UINT64 joinSSCallToSessionJoined = (GETTIME() - pSampleConfiguration->joinSSCallStartTime) / HUNDREDS_OF_NANOS_IN_A_MILLISECOND;
+                DLOGI("[Canary] JoinSSCallToSessionJoined: %" PRIu64 " ms", joinSSCallToSessionJoined);
+                Canary::Cloudwatch::getInstance().monitoring.pushJoinSSCallToSessionJoined(joinSSCallToSessionJoined, Aws::CloudWatch::Model::StandardUnit::Milliseconds);
+            }
             
             pSampleStreamingSession->canaryOutgoingRTPMetricsContext.prevTs = GETTIME();
             pSampleStreamingSession->canaryOutgoingRTPMetricsContext.prevFramesDiscardedOnSend = 0;
@@ -1151,6 +1158,7 @@ STATUS initSignaling(PSampleConfiguration pSampleConfiguration, PCHAR clientId)
 #ifdef ENABLE_DATA_CHANNEL
     pSampleConfiguration->onDataChannel = onDataChannel;
 #endif
+    pSampleConfiguration->joinSSCallStartTime = GETTIME();
     retStatus = signalingClientConnectSync(pSampleConfiguration->signalingClientHandle);
     if (pSampleConfiguration->channelInfo.useMediaStorage) {
         if (STATUS_SUCCEEDED(retStatus)) {
@@ -1554,6 +1562,7 @@ STATUS sessionCleanupWait(PSampleConfiguration pSampleConfiguration)
             // offer.  The signalingClientConnectSync call will result in a JoinSession API call being made.
             CHK_STATUS(signalingClientDisconnectSync(pSampleConfiguration->signalingClientHandle));
             CHK_STATUS(signalingClientFetchSync(pSampleConfiguration->signalingClientHandle));
+            pSampleConfiguration->joinSSCallStartTime = GETTIME();
             retStatus = signalingClientConnectSync(pSampleConfiguration->signalingClientHandle);
             if (STATUS_SUCCEEDED(retStatus)) {
                 DLOGI("[KVS Master] JoinStorageSession call succeeded (reconnect)");
