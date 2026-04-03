@@ -2,6 +2,8 @@ const puppeteer = require('puppeteer');
 const { CloudWatchClient } = require('@aws-sdk/client-cloudwatch');
 const { CloudWatchMetrics, CloudWatchLogger } = require('./cloudwatch');
 const fs = require('fs');
+const { execSync } = require('child_process');
+const path = require('path');
 
 function log(message) {
   const timestamp = new Date().toISOString();
@@ -88,6 +90,11 @@ class ViewerCanaryTest {
     
     this.browser = null;
     this.page = null;
+
+    // Video recording state
+    this.isRecording = false;
+    this.recordingFilePath = null;
+    this.recordingWriteStream = null;
   }
 
   async initializeCloudWatch() {
@@ -644,6 +651,168 @@ class ViewerCanaryTest {
     });
   }
 
+  async startRecording(page) {
+    if (this.isRecording) return;
+
+    const recordingsDir = 'recordings';
+    if (!fs.existsSync(recordingsDir)) fs.mkdirSync(recordingsDir);
+
+    this.recordingFilePath = `${recordingsDir}/viewer-${Date.now()}.mp4`;
+    this.recordingWriteStream = fs.createWriteStream(this.recordingFilePath);
+    this.isRecording = true;
+
+    // Expose a Node function so the browser can stream video chunks to disk.
+    // Each chunk arrives as an array of byte values since Blobs can't cross the bridge.
+    await page.exposeFunction('_saveVideoChunk', (bytes) => {
+      if (this.recordingWriteStream) {
+        this.recordingWriteStream.write(Buffer.from(bytes));
+      }
+    });
+
+    const mimeType = await page.evaluate(() => {
+      const remoteVideo = document.querySelector('.remote-view');
+      if (!remoteVideo || !remoteVideo.srcObject) {
+        console.log('No remote video stream available for recording');
+        return null;
+      }
+
+      // Use MP4/H.264 as the primary format if supported, fall back to WebM/VP8.
+      // The ArrayBuffer-based data transfer ensures bytes are preserved correctly.
+      const candidates = [
+        'video/mp4; codecs=avc1',
+        'video/mp4',
+        'video/webm; codecs=vp8',
+        'video/webm'
+      ];
+      let selectedMime = null;
+      for (const mime of candidates) {
+        if (MediaRecorder.isTypeSupported(mime)) {
+          selectedMime = mime;
+          break;
+        }
+      }
+      if (!selectedMime) {
+        console.log('No supported MIME type found for MediaRecorder');
+        return null;
+      }
+
+      const stream = remoteVideo.srcObject;
+      const recorder = new MediaRecorder(stream, { mimeType: selectedMime });
+
+      recorder.ondataavailable = async (event) => {
+        if (event.data && event.data.size > 0) {
+          // Convert Blob to ArrayBuffer, then to an array of numbers to cross the Puppeteer bridge
+          const arrayBuffer = await event.data.arrayBuffer();
+          const bytes = Array.from(new Uint8Array(arrayBuffer));
+          window._saveVideoChunk(bytes);
+        }
+      };
+
+      recorder.onstop = () => {
+        console.log('MediaRecorder stopped');
+      };
+
+      // Store on window so we can stop it later
+      window._mediaRecorder = recorder;
+      // Record in 1-second chunks for incremental flushing
+      recorder.start(1000);
+      console.log(`MediaRecorder started with MIME type: ${selectedMime}`);
+      return selectedMime;
+    });
+
+    if (mimeType) {
+      // Fix file extension if the actual MIME type doesn't match the default .mp4
+      if (mimeType.startsWith('video/webm')) {
+        const newPath = this.recordingFilePath.replace(/\.mp4$/, '.webm');
+        this.recordingWriteStream.close();
+        fs.renameSync(this.recordingFilePath, newPath);
+        this.recordingFilePath = newPath;
+        this.recordingWriteStream = fs.createWriteStream(this.recordingFilePath, { flags: 'a' });
+      }
+      log(`Recording started: ${this.recordingFilePath} (${mimeType})`);
+    } else {
+      log('Failed to start recording — no supported MIME type or no stream');
+      this.isRecording = false;
+      this.recordingWriteStream.close();
+      this.recordingWriteStream = null;
+    }
+  }
+
+  async stopRecording(page) {
+    if (!this.isRecording) return;
+
+    try {
+      // Stop the MediaRecorder in the browser and wait for the final chunk
+      await page.evaluate(() => {
+        return new Promise((resolve) => {
+          if (window._mediaRecorder && window._mediaRecorder.state !== 'inactive') {
+            window._mediaRecorder.onstop = () => resolve();
+            window._mediaRecorder.stop();
+          } else {
+            resolve();
+          }
+        });
+      });
+
+      // Give a moment for the last chunk to flush through the bridge
+      await new Promise(resolve => setTimeout(resolve, 500));
+    } catch (error) {
+      log(`Error stopping MediaRecorder: ${error.message}`);
+    }
+
+    if (this.recordingWriteStream) {
+      this.recordingWriteStream.end();
+      this.recordingWriteStream = null;
+    }
+    this.isRecording = false;
+    log(`Recording saved: ${this.recordingFilePath}`);
+  }
+
+  async runVideoVerification() {
+    if (!this.recordingFilePath || !fs.existsSync(this.recordingFilePath)) {
+      log('No recording available for video verification, skipping');
+      return;
+    }
+
+    const scriptDir = path.dirname(process.argv[1] || __filename);
+    const verifyScript = path.join(scriptDir, 'video-verification', 'verify.py');
+    const sourceFrames = path.join(scriptDir, '..', 'assets', 'h264SampleFrames');
+
+    if (!fs.existsSync(verifyScript)) {
+      log('verify.py not found, skipping video verification');
+      return;
+    }
+
+    try {
+      log('Running video verification...');
+      const cmd = `python3 "${verifyScript}" --recording "${this.recordingFilePath}" --source-frames "${sourceFrames}" --json`;
+      const output = execSync(cmd, { encoding: 'utf-8', timeout: 300000 });
+      const results = JSON.parse(output.trim());
+
+      log(`Video verification results: SSIM failure=${results.ssim_failure_pct}%, frame loss=${results.frame_loss_pct}%, avg SSIM=${results.avg_ssim}`);
+
+      await CloudWatchMetrics.publishPercentageMetric(
+        this.getMetricName('ViewerVideoSSIMFailureRate'),
+        this.config.channelName,
+        results.ssim_failure_pct
+      );
+
+      await CloudWatchMetrics.publishPercentageMetric(
+        this.getMetricName('ViewerVideoFrameLossRate'),
+        this.config.channelName,
+        results.frame_loss_pct
+      );
+    } catch (error) {
+      log(`Video verification failed: ${error.message}`);
+    }
+
+    // Clean up recording unless KEEP_RECORDING is set
+    if (process.env.KEEP_RECORDING !== 'true' && this.recordingFilePath && fs.existsSync(this.recordingFilePath)) {
+      fs.unlinkSync(this.recordingFilePath);
+      log(`Recording cleaned up: ${this.recordingFilePath}`);
+    }
+  }
+
   async handleVideoDetection(page) {
     log('SUCCESS: Active video detected!');
     
@@ -667,6 +836,9 @@ class ViewerCanaryTest {
     );
     
     this.framesReceived = true;
+
+    // Start recording the viewer's video stream
+    await this.startRecording(page);
   }
 
   async monitorConnection(page) {
@@ -771,6 +943,14 @@ async function runViewerCanary(config) {
     try {
       log(`Cleaning up viewer connection (${reason})...`);
       
+      // Stop recording before closing the viewer
+      if (test.isRecording && test.page) {
+        await test.stopRecording(test.page);
+      }
+
+      // Run video verification and publish metrics
+      await test.runVideoVerification();
+
       if (test.page) {
         try {
           // Try to click stop viewer button for proper cleanup

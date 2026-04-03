@@ -101,6 +101,7 @@ def runViewerSessions(viewerId = "", waitMinutes = 2, viewerCount = "1", stagger
                         export CLIENT_ID="${viewerId ? viewerId.toLowerCase() + '-' : 'viewer-'}session-${session}-${BUILD_NUMBER}"
                         export ENDPOINT="${endpointValue}"
                         export METRIC_SUFFIX="${metricSuffixValue}"
+                        export KEEP_RECORDING="${params.KEEP_RECORDING}"
                         
                         ./canary/webrtc-c/scripts/setup-storage-viewer.sh
                     """
@@ -195,6 +196,7 @@ pipeline {
         string(name: 'METRIC_SUFFIX', defaultValue: '-gamma')
         string(name: 'VIEWER_WAIT_MINUTES', defaultValue: '2', description: 'Minutes to wait for master to build')
         string(name: 'VIEWER_SESSION_DURATION_SECONDS', defaultValue: '600', description: 'Duration in seconds for each viewer session (default 10 minutes)')
+        booleanParam(name: 'KEEP_RECORDING', defaultValue: false, description: 'Keep viewer video recordings after verification')
         booleanParam(name: 'DEBUG_LOG_SDP', defaultValue: true)
         booleanParam(name: 'FIRST_ITERATION', defaultValue: true)
         booleanParam(name: 'JS_STORAGE_VIEWER_JOIN', defaultValue: false)

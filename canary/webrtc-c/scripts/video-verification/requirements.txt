@@ -1,0 +1,3 @@
+pytesseract
+Pillow
+scikit-image

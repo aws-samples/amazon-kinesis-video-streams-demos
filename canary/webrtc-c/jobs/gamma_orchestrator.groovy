@@ -72,6 +72,11 @@ pipeline {
             description: 'Git branch/tag/commit to use'
         )
         booleanParam(
+            name: 'KEEP_RECORDING',
+            defaultValue: false,
+            description: 'Keep viewer video recordings after verification (for debugging)'
+        )
+        booleanParam(
             name: 'RESCHEDULE',
             defaultValue: false,
             description: 'Enable continuous testing (reschedule after each run completes)'
@@ -153,6 +158,7 @@ pipeline {
                                     string(name: 'METRIC_SUFFIX', value: "-gamma"),
                                     string(name: 'VIEWER_WAIT_MINUTES', value: params.VIEWER_WAIT_MINUTES),
                                     string(name: 'VIEWER_SESSION_DURATION_SECONDS', value: params.VIEWER_SESSION_DURATION_SECONDS),
+                                    booleanParam(name: 'KEEP_RECORDING', value: params.KEEP_RECORDING),
                                     booleanParam(name: 'FIRST_ITERATION', value: true),
                                     booleanParam(name: 'RESCHEDULE', value: params.RESCHEDULE),
                                 ],
@@ -193,6 +199,7 @@ pipeline {
                                     string(name: 'METRIC_SUFFIX', value: "-gamma"),
                                     string(name: 'VIEWER_WAIT_MINUTES', value: params.VIEWER_WAIT_MINUTES),
                                     string(name: 'VIEWER_SESSION_DURATION_SECONDS', value: params.VIEWER_SESSION_DURATION_SECONDS),
+                                    booleanParam(name: 'KEEP_RECORDING', value: params.KEEP_RECORDING),
                                     booleanParam(name: 'FIRST_ITERATION', value: true),
                                     booleanParam(name: 'RESCHEDULE', value: params.RESCHEDULE),
                                 ],
@@ -234,6 +241,7 @@ pipeline {
                                     string(name: 'METRIC_SUFFIX', value: "-gamma"),
                                     string(name: 'VIEWER_WAIT_MINUTES', value: params.VIEWER_WAIT_MINUTES),
                                     string(name: 'VIEWER_SESSION_DURATION_SECONDS', value: params.VIEWER_SESSION_DURATION_SECONDS),
+                                    booleanParam(name: 'KEEP_RECORDING', value: params.KEEP_RECORDING),
                                     booleanParam(name: 'FIRST_ITERATION', value: true),
                                     booleanParam(name: 'RESCHEDULE', value: params.RESCHEDULE),
                                 ],
