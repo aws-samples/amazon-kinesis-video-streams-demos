@@ -44,6 +44,17 @@ else
     echo "Puppeteer Chrome verified at: $CHROME_PATH"
 fi
 
+# Install video verification dependencies (ffmpeg, Tesseract OCR, Python packages)
+if ! command -v ffmpeg &> /dev/null || ! command -v tesseract &> /dev/null; then
+    echo "Installing ffmpeg and tesseract-ocr..."
+    sudo apt-get update -y
+    sudo apt-get install -y ffmpeg tesseract-ocr || { echo "ERROR: Failed to install ffmpeg/tesseract"; exit 1; }
+fi
+echo "ffmpeg verified: $(ffmpeg -version | head -1)"
+echo "tesseract verified: $(tesseract --version 2>&1 | head -1)"
+
+pip3 install pytesseract Pillow scikit-image numpy || { echo "ERROR: Failed to install Python dependencies"; exit 1; }
+
 # Set environment variables for the test
 export CANARY_CHANNEL_NAME="${JOB_NAME}-${RUNNER_LABEL}"
 export AWS_REGION="${AWS_DEFAULT_REGION}"
