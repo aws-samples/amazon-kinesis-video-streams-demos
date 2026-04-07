@@ -53,13 +53,18 @@ fi
 echo "ffmpeg verified: $(ffmpeg -version | head -1)"
 echo "tesseract verified: $(tesseract --version 2>&1 | head -1)"
 
-# Ensure pip3 is available
-if ! command -v pip3 &> /dev/null; then
-    echo "pip3 not found, installing python3-pip..."
-    sudo apt-get update -y
-    sudo apt-get install -y python3-pip || { echo "ERROR: Failed to install python3-pip"; exit 1; }
+# Set up Python virtual environment for video verification dependencies.
+# Modern Ubuntu (24.04+) marks the system Python as "externally managed" (PEP 668),
+# which blocks pip install outside a venv to prevent breaking system packages.
+VENV_DIR="${HOME}/.venv/video-verify"
+if [ ! -d "$VENV_DIR" ]; then
+    echo "Creating Python virtual environment at $VENV_DIR..."
+    sudo apt-get install -y python3-venv 2>/dev/null || true
+    python3 -m venv "$VENV_DIR" || { echo "ERROR: Failed to create Python venv"; exit 1; }
 fi
-pip3 install pytesseract Pillow scikit-image numpy || { echo "ERROR: Failed to install Python dependencies"; exit 1; }
+source "$VENV_DIR/bin/activate"
+pip install pytesseract Pillow scikit-image numpy || { echo "ERROR: Failed to install Python dependencies"; exit 1; }
+echo "Python venv active: $(python3 --version), packages installed"
 
 # Set environment variables for the test
 export CANARY_CHANNEL_NAME="${JOB_NAME}-${RUNNER_LABEL}"

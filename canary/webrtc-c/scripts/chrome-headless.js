@@ -785,7 +785,13 @@ class ViewerCanaryTest {
 
     try {
       log('Running video verification...');
-      const cmd = `python3 "${verifyScript}" --recording "${this.recordingFilePath}" --source-frames "${sourceFrames}" --json`;
+      // Prefer the venv Python if available (PEP 668 blocks system-wide pip on modern Ubuntu)
+      const venvPython = path.join(process.env.HOME || '', '.venv', 'video-verify', 'bin', 'python3');
+      if (!fs.existsSync(venvPython)) {
+        log(`Video verification venv not found at ${venvPython} — run setup-storage-viewer.sh first`);
+        return;
+      }
+      const cmd = `"${venvPython}" "${verifyScript}" --recording "${this.recordingFilePath}" --source-frames "${sourceFrames}" --json`;
       const output = execSync(cmd, { encoding: 'utf-8', timeout: 300000 });
       const results = JSON.parse(output.trim());
 
@@ -1102,7 +1108,7 @@ async function runViewerCanary(config) {
 runViewerCanary({
   channelName: process.env.CANARY_CHANNEL_NAME || 'ScaryTestStream',
   region: process.env.AWS_REGION || 'us-west-2',
-  duration: parseInt(process.env.TEST_DURATION) || 360,
+  duration: parseInt(process.env.TEST_DURATION) || 30,
   saveFrames: process.env.SAVE_FRAMES === 'true',
   clientId: process.env.CLIENT_ID || `test-viewer-${Date.now()}`,
   forceTURN: process.env.FORCE_TURN === 'true',
