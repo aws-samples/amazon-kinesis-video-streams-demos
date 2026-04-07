@@ -1,6 +1,10 @@
 import jenkins.model.*
 
 RUNNER_JOB_NAME_PREFIX = "webrtc-canary-runner"
+// Dedicated runner for StorageExtended so it is not killed by the orchestrator's
+// teardown cycle.  This Jenkins job must use the same runner.groovy pipeline but
+// lives outside the webrtc-canary-runner-* naming convention.
+STORAGE_EXTENDED_RUNNER = "webrtc-canary-storage-extended"
 PERIODIC_DURATION_IN_SECONDS = 90
 PERIODIC_PROFILING_DURATION_IN_SECONDS = 90
 LONG_RUNNING_DURATION_IN_SECONDS = 0
@@ -52,6 +56,11 @@ def findRunners() {
     return Jenkins.instance
                     .getAllItems(Job.class)
                     .findAll(filterClosure)
+}
+
+def isJobBuilding(jobName) {
+    def job = Jenkins.instance.getItemByFullName(jobName)
+    return job != null && job.isBuilding()
 }
 
 NEXT_AVAILABLE_RUNNER = null
@@ -370,24 +379,32 @@ pipeline {
                             wait: false
                         )
 
-                        // Storage Extended.
-                        build(
-                            job: NEXT_AVAILABLE_RUNNER,
-                            parameters: COMMON_PARAMS + [
-                                booleanParam(name: 'IS_SIGNALING', value: false),
-                                booleanParam(name: 'IS_STORAGE', value: true),
-                                booleanParam(name: 'USE_TURN', value: true),
-                                booleanParam(name: 'TRICKLE_ICE', value: true),
-                                booleanParam(name: 'USE_IOT', value: false),
-                                string(name: 'DURATION_IN_SECONDS', value: STORAGE_EXTENDED_DURATION_IN_SECONDS.toString()),
-                                string(name: 'MASTER_NODE_LABEL', value: "webrtc-storage-master"),
-                                string(name: 'CONSUMER_NODE_LABEL', value: "webrtc-storage-consumer"),
-                                string(name: 'RUNNER_LABEL', value: "StorageExtended"),
-                                string(name: 'SCENARIO_LABEL', value: "StorageExtended"),
-                                string(name: 'AWS_DEFAULT_REGION', value: "us-west-2"),
-                            ],
-                            wait: false
-                        )
+                        // Storage Extended — runs on a dedicated runner to avoid being
+                        // killed by the orchestrator teardown cycle.  Only spawn a new
+                        // run when the previous one has finished.
+                        script {
+                            if (isJobBuilding(STORAGE_EXTENDED_RUNNER)) {
+                                echo "StorageExtended is still running on ${STORAGE_EXTENDED_RUNNER}, skipping"
+                            } else {
+                                build(
+                                    job: STORAGE_EXTENDED_RUNNER,
+                                    parameters: COMMON_PARAMS + [
+                                        booleanParam(name: 'IS_SIGNALING', value: false),
+                                        booleanParam(name: 'IS_STORAGE', value: true),
+                                        booleanParam(name: 'USE_TURN', value: true),
+                                        booleanParam(name: 'TRICKLE_ICE', value: true),
+                                        booleanParam(name: 'USE_IOT', value: false),
+                                        string(name: 'DURATION_IN_SECONDS', value: STORAGE_EXTENDED_DURATION_IN_SECONDS.toString()),
+                                        string(name: 'MASTER_NODE_LABEL', value: "webrtc-storage-master"),
+                                        string(name: 'CONSUMER_NODE_LABEL', value: "webrtc-storage-consumer"),
+                                        string(name: 'RUNNER_LABEL', value: "StorageExtended"),
+                                        string(name: 'SCENARIO_LABEL', value: "StorageExtended"),
+                                        string(name: 'AWS_DEFAULT_REGION', value: "us-west-2"),
+                                    ],
+                                    wait: false
+                                )
+                            }
+                        }
 
 
                         //Storage with a viewer join

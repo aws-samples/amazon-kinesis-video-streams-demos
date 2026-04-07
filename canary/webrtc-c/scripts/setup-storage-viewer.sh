@@ -53,6 +53,12 @@ fi
 echo "ffmpeg verified: $(ffmpeg -version | head -1)"
 echo "tesseract verified: $(tesseract --version 2>&1 | head -1)"
 
+# Ensure pip3 is available
+if ! command -v pip3 &> /dev/null; then
+    echo "pip3 not found, installing python3-pip..."
+    sudo apt-get update -y
+    sudo apt-get install -y python3-pip || { echo "ERROR: Failed to install python3-pip"; exit 1; }
+fi
 pip3 install pytesseract Pillow scikit-image numpy || { echo "ERROR: Failed to install Python dependencies"; exit 1; }
 
 # Set environment variables for the test
