@@ -208,6 +208,13 @@ def main():
     parser.add_argument('--json', action='store_true', dest='json_output', help='Output results as JSON for machine consumption')
     args = parser.parse_args()
 
+    # When --json is requested, redirect informational prints to stderr
+    # so that stdout contains only the JSON result for machine consumption.
+    if args.json_output:
+        import functools
+        _orig_print = print
+        print = functools.partial(_orig_print, file=sys.stderr)
+
     if not os.path.exists(args.recording):
         print(f"Recording not found: {args.recording}", file=sys.stderr)
         sys.exit(1)
