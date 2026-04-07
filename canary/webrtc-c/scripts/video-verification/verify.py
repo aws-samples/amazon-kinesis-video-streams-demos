@@ -211,9 +211,9 @@ def main():
     # When --json is requested, redirect informational prints to stderr
     # so that stdout contains only the JSON result for machine consumption.
     if args.json_output:
+        import builtins
         import functools
-        _orig_print = print
-        print = functools.partial(_orig_print, file=sys.stderr)
+        builtins.print = functools.partial(builtins.print, file=sys.stderr)
 
     if not os.path.exists(args.recording):
         print(f"Recording not found: {args.recording}", file=sys.stderr)
