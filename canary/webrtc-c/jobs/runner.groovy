@@ -306,6 +306,8 @@ def buildStorageCanary(isConsumer, params) {
         def receivedFramesDir = "${env.WORKSPACE}/canary/consumer-java/received-frames"
         def verifyScript = "${env.WORKSPACE}/canary/webrtc-c/scripts/video-verification/verify.py"
         def sourceFrames = "${env.WORKSPACE}/canary/webrtc-c/assets/h264SampleFrames"
+        def streamName = "${env.JOB_NAME}-${params.RUNNER_LABEL}"
+        def scenarioLabel = params.SCENARIO_LABEL
         if (new File(receivedFramesDir).exists() && new File(receivedFramesDir).list()?.length > 0) {
             try {
                 echo "Running consumer-side video verification..."
@@ -314,6 +316,21 @@ def buildStorageCanary(isConsumer, params) {
                     returnStdout: true
                 ).trim()
                 echo "Consumer video verification results: ${output}"
+
+                // Parse JSON and push metrics to CloudWatch
+                def results = readJSON text: output
+                def ssimFailurePct = results.ssim_failure_pct ?: 0
+                def frameLossPct = results.frame_loss_pct ?: 0
+
+                sh """
+                    aws cloudwatch put-metric-data \
+                        --namespace KinesisVideoSDKCanary \
+                        --metric-data \
+                            MetricName=ConsumerVideoSSIMFailureRate,Value=${ssimFailurePct},Unit=Percent,Dimensions="[{Name=StorageWebRTCSDKCanaryStreamName,Value=${streamName}},{Name=StorageWebRTCSDKCanaryLabel,Value=${scenarioLabel}}]" \
+                            MetricName=ConsumerVideoFrameLossRate,Value=${frameLossPct},Unit=Percent,Dimensions="[{Name=StorageWebRTCSDKCanaryStreamName,Value=${streamName}},{Name=StorageWebRTCSDKCanaryLabel,Value=${scenarioLabel}}]"
+                """
+                echo "Pushed ConsumerVideoSSIMFailureRate=${ssimFailurePct}%, ConsumerVideoFrameLossRate=${frameLossPct}%"
+
                 // Clean up received frames
                 sh "rm -rf '${receivedFramesDir}'"
             } catch (err) {

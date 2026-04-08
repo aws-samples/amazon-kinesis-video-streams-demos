@@ -197,25 +197,38 @@ def validate_frame_count(video_path, tolerance=0.1):
     return passed, actual_frames, expected_frames, duration
 
 
-def decode_h264_frames_to_png(h264_dir, output_dir):
+def decode_h264_frames_to_png(h264_dir, output_dir, source_frames_dir=None):
     """Decode individual .h264 frame files to PNG images using ffmpeg.
+    Prepends SPS/PPS from the first source keyframe if available, since
+    received frames may start mid-stream without codec headers.
     Returns sorted list of PNG file paths."""
     os.makedirs(output_dir, exist_ok=True)
     h264_files = sorted(glob.glob(os.path.join(h264_dir, '*.h264')))
     if not h264_files:
         return []
 
-    # Concatenate all .h264 files into a single stream for decoding
+    # Concatenate all .h264 files into a single stream for decoding.
+    # Prepend frame-0001.h264 (contains SPS/PPS) so ffmpeg can initialize the decoder
+    # even when the received frames start mid-stream.
     concat_path = os.path.join(output_dir, '_concat.h264')
     with open(concat_path, 'wb') as out:
+        if source_frames_dir:
+            keyframe = os.path.join(source_frames_dir, 'frame-0001.h264')
+            if os.path.exists(keyframe):
+                with open(keyframe, 'rb') as f:
+                    out.write(f.read())
         for h264_file in h264_files:
             with open(h264_file, 'rb') as f:
                 out.write(f.read())
 
-    # Decode the concatenated stream to individual PNGs
+    # Decode to PNGs. Skip the prepended keyframe (+1) if we added one.
+    has_prepended_keyframe = source_frames_dir is not None
+    skip_frames = 1 if has_prepended_keyframe else 0
+    total_frames = len(h264_files) + skip_frames
+
     cmd = [
         'ffmpeg', '-y', '-i', concat_path,
-        '-frames:v', str(len(h264_files)),
+        '-frames:v', str(total_frames),
         os.path.join(output_dir, 'frame-%05d.png')
     ]
     result = subprocess.run(cmd, capture_output=True, text=True)
@@ -225,9 +238,21 @@ def decode_h264_frames_to_png(h264_dir, output_dir):
         print(f"ffmpeg decode error: {result.stderr}", file=sys.stderr)
         return []
 
-    pngs = sorted(glob.glob(os.path.join(output_dir, 'frame-*.png')))
-    print(f"Decoded {len(pngs)} frames from {len(h264_files)} .h264 files")
-    return pngs
+    all_pngs = sorted(glob.glob(os.path.join(output_dir, 'frame-*.png')))
+
+    # Remove the prepended keyframe's decoded PNG
+    if has_prepended_keyframe and len(all_pngs) > 0:
+        os.remove(all_pngs[0])
+        all_pngs = all_pngs[1:]
+        # Rename remaining files to be sequential from 00001
+        for idx, png in enumerate(all_pngs):
+            new_name = os.path.join(output_dir, f'frame-{idx+1:05d}.png')
+            if png != new_name:
+                os.rename(png, new_name)
+        all_pngs = sorted(glob.glob(os.path.join(output_dir, 'frame-*.png')))
+
+    print(f"Decoded {len(all_pngs)} frames from {len(h264_files)} .h264 files")
+    return all_pngs
 
 
 def find_best_match_ssim(received_frame_path, source_stream, source_decoded_dir, sample_step=10):
@@ -319,7 +344,7 @@ def main():
         if args.received_frames_dir:
             # Consumer path: decode pre-extracted .h264 frames to PNGs
             print("\n--- Phase 2: Decoding received .h264 frames ---")
-            received_frames = decode_h264_frames_to_png(args.received_frames_dir, received_dir)
+            received_frames = decode_h264_frames_to_png(args.received_frames_dir, received_dir, args.source_frames)
             if not received_frames:
                 print("No frames decoded!", file=sys.stderr)
                 sys.exit(1)
@@ -354,9 +379,23 @@ def main():
         build_source_stream(args.source_frames, source_stream)
 
         if args.no_ocr:
-            print("\n--- Phase 3: Aligning frames via SSIM ---")
-            start_frame_index = find_best_match_ssim(received_frames[0], source_stream, source_decoded_dir)
-            print(f"SSIM alignment: best match source frame index: {start_frame_index}")
+            print("\n--- Phase 3: Aligning frames via metadata ---")
+            # Check for metadata.txt written by the Java consumer with the starting source frame index
+            metadata_file = os.path.join(args.received_frames_dir, 'metadata.txt') if args.received_frames_dir else None
+            if metadata_file and os.path.exists(metadata_file):
+                with open(metadata_file) as f:
+                    for line in f:
+                        if line.startswith('start_frame_index='):
+                            start_frame_index = int(line.strip().split('=')[1])
+                            break
+                    else:
+                        print("metadata.txt found but missing start_frame_index", file=sys.stderr)
+                        sys.exit(1)
+                print(f"Metadata alignment: start_frame_index={start_frame_index}")
+            else:
+                print("No metadata.txt found, falling back to SSIM brute-force alignment")
+                start_frame_index = find_best_match_ssim(received_frames[0], source_stream, source_decoded_dir)
+                print(f"SSIM alignment: best match source frame index: {start_frame_index}")
         else:
             print("\n--- Phase 3: Aligning frames via OCR ---")
             timer_text = ocr_timer(received_frames[0])
