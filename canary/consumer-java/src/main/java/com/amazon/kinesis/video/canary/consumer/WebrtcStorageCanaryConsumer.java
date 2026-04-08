@@ -221,12 +221,49 @@ public class WebrtcStorageCanaryConsumer {
                     }
                 };
 
+                // Video verification: save received frames to disk for later SSIM comparison.
+                // Runs a parallel GetMedia call that writes frames via VideoRecordingFrameProcessor.
+                // Enabled by setting VIDEO_VERIFY_ENABLED=true in the environment.
+                ExecutorService videoVerifyExecutor = null;
+                String videoVerifyEnabled = System.getenv(CanaryConstants.VIDEO_VERIFY_ENABLED_ENV_VAR);
+                if ("true".equalsIgnoreCase(videoVerifyEnabled)) {
+                    String outputDir = System.getenv().getOrDefault(
+                            CanaryConstants.VIDEO_VERIFY_OUTPUT_DIR_ENV_VAR,
+                            CanaryConstants.DEFAULT_VIDEO_VERIFY_OUTPUT_DIR);
+
+                    logger.info("Video verification enabled: outputDir=" + outputDir);
+
+                    VideoRecordingFrameProcessor recordingProcessor = VideoRecordingFrameProcessor.create(outputDir);
+                    final FrameVisitor recordingVisitor = FrameVisitor.create(recordingProcessor);
+
+                    final StartSelector recordingStartSelector = new StartSelector()
+                            .withStartSelectorType(StartSelectorType.NOW);
+
+                    final GetMediaWorker recordingWorker = GetMediaWorker.create(
+                            Regions.fromName(mRegion),
+                            mCredentialsProvider,
+                            mStreamName,
+                            recordingStartSelector,
+                            mAmazonKinesisVideo,
+                            recordingVisitor);
+
+                    videoVerifyExecutor = Executors.newSingleThreadExecutor();
+                    videoVerifyExecutor.submit(recordingWorker);
+                    logger.info("Video verification recording started");
+                }
+
                 // NOTE: Metric publishing will NOT begin if canaryRunTime is <
                 // intervalInitialDelay
                 intervalMetricsTimer.scheduleAtFixedRate(intervalMetricsTask,
                         CanaryConstants.LIST_FRAGMENTS_INITIAL_DELAY, CanaryConstants.LIST_FRAGMENTS_INTERVAL);
                 Thread.sleep(canaryRunTime * CanaryConstants.MILLISECONDS_IN_A_SECOND);
                 intervalMetricsTimer.cancel();
+
+                if (videoVerifyExecutor != null) {
+                    logger.info("Shutting down video verification recording");
+                    videoVerifyExecutor.shutdownNow();
+                }
+
                 shutdownCanaryResources();
                 break;
             }

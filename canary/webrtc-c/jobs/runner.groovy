@@ -267,7 +267,8 @@ def buildStorageCanary(isConsumer, params) {
       'JAVA_HOME': "/opt/jdk-11.0.20",
       'M2_HOME': "/opt/apache-maven-3.6.3",
       'AWS_DEFAULT_REGION': params.AWS_DEFAULT_REGION,
-      'CANARY_STREAM_NAME': "${env.JOB_NAME}-${params.RUNNER_LABEL}"
+      'CANARY_STREAM_NAME': "${env.JOB_NAME}-${params.RUNNER_LABEL}",
+      'VIDEO_VERIFY_ENABLED': params.VIDEO_VERIFY_ENABLED?.toString() ?: 'false'
     ]
 
     RUNNING_NODES_IN_BUILDING++
@@ -299,6 +300,28 @@ def buildStorageCanary(isConsumer, params) {
                 cd $WORKSPACE/canary/consumer-java
                 java -classpath target/aws-kinesisvideo-producer-sdk-canary-consumer-1.0-SNAPSHOT.jar:$(cat tmp_jar) -Daws.accessKeyId=${AWS_ACCESS_KEY_ID} -Daws.secretKey=${AWS_SECRET_ACCESS_KEY} -Daws.sessionToken=${AWS_SESSION_TOKEN} com.amazon.kinesis.video.canary.consumer.WebrtcStorageCanaryConsumer
             '''
+        }
+
+        // Run video verification on received frames if the consumer saved them
+        def receivedFramesDir = "${env.WORKSPACE}/canary/consumer-java/received-frames"
+        def verifyScript = "${env.WORKSPACE}/canary/webrtc-c/scripts/video-verification/verify.py"
+        def sourceFrames = "${env.WORKSPACE}/canary/webrtc-c/assets/h264SampleFrames"
+        if (new File(receivedFramesDir).exists() && new File(receivedFramesDir).list()?.length > 0) {
+            try {
+                echo "Running consumer-side video verification..."
+                def output = sh(
+                    script: "python3 '${verifyScript}' --received-frames-dir '${receivedFramesDir}' --source-frames '${sourceFrames}' --no-ocr --json",
+                    returnStdout: true
+                ).trim()
+                echo "Consumer video verification results: ${output}"
+                // Clean up received frames
+                sh "rm -rf '${receivedFramesDir}'"
+            } catch (err) {
+                echo "Consumer video verification failed: ${err.getMessage()}"
+                // Don't fail the build for verification failures
+            }
+        } else {
+            echo "No received frames found, skipping consumer video verification"
         }
     }
 }
@@ -342,6 +365,7 @@ pipeline {
         string(name: 'METRIC_SUFFIX', defaultValue: '')
         string(name: 'VIEWER_WAIT_MINUTES', defaultValue: '55')
         string(name: 'VIEWER_SESSION_DURATION_SECONDS', defaultValue: '600', description: 'Duration in seconds for each viewer session (default 10 minutes)')
+        booleanParam(name: 'VIDEO_VERIFY_ENABLED', defaultValue: false, description: 'Enable consumer-side video verification')
     }
     
     // Set the role ARN to environment to avoid string interpolation to follow Jenkins security guidelines.
@@ -763,6 +787,7 @@ pipeline {
                       string(name: 'METRIC_SUFFIX', value: params.METRIC_SUFFIX),
                       string(name: 'VIEWER_WAIT_MINUTES', value: params.VIEWER_WAIT_MINUTES),
                       string(name: 'VIEWER_SESSION_DURATION_SECONDS', value: params.VIEWER_SESSION_DURATION_SECONDS),
+                      booleanParam(name: 'VIDEO_VERIFY_ENABLED', value: params.VIDEO_VERIFY_ENABLED),
                       booleanParam(name: 'FIRST_ITERATION', value: false)
                     ],
                     wait: false

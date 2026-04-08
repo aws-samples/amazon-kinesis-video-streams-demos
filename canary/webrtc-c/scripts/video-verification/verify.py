@@ -197,15 +197,91 @@ def validate_frame_count(video_path, tolerance=0.1):
     return passed, actual_frames, expected_frames, duration
 
 
+def decode_h264_frames_to_png(h264_dir, output_dir):
+    """Decode individual .h264 frame files to PNG images using ffmpeg.
+    Returns sorted list of PNG file paths."""
+    os.makedirs(output_dir, exist_ok=True)
+    h264_files = sorted(glob.glob(os.path.join(h264_dir, '*.h264')))
+    if not h264_files:
+        return []
+
+    # Concatenate all .h264 files into a single stream for decoding
+    concat_path = os.path.join(output_dir, '_concat.h264')
+    with open(concat_path, 'wb') as out:
+        for h264_file in h264_files:
+            with open(h264_file, 'rb') as f:
+                out.write(f.read())
+
+    # Decode the concatenated stream to individual PNGs
+    cmd = [
+        'ffmpeg', '-y', '-i', concat_path,
+        '-frames:v', str(len(h264_files)),
+        os.path.join(output_dir, 'frame-%05d.png')
+    ]
+    result = subprocess.run(cmd, capture_output=True, text=True)
+    os.remove(concat_path)
+
+    if result.returncode != 0:
+        print(f"ffmpeg decode error: {result.stderr}", file=sys.stderr)
+        return []
+
+    pngs = sorted(glob.glob(os.path.join(output_dir, 'frame-*.png')))
+    print(f"Decoded {len(pngs)} frames from {len(h264_files)} .h264 files")
+    return pngs
+
+
+def find_best_match_ssim(received_frame_path, source_stream, source_decoded_dir, sample_step=10):
+    """Find the source frame index that best matches the received frame using SSIM.
+    Samples every sample_step-th source frame for speed, then refines around the best match."""
+    print("Aligning via SSIM brute-force search...")
+
+    # Coarse pass: sample every Nth frame
+    coarse_indices = list(range(1, TOTAL_SOURCE_FRAMES + 1, sample_step))
+    coarse_pngs = extract_source_frames(source_stream, source_decoded_dir, set(coarse_indices))
+
+    best_idx = 1
+    best_score = -1
+    for idx in coarse_indices:
+        png = coarse_pngs.get(idx)
+        if not png:
+            continue
+        score = compute_ssim(received_frame_path, png)
+        if score > best_score:
+            best_score = score
+            best_idx = idx
+
+    print(f"Coarse pass best: frame-{best_idx:04d} SSIM={best_score:.4f}")
+
+    # Fine pass: check neighbors around the best coarse match
+    fine_start = max(1, best_idx - sample_step)
+    fine_end = min(TOTAL_SOURCE_FRAMES, best_idx + sample_step)
+    fine_indices = list(range(fine_start, fine_end + 1))
+    fine_pngs = extract_source_frames(source_stream, source_decoded_dir, set(fine_indices))
+
+    for idx in fine_indices:
+        png = fine_pngs.get(idx)
+        if not png:
+            continue
+        score = compute_ssim(received_frame_path, png)
+        if score > best_score:
+            best_score = score
+            best_idx = idx
+
+    print(f"Fine pass best: frame-{best_idx:04d} SSIM={best_score:.4f}")
+    return best_idx
+
+
 def main():
     parser = argparse.ArgumentParser(description='Verify viewer video against source frames')
-    parser.add_argument('--recording', required=True, help='Path to viewer recording (mp4/webm)')
+    parser.add_argument('--recording', help='Path to viewer recording (mp4/webm)')
+    parser.add_argument('--received-frames-dir', dest='received_frames_dir', help='Path to directory of pre-extracted .h264 frame files (alternative to --recording)')
     parser.add_argument('--source-frames', required=True, help='Path to H.264 source frames directory')
     parser.add_argument('--max-compare', type=int, default=0, help='Max frames to compare (default: 0 = all)')
     parser.add_argument('--threshold', type=float, default=0.5, help='Min SSIM to pass (default: 0.5)')
     parser.add_argument('--keep-frames', action='store_true', help='Keep extracted frames after verification')
     parser.add_argument('--verbose', action='store_true', help='Print SSIM score for every frame')
     parser.add_argument('--json', action='store_true', dest='json_output', help='Output results as JSON for machine consumption')
+    parser.add_argument('--no-ocr', action='store_true', dest='no_ocr', help='Use SSIM brute-force alignment instead of OCR timer (for consumer-side verification)')
     args = parser.parse_args()
 
     # When --json is requested, redirect informational prints to stderr
@@ -215,8 +291,16 @@ def main():
         import functools
         builtins.print = functools.partial(builtins.print, file=sys.stderr)
 
-    if not os.path.exists(args.recording):
+    if not args.recording and not args.received_frames_dir:
+        print("Either --recording or --received-frames-dir is required", file=sys.stderr)
+        sys.exit(1)
+
+    if args.recording and not os.path.exists(args.recording):
         print(f"Recording not found: {args.recording}", file=sys.stderr)
+        sys.exit(1)
+
+    if args.received_frames_dir and not os.path.isdir(args.received_frames_dir):
+        print(f"Received frames directory not found: {args.received_frames_dir}", file=sys.stderr)
         sys.exit(1)
 
     if not os.path.isdir(args.source_frames):
@@ -229,49 +313,66 @@ def main():
     os.makedirs(source_decoded_dir, exist_ok=True)
 
     try:
-        # Phase 2: Extract frames from recording
-        print("\n--- Phase 2: Extracting frames from recording ---")
-        received_frames = extract_frames(args.recording, received_dir)
-        if not received_frames:
-            print("No frames extracted!", file=sys.stderr)
-            sys.exit(1)
+        # Phase 2: Get received frames
+        fc_passed, actual_frames, expected_frames, duration = None, None, None, None
 
-        # Frame count validation
-        print("\n--- Frame count validation ---")
-        fc_passed, actual_frames, expected_frames, duration = validate_frame_count(args.recording)
-        if fc_passed is None:
-            print("Could not determine video duration or frame count, skipping validation")
+        if args.received_frames_dir:
+            # Consumer path: decode pre-extracted .h264 frames to PNGs
+            print("\n--- Phase 2: Decoding received .h264 frames ---")
+            received_frames = decode_h264_frames_to_png(args.received_frames_dir, received_dir)
+            if not received_frames:
+                print("No frames decoded!", file=sys.stderr)
+                sys.exit(1)
+            actual_frames = len(received_frames)
         else:
-            print(f"Duration: {duration:.2f}s")
-            print(f"Actual frames: {actual_frames}")
-            print(f"Expected frames at {FPS} FPS: {expected_frames}")
-            diff_pct = abs(actual_frames - expected_frames) / expected_frames * 100 if expected_frames > 0 else 0
-            print(f"Difference: {diff_pct:.1f}%")
-            if fc_passed:
-                print("Frame count: PASS (within 10% tolerance)")
+            # Viewer path: extract frames from video recording
+            print("\n--- Phase 2: Extracting frames from recording ---")
+            received_frames = extract_frames(args.recording, received_dir)
+            if not received_frames:
+                print("No frames extracted!", file=sys.stderr)
+                sys.exit(1)
+
+            # Frame count validation (only for video recordings)
+            print("\n--- Frame count validation ---")
+            fc_passed, actual_frames, expected_frames, duration = validate_frame_count(args.recording)
+            if fc_passed is None:
+                print("Could not determine video duration or frame count, skipping validation")
             else:
-                print("Frame count: FAIL (exceeds 10% tolerance)")
+                print(f"Duration: {duration:.2f}s")
+                print(f"Actual frames: {actual_frames}")
+                print(f"Expected frames at {FPS} FPS: {expected_frames}")
+                diff_pct = abs(actual_frames - expected_frames) / expected_frames * 100 if expected_frames > 0 else 0
+                print(f"Difference: {diff_pct:.1f}%")
+                if fc_passed:
+                    print("Frame count: PASS (within 10% tolerance)")
+                else:
+                    print("Frame count: FAIL (exceeds 10% tolerance)")
 
-        # Phase 3: OCR and alignment
-        print("\n--- Phase 3: Aligning frames via OCR ---")
-        timer_text = ocr_timer(received_frames[0])
-        print(f"First frame timer: '{timer_text}'")
+        # Phase 3: Alignment
+        # Build source stream once (needed for both alignment methods and comparison)
+        source_stream = os.path.join(work_dir, 'source.h264')
+        build_source_stream(args.source_frames, source_stream)
 
-        timer_ms = parse_timer(timer_text)
-        if timer_ms is None:
-            print(f"Failed to parse timer text: '{timer_text}'", file=sys.stderr)
-            sys.exit(1)
+        if args.no_ocr:
+            print("\n--- Phase 3: Aligning frames via SSIM ---")
+            start_frame_index = find_best_match_ssim(received_frames[0], source_stream, source_decoded_dir)
+            print(f"SSIM alignment: best match source frame index: {start_frame_index}")
+        else:
+            print("\n--- Phase 3: Aligning frames via OCR ---")
+            timer_text = ocr_timer(received_frames[0])
+            print(f"First frame timer: '{timer_text}'")
 
-        start_frame_index = timer_to_frame_index(timer_ms)
-        print(f"Timer: {timer_ms}ms -> source frame index: {start_frame_index}")
+            timer_ms = parse_timer(timer_text)
+            if timer_ms is None:
+                print(f"Failed to parse timer text: '{timer_text}'", file=sys.stderr)
+                sys.exit(1)
+
+            start_frame_index = timer_to_frame_index(timer_ms)
+            print(f"Timer: {timer_ms}ms -> source frame index: {start_frame_index}")
 
         # Phase 4: Compare frames
         print(f"\n--- Phase 4: Comparing frames ---")
         num_to_compare = args.max_compare if args.max_compare > 0 else len(received_frames)
-
-        # Build source stream once and extract all needed frames
-        source_stream = os.path.join(work_dir, 'source.h264')
-        build_source_stream(args.source_frames, source_stream)
 
         needed_indices = [
             ((start_frame_index - 1 + i * FPS) % TOTAL_SOURCE_FRAMES) + 1
