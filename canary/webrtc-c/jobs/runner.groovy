@@ -388,8 +388,19 @@ pipeline {
                         cd ~/Jenkins 2>/dev/null || true
                         ls -t | grep "webrtc-canary-runner" | grep -v "@tmp" | tail -n +11 | xargs -I {} rm -rf {} 2>/dev/null || true
                         
-                        # Clean Puppeteer cache (keep only latest Chrome)
-                        find ~/.cache/puppeteer -type d -name "linux-*" 2>/dev/null | sort -r | tail -n +2 | xargs rm -rf 2>/dev/null || true
+                        # Clean Puppeteer cache (keep only latest version for each browser type)
+                        for browser_type in chrome chrome-headless-shell; do
+                            if [ -d ~/.cache/puppeteer/\$browser_type ]; then
+                                find ~/.cache/puppeteer/\$browser_type -maxdepth 1 -type d -name "linux-*" 2>/dev/null | sort -r | tail -n +2 | xargs rm -rf 2>/dev/null || true
+                                # Remove any cache dirs where the executable is missing (corrupt partial downloads)
+                                for dir in ~/.cache/puppeteer/\$browser_type/linux-*; do
+                                    if [ -d "\$dir" ] && ! find "\$dir" -name "\$browser_type" -type f 2>/dev/null | grep -q .; then
+                                        echo "Removing corrupt \$browser_type cache: \$dir"
+                                        rm -rf "\$dir"
+                                    fi
+                                done
+                            fi
+                        done
                         
                         # Clean npm cache if over 200MB
                         if [ -d ~/.npm ] && [ \$(du -sm ~/.npm 2>/dev/null | cut -f1) -gt 200 ]; then

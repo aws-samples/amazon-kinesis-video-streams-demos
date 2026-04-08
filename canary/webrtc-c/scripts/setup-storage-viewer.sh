@@ -33,15 +33,34 @@ npm install || { echo "ERROR: Failed to install Node.js dependencies"; exit 1; }
 
 # Verify Puppeteer can find Chrome. If the cached version doesn't match what
 # Puppeteer expects (e.g., after a Puppeteer upgrade), force-install the correct one.
+#
+# Puppeteer 24.x requires both "chrome" and "chrome-headless-shell". A partial
+# download (e.g., from a previous job abort or disk-full event) can leave the
+# cache directory present but the executable missing, causing npm install to
+# fail on subsequent runs. We validate both binaries and nuke stale caches.
 CHROME_PATH=$(node -e "try { console.log(require('puppeteer').executablePath()) } catch(e) { console.log('') }" 2>/dev/null)
-if [ -z "$CHROME_PATH" ] || [ ! -f "$CHROME_PATH" ]; then
-    echo "Puppeteer Chrome not found or version mismatch, installing correct version..."
-    # Clear stale cache to avoid disk bloat
+CHROME_HEADLESS_SHELL_OK=true
+# Check if chrome-headless-shell executable actually exists in any cached folder
+if ls "$HOME/.cache/puppeteer/chrome-headless-shell"/linux-*/chrome-headless-shell-linux64/chrome-headless-shell 2>/dev/null; then
+    echo "chrome-headless-shell binary found"
+else
+    if [ -d "$HOME/.cache/puppeteer/chrome-headless-shell" ]; then
+        echo "WARNING: chrome-headless-shell cache directory exists but executable is missing (corrupt cache)"
+    fi
+    CHROME_HEADLESS_SHELL_OK=false
+fi
+
+if [ -z "$CHROME_PATH" ] || [ ! -f "$CHROME_PATH" ] || [ "$CHROME_HEADLESS_SHELL_OK" = false ]; then
+    echo "Puppeteer browser(s) missing or corrupt, reinstalling..."
+    # Clear stale caches for both browser types to avoid partial-state issues
     rm -rf "$HOME/.cache/puppeteer/chrome" 2>/dev/null || true
+    rm -rf "$HOME/.cache/puppeteer/chrome-headless-shell" 2>/dev/null || true
     npx puppeteer browsers install chrome || { echo "ERROR: Failed to install Chrome for Puppeteer"; exit 1; }
-    echo "Chrome installed successfully"
+    npx puppeteer browsers install chrome-headless-shell || { echo "ERROR: Failed to install chrome-headless-shell for Puppeteer"; exit 1; }
+    echo "All Puppeteer browsers installed successfully"
 else
     echo "Puppeteer Chrome verified at: $CHROME_PATH"
+    echo "Puppeteer chrome-headless-shell verified"
 fi
 
 # Install video verification dependencies (ffmpeg, Tesseract OCR, Python packages)
