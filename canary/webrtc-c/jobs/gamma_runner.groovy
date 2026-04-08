@@ -49,7 +49,7 @@ def withRunnerWrapper(envs, fn) {
     }
 }
 
-def runViewerSessions(viewerId = "", waitMinutes = 2, viewerCount = "1", staggerDelaySeconds = 0) {
+def runViewerSessions(viewerId = "", waitMinutes = 2, viewerCount = "1") {
     def workspaceName = "${env.JOB_NAME}-${viewerId ?: 'viewer'}-${BUILD_NUMBER}"
     ws(workspaceName) {
         try {
@@ -61,12 +61,6 @@ def runViewerSessions(viewerId = "", waitMinutes = 2, viewerCount = "1", stagger
             if (waitMinutes > 0) {
                 echo "Waiting ${waitMinutes} minutes for master to build"
                 sleep waitMinutes * 60
-            }
-            
-            // Staggered start delay to avoid all viewers starting at the exact same time
-            if (staggerDelaySeconds > 0) {
-                echo "Staggered start - waiting ${staggerDelaySeconds} seconds before starting ${viewerId ?: 'viewer'}"
-                sleep staggerDelaySeconds
             }
             
             def endpointValue = params.ENDPOINT ?: ''
@@ -319,8 +313,7 @@ pipeline {
                             def waitMins = (params.VIEWER_WAIT_MINUTES != null && params.VIEWER_WAIT_MINUTES.toString().trim() != '') 
                                 ? params.VIEWER_WAIT_MINUTES.toInteger() 
                                 : 2
-                            // Viewer1 starts immediately (0 second stagger)
-                            runViewerSessions("Viewer1", waitMins, "2", 0)
+                            runViewerSessions("Viewer1", waitMins, "2")
                         }
                     }
                 }
@@ -333,8 +326,7 @@ pipeline {
                             def waitMins = (params.VIEWER_WAIT_MINUTES != null && params.VIEWER_WAIT_MINUTES.toString().trim() != '') 
                                 ? params.VIEWER_WAIT_MINUTES.toInteger() 
                                 : 2
-                            // Viewer2 starts 15 seconds after Viewer1
-                            runViewerSessions("Viewer2", waitMins, "2", 15)
+                            runViewerSessions("Viewer2", waitMins, "2")
                         }
                     }
                 }
@@ -371,8 +363,7 @@ pipeline {
                             def waitMins = (params.VIEWER_WAIT_MINUTES != null && params.VIEWER_WAIT_MINUTES.toString().trim() != '') 
                                 ? params.VIEWER_WAIT_MINUTES.toInteger() 
                                 : 2
-                            // Viewer1 starts immediately (0 second stagger)
-                            runViewerSessions("Viewer1", waitMins, "3", 0)
+                            runViewerSessions("Viewer1", waitMins, "3")
                         }
                     }
                 }
@@ -385,8 +376,7 @@ pipeline {
                             def waitMins = (params.VIEWER_WAIT_MINUTES != null && params.VIEWER_WAIT_MINUTES.toString().trim() != '') 
                                 ? params.VIEWER_WAIT_MINUTES.toInteger() 
                                 : 2
-                            // Viewer2 starts 15 seconds after Viewer1
-                            runViewerSessions("Viewer2", waitMins, "3", 15)
+                            runViewerSessions("Viewer2", waitMins, "3")
                         }
                     }
                 }
@@ -399,8 +389,7 @@ pipeline {
                             def waitMins = (params.VIEWER_WAIT_MINUTES != null && params.VIEWER_WAIT_MINUTES.toString().trim() != '') 
                                 ? params.VIEWER_WAIT_MINUTES.toInteger() 
                                 : 2
-                            // Viewer3 starts 30 seconds after Viewer1
-                            runViewerSessions("Viewer3", waitMins, "3", 30)
+                            runViewerSessions("Viewer3", waitMins, "3")
                         }
                     }
                 }
