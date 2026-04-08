@@ -385,6 +385,8 @@ pipeline {
                         // Storage Extended — runs on a dedicated runner to avoid being
                         // killed by the orchestrator teardown cycle.  Only spawn a new
                         // run when the previous one has finished.
+                        // Uses a dedicated node label to ensure it lands on a large-disk
+                        // machine and avoids resource contention with short-lived jobs.
                         script {
                             if (isJobBuilding(STORAGE_EXTENDED_RUNNER)) {
                                 echo "StorageExtended is still running on ${STORAGE_EXTENDED_RUNNER}, skipping"
@@ -399,7 +401,7 @@ pipeline {
                                         booleanParam(name: 'USE_IOT', value: false),
                                         booleanParam(name: 'VIDEO_VERIFY_ENABLED', value: true),
                                         string(name: 'DURATION_IN_SECONDS', value: STORAGE_EXTENDED_DURATION_IN_SECONDS.toString()),
-                                        string(name: 'MASTER_NODE_LABEL', value: "webrtc-storage-master"),
+                                        string(name: 'MASTER_NODE_LABEL', value: "webrtc-storage-extended-master"),
                                         string(name: 'CONSUMER_NODE_LABEL', value: "webrtc-storage-consumer"),
                                         string(name: 'RUNNER_LABEL', value: "StorageExtended"),
                                         string(name: 'SCENARIO_LABEL', value: "StorageExtended"),
