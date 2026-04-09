@@ -32,12 +32,13 @@ import com.amazonaws.kinesisvideo.parser.utilities.FrameVisitor;
 import com.amazonaws.kinesisvideo.parser.examples.GetMediaWorker;
 import com.amazonaws.services.kinesisvideo.model.FragmentSelectorType;
 import com.amazonaws.services.kinesisvideo.model.Fragment;
-import com.amazonaws.services.kinesisvideoarchivedmedia.AmazonKinesisVideoArchivedMedia;
-import com.amazonaws.services.kinesisvideoarchivedmedia.AmazonKinesisVideoArchivedMediaClientBuilder;
-import com.amazonaws.services.kinesisvideoarchivedmedia.model.ClipFragmentSelector;
-import com.amazonaws.services.kinesisvideoarchivedmedia.model.ClipTimestampRange;
-import com.amazonaws.services.kinesisvideoarchivedmedia.model.GetClipRequest;
-import com.amazonaws.services.kinesisvideoarchivedmedia.model.GetClipResult;
+import com.amazonaws.services.kinesisvideo.AmazonKinesisVideoArchivedMedia;
+import com.amazonaws.services.kinesisvideo.AmazonKinesisVideoArchivedMediaClient;
+import com.amazonaws.services.kinesisvideo.model.ClipFragmentSelector;
+import com.amazonaws.services.kinesisvideo.model.ClipTimestampRange;
+import com.amazonaws.services.kinesisvideo.model.GetClipRequest;
+import com.amazonaws.services.kinesisvideo.model.GetClipResult;
+import com.amazonaws.services.kinesisvideo.model.ClipFragmentSelectorType;
 
 import org.apache.log4j.Logger;
 import org.apache.log4j.BasicConfigurator;
@@ -195,8 +196,8 @@ public class WebrtcStorageCanaryConsumer {
                     .withStreamName(mStreamName);
             final String clipEndpoint = mAmazonKinesisVideo.getDataEndpoint(endpointRequest).getDataEndpoint();
 
-            AmazonKinesisVideoArchivedMedia archivedMediaClient = AmazonKinesisVideoArchivedMediaClientBuilder
-                    .standard()
+            AmazonKinesisVideoArchivedMedia archivedMediaClient = AmazonKinesisVideoArchivedMediaClient
+                    .builder()
                     .withCredentials(mCredentialsProvider)
                     .withEndpointConfiguration(
                             new com.amazonaws.client.builder.AwsClientBuilder.EndpointConfiguration(
@@ -208,8 +209,7 @@ public class WebrtcStorageCanaryConsumer {
                     .withEndTimestamp(endTime);
 
             ClipFragmentSelector fragmentSelector = new ClipFragmentSelector()
-                    .withFragmentSelectorType(
-                            com.amazonaws.services.kinesisvideoarchivedmedia.model.ClipFragmentSelectorType.SERVER_TIMESTAMP)
+                    .withFragmentSelectorType(ClipFragmentSelectorType.SERVER_TIMESTAMP)
                     .withTimestampRange(timestampRange);
 
             GetClipRequest getClipRequest = new GetClipRequest()
