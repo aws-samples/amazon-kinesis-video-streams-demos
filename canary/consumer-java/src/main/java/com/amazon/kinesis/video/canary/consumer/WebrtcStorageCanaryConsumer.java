@@ -32,9 +32,19 @@ import com.amazonaws.kinesisvideo.parser.utilities.FrameVisitor;
 import com.amazonaws.kinesisvideo.parser.examples.GetMediaWorker;
 import com.amazonaws.services.kinesisvideo.model.FragmentSelectorType;
 import com.amazonaws.services.kinesisvideo.model.Fragment;
+import com.amazonaws.services.kinesisvideoarchivedmedia.AmazonKinesisVideoArchivedMedia;
+import com.amazonaws.services.kinesisvideoarchivedmedia.AmazonKinesisVideoArchivedMediaClientBuilder;
+import com.amazonaws.services.kinesisvideoarchivedmedia.model.ClipFragmentSelector;
+import com.amazonaws.services.kinesisvideoarchivedmedia.model.ClipTimestampRange;
+import com.amazonaws.services.kinesisvideoarchivedmedia.model.GetClipRequest;
+import com.amazonaws.services.kinesisvideoarchivedmedia.model.GetClipResult;
 
 import org.apache.log4j.Logger;
 import org.apache.log4j.BasicConfigurator;
+
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.InputStream;
 
 /*
  * Canary for WebRTC with Storage thro Media Server
@@ -170,6 +180,65 @@ public class WebrtcStorageCanaryConsumer {
         mAmazonKinesisVideo.shutdown();
     }
 
+    /**
+     * Downloads an MP4 clip of the stream via the GetClip API for video verification.
+     * The clip covers from canary start time to now.
+     */
+    private static void downloadClip(Date startTime, Date endTime) {
+        String outputPath = System.getenv().getOrDefault(
+                CanaryConstants.CLIP_OUTPUT_PATH_ENV_VAR,
+                CanaryConstants.DEFAULT_CLIP_OUTPUT_PATH);
+        try {
+            // Get the archived media endpoint
+            final GetDataEndpointRequest endpointRequest = new GetDataEndpointRequest()
+                    .withAPIName(APIName.GET_CLIP)
+                    .withStreamName(mStreamName);
+            final String clipEndpoint = mAmazonKinesisVideo.getDataEndpoint(endpointRequest).getDataEndpoint();
+
+            AmazonKinesisVideoArchivedMedia archivedMediaClient = AmazonKinesisVideoArchivedMediaClientBuilder
+                    .standard()
+                    .withCredentials(mCredentialsProvider)
+                    .withEndpointConfiguration(
+                            new com.amazonaws.client.builder.AwsClientBuilder.EndpointConfiguration(
+                                    clipEndpoint, mRegion))
+                    .build();
+
+            ClipTimestampRange timestampRange = new ClipTimestampRange()
+                    .withStartTimestamp(startTime)
+                    .withEndTimestamp(endTime);
+
+            ClipFragmentSelector fragmentSelector = new ClipFragmentSelector()
+                    .withFragmentSelectorType(
+                            com.amazonaws.services.kinesisvideoarchivedmedia.model.ClipFragmentSelectorType.SERVER_TIMESTAMP)
+                    .withTimestampRange(timestampRange);
+
+            GetClipRequest getClipRequest = new GetClipRequest()
+                    .withStreamName(mStreamName)
+                    .withClipFragmentSelector(fragmentSelector);
+
+            logger.info("Calling GetClip for stream " + mStreamName
+                    + " from " + startTime + " to " + endTime);
+
+            GetClipResult result = archivedMediaClient.getClip(getClipRequest);
+
+            try (InputStream payload = result.getPayload();
+                 FileOutputStream fos = new FileOutputStream(new File(outputPath))) {
+                byte[] buf = new byte[8192];
+                int bytesRead;
+                long totalBytes = 0;
+                while ((bytesRead = payload.read(buf)) != -1) {
+                    fos.write(buf, 0, bytesRead);
+                    totalBytes += bytesRead;
+                }
+                logger.info("GetClip saved " + totalBytes + " bytes to " + outputPath);
+            }
+
+            archivedMediaClient.shutdown();
+        } catch (Exception e) {
+            logger.error("GetClip failed: " + e.getMessage(), e);
+        }
+    }
+
     public static void main(final String[] args) throws Exception {
         BasicConfigurator.configure();
 
@@ -197,6 +266,13 @@ public class WebrtcStorageCanaryConsumer {
                         * CanaryConstants.MILLISECONDS_IN_A_SECOND) {
                     calculateTimeToFirstFragment();
                 }
+
+                // Download clip for video verification if enabled
+                String videoVerifyEnabled = System.getenv(CanaryConstants.VIDEO_VERIFY_ENABLED_ENV_VAR);
+                if ("true".equalsIgnoreCase(videoVerifyEnabled)) {
+                    downloadClip(mCanaryStartTime, new Date());
+                }
+
                 break;
             }
             // Non-periodic cases.
@@ -227,6 +303,13 @@ public class WebrtcStorageCanaryConsumer {
                         CanaryConstants.LIST_FRAGMENTS_INITIAL_DELAY, CanaryConstants.LIST_FRAGMENTS_INTERVAL);
                 Thread.sleep(canaryRunTime * CanaryConstants.MILLISECONDS_IN_A_SECOND);
                 intervalMetricsTimer.cancel();
+
+                // Download clip for video verification if enabled
+                String videoVerifyEnabled = System.getenv(CanaryConstants.VIDEO_VERIFY_ENABLED_ENV_VAR);
+                if ("true".equalsIgnoreCase(videoVerifyEnabled)) {
+                    downloadClip(mCanaryStartTime, new Date());
+                }
+
                 shutdownCanaryResources();
                 break;
             }

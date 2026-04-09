@@ -267,7 +267,9 @@ def buildStorageCanary(isConsumer, params) {
       'JAVA_HOME': "/opt/jdk-11.0.20",
       'M2_HOME': "/opt/apache-maven-3.6.3",
       'AWS_DEFAULT_REGION': params.AWS_DEFAULT_REGION,
-      'CANARY_STREAM_NAME': "${env.JOB_NAME}-${params.RUNNER_LABEL}"
+      'CANARY_STREAM_NAME': "${env.JOB_NAME}-${params.RUNNER_LABEL}",
+      'VIDEO_VERIFY_ENABLED': params.VIDEO_VERIFY_ENABLED?.toString() ?: 'false',
+      'CANARY_CLIP_OUTPUT_PATH': "${env.WORKSPACE}/canary/consumer-java/clip.mp4"
     ]
 
     RUNNING_NODES_IN_BUILDING++
@@ -299,6 +301,43 @@ def buildStorageCanary(isConsumer, params) {
                 cd $WORKSPACE/canary/consumer-java
                 java -classpath target/aws-kinesisvideo-producer-sdk-canary-consumer-1.0-SNAPSHOT.jar:$(cat tmp_jar) -Daws.accessKeyId=${AWS_ACCESS_KEY_ID} -Daws.secretKey=${AWS_SECRET_ACCESS_KEY} -Daws.sessionToken=${AWS_SESSION_TOKEN} com.amazon.kinesis.video.canary.consumer.WebrtcStorageCanaryConsumer
             '''
+        }
+
+        // Run video verification on the GetClip MP4 if the consumer downloaded one
+        def clipPath = "${env.WORKSPACE}/canary/consumer-java/clip.mp4"
+        def verifyScript = "${env.WORKSPACE}/canary/webrtc-c/scripts/video-verification/verify.py"
+        def sourceFrames = "${env.WORKSPACE}/canary/webrtc-c/assets/h264SampleFrames"
+        def streamName = "${env.JOB_NAME}-${params.RUNNER_LABEL}"
+        def scenarioLabel = params.SCENARIO_LABEL
+
+        if (new File(clipPath).exists()) {
+            try {
+                echo "Running consumer-side video verification on GetClip MP4..."
+                def output = sh(
+                    script: "python3 '${verifyScript}' --recording '${clipPath}' --source-frames '${sourceFrames}' --json",
+                    returnStdout: true
+                ).trim()
+                echo "Consumer video verification results: ${output}"
+
+                def results = readJSON text: output
+                def ssimFailurePct = results.ssim_failure_pct ?: 0
+                def frameLossPct = results.frame_loss_pct ?: 0
+
+                sh """
+                    aws cloudwatch put-metric-data \
+                        --namespace KinesisVideoSDKCanary \
+                        --metric-data \
+                            MetricName=ConsumerVideoSSIMFailureRate,Value=${ssimFailurePct},Unit=Percent,Dimensions="[{Name=StorageWebRTCSDKCanaryStreamName,Value=${streamName}},{Name=StorageWebRTCSDKCanaryLabel,Value=${scenarioLabel}}]" \
+                            MetricName=ConsumerVideoFrameLossRate,Value=${frameLossPct},Unit=Percent,Dimensions="[{Name=StorageWebRTCSDKCanaryStreamName,Value=${streamName}},{Name=StorageWebRTCSDKCanaryLabel,Value=${scenarioLabel}}]"
+                """
+                echo "Pushed ConsumerVideoSSIMFailureRate=${ssimFailurePct}%, ConsumerVideoFrameLossRate=${frameLossPct}%"
+
+                sh "rm -f '${clipPath}'"
+            } catch (err) {
+                echo "Consumer video verification failed: ${err.getMessage()}"
+            }
+        } else {
+            echo "No GetClip MP4 found, skipping consumer video verification"
         }
     }
 }
@@ -342,6 +381,7 @@ pipeline {
         string(name: 'METRIC_SUFFIX', defaultValue: '')
         string(name: 'VIEWER_WAIT_MINUTES', defaultValue: '55')
         string(name: 'VIEWER_SESSION_DURATION_SECONDS', defaultValue: '600', description: 'Duration in seconds for each viewer session (default 10 minutes)')
+        booleanParam(name: 'VIDEO_VERIFY_ENABLED', defaultValue: false, description: 'Enable consumer-side video verification via GetClip')
     }
     
     // Set the role ARN to environment to avoid string interpolation to follow Jenkins security guidelines.
@@ -364,8 +404,19 @@ pipeline {
                         cd ~/Jenkins 2>/dev/null || true
                         ls -t | grep "webrtc-canary-runner" | grep -v "@tmp" | tail -n +11 | xargs -I {} rm -rf {} 2>/dev/null || true
                         
-                        # Clean Puppeteer cache (keep only latest Chrome)
-                        find ~/.cache/puppeteer -type d -name "linux-*" 2>/dev/null | sort -r | tail -n +2 | xargs rm -rf 2>/dev/null || true
+                        # Clean Puppeteer cache (keep only latest version for each browser type)
+                        for browser_type in chrome chrome-headless-shell; do
+                            if [ -d ~/.cache/puppeteer/\$browser_type ]; then
+                                find ~/.cache/puppeteer/\$browser_type -maxdepth 1 -type d -name "linux-*" 2>/dev/null | sort -r | tail -n +2 | xargs rm -rf 2>/dev/null || true
+                                # Remove any cache dirs where the executable is missing (corrupt partial downloads)
+                                for dir in ~/.cache/puppeteer/\$browser_type/linux-*; do
+                                    if [ -d "\$dir" ] && ! find "\$dir" -name "\$browser_type" -type f 2>/dev/null | grep -q .; then
+                                        echo "Removing corrupt \$browser_type cache: \$dir"
+                                        rm -rf "\$dir"
+                                    fi
+                                done
+                            fi
+                        done
                         
                         # Clean npm cache if over 200MB
                         if [ -d ~/.npm ] && [ \$(du -sm ~/.npm 2>/dev/null | cut -f1) -gt 200 ]; then
@@ -763,6 +814,7 @@ pipeline {
                       string(name: 'METRIC_SUFFIX', value: params.METRIC_SUFFIX),
                       string(name: 'VIEWER_WAIT_MINUTES', value: params.VIEWER_WAIT_MINUTES),
                       string(name: 'VIEWER_SESSION_DURATION_SECONDS', value: params.VIEWER_SESSION_DURATION_SECONDS),
+                      booleanParam(name: 'VIDEO_VERIFY_ENABLED', value: params.VIDEO_VERIFY_ENABLED),
                       booleanParam(name: 'FIRST_ITERATION', value: false)
                     ],
                     wait: false

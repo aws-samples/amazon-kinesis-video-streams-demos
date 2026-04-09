@@ -26,6 +26,11 @@ public final class CanaryConstants {
     public static final String CW_DIMENSION_INDIVIDUAL = "StorageWebRTCSDKCanaryStreamName";
     public static final String CW_DIMENSION_AGGREGATE = "StorageWebRTCSDKCanaryLabel";
 
+    // Video verification via GetClip
+    public static final String VIDEO_VERIFY_ENABLED_ENV_VAR = "VIDEO_VERIFY_ENABLED";
+    public static final String CLIP_OUTPUT_PATH_ENV_VAR = "CANARY_CLIP_OUTPUT_PATH";
+    public static final String DEFAULT_CLIP_OUTPUT_PATH = "clip.mp4";
+
     public static final String FIRST_FRAME_TS_FILE_PATH = "../webrtc-c/";
     public static final String DEFAULT_FIRST_FRAME_TS_FILE = "DefaultFirstFrameSentTSFileName.txt";
 
