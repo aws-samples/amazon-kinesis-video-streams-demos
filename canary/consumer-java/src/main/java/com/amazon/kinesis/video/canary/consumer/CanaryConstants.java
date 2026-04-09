@@ -23,11 +23,6 @@ public final class CanaryConstants {
     public static final String SINGLE_RECONNECT_LABEL = "StorageSingleReconnect"; // 1 Media Server forced reconnect, currently must be 60-120min.
     public static final String EXTENDED_LABEL = "StorageExtended"; // > 1 Media Server forced reconnect, currently must be > 120min.
 
-    // Video verification recording settings
-    public static final String VIDEO_VERIFY_OUTPUT_DIR_ENV_VAR = "VIDEO_VERIFY_OUTPUT_DIR";
-    public static final String VIDEO_VERIFY_ENABLED_ENV_VAR = "VIDEO_VERIFY_ENABLED";
-    public static final String DEFAULT_VIDEO_VERIFY_OUTPUT_DIR = "received-frames";
-
     public static final String CW_DIMENSION_INDIVIDUAL = "StorageWebRTCSDKCanaryStreamName";
     public static final String CW_DIMENSION_AGGREGATE = "StorageWebRTCSDKCanaryLabel";
 
