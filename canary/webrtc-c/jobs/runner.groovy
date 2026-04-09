@@ -308,6 +308,19 @@ def buildStorageCanary(isConsumer, params) {
         def sourceFrames = "${env.WORKSPACE}/canary/webrtc-c/assets/h264SampleFrames"
         def streamName = "${env.JOB_NAME}-${params.RUNNER_LABEL}"
         def scenarioLabel = params.SCENARIO_LABEL
+
+        echo "Video verify debug: WORKSPACE=${env.WORKSPACE}"
+        echo "Video verify debug: receivedFramesDir=${receivedFramesDir}"
+        echo "Video verify debug: VIDEO_VERIFY_ENABLED=${params.VIDEO_VERIFY_ENABLED}"
+        def dirFile = new File(receivedFramesDir)
+        echo "Video verify debug: dir exists=${dirFile.exists()}, isDirectory=${dirFile.isDirectory()}"
+        if (dirFile.exists() && dirFile.isDirectory()) {
+            def files = dirFile.list()
+            echo "Video verify debug: file count=${files?.length}, files=${files?.take(10)}"
+        }
+        // Also check via shell to rule out Groovy/Jenkins sandbox file access issues
+        sh "echo 'Shell check:' && ls -la '${receivedFramesDir}' 2>&1 || echo 'Directory does not exist from shell'"
+
         if (new File(receivedFramesDir).exists() && new File(receivedFramesDir).list()?.length > 0) {
             try {
                 echo "Running consumer-side video verification..."
