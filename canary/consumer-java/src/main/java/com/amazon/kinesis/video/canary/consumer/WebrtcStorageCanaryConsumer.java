@@ -189,12 +189,16 @@ public class WebrtcStorageCanaryConsumer {
         String outputPath = System.getenv().getOrDefault(
                 CanaryConstants.CLIP_OUTPUT_PATH_ENV_VAR,
                 CanaryConstants.DEFAULT_CLIP_OUTPUT_PATH);
+        logger.info("downloadClip: outputPath='" + outputPath + "', stream=" + mStreamName
+                + ", startTime=" + startTime + ", endTime=" + endTime);
         try {
             // Get the archived media endpoint
+            logger.info("downloadClip: getting data endpoint for GET_CLIP...");
             final GetDataEndpointRequest endpointRequest = new GetDataEndpointRequest()
                     .withAPIName(APIName.GET_CLIP)
                     .withStreamName(mStreamName);
             final String clipEndpoint = mAmazonKinesisVideo.getDataEndpoint(endpointRequest).getDataEndpoint();
+            logger.info("downloadClip: clipEndpoint=" + clipEndpoint);
 
             AmazonKinesisVideoArchivedMedia archivedMediaClient = AmazonKinesisVideoArchivedMediaClient
                     .builder()
@@ -203,6 +207,7 @@ public class WebrtcStorageCanaryConsumer {
                             new com.amazonaws.client.builder.AwsClientBuilder.EndpointConfiguration(
                                     clipEndpoint, mRegion))
                     .build();
+            logger.info("downloadClip: archived media client built");
 
             ClipTimestampRange timestampRange = new ClipTimestampRange()
                     .withStartTimestamp(startTime)
@@ -220,6 +225,7 @@ public class WebrtcStorageCanaryConsumer {
                     + " from " + startTime + " to " + endTime);
 
             GetClipResult result = archivedMediaClient.getClip(getClipRequest);
+            logger.info("downloadClip: GetClip returned, content-type=" + result.getContentType());
 
             try (InputStream payload = result.getPayload();
                  FileOutputStream fos = new FileOutputStream(new File(outputPath))) {
@@ -233,7 +239,12 @@ public class WebrtcStorageCanaryConsumer {
                 logger.info("GetClip saved " + totalBytes + " bytes to " + outputPath);
             }
 
+            // Verify file was actually written
+            File clipFile = new File(outputPath);
+            logger.info("downloadClip: file exists=" + clipFile.exists() + ", size=" + clipFile.length());
+
             archivedMediaClient.shutdown();
+            logger.info("downloadClip: done");
         } catch (Exception e) {
             logger.error("GetClip failed: " + e.getMessage(), e);
         }
@@ -269,6 +280,7 @@ public class WebrtcStorageCanaryConsumer {
 
                 // Download clip for video verification if enabled
                 String videoVerifyEnabled = System.getenv(CanaryConstants.VIDEO_VERIFY_ENABLED_ENV_VAR);
+                logger.info("Periodic path: VIDEO_VERIFY_ENABLED='" + videoVerifyEnabled + "', canaryRunTime=" + canaryRunTime);
                 if ("true".equalsIgnoreCase(videoVerifyEnabled)) {
                     downloadClip(mCanaryStartTime, new Date());
                 }
