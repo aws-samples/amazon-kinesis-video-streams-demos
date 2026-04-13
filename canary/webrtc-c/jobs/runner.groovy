@@ -465,8 +465,9 @@ pipeline {
                         find ~/Jenkins -name "*@tmp" -type d -mmin +60 -exec rm -rf {} + 2>/dev/null || true
                         
                         # Keep only last 10 workspace directories per job
-                        cd ~/Jenkins 2>/dev/null || true
-                        ls -t | grep "webrtc-canary-runner" | grep -v "@tmp" | tail -n +11 | xargs -I {} rm -rf {} 2>/dev/null || true
+                        cd ~/Jenkins/workspace 2>/dev/null || true
+                        ls -dt webrtc-canary-runner*@[0-9]* 2>/dev/null | grep -v "@tmp" | tail -n +11 | xargs -I {} rm -rf {} 2>/dev/null || true
+                        ls -dt webrtc-gamma-runner*@[0-9]* 2>/dev/null | grep -v "@tmp" | tail -n +11 | xargs -I {} rm -rf {} 2>/dev/null || true
                         
                         # Clean Puppeteer cache (keep only latest version for each browser type)
                         for browser_type in chrome chrome-headless-shell; do
@@ -905,8 +906,20 @@ pipeline {
         always {
             script {
                 sh """
-                    echo "Post-build cleanup - removing current workspace @tmp directory"
+                    echo "Post-build cleanup - Disk usage before cleanup:"
+                    df -h /
+                    
+                    # Remove current workspace @tmp directory
                     rm -rf ${env.WORKSPACE}@tmp 2>/dev/null || true
+                    
+                    # Clean build artifacts from current workspace to reclaim space
+                    rm -rf ${env.WORKSPACE}/canary/webrtc-c/build 2>/dev/null || true
+                    
+                    # Remove stale @N workspace copies older than 2 days
+                    find ~/Jenkins/workspace -maxdepth 1 -name "*@[0-9]*" -not -name "*@tmp" -type d -mtime +2 -exec rm -rf {} + 2>/dev/null || true
+                    
+                    echo "Post-build cleanup complete - Disk usage after cleanup:"
+                    df -h /
                 """
             }
         }
