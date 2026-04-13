@@ -17,6 +17,7 @@ import org.jenkinsci.plugins.workflow.steps.FlowInterruptedException
 START_TIMESTAMP = new Date().getTime()
 RUNNING_NODES_IN_BUILDING = 0
 HAS_ERROR = false
+VIEWER_SESSION_RESULTS = [:]
 
 def buildWebRTCProject(thing_prefix) {
     checkout([$class: 'GitSCM', branches: [[name: params.GIT_HASH]],
@@ -75,6 +76,10 @@ def runViewerSessions(viewerId = "", waitMinutes = 2, viewerCount = "1") {
             echo "Region: ${params.AWS_DEFAULT_REGION}"
             echo "=========================================="
             
+            // Initialize session results tracking for this viewer
+            def viewerKey = viewerId ?: 'viewer'
+            VIEWER_SESSION_RESULTS[viewerKey] = []
+            
             // Run 3 viewer sessions
             for (int session = 1; session <= 3; session++) {
                 echo "Starting ${viewerId ? viewerId + ' ' : ''}session ${session}/3"
@@ -83,6 +88,7 @@ def runViewerSessions(viewerId = "", waitMinutes = 2, viewerCount = "1") {
                     ? params.VIEWER_SESSION_DURATION_SECONDS 
                     : '600'
                 
+                def sessionSuccess = false
                 try {
                     sh """
                         export JOB_NAME="${env.JOB_NAME}"
@@ -99,6 +105,7 @@ def runViewerSessions(viewerId = "", waitMinutes = 2, viewerCount = "1") {
                         
                         ./canary/webrtc-c/scripts/setup-storage-viewer.sh
                     """
+                    sessionSuccess = true
                 } catch (FlowInterruptedException err) {
                     echo 'Aborted due to cancellation'
                     throw err
@@ -106,6 +113,9 @@ def runViewerSessions(viewerId = "", waitMinutes = 2, viewerCount = "1") {
                     HAS_ERROR = true
                     unstable err.toString()
                 }
+                
+                VIEWER_SESSION_RESULTS[viewerKey].add(sessionSuccess)
+                echo "${viewerId ? viewerId + ' ' : ''}session ${session} result: ${sessionSuccess ? 'SUCCESS' : 'FAILURE'}"
                 
                 if (session < 3) {
                     echo "${viewerId ? viewerId + ' ' : ''}session ${session} completed. Waiting 1 minute before next session."
@@ -117,6 +127,43 @@ def runViewerSessions(viewerId = "", waitMinutes = 2, viewerCount = "1") {
             deleteDir()
         }
     }
+}
+
+def publishViewerJoinPercentage(scenarioLabel) {
+    if (VIEWER_SESSION_RESULTS.isEmpty()) {
+        echo "No viewer session results to aggregate"
+        return
+    }
+
+    def channelName = "${env.JOB_NAME}-${params.RUNNER_LABEL}"
+    def metricSuffix = params.METRIC_SUFFIX ?: ''
+    def region = params.AWS_DEFAULT_REGION ?: 'us-west-2'
+    def totalViewers = VIEWER_SESSION_RESULTS.size()
+
+    echo "Computing ViewerJoinPercentage: ${totalViewers} viewer(s), results: ${VIEWER_SESSION_RESULTS}"
+
+    for (int round = 0; round < 3; round++) {
+        int joinedCount = 0
+        VIEWER_SESSION_RESULTS.each { viewerKey, sessions ->
+            if (round < sessions.size() && sessions[round]) {
+                joinedCount++
+            }
+        }
+        def percentage = (joinedCount * 100.0) / totalViewers
+        echo "Session round ${round + 1}: ${joinedCount}/${totalViewers} viewers joined (${percentage}%)"
+
+        def metricName = "ViewerJoinPercentage${metricSuffix}"
+        sh """
+            aws cloudwatch put-metric-data \
+                --namespace ViewerApplication \
+                --region ${region} \
+                --metric-data \
+                    MetricName=${metricName},Value=${percentage},Unit=Percent,Dimensions="[{Name=StorageWithViewerChannelName,Value=${channelName}},{Name=JobName,Value=${env.JOB_NAME}},{Name=RunnerLabel,Value=${params.RUNNER_LABEL}}]"
+        """
+        echo "Pushed ${metricName}=${percentage}% for session round ${round + 1}"
+    }
+
+    VIEWER_SESSION_RESULTS = [:]
 }
 
 def buildStorageCanary(params) {
@@ -392,6 +439,20 @@ pipeline {
                             runViewerSessions("Viewer3", waitMins, "3")
                         }
                     }
+                }
+            }
+        }
+
+        stage('Publish Viewer Join Percentage') {
+            when {
+                anyOf {
+                    equals expected: true, actual: params.JS_STORAGE_TWO_VIEWERS
+                    equals expected: true, actual: params.JS_STORAGE_THREE_VIEWERS
+                }
+            }
+            steps {
+                script {
+                    publishViewerJoinPercentage(params.SCENARIO_LABEL)
                 }
             }
         }
