@@ -310,7 +310,9 @@ def buildStorageCanary(isConsumer, params) {
         def streamName = "${env.JOB_NAME}-${params.RUNNER_LABEL}"
         def scenarioLabel = params.SCENARIO_LABEL
 
-        if (new File(clipPath).exists()) {
+        def clipExists = sh(script: "test -f '${clipPath}'", returnStatus: true) == 0
+
+        if (clipExists) {
             try {
                 echo "Running consumer-side video verification on GetClip MP4..."
                 def output = sh(
