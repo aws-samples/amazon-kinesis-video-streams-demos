@@ -290,6 +290,7 @@ public class WebrtcStorageCanaryConsumer {
                     downloadClip(mCanaryStartTime, new Date());
                 }
 
+                shutdownCanaryResources();
                 break;
             }
             // Non-periodic cases.
