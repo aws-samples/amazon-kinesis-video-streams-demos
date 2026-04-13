@@ -134,8 +134,6 @@ pipeline {
 
                         // TODO: Use matrix to spawn runners
 
-                        /* TEMPORARILY COMMENTED OUT FOR TESTING - only StoragePeriodic enabled
-
                         build(
                             job: NEXT_AVAILABLE_RUNNER,
                             parameters: COMMON_PARAMS + [
@@ -323,8 +321,6 @@ pipeline {
                             wait: false
                         )
 
-                        END TEMPORARILY COMMENTED OUT */
-
                         // Storage Periodic.
                         build(
                             job: NEXT_AVAILABLE_RUNNER,
@@ -345,8 +341,6 @@ pipeline {
                             ],
                             wait: false
                         )
-
-                        /* TEMPORARILY COMMENTED OUT FOR TESTING - only StoragePeriodic enabled
 
                         // Storage Sub-Reconnect.
                         build(
@@ -492,8 +486,6 @@ pipeline {
                             ],
                             wait: false
                         )
-
-                        END TEMPORARILY COMMENTED OUT */
                     }
                 }
 
