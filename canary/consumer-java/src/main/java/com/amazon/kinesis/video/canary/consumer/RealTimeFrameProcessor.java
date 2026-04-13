@@ -68,7 +68,7 @@ public class RealTimeFrameProcessor extends WebrtcStorageCanaryConsumer implemen
                 isFirstFrame = true;
             }
             // Stop the GetMediaWorker — we only needed the first frame
-            throw new FrameProcessException("First frame processed, stopping worker");
+            throw new FrameProcessException("First frame processed, stopping worker", null);
         }
 
     }
