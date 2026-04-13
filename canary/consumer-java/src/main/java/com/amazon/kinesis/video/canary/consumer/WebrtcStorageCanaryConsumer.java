@@ -273,10 +273,15 @@ public class WebrtcStorageCanaryConsumer {
                 // GetMedia() will return after ~3 sec if no footage is available. Once footage
                 // is available,
                 // it will continue to visit frames as long as there is footage available.
+                logger.info("Periodic case: canaryRunTime=" + canaryRunTime
+                        + "s, mCanaryStartTime=" + mCanaryStartTime
+                        + ", now=" + new Date()
+                        + ", elapsed=" + (System.currentTimeMillis() - mCanaryStartTime.getTime()) + "ms");
                 while ((System.currentTimeMillis() - mCanaryStartTime.getTime()) < canaryRunTime
                         * CanaryConstants.MILLISECONDS_IN_A_SECOND) {
                     calculateTimeToFirstFragment();
                 }
+                logger.info("Periodic while loop exited, elapsed=" + (System.currentTimeMillis() - mCanaryStartTime.getTime()) + "ms");
 
                 // Download clip for video verification if enabled
                 String videoVerifyEnabled = System.getenv(CanaryConstants.VIDEO_VERIFY_ENABLED_ENV_VAR);
