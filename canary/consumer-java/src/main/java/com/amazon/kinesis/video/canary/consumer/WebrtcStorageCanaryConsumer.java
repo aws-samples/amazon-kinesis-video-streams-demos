@@ -269,19 +269,31 @@ public class WebrtcStorageCanaryConsumer {
 
         switch (mCanaryLabel) {
             case CanaryConstants.PERIODIC_LABEL: {
-                // Continuously attempt getMedia() calls until footage is available.
-                // GetMedia() will return after ~3 sec if no footage is available. Once footage
-                // is available,
-                // it will continue to visit frames as long as there is footage available.
                 logger.info("Periodic case: canaryRunTime=" + canaryRunTime
                         + "s, mCanaryStartTime=" + mCanaryStartTime
                         + ", now=" + new Date()
                         + ", elapsed=" + (System.currentTimeMillis() - mCanaryStartTime.getTime()) + "ms");
-                while ((System.currentTimeMillis() - mCanaryStartTime.getTime()) < canaryRunTime
-                        * CanaryConstants.MILLISECONDS_IN_A_SECOND) {
-                    calculateTimeToFirstFragment();
+
+                // Fire off GetMedia to measure time-to-first-frame, but don't block on it
+                // for the full stream duration. Run it in a background thread and let it
+                // get interrupted when we're done waiting.
+                final ExecutorService periodicExecutor = Executors.newSingleThreadExecutor();
+                periodicExecutor.submit(new Runnable() {
+                    @Override
+                    public void run() {
+                        calculateTimeToFirstFragment();
+                    }
+                });
+
+                // Wait for the canary duration
+                long remainingMs = (canaryRunTime * CanaryConstants.MILLISECONDS_IN_A_SECOND)
+                        - (System.currentTimeMillis() - mCanaryStartTime.getTime());
+                if (remainingMs > 0) {
+                    logger.info("Sleeping for " + remainingMs + "ms until canary duration elapses");
+                    Thread.sleep(remainingMs);
                 }
-                logger.info("Periodic while loop exited, elapsed=" + (System.currentTimeMillis() - mCanaryStartTime.getTime()) + "ms");
+                logger.info("Periodic duration elapsed, shutting down GetMedia worker");
+                periodicExecutor.shutdownNow();
 
                 // Download clip for video verification if enabled
                 String videoVerifyEnabled = System.getenv(CanaryConstants.VIDEO_VERIFY_ENABLED_ENV_VAR);
