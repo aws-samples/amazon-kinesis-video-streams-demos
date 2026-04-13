@@ -4,6 +4,11 @@ START_TIMESTAMP = new Date().getTime()
 RUNNING_NODES_IN_BUILDING = 0
 HAS_ERROR = false
 
+// Track per-viewer, per-session peer connection results for aggregate ViewerJoinPercentage metric.
+// Structure: { "Viewer1": [true, false, true], "Viewer2": [true, true, true], ... }
+// Access is synchronized since parallel stages write to different keys.
+VIEWER_SESSION_RESULTS = [:]
+
 def buildWebRTCProject(useMbedTLS, thing_prefix) {
     echo 'Flag set to ' + useMbedTLS
     checkout([$class: 'GitSCM', branches: [[name: params.GIT_HASH ]],
@@ -186,11 +191,16 @@ def runViewerSessions(viewerId = "", waitMinutes = 10, viewerCount = "1", stagge
             def endpointValue = params.ENDPOINT ?: ''
             def metricSuffixValue = params.METRIC_SUFFIX ?: ''
             
+            // Initialize session results tracking for this viewer
+            def viewerKey = viewerId ?: 'viewer'
+            VIEWER_SESSION_RESULTS[viewerKey] = []
+
             for (int session = 1; session <= 3; session++) {
                 echo "Starting ${viewerId ? viewerId + ' ' : ''}session ${session}/3"
                 echo "DEBUG: ENDPOINT value = '${endpointValue}'"
                 echo "DEBUG: METRIC_SUFFIX value = '${metricSuffixValue}'"
                 
+                def sessionSuccess = false
                 try {
                     sh """
                         export JOB_NAME="${env.JOB_NAME}"
@@ -208,6 +218,7 @@ def runViewerSessions(viewerId = "", waitMinutes = 10, viewerCount = "1", stagge
                         
                         ./canary/webrtc-c/scripts/setup-storage-viewer.sh
                     """
+                    sessionSuccess = true
                 } catch (FlowInterruptedException err) {
                     echo 'Aborted due to cancellation'
                     throw err
@@ -215,6 +226,9 @@ def runViewerSessions(viewerId = "", waitMinutes = 10, viewerCount = "1", stagge
                     HAS_ERROR = true
                     unstable err.toString()
                 }
+
+                VIEWER_SESSION_RESULTS[viewerKey].add(sessionSuccess)
+                echo "${viewerId ? viewerId + ' ' : ''}session ${session} result: ${sessionSuccess ? 'SUCCESS' : 'FAILURE'}"
                 
                 if (session < 3) {
                     echo "${viewerId ? viewerId + ' ' : ''}session ${session} completed. Waiting 1 minute before next session."
@@ -227,6 +241,54 @@ def runViewerSessions(viewerId = "", waitMinutes = 10, viewerCount = "1", stagge
             deleteDir()
         }
     }
+}
+
+/**
+ * Computes and pushes the ViewerJoinPercentage metric to CloudWatch.
+ *
+ * For each session round (1, 2, 3), this looks across all viewers that participated
+ * and calculates: (viewers that succeeded in that round / total viewers) * 100.
+ * This gives per-round join percentages like 33%, 66%, 100% for a 3-viewer scenario.
+ *
+ * @param scenarioLabel  The scenario label (e.g. "StorageThreeViewers") used as a CW dimension
+ */
+def publishViewerJoinPercentage(scenarioLabel) {
+    if (VIEWER_SESSION_RESULTS.isEmpty()) {
+        echo "No viewer session results to aggregate"
+        return
+    }
+
+    def channelName = "${env.JOB_NAME}-${params.RUNNER_LABEL}"
+    def metricSuffix = params.METRIC_SUFFIX ?: ''
+    def region = params.AWS_DEFAULT_REGION ?: 'us-west-2'
+    def totalViewers = VIEWER_SESSION_RESULTS.size()
+
+    echo "Computing ViewerJoinPercentage: ${totalViewers} viewer(s), results: ${VIEWER_SESSION_RESULTS}"
+
+    // Each viewer runs 3 sessions. Compute a percentage per session round.
+    for (int round = 0; round < 3; round++) {
+        int joinedCount = 0
+        VIEWER_SESSION_RESULTS.each { viewerKey, sessions ->
+            if (round < sessions.size() && sessions[round]) {
+                joinedCount++
+            }
+        }
+        def percentage = (joinedCount * 100.0) / totalViewers
+        echo "Session round ${round + 1}: ${joinedCount}/${totalViewers} viewers joined (${percentage}%)"
+
+        def metricName = "ViewerJoinPercentage${metricSuffix}"
+        sh """
+            aws cloudwatch put-metric-data \
+                --namespace ViewerApplication \
+                --region ${region} \
+                --metric-data \
+                    MetricName=${metricName},Value=${percentage},Unit=Percent,Dimensions="[{Name=StorageWithViewerChannelName,Value=${channelName}},{Name=JobName,Value=${env.JOB_NAME}},{Name=RunnerLabel,Value=${params.RUNNER_LABEL}}]"
+        """
+        echo "Pushed ${metricName}=${percentage}% for session round ${round + 1}"
+    }
+
+    // Reset for next iteration
+    VIEWER_SESSION_RESULTS = [:]
 }
 
 def buildStorageCanary(isConsumer, params) {
@@ -726,6 +788,20 @@ pipeline {
                             runViewerSessions("Viewer3", waitMins, "3", 30)
                         }
                     }
+                }
+            }
+        }
+
+        stage('Publish Viewer Join Percentage') {
+            when {
+                anyOf {
+                    equals expected: true, actual: params.JS_STORAGE_TWO_VIEWERS
+                    equals expected: true, actual: params.JS_STORAGE_THREE_VIEWERS
+                }
+            }
+            steps {
+                script {
+                    publishViewerJoinPercentage(params.SCENARIO_LABEL)
                 }
             }
         }
