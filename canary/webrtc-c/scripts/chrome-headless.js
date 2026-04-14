@@ -78,6 +78,9 @@ class ViewerCanaryTest {
     // Unexpected disconnect tracking — after peer connection was successfully established
     this.peerConnectionEstablished = false;
     this.unexpectedDisconnectCount = 0;
+
+    // Viewer reconnect tracking — counts "[VIEWER] Reconnecting..." log lines
+    this.viewerReconnectCount = 0;
     
     // Storage session join failure tracking - sequence detection
     // Failure is confirmed when these 3 logs appear consecutively:
@@ -406,15 +409,11 @@ class ViewerCanaryTest {
       // Track peer connection state explicitly transitioning to "failed" (ICE connectivity check failed)
       // This is mutually exclusive with the 30s timeout above — covers the case where ICE fails outright
       if (text.includes('[VIEWER] PeerConnection state: failed')) {
-        log('Peer connection state transitioned to FAILED — pushing PeerConnectionAvailability = 0');
-        await CloudWatchMetrics.publishCountMetric(
-          this.getMetricName('PeerConnectionAvailability'),
-          this.config.channelName,
-          0
-        );
-
-        // If peer connection was previously established, this is an unexpected disconnect
         if (this.peerConnectionEstablished) {
+          // Connection was previously established — this is an unexpected disconnect.
+          // The master's printPeerConnectionStateInfo only triggers onPeerConnectionFailed
+          // (and reconnect) on 'failed', not on 'disconnected'. So 'failed' after 'connected'
+          // is the only real unexpected disconnect we should track.
           this.unexpectedDisconnectCount++;
           log(`Unexpected disconnect detected (failed after connected)! Count: ${this.unexpectedDisconnectCount}`);
           await CloudWatchMetrics.publishCountMetric(
@@ -423,18 +422,26 @@ class ViewerCanaryTest {
             1
           );
         }
+
+        // Always push PeerConnectionAvailability = 0 for any 'failed' state
+        log('Peer connection state transitioned to FAILED — pushing PeerConnectionAvailability = 0');
+        await CloudWatchMetrics.publishCountMetric(
+          this.getMetricName('PeerConnectionAvailability'),
+          this.config.channelName,
+          0
+        );
       }
 
-      // Track peer connection state transitioning to "disconnected" after being connected
-      // This indicates ICE connectivity was lost (e.g., network issue, media server dropped)
-      if (text.includes('[VIEWER] PeerConnection state: disconnected') && this.peerConnectionEstablished) {
-        this.unexpectedDisconnectCount++;
-        log(`Unexpected disconnect detected (disconnected after connected)! Count: ${this.unexpectedDisconnectCount}`);
-        await CloudWatchMetrics.publishCountMetric(
-          this.getMetricName('UnexpectedDisconnect'),
-          this.config.channelName,
-          1
-        );
+      // Note: 'disconnected' state is intentionally NOT tracked as an unexpected disconnect.
+      // The viewer's printPeerConnectionStateInfo only handles 'connected' and 'failed' —
+      // 'disconnected' falls through without triggering onPeerConnectionFailed or any
+      // reconnect logic. It's a transient ICE state that often resolves on its own.
+
+      // Track viewer reconnect attempts — the master calls onPeerConnectionFailed which
+      // logs "[VIEWER] Reconnecting..." before calling connectToMediaServer again.
+      if (text.includes('[VIEWER] Reconnecting...')) {
+        this.viewerReconnectCount++;
+        log(`Viewer reconnect attempt detected! Count: ${this.viewerReconnectCount}`);
       }
       
       // Detect storage session join error (single failure or retry failure)
@@ -929,6 +936,14 @@ class ViewerCanaryTest {
       this.unexpectedDisconnectCount
     );
     log(`Unexpected Disconnect Summary: Total disconnects after connection: ${this.unexpectedDisconnectCount}`);
+    
+    // Publish viewer reconnect count (0 means no reconnects during the session)
+    await CloudWatchMetrics.publishCountMetric(
+      this.getMetricName('ViewerReconnectCount'),
+      this.config.channelName,
+      this.viewerReconnectCount
+    );
+    log(`Viewer Reconnect Summary: Total reconnects: ${this.viewerReconnectCount}`);
     
     // Success is based on storage session joining, not frame reception
     const success = this.storageSessionJoined;
