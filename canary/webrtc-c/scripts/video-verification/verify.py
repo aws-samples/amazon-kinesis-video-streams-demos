@@ -203,6 +203,10 @@ def main():
     parser.add_argument('--source-frames', required=True, help='Path to H.264 source frames directory')
     parser.add_argument('--max-compare', type=int, default=0, help='Max frames to compare (default: 0 = all)')
     parser.add_argument('--threshold', type=float, default=0.5, help='Min SSIM to pass (default: 0.5)')
+    parser.add_argument('--expected-duration', type=float, default=0,
+                        help='Expected video duration in seconds (e.g. canary run time). '
+                             'When provided, frame loss is calculated against this instead of '
+                             'the clip\'s self-reported duration.')
     parser.add_argument('--keep-frames', action='store_true', help='Keep extracted frames after verification')
     parser.add_argument('--verbose', action='store_true', help='Print SSIM score for every frame')
     parser.add_argument('--json', action='store_true', dest='json_output', help='Output results as JSON for machine consumption')
@@ -307,7 +311,11 @@ def main():
             min_score = min(scores)
             ssim_failure_pct = (len(failures) / len(scores)) * 100
             frame_loss_pct = 0.0
-            if fc_passed is not None and expected_frames and expected_frames > 0:
+            if args.expected_duration > 0:
+                # Use external duration (e.g. canary run time) as ground truth
+                ext_expected = int(args.expected_duration * FPS)
+                frame_loss_pct = max(0, (ext_expected - actual_frames) / ext_expected * 100) if ext_expected > 0 else 0
+            elif fc_passed is not None and expected_frames and expected_frames > 0:
                 frame_loss_pct = max(0, (expected_frames - actual_frames) / expected_frames * 100)
 
             if args.json_output:

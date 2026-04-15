@@ -372,7 +372,7 @@ def buildStorageCanary(isConsumer, params) {
             try {
                 echo "Running consumer-side video verification on GetClip MP4..."
                 def output = sh(
-                    script: "python3 '${verifyScript}' --recording '${clipPath}' --source-frames '${sourceFrames}' --json",
+                    script: "python3 '${verifyScript}' --recording '${clipPath}' --source-frames '${sourceFrames}' --expected-duration '${params.DURATION_IN_SECONDS}' --json",
                     returnStdout: true
                 ).trim()
                 echo "Consumer video verification results: ${output}"
