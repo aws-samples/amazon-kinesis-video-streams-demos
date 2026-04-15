@@ -62,6 +62,18 @@ pipelineJob("${NAMESPACE}-orchestrator") {
             <li>Click "Build"</li>
         </ol>
     """)
+    parameters {
+        stringParam('ENDPOINT', '', 'Custom endpoint URL (e.g., gamma endpoint). REQUIRED.')
+        stringParam('AWS_DEFAULT_REGION', 'us-west-2', 'AWS region for the tests')
+        stringParam('VIEWER_WAIT_MINUTES', '2', 'Minutes to wait for master to build before starting viewers')
+        stringParam('VIEWER_SESSION_DURATION_SECONDS', '600', 'Duration in seconds for each viewer session')
+        stringParam('GIT_HASH', 'clean_viewer_test', 'Git branch/tag/commit to use')
+        booleanParam('RUN_STORAGE_WITH_VIEWER', true, 'Run StorageWithViewer test (1 viewer)')
+        booleanParam('RUN_STORAGE_TWO_VIEWERS', true, 'Run StorageTwoViewers test (2 viewers)')
+        booleanParam('RUN_STORAGE_THREE_VIEWERS', true, 'Run StorageThreeViewers test (3 viewers)')
+        booleanParam('KEEP_RECORDING', false, 'Keep viewer video recordings after verification')
+        booleanParam('RESCHEDULE', true, 'Enable continuous testing (reschedule after each run completes)')
+    }
     throttleConcurrentBuilds {
         maxTotal(1)
     }
