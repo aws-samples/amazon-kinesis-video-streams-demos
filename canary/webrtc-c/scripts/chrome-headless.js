@@ -72,6 +72,11 @@ class ViewerCanaryTest {
     this.webrtcRetryCount = 0;
     this.hadWebRTCRetries = false;
     
+    // Connection attempt tracking for ViewerJoinPercentage
+    // Initial connection counts as attempt 1; each "Reconnecting..." adds another
+    this.connectionAttempts = 1;
+    this.successfulConnections = 0;
+    
     // JoinStorageSessionAsViewer retry tracking
     this.joinSSRetryCount = 0;
 
@@ -356,7 +361,8 @@ class ViewerCanaryTest {
       if (text.includes('[VIEWER] Connection to peer successful!')) {
         this.peerConnectionEstablishedTime = Date.now();
         this.peerConnectionEstablished = true;
-        log('Peer connection established timestamp captured');
+        this.successfulConnections++;
+        log(`Peer connection established timestamp captured (successful connections: ${this.successfulConnections}/${this.connectionAttempts})`);
 
         // Push PeerConnectionAvailability = 1 (ICE candidate pair selected, connection established)
         log('Peer connection to media server succeeded — pushing PeerConnectionAvailability = 1');
@@ -441,7 +447,8 @@ class ViewerCanaryTest {
       // logs "[VIEWER] Reconnecting..." before calling connectToMediaServer again.
       if (text.includes('[VIEWER] Reconnecting...')) {
         this.viewerReconnectCount++;
-        log(`Viewer reconnect attempt detected! Count: ${this.viewerReconnectCount}`);
+        this.connectionAttempts++;
+        log(`Viewer reconnect attempt detected! Count: ${this.viewerReconnectCount}, total attempts: ${this.connectionAttempts}`);
       }
       
       // Detect storage session join error (single failure or retry failure)
@@ -945,6 +952,13 @@ class ViewerCanaryTest {
     );
     log(`Viewer Reconnect Summary: Total reconnects: ${this.viewerReconnectCount}`);
     
+    // Publish connection attempt stats for ViewerJoinPercentage aggregation
+    const joinPct = this.connectionAttempts > 0
+      ? (this.successfulConnections * 100.0) / this.connectionAttempts
+      : 0;
+    log(`Connection Attempt Summary: ${this.successfulConnections}/${this.connectionAttempts} successful (${joinPct.toFixed(1)}%)`);
+    log(`VIEWER_STATS:${JSON.stringify({attempts: this.connectionAttempts, successes: this.successfulConnections})}`);
+    
     // Success is based on storage session joining, not frame reception
     const success = this.storageSessionJoined;
     log(success ? 'TEST PASSED: Storage session joined successfully' : 'TEST FAILED: Storage session not joined');
@@ -1123,7 +1137,7 @@ async function runViewerCanary(config) {
 runViewerCanary({
   channelName: process.env.CANARY_CHANNEL_NAME || 'ScaryTestStream',
   region: process.env.AWS_REGION || 'us-west-2',
-  duration: parseInt(process.env.TEST_DURATION) || 30,
+  duration: parseInt(process.env.TEST_DURATION) || 180,
   saveFrames: process.env.SAVE_FRAMES === 'true',
   clientId: process.env.CLIENT_ID || `test-viewer-${Date.now()}`,
   forceTURN: process.env.FORCE_TURN === 'true',

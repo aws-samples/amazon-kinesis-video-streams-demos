@@ -58,7 +58,6 @@ def runViewerSessions(viewerId = "", waitMinutes = 2, viewerCount = "1") {
             checkout([$class: 'GitSCM', branches: [[name: params.GIT_HASH]],
                       userRemoteConfigs: [[url: params.GIT_URL]]])
             
-            // Wait for master to build before starting viewers
             if (waitMinutes > 0) {
                 echo "Waiting ${waitMinutes} minutes for master to build"
                 sleep waitMinutes * 60
@@ -76,21 +75,18 @@ def runViewerSessions(viewerId = "", waitMinutes = 2, viewerCount = "1") {
             echo "Region: ${params.AWS_DEFAULT_REGION}"
             echo "=========================================="
             
-            // Initialize session results tracking for this viewer
             def viewerKey = viewerId ?: 'viewer'
-            VIEWER_SESSION_RESULTS[viewerKey] = []
+            VIEWER_SESSION_RESULTS[viewerKey] = [attempts: 1, successes: 0]
+
+            def viewerSessionDuration = (params.VIEWER_SESSION_DURATION_SECONDS != null && params.VIEWER_SESSION_DURATION_SECONDS.toString().trim() != '') 
+                ? params.VIEWER_SESSION_DURATION_SECONDS 
+                : '600'
+
+            echo "Starting ${viewerId ? viewerId + ' ' : ''}viewer session"
             
-            // Run 3 viewer sessions
-            for (int session = 1; session <= 3; session++) {
-                echo "Starting ${viewerId ? viewerId + ' ' : ''}session ${session}/3"
-                
-                def viewerSessionDuration = (params.VIEWER_SESSION_DURATION_SECONDS != null && params.VIEWER_SESSION_DURATION_SECONDS.toString().trim() != '') 
-                    ? params.VIEWER_SESSION_DURATION_SECONDS 
-                    : '600'
-                
-                def sessionSuccess = false
-                try {
-                    sh """
+            try {
+                def output = sh(
+                    script: """
                         export JOB_NAME="${env.JOB_NAME}"
                         export RUNNER_LABEL="${params.RUNNER_LABEL}"
                         export AWS_DEFAULT_REGION="${params.AWS_DEFAULT_REGION}"
@@ -98,38 +94,40 @@ def runViewerSessions(viewerId = "", waitMinutes = 2, viewerCount = "1") {
                         export FORCE_TURN="${params.FORCE_TURN ?: 'false'}"
                         export VIEWER_COUNT="${viewerCount}"
                         export VIEWER_ID="${viewerId}"
-                        export CLIENT_ID="${viewerId ? viewerId.toLowerCase() + '-' : 'viewer-'}session-${session}-${BUILD_NUMBER}"
+                        export CLIENT_ID="${viewerId ? viewerId.toLowerCase() + '-' : 'viewer-'}${BUILD_NUMBER}"
                         export ENDPOINT="${endpointValue}"
                         export METRIC_SUFFIX="${metricSuffixValue}"
                         export KEEP_RECORDING="${params.KEEP_RECORDING}"
                         
                         ./canary/webrtc-c/scripts/setup-storage-viewer.sh
-                    """
-                    sessionSuccess = true
-                } catch (FlowInterruptedException err) {
-                    echo 'Aborted due to cancellation'
-                    throw err
-                } catch (err) {
-                    HAS_ERROR = true
-                    unstable err.toString()
-                }
+                    """,
+                    returnStdout: true
+                ).trim()
                 
-                VIEWER_SESSION_RESULTS[viewerKey].add(sessionSuccess)
-                echo "${viewerId ? viewerId + ' ' : ''}session ${session} result: ${sessionSuccess ? 'SUCCESS' : 'FAILURE'}"
+                echo output
                 
-                if (session < 3) {
-                    echo "${viewerId ? viewerId + ' ' : ''}session ${session} completed. Waiting 1 minute before next session."
-                    sleep 60
+                def statsMatch = (output =~ /VIEWER_STATS:(\{.*?\})/)
+                if (statsMatch.find()) {
+                    def stats = readJSON text: statsMatch.group(1)
+                    VIEWER_SESSION_RESULTS[viewerKey] = [attempts: stats.attempts, successes: stats.successes]
+                    echo "${viewerKey} stats: ${stats.attempts} attempts, ${stats.successes} successes"
                 }
+            } catch (FlowInterruptedException err) {
+                echo 'Aborted due to cancellation'
+                throw err
+            } catch (err) {
+                HAS_ERROR = true
+                unstable err.toString()
             }
-            echo "All 3 ${viewerId ? viewerId + ' ' : ''}sessions completed"
+
+            echo "${viewerId ? viewerId + ' ' : ''}viewer session completed"
         } finally {
             deleteDir()
         }
     }
 }
 
-def publishViewerJoinPercentage(scenarioLabel) {
+def publishViewerConnectionSuccessRate(scenarioLabel) {
     if (VIEWER_SESSION_RESULTS.isEmpty()) {
         echo "No viewer session results to aggregate"
         return
@@ -138,30 +136,27 @@ def publishViewerJoinPercentage(scenarioLabel) {
     def channelName = "${env.JOB_NAME}-${params.RUNNER_LABEL}"
     def metricSuffix = params.METRIC_SUFFIX ?: ''
     def region = params.AWS_DEFAULT_REGION ?: 'us-west-2'
-    def totalViewers = VIEWER_SESSION_RESULTS.size()
 
-    echo "Computing ViewerJoinPercentage: ${totalViewers} viewer(s), results: ${VIEWER_SESSION_RESULTS}"
-
-    for (int round = 0; round < 3; round++) {
-        int joinedCount = 0
-        VIEWER_SESSION_RESULTS.each { viewerKey, sessions ->
-            if (round < sessions.size() && sessions[round]) {
-                joinedCount++
-            }
-        }
-        def percentage = (joinedCount * 100.0) / totalViewers
-        echo "Session round ${round + 1}: ${joinedCount}/${totalViewers} viewers joined (${percentage}%)"
-
-        def metricName = "ViewerJoinPercentage${metricSuffix}"
-        sh """
-            aws cloudwatch put-metric-data \
-                --namespace ViewerApplication \
-                --region ${region} \
-                --metric-data \
-                    MetricName=${metricName},Value=${percentage},Unit=Percent,Dimensions="[{Name=StorageWithViewerChannelName,Value=${channelName}},{Name=JobName,Value=${env.JOB_NAME}},{Name=RunnerLabel,Value=${params.RUNNER_LABEL}}]"
-        """
-        echo "Pushed ${metricName}=${percentage}% for session round ${round + 1}"
+    int totalAttempts = 0
+    int totalSuccesses = 0
+    VIEWER_SESSION_RESULTS.each { viewerKey, stats ->
+        totalAttempts += stats.attempts ?: 0
+        totalSuccesses += stats.successes ?: 0
     }
+
+    def percentage = totalAttempts > 0 ? (totalSuccesses * 100.0) / totalAttempts : 0
+    echo "ViewerConnectionSuccessRate: ${totalSuccesses}/${totalAttempts} successful connections (${percentage}%)"
+    echo "Per-viewer breakdown: ${VIEWER_SESSION_RESULTS}"
+
+    def metricName = "ViewerConnectionSuccessRate${metricSuffix}"
+    sh """
+        aws cloudwatch put-metric-data \
+            --namespace ViewerApplication \
+            --region ${region} \
+            --metric-data \
+                MetricName=${metricName},Value=${percentage},Unit=Percent,Dimensions="[{Name=StorageWithViewerChannelName,Value=${channelName}},{Name=JobName,Value=${env.JOB_NAME}},{Name=RunnerLabel,Value=${params.RUNNER_LABEL}}]"
+    """
+    echo "Pushed ${metricName}=${percentage}%"
 
     VIEWER_SESSION_RESULTS = [:]
 }
@@ -306,8 +301,8 @@ pipeline {
                         script {
                             def viewerWaitMin = (params.VIEWER_WAIT_MINUTES != null && params.VIEWER_WAIT_MINUTES.toString().trim() != '') ? params.VIEWER_WAIT_MINUTES.toInteger() : 2
                             def sessionDurationSec = (params.VIEWER_SESSION_DURATION_SECONDS != null && params.VIEWER_SESSION_DURATION_SECONDS.toString().trim() != '') ? params.VIEWER_SESSION_DURATION_SECONDS.toInteger() : 600
-                            // Master duration = viewer wait + 3 sessions + 2 inter-session gaps + 10 min buffer
-                            def masterDuration = (viewerWaitMin * 60) + (3 * sessionDurationSec) + (2 * 60) + 600
+                            // Master duration = viewer wait + 1 session + 5 min buffer
+                            def masterDuration = (viewerWaitMin * 60) + sessionDurationSec + 300
                             def mutableParams = [:] + params
                             mutableParams.DURATION_IN_SECONDS = "${masterDuration}"
                             buildStorageCanary(mutableParams)
@@ -343,8 +338,8 @@ pipeline {
                         script {
                             def viewerWaitMin = (params.VIEWER_WAIT_MINUTES != null && params.VIEWER_WAIT_MINUTES.toString().trim() != '') ? params.VIEWER_WAIT_MINUTES.toInteger() : 2
                             def sessionDurationSec = (params.VIEWER_SESSION_DURATION_SECONDS != null && params.VIEWER_SESSION_DURATION_SECONDS.toString().trim() != '') ? params.VIEWER_SESSION_DURATION_SECONDS.toInteger() : 600
-                            // Master duration = viewer wait + 3 sessions + 2 inter-session gaps + 10 min buffer
-                            def masterDuration = (viewerWaitMin * 60) + (3 * sessionDurationSec) + (2 * 60) + 600
+                            // Master duration = viewer wait + 1 session + 5 min buffer
+                            def masterDuration = (viewerWaitMin * 60) + sessionDurationSec + 300
                             def mutableParams = [:] + params
                             mutableParams.DURATION_IN_SECONDS = "${masterDuration}"
                             buildStorageCanary(mutableParams)
@@ -393,8 +388,8 @@ pipeline {
                         script {
                             def viewerWaitMin = (params.VIEWER_WAIT_MINUTES != null && params.VIEWER_WAIT_MINUTES.toString().trim() != '') ? params.VIEWER_WAIT_MINUTES.toInteger() : 2
                             def sessionDurationSec = (params.VIEWER_SESSION_DURATION_SECONDS != null && params.VIEWER_SESSION_DURATION_SECONDS.toString().trim() != '') ? params.VIEWER_SESSION_DURATION_SECONDS.toInteger() : 600
-                            // Master duration = viewer wait + 3 sessions + 2 inter-session gaps + 10 min buffer
-                            def masterDuration = (viewerWaitMin * 60) + (3 * sessionDurationSec) + (2 * 60) + 600
+                            // Master duration = viewer wait + 1 session + 5 min buffer
+                            def masterDuration = (viewerWaitMin * 60) + sessionDurationSec + 300
                             def mutableParams = [:] + params
                             mutableParams.DURATION_IN_SECONDS = "${masterDuration}"
                             buildStorageCanary(mutableParams)
@@ -443,16 +438,17 @@ pipeline {
             }
         }
 
-        stage('Publish Viewer Join Percentage') {
+        stage('Publish Viewer Connection Success Rate') {
             when {
                 anyOf {
+                    equals expected: true, actual: params.JS_STORAGE_VIEWER_JOIN
                     equals expected: true, actual: params.JS_STORAGE_TWO_VIEWERS
                     equals expected: true, actual: params.JS_STORAGE_THREE_VIEWERS
                 }
             }
             steps {
                 script {
-                    publishViewerJoinPercentage(params.SCENARIO_LABEL)
+                    publishViewerConnectionSuccessRate(params.SCENARIO_LABEL)
                 }
             }
         }
