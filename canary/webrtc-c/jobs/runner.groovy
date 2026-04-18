@@ -9,6 +9,10 @@ HAS_ERROR = false
 // Access is synchronized since parallel stages write to different keys.
 VIEWER_SESSION_RESULTS = [:]
 
+// Signal flag: set to true when the storage master build is complete and the binary
+// is about to start streaming. Viewers poll this instead of sleeping a fixed duration.
+MASTER_READY = false
+
 def buildWebRTCProject(useMbedTLS, thing_prefix) {
     echo 'Flag set to ' + useMbedTLS
     checkout([$class: 'GitSCM', branches: [[name: params.GIT_HASH ]],
@@ -177,8 +181,17 @@ def runViewerSessions(viewerId = "", waitMinutes = 10, viewerCount = "1", stagge
                       userRemoteConfigs: [[url: params.GIT_URL]]])
             
             if (waitMinutes > 0) {
-                echo "Waiting ${waitMinutes} minutes for master to build"
-                sleep waitMinutes * 60
+                def maxWaitMs = waitMinutes * 60 * 1000
+                def startWait = System.currentTimeMillis()
+                echo "Waiting for master to be ready (timeout: ${waitMinutes} minutes)..."
+                while (!MASTER_READY && (System.currentTimeMillis() - startWait) < maxWaitMs) {
+                    sleep 2 // poll every 2 seconds
+                }
+                if (MASTER_READY) {
+                    echo "Master is ready! Waited ${(System.currentTimeMillis() - startWait) / 1000}s"
+                } else {
+                    echo "WARNING: Master not ready after ${waitMinutes} minutes, proceeding anyway"
+                }
             }
             
             // Staggered start delay to avoid all viewers starting at the exact same time
@@ -329,6 +342,9 @@ def buildStorageCanary(isConsumer, params) {
     ]
 
     RUNNING_NODES_IN_BUILDING++
+    if (!isConsumer) {
+        MASTER_READY = false
+    }
     if (params.FIRST_ITERATION) {
         deleteDir()
     }
@@ -345,6 +361,8 @@ def buildStorageCanary(isConsumer, params) {
 
     if (!isConsumer) {
         def envs = (commonEnvs + masterEnvs).collect{ k, v -> "${k}=${v}" }
+        MASTER_READY = true
+        echo "Master build complete, signaling viewers (MASTER_READY=true)"
         withRunnerWrapper(envs) {
             sh """
                 cd ./canary/webrtc-c/build &&
