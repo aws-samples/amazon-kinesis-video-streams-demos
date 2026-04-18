@@ -6,9 +6,9 @@ Compares the viewer's recorded video against the source H.264 frames
 sent by the C master to verify visual quality.
 
 Pipeline:
-  1. Extract frames from the viewer recording (ffmpeg)
-  2. OCR the timer overlay from the first received frame (Tesseract)
-  3. Compute the source frame offset from the timer value
+  1. Extract frames from the viewer recording (ffmpeg) at 1 FPS
+  2. OCR the timer overlay on each extracted frame (Tesseract)
+  3. Convert each timer value to a source frame index for independent alignment
   4. Decode matching source H.264 frames (ffmpeg)
   5. Compare frame pairs using SSIM
 
@@ -68,6 +68,10 @@ def ocr_timer(frame_path):
 
 def parse_timer(timer_text):
     """Parse timer text like '0:00:17.080' into milliseconds."""
+    # Sanitize common OCR misreads: comma instead of period, double dots
+    timer_text = timer_text.replace(',', '.')
+    timer_text = timer_text.replace('..', '.')
+
     # Handle formats: H:MM:SS.mmm or MM:SS.mmm or SS.mmm
     match = re.match(r'(\d+):(\d+):(\d+)\.(\d+)', timer_text)
     if match:
@@ -202,7 +206,7 @@ def main():
     parser.add_argument('--recording', required=True, help='Path to viewer recording (mp4/webm)')
     parser.add_argument('--source-frames', required=True, help='Path to H.264 source frames directory')
     parser.add_argument('--max-compare', type=int, default=0, help='Max frames to compare (default: 0 = all)')
-    parser.add_argument('--threshold', type=float, default=0.5, help='Min SSIM to pass (default: 0.5)')
+    parser.add_argument('--threshold', type=float, default=0.95, help='Min SSIM to pass (default: 0.95)')
     parser.add_argument('--expected-duration', type=float, default=0,
                         help='Expected video duration in seconds (e.g. canary run time). '
                              'When provided, frame loss is calculated against this instead of '
@@ -256,53 +260,57 @@ def main():
             else:
                 print("Frame count: FAIL (exceeds 10% tolerance)")
 
-        # Phase 3: OCR and alignment
-        print("\n--- Phase 3: Aligning frames via OCR ---")
-        timer_text = ocr_timer(received_frames[0])
-        print(f"First frame timer: '{timer_text}'")
+        # Phase 3: OCR each frame independently for alignment
+        print("\n--- Phase 3: OCR alignment (per-frame) ---")
 
-        timer_ms = parse_timer(timer_text)
-        if timer_ms is None:
-            print(f"Failed to parse timer text: '{timer_text}'", file=sys.stderr)
-            sys.exit(1)
-
-        start_frame_index = timer_to_frame_index(timer_ms)
-        print(f"Timer: {timer_ms}ms -> source frame index: {start_frame_index}")
-
-        # Phase 4: Compare frames
-        print(f"\n--- Phase 4: Comparing frames ---")
-        num_to_compare = args.max_compare if args.max_compare > 0 else len(received_frames)
-
-        # Build source stream once and extract all needed frames
+        # Build source stream once — we'll extract specific frames from it
         source_stream = os.path.join(work_dir, 'source.h264')
         build_source_stream(args.source_frames, source_stream)
 
-        needed_indices = [
-            ((start_frame_index - 1 + i * FPS) % TOTAL_SOURCE_FRAMES) + 1
-            for i in range(num_to_compare)
-        ]
-        source_pngs = extract_source_frames(source_stream, source_decoded_dir, set(needed_indices))
+        num_to_compare = args.max_compare if args.max_compare > 0 else len(received_frames)
 
+        # OCR every extracted frame to determine its source frame index
+        frame_alignments = []  # list of (received_index, source_frame_index)
+        ocr_failures = 0
+        for i in range(num_to_compare):
+            timer_text = ocr_timer(received_frames[i])
+            timer_ms = parse_timer(timer_text)
+            if timer_ms is None:
+                print(f"  [{i+1}/{num_to_compare}] OCR failed: '{timer_text}', skipping")
+                ocr_failures += 1
+                continue
+            source_idx = timer_to_frame_index(timer_ms)
+            frame_alignments.append((i, source_idx))
+            if i < 5 or args.verbose:
+                print(f"  [{i+1}/{num_to_compare}] timer='{timer_text}' -> {timer_ms}ms -> source frame {source_idx}")
+
+        print(f"OCR complete: {len(frame_alignments)} aligned, {ocr_failures} failed")
+
+        # Extract all needed source frames in one batch
+        needed_indices = set(src_idx for _, src_idx in frame_alignments)
+        source_pngs = extract_source_frames(source_stream, source_decoded_dir, needed_indices)
+
+        # Phase 4: Compare frames
+        print(f"\n--- Phase 4: Comparing {len(frame_alignments)} frames ---")
         scores = []
         failures = []
 
-        for i in range(num_to_compare):
-            source_idx = needed_indices[i]
+        for recv_idx, source_idx in frame_alignments:
             source_png = source_pngs.get(source_idx)
 
             if not source_png:
-                print(f"  [{i+1}/{num_to_compare}] Could not decode source frame {source_idx}, skipping")
+                print(f"  [{recv_idx+1}/{num_to_compare}] Could not decode source frame {source_idx}, skipping")
                 continue
 
-            score = compute_ssim(received_frames[i], source_png)
+            score = compute_ssim(received_frames[recv_idx], source_png)
             scores.append(score)
 
             status = "PASS" if score >= args.threshold else "FAIL"
             if score < args.threshold:
-                failures.append((i, source_idx, score))
+                failures.append((recv_idx, source_idx, score))
 
-            if i < 5 or score < args.threshold or args.verbose:
-                print(f"  [{i+1}/{num_to_compare}] received frame {i+1} vs source frame-{source_idx:04d}: SSIM={score:.4f} {status}")
+            if recv_idx < 5 or score < args.threshold or args.verbose:
+                print(f"  [{recv_idx+1}/{num_to_compare}] received frame {recv_idx+1} vs source frame-{source_idx:04d}: SSIM={score:.4f} {status}")
 
         # Summary
         print(f"\n--- Results ---")
@@ -327,6 +335,7 @@ def main():
                     'min_ssim': round(min_score, 4),
                     'frames_compared': len(scores),
                     'frames_failed': len(failures),
+                    'ocr_failures': ocr_failures,
                     'actual_frames': actual_frames,
                     'expected_frames': expected_frames,
                     'duration': round(duration, 2) if duration else None
