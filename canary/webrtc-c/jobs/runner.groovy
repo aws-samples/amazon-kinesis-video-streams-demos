@@ -13,6 +13,16 @@ VIEWER_SESSION_RESULTS = [:]
 // is about to start streaming. Viewers poll this instead of sleeping a fixed duration.
 MASTER_READY = false
 
+// @NonCPS prevents Jenkins CPS from trying to serialize local variables in this
+// method.  java.util.regex.Matcher is NOT serializable — holding one across a CPS
+// step boundary (sh, sleep, echo …) causes NotSerializableException and kills the
+// pipeline thread.
+@NonCPS
+def extractViewerStats(String output) {
+    def m = (output =~ /VIEWER_STATS:(\{.*?\})/)
+    return m.find() ? m.group(1) : null
+}
+
 def buildWebRTCProject(useMbedTLS, thing_prefix) {
     echo 'Flag set to ' + useMbedTLS
     checkout([$class: 'GitSCM', branches: [[name: params.GIT_HASH ]],
@@ -233,9 +243,12 @@ def runViewerSessions(viewerId = "", waitMinutes = 10, viewerCount = "1", stagge
                 echo output
                 
                 // Parse VIEWER_STATS from output
-                def statsMatch = (output =~ /VIEWER_STATS:(\{.*?\})/)
-                if (statsMatch.find()) {
-                    def stats = readJSON text: statsMatch.group(1)
+                // NOTE: avoid holding a Matcher reference across CPS step
+                // boundaries — Matcher is not serializable and will crash
+                // the pipeline with NotSerializableException.
+                def statsJson = extractViewerStats(output)
+                if (statsJson != null) {
+                    def stats = readJSON text: statsJson
                     VIEWER_SESSION_RESULTS[viewerKey] = [attempts: stats.attempts, successes: stats.successes]
                     echo "${viewerKey} stats: ${stats.attempts} attempts, ${stats.successes} successes"
                 }
@@ -816,30 +829,6 @@ pipeline {
             steps {
                 script {
                     publishViewerConnectionSuccessRate(params.SCENARIO_LABEL)
-                }
-            }
-        }
-
-        stage('Stop Continuous StorageMaster') {
-            when {
-                anyOf {
-                    equals expected: true, actual: params.JS_STORAGE_VIEWER_JOIN
-                    equals expected: true, actual: params.JS_STORAGE_TWO_VIEWERS
-                    equals expected: true, actual: params.JS_STORAGE_THREE_VIEWERS
-                }
-            }
-            agent {
-                label params.MASTER_NODE_LABEL
-            }
-            steps {
-                script {
-                    sh """
-                        # Stop the background master process
-                        if [ -f master.pid ]; then
-                            kill \$(cat master.pid) || true
-                            rm -f master.pid
-                        fi
-                    """
                 }
             }
         }

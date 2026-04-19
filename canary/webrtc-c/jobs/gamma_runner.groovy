@@ -19,6 +19,16 @@ RUNNING_NODES_IN_BUILDING = 0
 HAS_ERROR = false
 VIEWER_SESSION_RESULTS = [:]
 
+// @NonCPS prevents Jenkins CPS from trying to serialize local variables in this
+// method.  java.util.regex.Matcher is NOT serializable — holding one across a CPS
+// step boundary (sh, sleep, echo …) causes NotSerializableException and kills the
+// pipeline thread.
+@NonCPS
+def extractViewerStats(String output) {
+    def m = (output =~ /VIEWER_STATS:(\{.*?\})/)
+    return m.find() ? m.group(1) : null
+}
+
 def buildWebRTCProject(thing_prefix) {
     checkout([$class: 'GitSCM', branches: [[name: params.GIT_HASH]],
               userRemoteConfigs: [[url: params.GIT_URL]]])
@@ -106,9 +116,10 @@ def runViewerSessions(viewerId = "", waitMinutes = 2, viewerCount = "1") {
                 
                 echo output
                 
-                def statsMatch = (output =~ /VIEWER_STATS:(\{.*?\})/)
-                if (statsMatch.find()) {
-                    def stats = readJSON text: statsMatch.group(1)
+                // Parse VIEWER_STATS from output
+                def statsJson = extractViewerStats(output)
+                if (statsJson != null) {
+                    def stats = readJSON text: statsJson
                     VIEWER_SESSION_RESULTS[viewerKey] = [attempts: stats.attempts, successes: stats.successes]
                     echo "${viewerKey} stats: ${stats.attempts} attempts, ${stats.successes} successes"
                 }
