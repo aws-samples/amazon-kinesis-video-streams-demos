@@ -344,7 +344,7 @@ def buildStorageCanary(isConsumer, params) {
       'AWS_DEFAULT_REGION': params.AWS_DEFAULT_REGION,
       'CANARY_STREAM_NAME': "${env.JOB_NAME}-${params.RUNNER_LABEL}",
       'VIDEO_VERIFY_ENABLED': params.VIDEO_VERIFY_ENABLED?.toString() ?: 'false',
-      'CANARY_CLIP_OUTPUT_PATH': "${env.WORKSPACE}/canary/consumer-java/clip.mp4"
+      'CANARY_CLIP_OUTPUT_PATH': "${env.WORKSPACE}/canary/consumer-java/clip-${START_TIMESTAMP}.mp4"
     ]
 
     RUNNING_NODES_IN_BUILDING++
@@ -381,7 +381,7 @@ def buildStorageCanary(isConsumer, params) {
         }
 
         // Run video verification on the GetClip MP4 if the consumer downloaded one
-        def clipPath = "${env.WORKSPACE}/canary/consumer-java/clip.mp4"
+        def clipPath = "${env.WORKSPACE}/canary/consumer-java/clip-${START_TIMESTAMP}.mp4"
         def verifyScript = "${env.WORKSPACE}/canary/webrtc-c/scripts/video-verification/verify.py"
         def sourceFrames = "${env.WORKSPACE}/canary/webrtc-c/assets/h264SampleFrames"
         def streamName = "${env.JOB_NAME}-${params.RUNNER_LABEL}"
@@ -409,12 +409,12 @@ def buildStorageCanary(isConsumer, params) {
                 """
                 echo "Pushed ConsumerStorageAvailability=${storageAvailability}"
 
-                sh "rm -f '${clipPath}'"
+                echo "GetClip MP4 preserved at: ${clipPath}"
             } catch (err) {
                 echo "Consumer video verification failed: ${err.getMessage()}"
             }
         } else {
-            echo "No GetClip MP4 found, skipping consumer video verification"
+            echo "No GetClip MP4 found at ${clipPath}, skipping consumer video verification"
         }
     }
 }
