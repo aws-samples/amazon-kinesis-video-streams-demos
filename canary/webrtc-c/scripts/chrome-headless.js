@@ -653,8 +653,35 @@ class ViewerCanaryTest {
    */
   async getRTCStats(page) {
     return await page.evaluate(() => {
-      const pc = window.viewer?.pc;
-      if (!pc || typeof pc.getStats !== 'function') return null;
+      // Strategy 1: Find the peer connection on the viewer object
+      const viewer = window.viewer;
+      let pc = viewer?.pc || viewer?.peerConnection || viewer?.rtcPeerConnection;
+
+      // Strategy 2: Find any RTCPeerConnection via the video element's srcObject
+      if (!pc || typeof pc.getStats !== 'function') {
+        const video = document.querySelector('.remote-view');
+        if (video?.srcObject) {
+          const receivers = video.srcObject.getTracks().map(track => {
+            // RTCRtpReceiver is not directly on MediaStream, need the PC
+            return null;
+          });
+        }
+        // Last resort: check all viewer properties for an RTCPeerConnection
+        if (viewer) {
+          for (const key of Object.keys(viewer)) {
+            const val = viewer[key];
+            if (val && typeof val === 'object' && typeof val.getStats === 'function' && typeof val.getReceivers === 'function') {
+              pc = val;
+              break;
+            }
+          }
+        }
+      }
+
+      if (!pc || typeof pc.getStats !== 'function') {
+        const keys = viewer ? Object.keys(viewer).slice(0, 30).join(',') : 'no viewer';
+        return { debug: `no RTCPeerConnection found. viewer keys: [${keys}]` };
+      }
 
       return pc.getStats().then(report => {
         const result = { video: null, audio: null };
@@ -676,7 +703,10 @@ class ViewerCanaryTest {
         });
         return result;
       });
-    }).catch(() => null);
+    }).catch((err) => {
+      log(`getRTCStats error: ${err.message}`);
+      return null;
+    });
   }
 
   async captureVideoFrame(page) {
@@ -924,6 +954,9 @@ class ViewerCanaryTest {
       if (rtcStats?.video) {
         if (!this.firstRTCStats) this.firstRTCStats = rtcStats;
         this.lastRTCStats = rtcStats;
+      } else if (rtcStats?.debug && !this.rtcStatsDebugLogged) {
+        log(`RTCStats debug: ${rtcStats.debug}`);
+        this.rtcStatsDebugLogged = true;
       }
       
       const now = Date.now();
