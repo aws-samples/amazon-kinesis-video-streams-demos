@@ -33,6 +33,24 @@ def extractViewerStats(String output) {
     return m.find() ? m.group(1) : null
 }
 
+// Polls MASTER_READY in a tight loop without CPS step overhead.
+// Runs as a single non-CPS method call so Jenkins doesn't log hundreds
+// of individual sleep steps.  Returns the number of seconds waited.
+@NonCPS
+def waitForMasterReady(int timeoutMs, int logIntervalMs = 30000) {
+    def startWait = System.currentTimeMillis()
+    def lastLogTime = startWait
+    while (!MASTER_READY && (System.currentTimeMillis() - startWait) < timeoutMs) {
+        Thread.sleep(2000)
+        if (System.currentTimeMillis() - lastLogTime >= logIntervalMs) {
+            def elapsedSec = (System.currentTimeMillis() - startWait) / 1000
+            println "Still waiting for master... (${elapsedSec}s elapsed)"
+            lastLogTime = System.currentTimeMillis()
+        }
+    }
+    return (System.currentTimeMillis() - startWait) / 1000
+}
+
 def buildWebRTCProject(thing_prefix) {
     checkout([$class: 'GitSCM', branches: [[name: params.GIT_HASH]],
               userRemoteConfigs: [[url: params.GIT_URL]]])
@@ -73,21 +91,11 @@ def runViewerSessions(viewerId = "", waitMinutes = 2, viewerCount = "1") {
                       userRemoteConfigs: [[url: params.GIT_URL]]])
             
             if (waitMinutes > 0) {
-                def maxWaitMs = waitMinutes * 60 * 1000
-                def startWait = System.currentTimeMillis()
-                def lastLogTime = startWait
+                def timeoutMs = waitMinutes * 60 * 1000
                 echo "Waiting for master to be ready (timeout: ${waitMinutes} minutes)..."
-                while (!MASTER_READY && (System.currentTimeMillis() - startWait) < maxWaitMs) {
-                    sleep 2 // poll every 2 seconds
-                    // Log progress every 30 seconds so we know it's still polling
-                    if (System.currentTimeMillis() - lastLogTime >= 30000) {
-                        def elapsedSec = (System.currentTimeMillis() - startWait) / 1000
-                        echo "Still waiting for master... (${elapsedSec}s elapsed)"
-                        lastLogTime = System.currentTimeMillis()
-                    }
-                }
+                def waitedSec = waitForMasterReady(timeoutMs)
                 if (MASTER_READY) {
-                    echo "Master is ready! Waited ${(System.currentTimeMillis() - startWait) / 1000}s"
+                    echo "Master is ready! Waited ${waitedSec}s"
                 } else {
                     echo "WARNING: Master not ready after ${waitMinutes} minutes, proceeding anyway"
                 }
@@ -258,14 +266,14 @@ pipeline {
         string(name: 'STORAGE_VIEWER_THREE_NODE_LABEL', defaultValue: 'webrtc-storage-consumer')
         string(name: 'RUNNER_LABEL', defaultValue: 'GammaTest')
         string(name: 'SCENARIO_LABEL', defaultValue: 'GammaTest')
-        string(name: 'DURATION_IN_SECONDS', defaultValue: '600')
+        string(name: 'DURATION_IN_SECONDS', defaultValue: '180')
         string(name: 'GIT_URL', defaultValue: 'https://github.com/aws-samples/amazon-kinesis-video-streams-demos.git')
         string(name: 'GIT_HASH', defaultValue: 'clean_viewer_test')
         string(name: 'AWS_DEFAULT_REGION', defaultValue: 'us-west-2')
         string(name: 'ENDPOINT', defaultValue: '', description: 'Custom endpoint URL (e.g., gamma endpoint)')
         string(name: 'METRIC_SUFFIX', defaultValue: '-gamma')
-        string(name: 'VIEWER_WAIT_MINUTES', defaultValue: '2', description: 'Minutes to wait for master to build')
-        string(name: 'VIEWER_SESSION_DURATION_SECONDS', defaultValue: '600', description: 'Duration in seconds for each viewer session (default 10 minutes)')
+        string(name: 'VIEWER_WAIT_MINUTES', defaultValue: '20', description: 'Minutes to wait for master to build')
+        string(name: 'VIEWER_SESSION_DURATION_SECONDS', defaultValue: '180', description: 'Duration in seconds for each viewer session (default 3 minutes)')
         booleanParam(name: 'KEEP_RECORDING', defaultValue: false, description: 'Keep viewer video recordings after verification')
         booleanParam(name: 'DEBUG_LOG_SDP', defaultValue: true)
         booleanParam(name: 'FIRST_ITERATION', defaultValue: true)
@@ -333,12 +341,8 @@ pipeline {
                     }
                     steps {
                         script {
-                            def viewerWaitMin = (params.VIEWER_WAIT_MINUTES != null && params.VIEWER_WAIT_MINUTES.toString().trim() != '') ? params.VIEWER_WAIT_MINUTES.toInteger() : 2
-                            def sessionDurationSec = (params.VIEWER_SESSION_DURATION_SECONDS != null && params.VIEWER_SESSION_DURATION_SECONDS.toString().trim() != '') ? params.VIEWER_SESSION_DURATION_SECONDS.toInteger() : 600
-                            // Master duration = viewer wait + 1 session + 5 min buffer
-                            def masterDuration = (viewerWaitMin * 60) + sessionDurationSec + 300
                             def mutableParams = [:] + params
-                            mutableParams.DURATION_IN_SECONDS = "${masterDuration}"
+                            mutableParams.DURATION_IN_SECONDS = "180"
                             buildStorageCanary(mutableParams)
                         }
                     }
@@ -351,7 +355,7 @@ pipeline {
                         script {
                             def waitMins = (params.VIEWER_WAIT_MINUTES != null && params.VIEWER_WAIT_MINUTES.toString().trim() != '') 
                                 ? params.VIEWER_WAIT_MINUTES.toInteger() 
-                                : 2
+                                : 20
                             runViewerSessions("", waitMins, "1")
                         }
                     }
@@ -370,12 +374,8 @@ pipeline {
                     }
                     steps {
                         script {
-                            def viewerWaitMin = (params.VIEWER_WAIT_MINUTES != null && params.VIEWER_WAIT_MINUTES.toString().trim() != '') ? params.VIEWER_WAIT_MINUTES.toInteger() : 2
-                            def sessionDurationSec = (params.VIEWER_SESSION_DURATION_SECONDS != null && params.VIEWER_SESSION_DURATION_SECONDS.toString().trim() != '') ? params.VIEWER_SESSION_DURATION_SECONDS.toInteger() : 600
-                            // Master duration = viewer wait + 1 session + 5 min buffer
-                            def masterDuration = (viewerWaitMin * 60) + sessionDurationSec + 300
                             def mutableParams = [:] + params
-                            mutableParams.DURATION_IN_SECONDS = "${masterDuration}"
+                            mutableParams.DURATION_IN_SECONDS = "180"
                             buildStorageCanary(mutableParams)
                         }
                     }
@@ -388,7 +388,7 @@ pipeline {
                         script {
                             def waitMins = (params.VIEWER_WAIT_MINUTES != null && params.VIEWER_WAIT_MINUTES.toString().trim() != '') 
                                 ? params.VIEWER_WAIT_MINUTES.toInteger() 
-                                : 2
+                                : 20
                             runViewerSessions("Viewer1", waitMins, "2")
                         }
                     }
@@ -401,7 +401,7 @@ pipeline {
                         script {
                             def waitMins = (params.VIEWER_WAIT_MINUTES != null && params.VIEWER_WAIT_MINUTES.toString().trim() != '') 
                                 ? params.VIEWER_WAIT_MINUTES.toInteger() 
-                                : 2
+                                : 20
                             runViewerSessions("Viewer2", waitMins, "2")
                         }
                     }
@@ -420,12 +420,8 @@ pipeline {
                     }
                     steps {
                         script {
-                            def viewerWaitMin = (params.VIEWER_WAIT_MINUTES != null && params.VIEWER_WAIT_MINUTES.toString().trim() != '') ? params.VIEWER_WAIT_MINUTES.toInteger() : 2
-                            def sessionDurationSec = (params.VIEWER_SESSION_DURATION_SECONDS != null && params.VIEWER_SESSION_DURATION_SECONDS.toString().trim() != '') ? params.VIEWER_SESSION_DURATION_SECONDS.toInteger() : 600
-                            // Master duration = viewer wait + 1 session + 5 min buffer
-                            def masterDuration = (viewerWaitMin * 60) + sessionDurationSec + 300
                             def mutableParams = [:] + params
-                            mutableParams.DURATION_IN_SECONDS = "${masterDuration}"
+                            mutableParams.DURATION_IN_SECONDS = "180"
                             buildStorageCanary(mutableParams)
                         }
                     }
@@ -438,7 +434,7 @@ pipeline {
                         script {
                             def waitMins = (params.VIEWER_WAIT_MINUTES != null && params.VIEWER_WAIT_MINUTES.toString().trim() != '') 
                                 ? params.VIEWER_WAIT_MINUTES.toInteger() 
-                                : 2
+                                : 20
                             runViewerSessions("Viewer1", waitMins, "3")
                         }
                     }
@@ -451,7 +447,7 @@ pipeline {
                         script {
                             def waitMins = (params.VIEWER_WAIT_MINUTES != null && params.VIEWER_WAIT_MINUTES.toString().trim() != '') 
                                 ? params.VIEWER_WAIT_MINUTES.toInteger() 
-                                : 2
+                                : 20
                             runViewerSessions("Viewer2", waitMins, "3")
                         }
                     }
@@ -464,7 +460,7 @@ pipeline {
                         script {
                             def waitMins = (params.VIEWER_WAIT_MINUTES != null && params.VIEWER_WAIT_MINUTES.toString().trim() != '') 
                                 ? params.VIEWER_WAIT_MINUTES.toInteger() 
-                                : 2
+                                : 20
                             runViewerSessions("Viewer3", waitMins, "3")
                         }
                     }

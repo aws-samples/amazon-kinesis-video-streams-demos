@@ -23,6 +23,24 @@ def extractViewerStats(String output) {
     return m.find() ? m.group(1) : null
 }
 
+// Polls MASTER_READY in a tight loop without CPS step overhead.
+// Runs as a single non-CPS method call so Jenkins doesn't log hundreds
+// of individual sleep steps.  Returns the number of seconds waited.
+@NonCPS
+def waitForMasterReady(int timeoutMs, int logIntervalMs = 30000) {
+    def startWait = System.currentTimeMillis()
+    def lastLogTime = startWait
+    while (!MASTER_READY && (System.currentTimeMillis() - startWait) < timeoutMs) {
+        Thread.sleep(2000)
+        if (System.currentTimeMillis() - lastLogTime >= logIntervalMs) {
+            def elapsedSec = (System.currentTimeMillis() - startWait) / 1000
+            println "Still waiting for master... (${elapsedSec}s elapsed)"
+            lastLogTime = System.currentTimeMillis()
+        }
+    }
+    return (System.currentTimeMillis() - startWait) / 1000
+}
+
 def buildWebRTCProject(useMbedTLS, thing_prefix) {
     echo 'Flag set to ' + useMbedTLS
     checkout([$class: 'GitSCM', branches: [[name: params.GIT_HASH ]],
@@ -191,21 +209,11 @@ def runViewerSessions(viewerId = "", waitMinutes = 10, viewerCount = "1", stagge
                       userRemoteConfigs: [[url: params.GIT_URL]]])
             
             if (waitMinutes > 0) {
-                def maxWaitMs = waitMinutes * 60 * 1000
-                def startWait = System.currentTimeMillis()
-                def lastLogTime = startWait
+                def timeoutMs = waitMinutes * 60 * 1000
                 echo "Waiting for master to be ready (timeout: ${waitMinutes} minutes)..."
-                while (!MASTER_READY && (System.currentTimeMillis() - startWait) < maxWaitMs) {
-                    sleep 2 // poll every 2 seconds
-                    // Log progress every 30 seconds so we know it's still polling
-                    if (System.currentTimeMillis() - lastLogTime >= 30000) {
-                        def elapsedSec = (System.currentTimeMillis() - startWait) / 1000
-                        echo "Still waiting for master... (${elapsedSec}s elapsed)"
-                        lastLogTime = System.currentTimeMillis()
-                    }
-                }
+                def waitedSec = waitForMasterReady(timeoutMs)
                 if (MASTER_READY) {
-                    echo "Master is ready! Waited ${(System.currentTimeMillis() - startWait) / 1000}s"
+                    echo "Master is ready! Waited ${waitedSec}s"
                 } else {
                     echo "WARNING: Master not ready after ${waitMinutes} minutes, proceeding anyway"
                 }
