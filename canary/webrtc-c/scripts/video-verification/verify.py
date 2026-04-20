@@ -177,8 +177,8 @@ def main():
                         help=f'Expected duration in seconds (default: {EXPECTED_DURATION})')
     parser.add_argument('--threshold', type=float, default=0.85,
                         help='Overall score threshold for availability=1 (default: 0.85)')
-    parser.add_argument('--ssim-threshold', type=float, default=0.80,
-                        help='Per-frame SSIM threshold (default: 0.80)')
+    parser.add_argument('--ssim-threshold', type=float, default=0.95,
+                        help='Per-frame SSIM threshold (default: 0.95)')
     parser.add_argument('--keep-frames', action='store_true', help='Keep extracted frames')
     parser.add_argument('--verbose', action='store_true')
     parser.add_argument('--json', action='store_true', dest='json_output',
