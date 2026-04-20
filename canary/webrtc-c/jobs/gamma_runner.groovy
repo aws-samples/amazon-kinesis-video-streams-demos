@@ -232,9 +232,6 @@ def buildStorageCanary(params) {
 
     RUNNING_NODES_IN_BUILDING++
     MASTER_READY = false
-    if (params.FIRST_ITERATION) {
-        deleteDir()
-    }
     buildWebRTCProject(thing_prefix)
     RUNNING_NODES_IN_BUILDING--
     

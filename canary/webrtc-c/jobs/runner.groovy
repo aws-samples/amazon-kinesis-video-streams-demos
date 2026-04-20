@@ -106,10 +106,6 @@ def buildPeer(isMaster, params) {
     RUNNING_NODES_IN_BUILDING++
 
     // TODO: get the branch and version from orchestrator
-    if (params.FIRST_ITERATION) {
-        deleteDir()
-    }
-
     def thing_prefix = "${env.JOB_NAME}-${params.RUNNER_LABEL}"
     buildWebRTCProject(params.USE_MBEDTLS, thing_prefix)
 
@@ -164,8 +160,6 @@ def buildSignaling(params) {
         if(params.CACHED_WORKSPACE_ID == "${env.WORKSPACE}") {
             echo "Same workspace: " + params.CACHED_WORKSPACE_ID
             echo "New one: ${env.WORKSPACE}"
-        } else {
-            deleteDir()
         }
     }
     def thing_prefix = "${env.JOB_NAME}-${params.RUNNER_LABEL}"
@@ -371,9 +365,6 @@ def buildStorageCanary(isConsumer, params) {
     RUNNING_NODES_IN_BUILDING++
     if (!isConsumer) {
         MASTER_READY = false
-    }
-    if (params.FIRST_ITERATION) {
-        deleteDir()
     }
     if (!isConsumer){
         buildWebRTCProject(params.USE_MBEDTLS, thing_prefix)
