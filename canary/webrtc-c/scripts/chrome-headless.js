@@ -646,6 +646,39 @@ class ViewerCanaryTest {
     });
   }
 
+  /**
+   * Collect inbound-rtp stats from the viewer's RTCPeerConnection via getStats().
+   * Returns { packetsReceived, packetsLost, framesDecoded, framesDropped, jitter }
+   * or null if the peer connection is not available.
+   */
+  async getRTCStats(page) {
+    return await page.evaluate(() => {
+      const pc = window.viewer?.peerConnection;
+      if (!pc || typeof pc.getStats !== 'function') return null;
+
+      return pc.getStats().then(report => {
+        const result = { video: null, audio: null };
+        report.forEach(stat => {
+          if (stat.type !== 'inbound-rtp') return;
+          const entry = {
+            packetsReceived: stat.packetsReceived || 0,
+            packetsLost: stat.packetsLost || 0,
+            bytesReceived: stat.bytesReceived || 0,
+            jitter: stat.jitter || 0,
+            framesDecoded: stat.framesDecoded || 0,
+            framesDropped: stat.framesDropped || 0,
+            framesPerSecond: stat.framesPerSecond || 0,
+            nackCount: stat.nackCount || 0,
+            pliCount: stat.pliCount || 0,
+          };
+          if (stat.kind === 'video') result.video = entry;
+          else if (stat.kind === 'audio') result.audio = entry;
+        });
+        return result;
+      });
+    }).catch(() => null);
+  }
+
   async captureVideoFrame(page) {
     return await page.evaluate(() => {
       const remoteVideo = document.querySelector('.remote-view');
@@ -809,7 +842,7 @@ class ViewerCanaryTest {
       const output = execSync(cmd, { encoding: 'utf-8', timeout: 300000 });
       const results = JSON.parse(output.trim());
 
-      log(`Video verification results: SSIM failure=${results.ssim_failure_pct}%, frame loss=${results.frame_loss_pct}%, avg SSIM=${results.avg_ssim}`);
+      log(`Video verification results: SSIM failure=${results.ssim_failure_pct}%, avg SSIM=${results.avg_ssim}`);
 
       await CloudWatchMetrics.publishPercentageMetric(
         this.getMetricName('ViewerVideoSSIMFailureRate'),
@@ -817,11 +850,8 @@ class ViewerCanaryTest {
         results.ssim_failure_pct
       );
 
-      await CloudWatchMetrics.publishPercentageMetric(
-        this.getMetricName('ViewerVideoFrameLossRate'),
-        this.config.channelName,
-        results.frame_loss_pct
-      );
+      // ViewerVideoFrameLossRate removed — packet loss is now measured via
+      // RTCStatsReport (ViewerPacketLossRate) in getTestResults()
     } catch (error) {
       log(`Video verification failed: ${error.message}`);
     }
@@ -875,6 +905,10 @@ class ViewerCanaryTest {
     let lastStatusLog = 0;
     const statusLogInterval = 10000;
     
+    // Track RTCStats snapshots for final packet loss calculation
+    this.firstRTCStats = null;
+    this.lastRTCStats = null;
+    
     while (!this.testCompleted) {
       const frameStats = await this.getFrameStats(page);
       
@@ -888,10 +922,22 @@ class ViewerCanaryTest {
         break;
       }
       
+      // Collect RTCStats snapshot
+      const rtcStats = await this.getRTCStats(page);
+      if (rtcStats?.video) {
+        if (!this.firstRTCStats) this.firstRTCStats = rtcStats;
+        this.lastRTCStats = rtcStats;
+      }
+      
       const now = Date.now();
       if (now - lastStatusLog >= statusLogInterval) {
         const elapsed = Math.floor((now - this.sessionStartTime) / 1000);
-        log(`[${elapsed}s]ActiveVideo: ${frameStats.hasActiveVideo}`);
+        let statusMsg = `[${elapsed}s]ActiveVideo: ${frameStats.hasActiveVideo}`;
+        if (rtcStats?.video) {
+          const v = rtcStats.video;
+          statusMsg += ` | pktsRecv:${v.packetsReceived} pktsLost:${v.packetsLost} fps:${v.framesPerSecond} jitter:${(v.jitter * 1000).toFixed(1)}ms`;
+        }
+        log(statusMsg);
         lastStatusLog = now;
       }
       
@@ -951,6 +997,42 @@ class ViewerCanaryTest {
       this.viewerReconnectCount
     );
     log(`Viewer Reconnect Summary: Total reconnects: ${this.viewerReconnectCount}`);
+    
+    // Publish packet loss rate from RTCStatsReport (inbound-rtp)
+    if (this.lastRTCStats?.video) {
+      const v = this.lastRTCStats.video;
+      const totalPackets = v.packetsReceived + v.packetsLost;
+      const packetLossRate = totalPackets > 0 ? (v.packetsLost / totalPackets) * 100 : 0;
+      
+      log(`RTCStats Video Summary: packetsReceived=${v.packetsReceived}, packetsLost=${v.packetsLost}, packetLossRate=${packetLossRate.toFixed(2)}%`);
+      log(`RTCStats Video Detail: framesDecoded=${v.framesDecoded}, framesDropped=${v.framesDropped}, nackCount=${v.nackCount}, pliCount=${v.pliCount}`);
+      
+      await CloudWatchMetrics.publishPercentageMetric(
+        this.getMetricName('ViewerPacketLossRate'),
+        this.config.channelName,
+        packetLossRate
+      );
+      
+      await CloudWatchMetrics.publishCountMetric(
+        this.getMetricName('ViewerFramesDropped'),
+        this.config.channelName,
+        v.framesDropped
+      );
+      
+      await CloudWatchMetrics.publishCountMetric(
+        this.getMetricName('ViewerNackCount'),
+        this.config.channelName,
+        v.nackCount
+      );
+      
+      await CloudWatchMetrics.publishCountMetric(
+        this.getMetricName('ViewerPliCount'),
+        this.config.channelName,
+        v.pliCount
+      );
+    } else {
+      log('No RTCStats video data available for packet loss calculation');
+    }
     
     // Publish connection attempt stats for ViewerJoinPercentage aggregation
     const joinPct = this.connectionAttempts > 0
