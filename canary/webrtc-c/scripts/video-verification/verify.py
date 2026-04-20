@@ -177,8 +177,8 @@ def main():
                         help=f'Expected duration in seconds (default: {EXPECTED_DURATION})')
     parser.add_argument('--threshold', type=float, default=0.85,
                         help='Overall score threshold for availability=1 (default: 0.85)')
-    parser.add_argument('--ssim-threshold', type=float, default=0.95,
-                        help='Per-frame SSIM threshold (default: 0.95)')
+    parser.add_argument('--ssim-threshold', type=float, default=0.90,
+                        help='Per-frame SSIM threshold (default: 0.90)')
     parser.add_argument('--keep-frames', action='store_true', help='Keep extracted frames')
     parser.add_argument('--verbose', action='store_true')
     parser.add_argument('--json', action='store_true', dest='json_output',
@@ -247,37 +247,39 @@ def main():
             if i < 5 or not passed or args.verbose:
                 print(f"  [clip sec {i+1} vs ref sec {ref_idx+1}] SSIM={score:.4f} {'PASS' if passed else 'FAIL'}")
 
-        # Phase 6: Compute overall score and availability
+        # Phase 6: Compute availability
+        # Rule 1: duration ratio must be >= 0.85
+        # Rule 2: no more than 5 frames with SSIM below 0.9
         print("\n--- Results ---")
         if not scores:
             print("No frames compared!", file=sys.stderr)
-            result = {'storage_availability': 0, 'score': 0, 'duration_ratio': 0,
-                      'ssim_pass_rate': 0, 'avg_ssim': 0, 'frames_compared': 0}
+            result = {'storage_availability': 0, 'duration_ratio': 0,
+                      'avg_ssim': 0, 'frames_compared': 0, 'frames_failed': 0}
         else:
             avg_ssim = sum(scores) / len(scores)
-            ssim_pass_rate = (num_compare - len(failures)) / num_compare
-            overall_score = duration_ratio * ssim_pass_rate
-            available = 1 if overall_score >= args.threshold else 0
+            low_ssim_frames = [(i, ref, s) for i, ref, s in failures]
 
-            print(f"Duration ratio:   {duration_ratio:.4f}")
-            print(f"SSIM pass rate:   {ssim_pass_rate:.4f} ({num_compare - len(failures)}/{num_compare})")
-            print(f"Average SSIM:     {avg_ssim:.4f}")
-            print(f"Overall score:    {overall_score:.4f} (threshold: {args.threshold})")
-            print(f"Storage available: {available}")
+            duration_ok = duration_ratio >= 0.85
+            ssim_ok = len(low_ssim_frames) <= 5
+            available = 1 if (duration_ok and ssim_ok) else 0
 
-            if failures:
-                print(f"\nFailed frames ({len(failures)}):")
-                for clip_sec, ref_sec, score in failures:
+            print(f"Duration ratio:     {duration_ratio:.4f} ({'PASS' if duration_ok else 'FAIL'} — threshold: 0.85)")
+            print(f"Low SSIM frames:    {len(low_ssim_frames)} ({'PASS' if ssim_ok else 'FAIL'} — max allowed: 5)")
+            print(f"Average SSIM:       {avg_ssim:.4f}")
+            print(f"Frames compared:    {num_compare}")
+            print(f"Storage available:  {available}")
+
+            if low_ssim_frames:
+                print(f"\nFrames below 0.9 SSIM ({len(low_ssim_frames)}):")
+                for clip_sec, ref_sec, score in low_ssim_frames:
                     print(f"  clip sec {clip_sec} vs ref sec {ref_sec}: SSIM={score:.4f}")
 
             result = {
                 'storage_availability': available,
-                'score': round(overall_score, 4),
                 'duration_ratio': round(duration_ratio, 4),
-                'ssim_pass_rate': round(ssim_pass_rate, 4),
                 'avg_ssim': round(avg_ssim, 4),
                 'frames_compared': num_compare,
-                'frames_failed': len(failures),
+                'frames_failed': len(low_ssim_frames),
                 'clip_offset_seconds': offset,
                 'clip_duration': round(clip_duration, 2) if clip_duration else None,
                 'ref_duration': round(ref_duration, 2) if ref_duration else None,

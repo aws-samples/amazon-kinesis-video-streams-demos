@@ -628,12 +628,8 @@ pipeline {
                     }
                     steps {
                         script {
-                            def viewerWaitMin = (params.VIEWER_WAIT_MINUTES != null && params.VIEWER_WAIT_MINUTES.toString().trim() != '') ? params.VIEWER_WAIT_MINUTES.toInteger() : 20
-                            def sessionDurationSec = (params.VIEWER_SESSION_DURATION_SECONDS != null && params.VIEWER_SESSION_DURATION_SECONDS.toString().trim() != '') ? params.VIEWER_SESSION_DURATION_SECONDS.toInteger() : 600
-                            // Master duration = viewer wait + 1 session + 5 min buffer
-                            def masterDuration = (viewerWaitMin * 60) + sessionDurationSec + 300
                             def mutableParams = [:] + params
-                            mutableParams.DURATION_IN_SECONDS = "${masterDuration}"
+                            mutableParams.DURATION_IN_SECONDS = "180"
                             buildStorageCanary(false, mutableParams)
                         }
                     }
@@ -663,12 +659,8 @@ pipeline {
                     }
                     steps {
                         script {
-                            def viewerWaitMin = (params.VIEWER_WAIT_MINUTES != null && params.VIEWER_WAIT_MINUTES.toString().trim() != '') ? params.VIEWER_WAIT_MINUTES.toInteger() : 20
-                            def sessionDurationSec = (params.VIEWER_SESSION_DURATION_SECONDS != null && params.VIEWER_SESSION_DURATION_SECONDS.toString().trim() != '') ? params.VIEWER_SESSION_DURATION_SECONDS.toInteger() : 600
-                            // Master duration = viewer wait + 1 session + 5 min buffer
-                            def masterDuration = (viewerWaitMin * 60) + sessionDurationSec + 300
                             def mutableParams = [:] + params
-                            mutableParams.DURATION_IN_SECONDS = "${masterDuration}"
+                            mutableParams.DURATION_IN_SECONDS = "180"
                             buildStorageCanary(false, mutableParams)
                         }
                     }
@@ -711,12 +703,8 @@ pipeline {
                     }
                     steps {
                         script {
-                            def viewerWaitMin = (params.VIEWER_WAIT_MINUTES != null && params.VIEWER_WAIT_MINUTES.toString().trim() != '') ? params.VIEWER_WAIT_MINUTES.toInteger() : 20
-                            def sessionDurationSec = (params.VIEWER_SESSION_DURATION_SECONDS != null && params.VIEWER_SESSION_DURATION_SECONDS.toString().trim() != '') ? params.VIEWER_SESSION_DURATION_SECONDS.toInteger() : 600
-                            // Master duration = viewer wait + 1 session + 5 min buffer
-                            def masterDuration = (viewerWaitMin * 60) + sessionDurationSec + 300
                             def mutableParams = [:] + params
-                            mutableParams.DURATION_IN_SECONDS = "${masterDuration}"
+                            mutableParams.DURATION_IN_SECONDS = "180"
                             buildStorageCanary(false, mutableParams)
                         }
                     }

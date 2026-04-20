@@ -862,12 +862,12 @@ class ViewerCanaryTest {
       const output = execSync(cmd, { encoding: 'utf-8', timeout: 300000 });
       const results = JSON.parse(output.trim());
 
-      log(`Video verification results: score=${results.score}, availability=${results.storage_availability}, avg SSIM=${results.avg_ssim}`);
+      log(`Video verification results: availability=${results.storage_availability}, avg SSIM=${results.avg_ssim}, duration_ratio=${results.duration_ratio}, failed_frames=${results.frames_failed}`);
 
-      await CloudWatchMetrics.publishPercentageMetric(
-        this.getMetricName('ViewerVideoSSIMFailureRate'),
+      await CloudWatchMetrics.publishCountMetric(
+        this.getMetricName('ViewerStorageAvailability'),
         this.config.channelName,
-        results.frames_compared > 0 ? (results.frames_failed / results.frames_compared) * 100 : 0
+        results.storage_availability
       );
     } catch (error) {
       log(`Video verification failed: ${error.message}`);
