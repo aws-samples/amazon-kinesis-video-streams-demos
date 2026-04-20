@@ -784,9 +784,12 @@ pipeline {
             }
         }
 
-        stage('Reschedule') {
-            steps {
-                // TODO: Maybe there's a better way to write this instead of duplicating it
+    }
+    
+    post {
+        always {
+            script {
+                // Always reschedule regardless of build result to keep the canary running
                 build(
                     job: env.JOB_NAME,
                     parameters: [
@@ -830,14 +833,6 @@ pipeline {
                     ],
                     wait: false
                 )
-            }
-        }
-    }
-    
-    post {
-        always {
-            script {
-                echo "Build complete. Cleanup handled by external cron."
             }
         }
     }
