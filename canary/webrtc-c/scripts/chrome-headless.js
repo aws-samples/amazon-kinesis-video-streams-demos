@@ -653,7 +653,7 @@ class ViewerCanaryTest {
    */
   async getRTCStats(page) {
     return await page.evaluate(() => {
-      const pc = window.viewer?.peerConnection;
+      const pc = window.viewer?.pc;
       if (!pc || typeof pc.getStats !== 'function') return null;
 
       return pc.getStats().then(report => {
