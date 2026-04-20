@@ -550,12 +550,17 @@ class ViewerCanaryTest {
     const startTime = Date.now();
     
     while ((Date.now() - startTime) < startTimeout) {
-      const status = await page.evaluate(() => ({
-        viewerExists: !!(window.viewer),
-        connectionState: window.viewer?.pc?.iceConnectionState,
-        signalingState: window.viewer?.pc?.signalingState,
-        error: window.viewer?.error
-      }));
+      const status = await page.evaluate(() => {
+        const m = typeof master !== 'undefined' ? master : window.master;
+        return {
+          viewerExists: !!(m),
+          connectionState: m?.peerByClientId ? 
+            Object.values(m.peerByClientId)[0]?.getPeerConnection?.()?.iceConnectionState : undefined,
+          signalingState: m?.peerByClientId ?
+            Object.values(m.peerByClientId)[0]?.getPeerConnection?.()?.signalingState : undefined,
+          error: m?.error
+        };
+      });
       
       if (status.viewerExists && !status.error) {
         log('Viewer started successfully!');
@@ -606,7 +611,8 @@ class ViewerCanaryTest {
 
   async getFrameStats(page) {
     return await page.evaluate(() => {
-      const viewerExists = !!(window.viewer);
+      const m = typeof master !== 'undefined' ? master : window.master;
+      const masterExists = !!(m);
       const remoteViewElements = document.querySelectorAll('.remote-view');
       
       let hasActiveVideo = false;
@@ -626,15 +632,14 @@ class ViewerCanaryTest {
       let storageSessionActive = false;
       let signalingConnected = false;
       
-      if (window.viewer) {
-        signalingConnected = window.viewer.signalingClient?.readyState === 1;
-        storageSessionActive = !!(window.viewer.storageSessionJoined || 
-                                window.viewer.isStorageSessionActive ||
-                                (window.viewer.signalingClient && signalingConnected));
+      if (m) {
+        const sigClient = m.channelHelper?.getSignalingClient?.();
+        signalingConnected = sigClient?.readyState === 1;
+        storageSessionActive = !!(signalingConnected && Object.keys(m.peerByClientId || {}).length > 0);
       }
       
       return {
-        viewerExists,
+        viewerExists: masterExists,
         storageSessionActive,
         signalingConnected,
         connectionState: signalingConnected ? 'connected' : 'disconnected',
@@ -652,57 +657,42 @@ class ViewerCanaryTest {
    * or null if the peer connection is not available.
    */
   async getRTCStats(page) {
-    return await page.evaluate(() => {
-      // Strategy 1: Find the peer connection on the viewer object
-      const viewer = window.viewer;
-      let pc = viewer?.pc || viewer?.peerConnection || viewer?.rtcPeerConnection;
+    return await page.evaluate(async () => {
+      // The KVS JS SDK example page stores peer connections in master.peerByClientId
+      // regardless of whether it's running as master or viewer role.
+      // master is declared with `let` so it may not be on `window`.
+      const m = typeof master !== 'undefined' ? master : window.master;
+      const peerMap = m?.peerByClientId;
+      if (!peerMap) return { debug: `no master.peerByClientId (master exists: ${!!m})` };
 
-      // Strategy 2: Find any RTCPeerConnection via the video element's srcObject
+      const clientIds = Object.keys(peerMap);
+      if (clientIds.length === 0) return { debug: 'peerByClientId is empty' };
+
+      const peer = peerMap[clientIds[0]];
+      const pc = typeof peer.getPeerConnection === 'function' ? peer.getPeerConnection() : peer;
       if (!pc || typeof pc.getStats !== 'function') {
-        const video = document.querySelector('.remote-view');
-        if (video?.srcObject) {
-          const receivers = video.srcObject.getTracks().map(track => {
-            // RTCRtpReceiver is not directly on MediaStream, need the PC
-            return null;
-          });
-        }
-        // Last resort: check all viewer properties for an RTCPeerConnection
-        if (viewer) {
-          for (const key of Object.keys(viewer)) {
-            const val = viewer[key];
-            if (val && typeof val === 'object' && typeof val.getStats === 'function' && typeof val.getReceivers === 'function') {
-              pc = val;
-              break;
-            }
-          }
-        }
+        return { debug: `peer found but no getStats. peer keys: [${Object.keys(peer).slice(0, 20)}]` };
       }
 
-      if (!pc || typeof pc.getStats !== 'function') {
-        const keys = viewer ? Object.keys(viewer).slice(0, 30).join(',') : 'no viewer';
-        return { debug: `no RTCPeerConnection found. viewer keys: [${keys}]` };
-      }
-
-      return pc.getStats().then(report => {
-        const result = { video: null, audio: null };
-        report.forEach(stat => {
-          if (stat.type !== 'inbound-rtp') return;
-          const entry = {
-            packetsReceived: stat.packetsReceived || 0,
-            packetsLost: stat.packetsLost || 0,
-            bytesReceived: stat.bytesReceived || 0,
-            jitter: stat.jitter || 0,
-            framesDecoded: stat.framesDecoded || 0,
-            framesDropped: stat.framesDropped || 0,
-            framesPerSecond: stat.framesPerSecond || 0,
-            nackCount: stat.nackCount || 0,
-            pliCount: stat.pliCount || 0,
-          };
-          if (stat.kind === 'video') result.video = entry;
-          else if (stat.kind === 'audio') result.audio = entry;
-        });
-        return result;
+      const report = await pc.getStats();
+      const result = { video: null, audio: null };
+      report.forEach(stat => {
+        if (stat.type !== 'inbound-rtp') return;
+        const entry = {
+          packetsReceived: stat.packetsReceived || 0,
+          packetsLost: stat.packetsLost || 0,
+          bytesReceived: stat.bytesReceived || 0,
+          jitter: stat.jitter || 0,
+          framesDecoded: stat.framesDecoded || 0,
+          framesDropped: stat.framesDropped || 0,
+          framesPerSecond: stat.framesPerSecond || 0,
+          nackCount: stat.nackCount || 0,
+          pliCount: stat.pliCount || 0,
+        };
+        if (stat.kind === 'video') result.video = entry;
+        else if (stat.kind === 'audio') result.audio = entry;
       });
+      return result;
     }).catch((err) => {
       log(`getRTCStats error: ${err.message}`);
       return null;
@@ -1116,9 +1106,11 @@ async function runViewerCanary(config) {
             log(`Stop viewer button not found, attempting manual cleanup`);
             // Manual cleanup if button doesn't exist
             await test.page.evaluate(() => {
-              if (window.viewer && window.viewer.signalingClient) {
+              const m = typeof master !== 'undefined' ? master : window.master;
+              if (m?.channelHelper) {
                 try {
-                  window.viewer.signalingClient.close();
+                  const sigClient = m.channelHelper.getSignalingClient?.();
+                  if (sigClient) sigClient.close();
                   console.log('Manually closed signaling client');
                 } catch (e) {
                   console.log('Error closing signaling client:', e);
