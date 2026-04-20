@@ -23,25 +23,6 @@ def extractViewerStats(String output) {
     return m.find() ? m.group(1) : null
 }
 
-// Polls MASTER_READY in a tight loop without CPS step overhead.
-// Runs as a single non-CPS method call so Jenkins doesn't log hundreds
-// of individual sleep steps.  Returns the number of seconds waited.
-// Requires Thread.sleep to be approved in Jenkins script security.
-@NonCPS
-def waitForMasterReady(int timeoutMs) {
-    def startWait = System.currentTimeMillis()
-    def lastLogTime = startWait
-    while (!MASTER_READY && (System.currentTimeMillis() - startWait) < timeoutMs) {
-        Thread.sleep(5000)
-        if (System.currentTimeMillis() - lastLogTime >= 30000) {
-            def elapsedSec = (System.currentTimeMillis() - startWait) / 1000
-            println "Still waiting for master... (${elapsedSec}s elapsed)"
-            lastLogTime = System.currentTimeMillis()
-        }
-    }
-    return (System.currentTimeMillis() - startWait) / 1000
-}
-
 def buildWebRTCProject(useMbedTLS, thing_prefix) {
     echo 'Flag set to ' + useMbedTLS
     checkout([$class: 'GitSCM', branches: [[name: params.GIT_HASH ]],
@@ -203,9 +184,13 @@ def runViewerSessions(viewerId = "", waitMinutes = 10, viewerCount = "1", stagge
                       userRemoteConfigs: [[url: params.GIT_URL]]])
             
             if (waitMinutes > 0) {
-                def timeoutMs = waitMinutes * 60 * 1000
                 echo "Waiting for master to be ready (timeout: ${waitMinutes} minutes)..."
-                def waitedSec = waitForMasterReady(timeoutMs)
+                def startWait = System.currentTimeMillis()
+                def timeoutMs = waitMinutes * 60 * 1000
+                while (!MASTER_READY && (System.currentTimeMillis() - startWait) < timeoutMs) {
+                    sleep 5
+                }
+                def waitedSec = (System.currentTimeMillis() - startWait) / 1000
                 if (MASTER_READY) {
                     echo "Master is ready! Waited ${waitedSec}s"
                 } else {
