@@ -26,13 +26,14 @@ def extractViewerStats(String output) {
 // Polls MASTER_READY in a tight loop without CPS step overhead.
 // Runs as a single non-CPS method call so Jenkins doesn't log hundreds
 // of individual sleep steps.  Returns the number of seconds waited.
+// Requires Thread.sleep to be approved in Jenkins script security.
 @NonCPS
-def waitForMasterReady(int timeoutMs, int logIntervalMs = 30000) {
+def waitForMasterReady(int timeoutMs) {
     def startWait = System.currentTimeMillis()
     def lastLogTime = startWait
     while (!MASTER_READY && (System.currentTimeMillis() - startWait) < timeoutMs) {
-        Thread.sleep(2000)
-        if (System.currentTimeMillis() - lastLogTime >= logIntervalMs) {
+        Thread.sleep(5000)
+        if (System.currentTimeMillis() - lastLogTime >= 30000) {
             def elapsedSec = (System.currentTimeMillis() - startWait) / 1000
             println "Still waiting for master... (${elapsedSec}s elapsed)"
             lastLogTime = System.currentTimeMillis()
@@ -204,7 +205,6 @@ def runViewerSessions(viewerId = "", waitMinutes = 10, viewerCount = "1", stagge
     def workspaceName = "${env.JOB_NAME}-${viewerId ?: 'viewer'}-${BUILD_NUMBER}"
     ws(workspaceName) {
         try {
-            deleteDir()
             checkout([$class: 'GitSCM', branches: [[name: params.GIT_HASH ]],
                       userRemoteConfigs: [[url: params.GIT_URL]]])
             
@@ -277,8 +277,7 @@ def runViewerSessions(viewerId = "", waitMinutes = 10, viewerCount = "1", stagge
 
             echo "${viewerId ? viewerId + ' ' : ''}viewer session completed"
         } finally {
-            // Ensure complete cleanup
-            deleteDir()
+            // Cleanup handled by Pre Cleanup stage on next iteration
         }
     }
 }
@@ -492,52 +491,6 @@ pipeline {
     }
 
     stages {
-        stage('Pre Cleanup') {
-            steps {
-                script {
-                    sh """
-                        echo "Cleaning up workspace artifacts - Disk usage before cleanup:"
-                        df -h
-                        
-                        # Clean all @tmp directories older than 1 hour
-                        find ~/Jenkins -name "*@tmp" -type d -mmin +60 -exec rm -rf {} + 2>/dev/null || true
-                        
-                        # Keep only last 10 workspace directories per job
-                        cd ~/Jenkins/workspace 2>/dev/null || true
-                        ls -dt webrtc-canary-runner*@[0-9]* 2>/dev/null | grep -v "@tmp" | tail -n +11 | xargs -I {} rm -rf {} 2>/dev/null || true
-                        ls -dt webrtc-gamma-runner*@[0-9]* 2>/dev/null | grep -v "@tmp" | tail -n +11 | xargs -I {} rm -rf {} 2>/dev/null || true
-                        
-                        # Clean Puppeteer cache (keep only latest version for each browser type)
-                        for browser_type in chrome chrome-headless-shell; do
-                            if [ -d ~/.cache/puppeteer/\$browser_type ]; then
-                                find ~/.cache/puppeteer/\$browser_type -maxdepth 1 -type d -name "linux-*" 2>/dev/null | sort -r | tail -n +2 | xargs rm -rf 2>/dev/null || true
-                                # Remove any cache dirs where the executable is missing (corrupt partial downloads)
-                                for dir in ~/.cache/puppeteer/\$browser_type/linux-*; do
-                                    if [ -d "\$dir" ] && ! find "\$dir" -name "\$browser_type" -type f 2>/dev/null | grep -q .; then
-                                        echo "Removing corrupt \$browser_type cache: \$dir"
-                                        rm -rf "\$dir"
-                                    fi
-                                done
-                            fi
-                        done
-                        
-                        # Clean npm cache if over 200MB
-                        if [ -d ~/.npm ] && [ \$(du -sm ~/.npm 2>/dev/null | cut -f1) -gt 200 ]; then
-                            npm cache clean --force 2>/dev/null || true
-                        fi
-                        
-                        # Clean temp files
-                        find /tmp -name "*storage*viewer*" -type d -mmin +60 -exec rm -rf {} + 2>/dev/null || true
-                        find /tmp -name "*webrtc-canary-runner*" -type d -mmin +60 -exec rm -rf {} + 2>/dev/null || true
-                        find /tmp -name "jenkins-*" -type d -mtime +1 -exec rm -rf {} + 2>/dev/null || true
-                        
-                        echo "Cleanup completed - Disk usage after cleanup:"
-                        df -h
-                    """
-                }
-            }
-        }
-
         stage('Fetch STS credentials and export to env vars') {
             steps {
                 script {
@@ -920,22 +873,7 @@ pipeline {
     post {
         always {
             script {
-                sh """
-                    echo "Post-build cleanup - Disk usage before cleanup:"
-                    df -h /
-                    
-                    # Remove current workspace @tmp directory
-                    rm -rf ${env.WORKSPACE}@tmp 2>/dev/null || true
-                    
-                    # Clean build artifacts from current workspace to reclaim space
-                    rm -rf ${env.WORKSPACE}/canary/webrtc-c/build 2>/dev/null || true
-                    
-                    # Remove stale @N workspace copies older than 2 days
-                    find ~/Jenkins/workspace -maxdepth 1 -name "*@[0-9]*" -not -name "*@tmp" -type d -mtime +2 -exec rm -rf {} + 2>/dev/null || true
-                    
-                    echo "Post-build cleanup complete - Disk usage after cleanup:"
-                    df -h /
-                """
+                echo "Build complete. Cleanup handled by external cron."
             }
         }
     }

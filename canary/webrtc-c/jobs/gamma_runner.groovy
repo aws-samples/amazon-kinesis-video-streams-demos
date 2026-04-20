@@ -36,13 +36,14 @@ def extractViewerStats(String output) {
 // Polls MASTER_READY in a tight loop without CPS step overhead.
 // Runs as a single non-CPS method call so Jenkins doesn't log hundreds
 // of individual sleep steps.  Returns the number of seconds waited.
+// Requires Thread.sleep to be approved in Jenkins script security.
 @NonCPS
-def waitForMasterReady(int timeoutMs, int logIntervalMs = 30000) {
+def waitForMasterReady(int timeoutMs) {
     def startWait = System.currentTimeMillis()
     def lastLogTime = startWait
     while (!MASTER_READY && (System.currentTimeMillis() - startWait) < timeoutMs) {
-        Thread.sleep(2000)
-        if (System.currentTimeMillis() - lastLogTime >= logIntervalMs) {
+        Thread.sleep(5000)
+        if (System.currentTimeMillis() - lastLogTime >= 30000) {
             def elapsedSec = (System.currentTimeMillis() - startWait) / 1000
             println "Still waiting for master... (${elapsedSec}s elapsed)"
             lastLogTime = System.currentTimeMillis()
@@ -86,7 +87,6 @@ def runViewerSessions(viewerId = "", waitMinutes = 2, viewerCount = "1") {
     def workspaceName = "${env.JOB_NAME}-${viewerId ?: 'viewer'}-${BUILD_NUMBER}"
     ws(workspaceName) {
         try {
-            deleteDir()
             checkout([$class: 'GitSCM', branches: [[name: params.GIT_HASH]],
                       userRemoteConfigs: [[url: params.GIT_URL]]])
             
@@ -161,7 +161,7 @@ def runViewerSessions(viewerId = "", waitMinutes = 2, viewerCount = "1") {
 
             echo "${viewerId ? viewerId + ' ' : ''}viewer session completed"
         } finally {
-            deleteDir()
+            // Cleanup handled by Pre Cleanup stage on next iteration
         }
     }
 }
