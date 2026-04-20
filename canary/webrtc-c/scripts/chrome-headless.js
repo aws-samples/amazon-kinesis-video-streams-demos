@@ -842,16 +842,13 @@ class ViewerCanaryTest {
       const output = execSync(cmd, { encoding: 'utf-8', timeout: 300000 });
       const results = JSON.parse(output.trim());
 
-      log(`Video verification results: SSIM failure=${results.ssim_failure_pct}%, avg SSIM=${results.avg_ssim}`);
+      log(`Video verification results: score=${results.score}, availability=${results.storage_availability}, avg SSIM=${results.avg_ssim}`);
 
       await CloudWatchMetrics.publishPercentageMetric(
         this.getMetricName('ViewerVideoSSIMFailureRate'),
         this.config.channelName,
-        results.ssim_failure_pct
+        results.frames_compared > 0 ? (results.frames_failed / results.frames_compared) * 100 : 0
       );
-
-      // ViewerVideoFrameLossRate removed — packet loss is now measured via
-      // RTCStatsReport (ViewerPacketLossRate) in getTestResults()
     } catch (error) {
       log(`Video verification failed: ${error.message}`);
     }

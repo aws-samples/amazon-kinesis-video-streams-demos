@@ -424,17 +424,15 @@ def buildStorageCanary(isConsumer, params) {
                 echo "Consumer video verification results: ${output}"
 
                 def results = readJSON text: output
-                def ssimFailurePct = results.ssim_failure_pct ?: 0
-                def frameLossPct = results.frame_loss_pct ?: 0
+                def storageAvailability = results.storage_availability ?: 0
 
                 sh """
                     aws cloudwatch put-metric-data \
                         --namespace KinesisVideoSDKCanary \
                         --metric-data \
-                            MetricName=ConsumerVideoSSIMFailureRate,Value=${ssimFailurePct},Unit=Percent,Dimensions="[{Name=StorageWebRTCSDKCanaryStreamName,Value=${streamName}},{Name=StorageWebRTCSDKCanaryLabel,Value=${scenarioLabel}}]" \
-                            MetricName=ConsumerVideoFrameLossRate,Value=${frameLossPct},Unit=Percent,Dimensions="[{Name=StorageWebRTCSDKCanaryStreamName,Value=${streamName}},{Name=StorageWebRTCSDKCanaryLabel,Value=${scenarioLabel}}]"
+                            MetricName=ConsumerStorageAvailability,Value=${storageAvailability},Unit=Count,Dimensions="[{Name=StorageWebRTCSDKCanaryStreamName,Value=${streamName}},{Name=StorageWebRTCSDKCanaryLabel,Value=${scenarioLabel}}]"
                 """
-                echo "Pushed ConsumerVideoSSIMFailureRate=${ssimFailurePct}%, ConsumerVideoFrameLossRate=${frameLossPct}%"
+                echo "Pushed ConsumerStorageAvailability=${storageAvailability}"
 
                 sh "rm -f '${clipPath}'"
             } catch (err) {
