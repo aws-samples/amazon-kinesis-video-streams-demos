@@ -193,9 +193,16 @@ def runViewerSessions(viewerId = "", waitMinutes = 10, viewerCount = "1", stagge
             if (waitMinutes > 0) {
                 def maxWaitMs = waitMinutes * 60 * 1000
                 def startWait = System.currentTimeMillis()
+                def lastLogTime = startWait
                 echo "Waiting for master to be ready (timeout: ${waitMinutes} minutes)..."
                 while (!MASTER_READY && (System.currentTimeMillis() - startWait) < maxWaitMs) {
                     sleep 2 // poll every 2 seconds
+                    // Log progress every 30 seconds so we know it's still polling
+                    if (System.currentTimeMillis() - lastLogTime >= 30000) {
+                        def elapsedSec = (System.currentTimeMillis() - startWait) / 1000
+                        echo "Still waiting for master... (${elapsedSec}s elapsed)"
+                        lastLogTime = System.currentTimeMillis()
+                    }
                 }
                 if (MASTER_READY) {
                     echo "Master is ready! Waited ${(System.currentTimeMillis() - startWait) / 1000}s"

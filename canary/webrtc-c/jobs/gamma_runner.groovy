@@ -19,6 +19,10 @@ RUNNING_NODES_IN_BUILDING = 0
 HAS_ERROR = false
 VIEWER_SESSION_RESULTS = [:]
 
+// Signal flag: set to true when the storage master build is complete and the binary
+// is about to start streaming. Viewers poll this instead of sleeping a fixed duration.
+MASTER_READY = false
+
 // @NonCPS prevents Jenkins CPS from trying to serialize local variables in this
 // method.  java.util.regex.Matcher is NOT serializable — holding one across a CPS
 // step boundary (sh, sleep, echo …) causes NotSerializableException and kills the
@@ -69,8 +73,24 @@ def runViewerSessions(viewerId = "", waitMinutes = 2, viewerCount = "1") {
                       userRemoteConfigs: [[url: params.GIT_URL]]])
             
             if (waitMinutes > 0) {
-                echo "Waiting ${waitMinutes} minutes for master to build"
-                sleep waitMinutes * 60
+                def maxWaitMs = waitMinutes * 60 * 1000
+                def startWait = System.currentTimeMillis()
+                def lastLogTime = startWait
+                echo "Waiting for master to be ready (timeout: ${waitMinutes} minutes)..."
+                while (!MASTER_READY && (System.currentTimeMillis() - startWait) < maxWaitMs) {
+                    sleep 2 // poll every 2 seconds
+                    // Log progress every 30 seconds so we know it's still polling
+                    if (System.currentTimeMillis() - lastLogTime >= 30000) {
+                        def elapsedSec = (System.currentTimeMillis() - startWait) / 1000
+                        echo "Still waiting for master... (${elapsedSec}s elapsed)"
+                        lastLogTime = System.currentTimeMillis()
+                    }
+                }
+                if (MASTER_READY) {
+                    echo "Master is ready! Waited ${(System.currentTimeMillis() - startWait) / 1000}s"
+                } else {
+                    echo "WARNING: Master not ready after ${waitMinutes} minutes, proceeding anyway"
+                }
             }
             
             def endpointValue = params.ENDPOINT ?: ''
@@ -203,6 +223,7 @@ def buildStorageCanary(params) {
     ].collect{ k, v -> "${k}=${v}" }
 
     RUNNING_NODES_IN_BUILDING++
+    MASTER_READY = false
     if (params.FIRST_ITERATION) {
         deleteDir()
     }
@@ -213,6 +234,8 @@ def buildStorageCanary(params) {
         RUNNING_NODES_IN_BUILDING == 0
     }
 
+    MASTER_READY = true
+    echo "Master build complete, signaling viewers (MASTER_READY=true)"
     withRunnerWrapper(envs) {
         sh """
             cd ./canary/webrtc-c/build &&
