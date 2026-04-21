@@ -35,12 +35,12 @@ from PIL import Image
 from skimage.metrics import structural_similarity as ssim
 
 
-FPS = 25
-TOTAL_SOURCE_FRAMES = 4500
-EXPECTED_DURATION = TOTAL_SOURCE_FRAMES / FPS  # 180s
+FPS = 30
+TOTAL_SOURCE_FRAMES = 4676
+EXPECTED_DURATION = TOTAL_SOURCE_FRAMES / FPS  # ~155.87s
 
 # Timer crop coordinates for 1280x720 frames
-TIMER_CROP = (30, 30, 420, 80)
+TIMER_CROP = (25, 20, 145, 90)
 
 
 def ocr_timer(frame_path):

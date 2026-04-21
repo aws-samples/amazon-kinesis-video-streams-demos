@@ -913,7 +913,7 @@ class ViewerCanaryTest {
     
     // Start timer immediately since we already joined the storage session
     this.timerStarted = true;
-    const monitorDurationMs = 180000; // 3 minutes
+    const monitorDurationMs = 156000; // 2 min 36 sec
     log(`Storage session joined, monitoring connection for ${monitorDurationMs / 1000} seconds...`);
     setTimeout(() => {
       this.testCompleted = true;

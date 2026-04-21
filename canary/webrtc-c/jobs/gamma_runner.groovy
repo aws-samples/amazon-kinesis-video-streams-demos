@@ -248,14 +248,14 @@ pipeline {
         string(name: 'STORAGE_VIEWER_THREE_NODE_LABEL', defaultValue: 'webrtc-storage-consumer')
         string(name: 'RUNNER_LABEL', defaultValue: 'GammaTest')
         string(name: 'SCENARIO_LABEL', defaultValue: 'GammaTest')
-        string(name: 'DURATION_IN_SECONDS', defaultValue: '180')
+        string(name: 'DURATION_IN_SECONDS', defaultValue: '156')
         string(name: 'GIT_URL', defaultValue: 'https://github.com/aws-samples/amazon-kinesis-video-streams-demos.git')
         string(name: 'GIT_HASH', defaultValue: 'clean_viewer_test')
         string(name: 'AWS_DEFAULT_REGION', defaultValue: 'us-west-2')
         string(name: 'ENDPOINT', defaultValue: '', description: 'Custom endpoint URL (e.g., gamma endpoint)')
         string(name: 'METRIC_SUFFIX', defaultValue: '-gamma')
         string(name: 'VIEWER_WAIT_MINUTES', defaultValue: '20', description: 'Minutes to wait for master to build')
-        string(name: 'VIEWER_SESSION_DURATION_SECONDS', defaultValue: '180', description: 'Duration in seconds for each viewer session (default 3 minutes)')
+        string(name: 'VIEWER_SESSION_DURATION_SECONDS', defaultValue: '156', description: 'Duration in seconds for each viewer session (default 2 min 36 sec)')
         booleanParam(name: 'KEEP_RECORDING', defaultValue: false, description: 'Keep viewer video recordings after verification')
         booleanParam(name: 'DEBUG_LOG_SDP', defaultValue: true)
         booleanParam(name: 'FIRST_ITERATION', defaultValue: true)
@@ -324,7 +324,7 @@ pipeline {
                     steps {
                         script {
                             def mutableParams = [:] + params
-                            mutableParams.DURATION_IN_SECONDS = "180"
+                            mutableParams.DURATION_IN_SECONDS = "156"
                             buildStorageCanary(mutableParams)
                         }
                     }
@@ -357,7 +357,7 @@ pipeline {
                     steps {
                         script {
                             def mutableParams = [:] + params
-                            mutableParams.DURATION_IN_SECONDS = "180"
+                            mutableParams.DURATION_IN_SECONDS = "156"
                             buildStorageCanary(mutableParams)
                         }
                     }
@@ -403,7 +403,7 @@ pipeline {
                     steps {
                         script {
                             def mutableParams = [:] + params
-                            mutableParams.DURATION_IN_SECONDS = "180"
+                            mutableParams.DURATION_IN_SECONDS = "156"
                             buildStorageCanary(mutableParams)
                         }
                     }
