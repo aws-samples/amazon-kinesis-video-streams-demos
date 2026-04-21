@@ -343,6 +343,7 @@ def buildStorageCanary(isConsumer, params) {
       'M2_HOME': "/opt/apache-maven-3.6.3",
       'AWS_DEFAULT_REGION': params.AWS_DEFAULT_REGION,
       'CANARY_STREAM_NAME': "${env.JOB_NAME}-${params.RUNNER_LABEL}",
+      'CANARY_DURATION_IN_SECONDS': "${params.DURATION_IN_SECONDS.toInteger() + 120}",
       'VIDEO_VERIFY_ENABLED': params.VIDEO_VERIFY_ENABLED?.toString() ?: 'false',
       'CANARY_CLIP_OUTPUT_PATH': "${env.WORKSPACE}/canary/consumer-java/clip-${START_TIMESTAMP}.mp4"
     ]
@@ -557,6 +558,7 @@ pipeline {
         }
 
         stage('Build and Run Webrtc-Storage Master and Consumer Canaries') {
+            failFast true
             when {
                 allOf {
                     equals expected: false, actual: params.IS_SIGNALING
@@ -590,6 +592,7 @@ pipeline {
 
 
         stage('Build and Run Webrtc-Storage Master and Consumer Canaries on Same Node') {
+            failFast true
             when {
                 allOf {
                     equals expected: false, actual: params.IS_SIGNALING

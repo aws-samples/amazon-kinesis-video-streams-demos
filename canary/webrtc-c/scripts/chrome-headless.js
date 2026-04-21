@@ -873,10 +873,9 @@ class ViewerCanaryTest {
       log(`Video verification failed: ${error.message}`);
     }
 
-    // Clean up recording unless KEEP_RECORDING is set
-    if (process.env.KEEP_RECORDING !== 'true' && this.recordingFilePath && fs.existsSync(this.recordingFilePath)) {
-      fs.unlinkSync(this.recordingFilePath);
-      log(`Recording cleaned up: ${this.recordingFilePath}`);
+    // Preserve recording for manual verification
+    if (this.recordingFilePath && fs.existsSync(this.recordingFilePath)) {
+      log(`Viewer recording preserved at: ${this.recordingFilePath}`);
     }
   }
 
