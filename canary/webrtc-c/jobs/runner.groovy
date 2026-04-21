@@ -318,7 +318,6 @@ def buildStorageCanary(isConsumer, params) {
       'AWS_KVS_LOG_LEVEL': params.AWS_KVS_LOG_LEVEL,
       'CANARY_USE_IOT_PROVIDER': params.USE_IOT,
       'CANARY_LABEL': params.SCENARIO_LABEL,
-      'CANARY_DURATION_IN_SECONDS': params.DURATION_IN_SECONDS,
       'AWS_IOT_CORE_CREDENTIAL_ENDPOINT': "${endpoint}",
       'AWS_IOT_CORE_CERT': "${core_cert_file}",
       'AWS_IOT_CORE_PRIVATE_KEY': "${private_key_file}",
@@ -327,6 +326,7 @@ def buildStorageCanary(isConsumer, params) {
     ]
 
     def masterEnvs = [
+      'CANARY_DURATION_IN_SECONDS': params.DURATION_IN_SECONDS,
       'CANARY_USE_TURN': params.USE_TURN,
       'CANARY_TRICKLE_ICE': params.TRICKLE_ICE,
       'CANARY_LOG_GROUP_NAME': params.LOG_GROUP_NAME,
