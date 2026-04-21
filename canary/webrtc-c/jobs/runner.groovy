@@ -557,7 +557,6 @@ pipeline {
         }
 
         stage('Build and Run Webrtc-Storage Master and Consumer Canaries') {
-            failFast true
             when {
                 allOf {
                     equals expected: false, actual: params.IS_SIGNALING
@@ -591,7 +590,6 @@ pipeline {
 
 
         stage('Build and Run Webrtc-Storage Master and Consumer Canaries on Same Node') {
-            failFast true
             when {
                 allOf {
                     equals expected: false, actual: params.IS_SIGNALING
