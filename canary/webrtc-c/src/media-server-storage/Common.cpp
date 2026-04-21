@@ -287,11 +287,8 @@ VOID onConnectionStateChange(UINT64 customData, RTC_PEER_CONNECTION_STATE newSta
     DLOGI("New connection state %u", newState);
 
     switch (newState) {
-        case RTC_PEER_CONNECTION_STATE_CONNECTING:
-            DLOGI("[Canary] Peer connection CONNECTING — pushing PeerConnectionAvailability = 0 (will update to 1 on success)");
-            Canary::Cloudwatch::getInstance().monitoring.pushPeerConnectionAvailability(0.0);
-            break;
         case RTC_PEER_CONNECTION_STATE_CONNECTED:
+            gConnectingStartTime = 0;
             ATOMIC_STORE_BOOL(&pSampleConfiguration->connected, TRUE);
             CVAR_BROADCAST(pSampleConfiguration->cvar);
 
