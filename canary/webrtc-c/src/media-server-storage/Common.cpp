@@ -1941,4 +1941,5 @@ STATUS handleWriteFrameMetricIncrementation(PSampleStreamingSession pSampleStrea
         }
         pSampleStreamingSession->canaryOutgoingRTPMetricsContext.videoFramesGenerated++;
         pSampleStreamingSession->canaryOutgoingRTPMetricsContext.videoBytesGenerated += frameSize;
+        return STATUS_SUCCESS;
 }
