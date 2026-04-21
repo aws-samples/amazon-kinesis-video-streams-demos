@@ -2,19 +2,22 @@
 """
 Video verification script for WebRTC storage canary.
 
-Compares the GetClip MP4 (received from storage) against the source H.264
-frames sent by the C master to determine ConsumerStorageAvailability.
+Compares the received video (GetClip or viewer recording) against the source
+H.264 frames to determine StorageAvailability.
 
 Pipeline:
   1. Build a reference video from the raw H.264 sample frames
-  2. Compare durations (reference vs GetClip)
-  3. Extract 1 frame per second from both videos
-  4. Compare matching seconds via SSIM
-  5. Emit storage_availability: 1 if score > threshold, 0 otherwise
+  2. Extract ALL frames from the reference as PNGs (indexed by frame number)
+  3. Extract 1 frame per second from the received clip
+  4. OCR each clip frame to read the frame counter
+  5. Compare each clip frame against the reference PNG at that frame index via SSIM
+  6. Emit storage_availability: 1 if thresholds pass, 0 otherwise
 
-Score = (duration_ratio) * (ssim_pass_rate)
-  - duration_ratio = min(clip_duration, expected_duration) / expected_duration
-  - ssim_pass_rate  = frames_passing_ssim / frames_compared
+Thresholds (matching VideoVerificationComponent.java):
+  - Duration >= 120 seconds
+  - Max SSIM > 0.99
+  - Avg SSIM > 0.85
+  - Min SSIM > 0.03
 
 Usage:
   python verify.py --recording clip.mp4 --source-frames ../../assets/h264SampleFrames --json
@@ -39,57 +42,32 @@ FPS = 30
 TOTAL_SOURCE_FRAMES = 4676
 EXPECTED_DURATION = TOTAL_SOURCE_FRAMES / FPS  # ~155.87s
 
-# Timer crop coordinates for 1280x720 frames
+# Sync box crop coordinates for 1280x720 frames
 TIMER_CROP = (25, 20, 145, 90)
 
 
-def ocr_timer(frame_path):
-    """Read the timer text from a frame image."""
+def ocr_frame_number(frame_path):
+    """Read the frame counter from the sync box region.
+    Returns the frame number as an integer, or None if OCR fails."""
     img = Image.open(frame_path)
     timer_region = img.crop(TIMER_CROP)
-    text = pytesseract.image_to_string(timer_region, config='--psm 7').strip()
-    return text
-
-
-def parse_timer(timer_text):
-    """Parse timer text like '0:00:17.080' into total seconds (float)."""
-    import re
-    timer_text = timer_text.replace(',', '.').replace('..', '.')
-
-    match = re.match(r'(\d+):(\d+):(\d+)\.(\d+)', timer_text)
-    if match:
-        h, m, s, ms = match.groups()
-        return int(h) * 3600 + int(m) * 60 + int(s) + int(ms) / 1000.0
-
-    match = re.match(r'(\d+):(\d+)\.(\d+)', timer_text)
-    if match:
-        m, s, ms = match.groups()
-        return int(m) * 60 + int(s) + int(ms) / 1000.0
-
-    match = re.match(r'(\d+)\.(\d+)', timer_text)
-    if match:
-        s, ms = match.groups()
-        return int(s) + int(ms) / 1000.0
-
+    upscaled = timer_region.resize(
+        (timer_region.width * 4, timer_region.height * 4), Image.LANCZOS)
+    gray = upscaled.convert('L')
+    threshold = gray.point(lambda x: 255 if x > 128 else 0)
+    # Auto-crop to the white box to remove black border
+    arr = np.array(threshold)
+    white_rows = np.where(arr.mean(axis=1) > 128)[0]
+    white_cols = np.where(arr.mean(axis=0) > 128)[0]
+    if len(white_rows) > 10 and len(white_cols) > 10:
+        tight = threshold.crop((white_cols[0]+5, white_rows[0]+5, white_cols[-1]-5, white_rows[-1]-5))
+    else:
+        tight = threshold
+    text = pytesseract.image_to_string(
+        tight, config='--psm 7 -c tessedit_char_whitelist=0123456789').strip()
+    if text and text.isdigit():
+        return int(text)
     return None
-
-
-def detect_clip_offset(clip_frames, num_attempts=5):
-    """OCR the first few frames of the GetClip to determine the time offset in seconds.
-    Returns the offset as an integer number of seconds, or 0 if OCR fails."""
-    for i in range(min(num_attempts, len(clip_frames))):
-        timer_text = ocr_timer(clip_frames[i])
-        timer_sec = parse_timer(timer_text)
-        if timer_sec is not None:
-            # The extracted frame index i corresponds to second i of the clip.
-            # The timer tells us what second of the source stream this is.
-            offset = int(timer_sec) - i
-            print(f"  OCR frame {i}: timer='{timer_text}' -> {timer_sec:.1f}s, offset={offset}s")
-            return max(0, offset)
-        else:
-            print(f"  OCR frame {i}: failed ('{timer_text}'), trying next")
-    print("  WARNING: Could not determine offset via OCR, using 0")
-    return 0
 
 
 def get_video_duration(video_path):
@@ -126,7 +104,6 @@ def build_reference_video(source_dir, output_path):
             if os.path.exists(h264_path):
                 with open(h264_path, 'rb') as f:
                     out.write(f.read())
-
     cmd = [
         'ffmpeg', '-y', '-f', 'h264', '-r', str(FPS),
         '-i', stream_path, '-c:v', 'libx264', '-pix_fmt', 'yuv420p',
@@ -139,6 +116,22 @@ def build_reference_video(source_dir, output_path):
         return None
     print(f"Reference video built: {output_path}")
     return output_path
+
+
+def extract_all_frames(video_path, output_dir):
+    """Extract every frame from a video as PNGs."""
+    os.makedirs(output_dir, exist_ok=True)
+    cmd = [
+        'ffmpeg', '-i', video_path,
+        os.path.join(output_dir, 'frame-%05d.png')
+    ]
+    result = subprocess.run(cmd, capture_output=True, text=True)
+    if result.returncode != 0:
+        print(f"ffmpeg error: {result.stderr}", file=sys.stderr)
+        return []
+    frames = sorted(glob.glob(os.path.join(output_dir, 'frame-*.png')))
+    print(f"Extracted {len(frames)} frames from {video_path}")
+    return frames
 
 
 def extract_frames_1fps(video_path, output_dir):
@@ -170,15 +163,11 @@ def compute_ssim(img_path_a, img_path_b):
 
 def main():
     parser = argparse.ArgumentParser(
-        description='Verify GetClip video against source frames for ConsumerStorageAvailability')
-    parser.add_argument('--recording', required=True, help='Path to GetClip MP4')
+        description='Verify received video against source frames for StorageAvailability')
+    parser.add_argument('--recording', required=True, help='Path to received video (GetClip or viewer recording)')
     parser.add_argument('--source-frames', required=True, help='Path to H.264 source frames directory')
     parser.add_argument('--expected-duration', type=float, default=EXPECTED_DURATION,
                         help=f'Expected duration in seconds (default: {EXPECTED_DURATION})')
-    parser.add_argument('--threshold', type=float, default=0.85,
-                        help='Overall score threshold for availability=1 (default: 0.85)')
-    parser.add_argument('--ssim-threshold', type=float, default=0.90,
-                        help='Per-frame SSIM threshold (default: 0.90)')
     parser.add_argument('--keep-frames', action='store_true', help='Keep extracted frames')
     parser.add_argument('--verbose', action='store_true')
     parser.add_argument('--json', action='store_true', dest='json_output',
@@ -198,7 +187,7 @@ def main():
 
     work_dir = tempfile.mkdtemp(prefix='video-verify-')
     try:
-        # Phase 1: Build reference video from source frames
+        # Phase 1: Build reference video and extract ALL frames
         print("\n--- Phase 1: Building reference video ---")
         ref_video = build_reference_video(
             args.source_frames, os.path.join(work_dir, 'reference.mp4'))
@@ -206,83 +195,87 @@ def main():
             print("Failed to build reference video", file=sys.stderr)
             sys.exit(1)
 
-        # Phase 2: Duration comparison
-        print("\n--- Phase 2: Duration comparison ---")
-        ref_duration = get_video_duration(ref_video)
+        print("\n--- Phase 2: Extracting all reference frames ---")
+        ref_frames = extract_all_frames(ref_video, os.path.join(work_dir, 'ref'))
+        if not ref_frames:
+            print("Failed to extract reference frames", file=sys.stderr)
+            sys.exit(1)
+
+        # Phase 3: Duration check
+        print("\n--- Phase 3: Duration comparison ---")
         clip_duration = get_video_duration(args.recording)
         expected = args.expected_duration
-
-        print(f"Reference duration: {ref_duration:.2f}s")
-        print(f"GetClip duration:   {clip_duration:.2f}s")
+        print(f"Clip duration:      {clip_duration:.2f}s")
         print(f"Expected duration:  {expected:.2f}s")
 
-        duration_ratio = min(clip_duration, expected) / expected if expected > 0 else 0
-        print(f"Duration ratio:     {duration_ratio:.4f}")
-
-        # Phase 3: Extract 1fps from both
-        print("\n--- Phase 3: Extracting frames at 1 FPS ---")
-        ref_frames = extract_frames_1fps(ref_video, os.path.join(work_dir, 'ref'))
+        # Phase 4: Extract 1fps from clip
+        print("\n--- Phase 4: Extracting clip frames at 1 FPS ---")
         clip_frames = extract_frames_1fps(args.recording, os.path.join(work_dir, 'clip'))
+        if not clip_frames:
+            print("Failed to extract clip frames", file=sys.stderr)
+            sys.exit(1)
 
-        # Phase 4: Determine clip offset via OCR and compare with alignment
-        print("\n--- Phase 4: Detecting clip offset via OCR ---")
-        offset = detect_clip_offset(clip_frames)
-        print(f"Clip starts at second {offset} of the source stream")
-
-        # Compare: clip frame i <-> ref frame (i + offset)
-        num_compare = 0
+        # Phase 5: OCR each clip frame and compare against matching reference frame
+        print(f"\n--- Phase 5: OCR + SSIM comparison ({len(clip_frames)} clip frames) ---")
         scores = []
-        failures = []
-        print(f"\n--- Phase 5: Comparing frames (offset={offset}s) ---")
-        for i in range(len(clip_frames)):
-            ref_idx = i + offset
-            if ref_idx >= len(ref_frames):
-                break
-            num_compare += 1
-            score = compute_ssim(ref_frames[ref_idx], clip_frames[i])
+        ocr_failures = 0
+
+        for i, clip_frame in enumerate(clip_frames):
+            frame_num = ocr_frame_number(clip_frame)
+            if frame_num is None:
+                if i < 5 or args.verbose:
+                    print(f"  [clip sec {i+1}] OCR failed, skipping")
+                ocr_failures += 1
+                continue
+
+            # frame_num is 1-based, ref_frames is 0-indexed
+            ref_idx = frame_num - 1
+            if ref_idx < 0 or ref_idx >= len(ref_frames):
+                if i < 5 or args.verbose:
+                    print(f"  [clip sec {i+1}] frame #{frame_num} out of range, skipping")
+                continue
+
+            score = compute_ssim(clip_frame, ref_frames[ref_idx])
             scores.append(score)
-            passed = score >= args.ssim_threshold
-            if not passed:
-                failures.append((i + 1, ref_idx + 1, score))
-            if i < 5 or not passed or args.verbose:
-                print(f"  [clip sec {i+1} vs ref sec {ref_idx+1}] SSIM={score:.4f} {'PASS' if passed else 'FAIL'}")
+
+            if i < 5 or score < 0.9 or args.verbose:
+                print(f"  [clip sec {i+1}] frame #{frame_num} -> SSIM={score:.4f}")
 
         # Phase 6: Compute availability
-        # Rule 1: duration ratio must be >= 0.85
-        # Rule 2: no more than 5 frames with SSIM below 0.9
+        # Thresholds match VideoVerificationComponent.java
         print("\n--- Results ---")
         if not scores:
             print("No frames compared!", file=sys.stderr)
-            result = {'storage_availability': 0, 'duration_ratio': 0,
-                      'avg_ssim': 0, 'frames_compared': 0, 'frames_failed': 0}
+            result = {'storage_availability': 0, 'clip_duration': clip_duration,
+                      'frames_compared': 0, 'ocr_failures': ocr_failures}
         else:
             avg_ssim = sum(scores) / len(scores)
-            low_ssim_frames = [(i, ref, s) for i, ref, s in failures]
+            max_ssim = max(scores)
+            min_ssim = min(scores)
 
-            duration_ok = duration_ratio >= 0.85
-            ssim_ok = len(low_ssim_frames) <= 5
-            available = 1 if (duration_ok and ssim_ok) else 0
+            duration_ok = clip_duration is not None and clip_duration >= 120
+            max_ssim_ok = max_ssim > 0.99
+            avg_ssim_ok = avg_ssim > 0.85
+            min_ssim_ok = min_ssim > 0.03
+            frames_ok = len(scores) >= (TOTAL_SOURCE_FRAMES - 1500)
+            available = 1 if (duration_ok and max_ssim_ok and avg_ssim_ok and min_ssim_ok and frames_ok) else 0
 
-            print(f"Duration ratio:     {duration_ratio:.4f} ({'PASS' if duration_ok else 'FAIL'} — threshold: 0.85)")
-            print(f"Low SSIM frames:    {len(low_ssim_frames)} ({'PASS' if ssim_ok else 'FAIL'} — max allowed: 5)")
-            print(f"Average SSIM:       {avg_ssim:.4f}")
-            print(f"Frames compared:    {num_compare}")
+            print(f"Duration:           {clip_duration:.2f}s ({'PASS' if duration_ok else 'FAIL'} — threshold: >= 120s)")
+            print(f"Max SSIM:           {max_ssim:.4f} ({'PASS' if max_ssim_ok else 'FAIL'} — threshold: > 0.99)")
+            print(f"Avg SSIM:           {avg_ssim:.4f} ({'PASS' if avg_ssim_ok else 'FAIL'} — threshold: > 0.85)")
+            print(f"Min SSIM:           {min_ssim:.4f} ({'PASS' if min_ssim_ok else 'FAIL'} — threshold: > 0.03)")
+            print(f"Frames compared:    {len(scores)} ({'PASS' if frames_ok else 'FAIL'} — threshold: >= {TOTAL_SOURCE_FRAMES - 1500})")
+            print(f"OCR failures:       {ocr_failures}")
             print(f"Storage available:  {available}")
-
-            if low_ssim_frames:
-                print(f"\nFrames below 0.9 SSIM ({len(low_ssim_frames)}):")
-                for clip_sec, ref_sec, score in low_ssim_frames:
-                    print(f"  clip sec {clip_sec} vs ref sec {ref_sec}: SSIM={score:.4f}")
 
             result = {
                 'storage_availability': available,
-                'duration_ratio': round(duration_ratio, 4),
+                'max_ssim': round(max_ssim, 4),
                 'avg_ssim': round(avg_ssim, 4),
-                'frames_compared': num_compare,
-                'frames_failed': len(low_ssim_frames),
-                'clip_offset_seconds': offset,
+                'min_ssim': round(min_ssim, 4),
+                'frames_compared': len(scores),
+                'ocr_failures': ocr_failures,
                 'clip_duration': round(clip_duration, 2) if clip_duration else None,
-                'ref_duration': round(ref_duration, 2) if ref_duration else None,
                 'expected_duration': round(expected, 2),
             }
 
