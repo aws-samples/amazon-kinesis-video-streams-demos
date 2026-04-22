@@ -7,10 +7,10 @@ H.264 frames to determine StorageAvailability.
 
 Pipeline:
   1. Build a reference video from the raw H.264 sample frames
-  2. Extract ALL frames from the reference as PNGs (indexed by frame number)
-  3. Extract 1 frame per second from the received clip
-  4. OCR each clip frame to read the frame counter
-  5. Compare each clip frame against the reference PNG at that frame index via SSIM
+  2. Extract 1fps from the received clip
+  3. OCR each clip frame to read the frame counter
+  4. Extract only the needed reference frames (by frame number)
+  5. Compare each clip frame against its matching reference frame via SSIM
   6. Emit storage_availability: 1 if thresholds pass, 0 otherwise
 
 Thresholds (matching VideoVerificationComponent.java):
@@ -18,6 +18,7 @@ Thresholds (matching VideoVerificationComponent.java):
   - Max SSIM > 0.99
   - Avg SSIM > 0.85
   - Min SSIM > 0.03
+  - Clip frame count >= TOTAL_SOURCE_FRAMES - 1500
 
 Usage:
   python verify.py --recording clip.mp4 --source-frames ../../assets/h264SampleFrames --json
@@ -41,6 +42,7 @@ from skimage.metrics import structural_similarity as ssim
 FPS = 30
 TOTAL_SOURCE_FRAMES = 4676
 EXPECTED_DURATION = TOTAL_SOURCE_FRAMES / FPS  # ~155.87s
+DROPPED_FRAME_THRESHOLD = 1500
 
 # Sync box crop coordinates for 1280x720 frames
 TIMER_CROP = (25, 20, 145, 90)
@@ -55,7 +57,6 @@ def ocr_frame_number(frame_path):
         (timer_region.width * 4, timer_region.height * 4), Image.LANCZOS)
     gray = upscaled.convert('L')
     threshold = gray.point(lambda x: 255 if x > 128 else 0)
-    # Auto-crop to the white box to remove black border
     arr = np.array(threshold)
     white_rows = np.where(arr.mean(axis=1) > 128)[0]
     white_cols = np.where(arr.mean(axis=0) > 128)[0]
@@ -118,20 +119,39 @@ def build_reference_video(source_dir, output_path):
     return output_path
 
 
-def extract_all_frames(video_path, output_dir):
-    """Extract every frame from a video as PNGs."""
+def extract_specific_frames(video_path, output_dir, frame_numbers):
+    """Extract specific frames from a video by frame number (1-based).
+    Uses a single ffmpeg call with a select filter for efficiency."""
     os.makedirs(output_dir, exist_ok=True)
+    if not frame_numbers:
+        return {}
+
+    # Build select filter: select frames by 0-based index
+    conditions = '+'.join(f'eq(n\\,{n-1})' for n in sorted(frame_numbers))
+    select_filter = f"select='{conditions}'"
+
     cmd = [
         'ffmpeg', '-i', video_path,
+        '-vf', select_filter,
+        '-vsync', '0',
         os.path.join(output_dir, 'frame-%05d.png')
     ]
     result = subprocess.run(cmd, capture_output=True, text=True)
     if result.returncode != 0:
-        print(f"ffmpeg error: {result.stderr}", file=sys.stderr)
-        return []
-    frames = sorted(glob.glob(os.path.join(output_dir, 'frame-*.png')))
-    print(f"Extracted {len(frames)} frames from {video_path}")
-    return frames
+        print(f"ffmpeg error extracting frames: {result.stderr}", file=sys.stderr)
+        return {}
+
+    # Map output files back to frame numbers
+    # ffmpeg outputs sequentially: frame-00001.png, frame-00002.png, ...
+    # in the same order as the sorted frame_numbers
+    output_files = sorted(glob.glob(os.path.join(output_dir, 'frame-*.png')))
+    sorted_nums = sorted(frame_numbers)
+    result_map = {}
+    for idx, num in enumerate(sorted_nums):
+        if idx < len(output_files):
+            result_map[num] = output_files[idx]
+    print(f"Extracted {len(result_map)} specific frames from {video_path}")
+    return result_map
 
 
 def extract_frames_1fps(video_path, output_dir):
@@ -164,7 +184,7 @@ def compute_ssim(img_path_a, img_path_b):
 def main():
     parser = argparse.ArgumentParser(
         description='Verify received video against source frames for StorageAvailability')
-    parser.add_argument('--recording', required=True, help='Path to received video (GetClip or viewer recording)')
+    parser.add_argument('--recording', required=True, help='Path to received video')
     parser.add_argument('--source-frames', required=True, help='Path to H.264 source frames directory')
     parser.add_argument('--expected-duration', type=float, default=EXPECTED_DURATION,
                         help=f'Expected duration in seconds (default: {EXPECTED_DURATION})')
@@ -187,7 +207,7 @@ def main():
 
     work_dir = tempfile.mkdtemp(prefix='video-verify-')
     try:
-        # Phase 1: Build reference video and extract ALL frames
+        # Phase 1: Build reference video
         print("\n--- Phase 1: Building reference video ---")
         ref_video = build_reference_video(
             args.source_frames, os.path.join(work_dir, 'reference.mp4'))
@@ -195,54 +215,71 @@ def main():
             print("Failed to build reference video", file=sys.stderr)
             sys.exit(1)
 
-        print("\n--- Phase 2: Extracting all reference frames ---")
-        ref_frames = extract_all_frames(ref_video, os.path.join(work_dir, 'ref'))
-        if not ref_frames:
-            print("Failed to extract reference frames", file=sys.stderr)
-            sys.exit(1)
-
-        # Phase 3: Duration check
-        print("\n--- Phase 3: Duration comparison ---")
+        # Phase 2: Duration and frame count check
+        print("\n--- Phase 2: Duration and frame count ---")
         clip_duration = get_video_duration(args.recording)
         expected = args.expected_duration
+
+        # Get total frame count of the clip
+        fc_cmd = [
+            'ffprobe', '-v', 'error', '-select_streams', 'v:0',
+            '-count_frames', '-show_entries', 'stream=nb_read_frames',
+            '-of', 'default=noprint_wrappers=1:nokey=1', args.recording
+        ]
+        fc_result = subprocess.run(fc_cmd, capture_output=True, text=True)
+        try:
+            clip_total_frames = int(fc_result.stdout.strip())
+        except ValueError:
+            clip_total_frames = 0
+
         print(f"Clip duration:      {clip_duration:.2f}s")
+        print(f"Clip total frames:  {clip_total_frames}")
         print(f"Expected duration:  {expected:.2f}s")
 
-        # Phase 4: Extract 1fps from clip
-        print("\n--- Phase 4: Extracting clip frames at 1 FPS ---")
+        # Phase 3: Extract 1fps from clip
+        print("\n--- Phase 3: Extracting clip frames at 1 FPS ---")
         clip_frames = extract_frames_1fps(args.recording, os.path.join(work_dir, 'clip'))
         if not clip_frames:
             print("Failed to extract clip frames", file=sys.stderr)
             sys.exit(1)
 
-        # Phase 5: OCR each clip frame and compare against matching reference frame
-        print(f"\n--- Phase 5: OCR + SSIM comparison ({len(clip_frames)} clip frames) ---")
-        scores = []
+        # Phase 4: OCR all clip frames to get frame numbers
+        print(f"\n--- Phase 4: OCR {len(clip_frames)} clip frames ---")
+        clip_to_ref = []  # list of (clip_frame_path, ref_frame_number)
         ocr_failures = 0
-
         for i, clip_frame in enumerate(clip_frames):
             frame_num = ocr_frame_number(clip_frame)
-            if frame_num is None:
+            if frame_num is None or frame_num < 1 or frame_num > TOTAL_SOURCE_FRAMES:
                 if i < 5 or args.verbose:
-                    print(f"  [clip sec {i+1}] OCR failed, skipping")
+                    print(f"  [clip sec {i+1}] OCR: {frame_num} — skipping")
                 ocr_failures += 1
                 continue
+            clip_to_ref.append((clip_frame, frame_num))
+            if i < 5 or args.verbose:
+                print(f"  [clip sec {i+1}] frame #{frame_num}")
 
-            # frame_num is 1-based, ref_frames is 0-indexed
-            ref_idx = frame_num - 1
-            if ref_idx < 0 or ref_idx >= len(ref_frames):
-                if i < 5 or args.verbose:
-                    print(f"  [clip sec {i+1}] frame #{frame_num} out of range, skipping")
+        print(f"OCR complete: {len(clip_to_ref)} matched, {ocr_failures} failed")
+
+        # Phase 5: Extract only the needed reference frames
+        needed_frames = set(num for _, num in clip_to_ref)
+        print(f"\n--- Phase 5: Extracting {len(needed_frames)} reference frames ---")
+        ref_frame_map = extract_specific_frames(
+            ref_video, os.path.join(work_dir, 'ref'), needed_frames)
+
+        # Phase 6: SSIM comparison
+        print(f"\n--- Phase 6: SSIM comparison ---")
+        scores = []
+        for i, (clip_frame, ref_num) in enumerate(clip_to_ref):
+            ref_path = ref_frame_map.get(ref_num)
+            if not ref_path:
                 continue
-
-            score = compute_ssim(clip_frame, ref_frames[ref_idx])
+            score = compute_ssim(clip_frame, ref_path)
             scores.append(score)
+            clip_sec = clip_frames.index(clip_frame) + 1
+            if clip_sec <= 5 or score < 0.9 or args.verbose:
+                print(f"  [clip sec {clip_sec}] frame #{ref_num} -> SSIM={score:.4f}")
 
-            if i < 5 or score < 0.9 or args.verbose:
-                print(f"  [clip sec {i+1}] frame #{frame_num} -> SSIM={score:.4f}")
-
-        # Phase 6: Compute availability
-        # Thresholds match VideoVerificationComponent.java
+        # Phase 7: Compute availability
         print("\n--- Results ---")
         if not scores:
             print("No frames compared!", file=sys.stderr)
@@ -257,14 +294,15 @@ def main():
             max_ssim_ok = max_ssim > 0.99
             avg_ssim_ok = avg_ssim > 0.85
             min_ssim_ok = min_ssim > 0.03
-            frames_ok = len(scores) >= (TOTAL_SOURCE_FRAMES - 1500)
+            frames_ok = clip_total_frames >= (TOTAL_SOURCE_FRAMES - DROPPED_FRAME_THRESHOLD)
             available = 1 if (duration_ok and max_ssim_ok and avg_ssim_ok and min_ssim_ok and frames_ok) else 0
 
             print(f"Duration:           {clip_duration:.2f}s ({'PASS' if duration_ok else 'FAIL'} — threshold: >= 120s)")
             print(f"Max SSIM:           {max_ssim:.4f} ({'PASS' if max_ssim_ok else 'FAIL'} — threshold: > 0.99)")
             print(f"Avg SSIM:           {avg_ssim:.4f} ({'PASS' if avg_ssim_ok else 'FAIL'} — threshold: > 0.85)")
             print(f"Min SSIM:           {min_ssim:.4f} ({'PASS' if min_ssim_ok else 'FAIL'} — threshold: > 0.03)")
-            print(f"Frames compared:    {len(scores)} ({'PASS' if frames_ok else 'FAIL'} — threshold: >= {TOTAL_SOURCE_FRAMES - 1500})")
+            print(f"Clip frames:        {clip_total_frames} ({'PASS' if frames_ok else 'FAIL'} — threshold: >= {TOTAL_SOURCE_FRAMES - DROPPED_FRAME_THRESHOLD})")
+            print(f"SSIM comparisons:   {len(scores)}")
             print(f"OCR failures:       {ocr_failures}")
             print(f"Storage available:  {available}")
 
