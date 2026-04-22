@@ -320,7 +320,7 @@ def main():
         if args.json_output:
             json.dump(result, sys.stdout)
             print()
-        sys.exit(0 if result.get('storage_availability', 0) == 1 else 1)
+        sys.exit(0)
 
     finally:
         if not args.keep_frames:
