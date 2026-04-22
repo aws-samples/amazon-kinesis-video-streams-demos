@@ -869,6 +869,24 @@ class ViewerCanaryTest {
         this.config.channelName,
         results.storage_availability
       );
+
+      if (results.avg_ssim !== undefined) {
+        await CloudWatchMetrics.publishPercentageMetric(
+          this.getMetricName('ViewerSSIMAvg'),
+          this.config.channelName,
+          results.avg_ssim * 100
+        );
+        await CloudWatchMetrics.publishPercentageMetric(
+          this.getMetricName('ViewerSSIMMin'),
+          this.config.channelName,
+          results.min_ssim * 100
+        );
+        await CloudWatchMetrics.publishPercentageMetric(
+          this.getMetricName('ViewerSSIMMax'),
+          this.config.channelName,
+          results.max_ssim * 100
+        );
+      }
     } catch (error) {
       log(`Video verification failed: ${error.message}`);
     }

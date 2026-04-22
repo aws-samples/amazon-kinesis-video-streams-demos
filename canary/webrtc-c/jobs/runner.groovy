@@ -410,6 +410,19 @@ def buildStorageCanary(isConsumer, params) {
                 """
                 echo "Pushed ConsumerStorageAvailability=${storageAvailability}"
 
+                def avgSsim = results.avg_ssim ?: 0
+                def minSsim = results.min_ssim ?: 0
+                def maxSsim = results.max_ssim ?: 0
+                sh """
+                    aws cloudwatch put-metric-data \
+                        --namespace KinesisVideoSDKCanary \
+                        --metric-data \
+                            MetricName=ConsumerSSIMAvg,Value=${avgSsim},Unit=None,Dimensions="[{Name=StorageWebRTCSDKCanaryStreamName,Value=${streamName}},{Name=StorageWebRTCSDKCanaryLabel,Value=${scenarioLabel}}]" \
+                            MetricName=ConsumerSSIMMin,Value=${minSsim},Unit=None,Dimensions="[{Name=StorageWebRTCSDKCanaryStreamName,Value=${streamName}},{Name=StorageWebRTCSDKCanaryLabel,Value=${scenarioLabel}}]" \
+                            MetricName=ConsumerSSIMMax,Value=${maxSsim},Unit=None,Dimensions="[{Name=StorageWebRTCSDKCanaryStreamName,Value=${streamName}},{Name=StorageWebRTCSDKCanaryLabel,Value=${scenarioLabel}}]"
+                """
+                echo "Pushed ConsumerSSIM avg=${avgSsim}, min=${minSsim}, max=${maxSsim}"
+
                 echo "GetClip MP4 preserved at: ${clipPath}"
             } catch (err) {
                 echo "Consumer video verification failed: ${err.getMessage()}"
