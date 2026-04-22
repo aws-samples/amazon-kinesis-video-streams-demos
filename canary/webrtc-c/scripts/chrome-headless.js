@@ -859,7 +859,7 @@ class ViewerCanaryTest {
         return;
       }
       const cmd = `"${venvPython}" "${verifyScript}" --recording "${this.recordingFilePath}" --source-frames "${sourceFrames}" --json`;
-      const output = execSync(cmd, { encoding: 'utf-8', timeout: 300000 });
+      const output = execSync(cmd, { encoding: 'utf-8', timeout: 600000 });
       const results = JSON.parse(output.trim());
 
       log(`Video verification results: availability=${results.storage_availability}, avg SSIM=${results.avg_ssim}, duration_ratio=${results.duration_ratio}, failed_frames=${results.frames_failed}`);
@@ -1084,9 +1084,6 @@ async function runViewerCanary(config) {
         await test.stopRecording(test.page);
       }
 
-      // Run video verification and publish metrics
-      await test.runVideoVerification();
-
       if (test.page) {
         try {
           // Try to click stop viewer button for proper cleanup
@@ -1125,7 +1122,9 @@ async function runViewerCanary(config) {
       // Wait a moment for cleanup
       await new Promise(resolve => setTimeout(resolve, 1000));
       
-      // Close browser
+      // Close browser BEFORE running video verification to prevent
+      // stale connection events (disconnects, reconnects) during the
+      // potentially long verification process.
       if (test.browser) {
         try {
           await test.browser.close();
@@ -1134,6 +1133,9 @@ async function runViewerCanary(config) {
           log(`Error closing browser: ${error.message}`);
         }
       }
+
+      // Run video verification after browser is closed
+      await test.runVideoVerification();
       
     } catch (error) {
       log(`Error during cleanup: ${error.message}`);
