@@ -862,7 +862,7 @@ class ViewerCanaryTest {
       const output = execSync(cmd, { encoding: 'utf-8', timeout: 600000 });
       const results = JSON.parse(output.trim());
 
-      log(`Video verification results: availability=${results.storage_availability}, avg SSIM=${results.avg_ssim}, duration_ratio=${results.duration_ratio}, failed_frames=${results.frames_failed}`);
+      log(`Video verification results: availability=${results.storage_availability}, avg SSIM=${results.avg_ssim}, min SSIM=${results.min_ssim}, max SSIM=${results.max_ssim}, compared=${results.frames_compared}`);
 
       await CloudWatchMetrics.publishCountMetric(
         this.getMetricName('ViewerStorageAvailability'),

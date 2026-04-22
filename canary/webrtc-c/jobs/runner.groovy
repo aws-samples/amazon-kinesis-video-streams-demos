@@ -221,7 +221,7 @@ def runViewerSessions(viewerId = "", waitMinutes = 10, viewerCount = "1", stagge
                         export JOB_NAME="${env.JOB_NAME}"
                         export RUNNER_LABEL="${params.RUNNER_LABEL}"
                         export AWS_DEFAULT_REGION="${params.AWS_DEFAULT_REGION}"
-                        export DURATION_IN_SECONDS="${(params.VIEWER_SESSION_DURATION_SECONDS != null && params.VIEWER_SESSION_DURATION_SECONDS.toString().trim() != '') ? params.VIEWER_SESSION_DURATION_SECONDS : '156'}"
+                        export DURATION_IN_SECONDS="${(params.VIEWER_SESSION_DURATION_SECONDS != null && params.VIEWER_SESSION_DURATION_SECONDS.toString().trim() != '') ? params.VIEWER_SESSION_DURATION_SECONDS : '900'}"
                         export FORCE_TURN="${params.FORCE_TURN}"
                         export VIEWER_COUNT="${viewerCount}"
                         export VIEWER_ID="${viewerId}"
@@ -471,7 +471,7 @@ pipeline {
         string(name: 'ENDPOINT', defaultValue: '')
         string(name: 'METRIC_SUFFIX', defaultValue: '')
         string(name: 'VIEWER_WAIT_MINUTES', defaultValue: '20')
-        string(name: 'VIEWER_SESSION_DURATION_SECONDS', defaultValue: '156', description: 'Duration in seconds for each viewer session (default 2 min 36 sec)')
+        string(name: 'VIEWER_SESSION_DURATION_SECONDS', defaultValue: '900', description: 'Hard timeout in seconds for the viewer process (default 15 minutes, must be larger than monitoring duration)')
         booleanParam(name: 'VIDEO_VERIFY_ENABLED', defaultValue: false, description: 'Enable consumer-side video verification via GetClip')
     }
     

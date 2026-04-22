@@ -255,7 +255,7 @@ pipeline {
         string(name: 'ENDPOINT', defaultValue: '', description: 'Custom endpoint URL (e.g., gamma endpoint)')
         string(name: 'METRIC_SUFFIX', defaultValue: '-gamma')
         string(name: 'VIEWER_WAIT_MINUTES', defaultValue: '20', description: 'Minutes to wait for master to build')
-        string(name: 'VIEWER_SESSION_DURATION_SECONDS', defaultValue: '156', description: 'Duration in seconds for each viewer session (default 2 min 36 sec)')
+        string(name: 'VIEWER_SESSION_DURATION_SECONDS', defaultValue: '900', description: 'Hard timeout in seconds for the viewer process (default 15 minutes, must be larger than monitoring duration)')
         booleanParam(name: 'KEEP_RECORDING', defaultValue: false, description: 'Keep viewer video recordings after verification')
         booleanParam(name: 'DEBUG_LOG_SDP', defaultValue: true)
         booleanParam(name: 'FIRST_ITERATION', defaultValue: true)
