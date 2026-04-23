@@ -92,6 +92,19 @@ def runViewerSessions(viewerId = "", waitMinutes = 2, viewerCount = "1") {
             checkout([$class: 'GitSCM', branches: [[name: params.GIT_HASH]],
                       userRemoteConfigs: [[url: params.GIT_URL]]])
             
+            def endpointValue = params.ENDPOINT ?: ''
+            def metricSuffixValue = params.METRIC_SUFFIX ?: ''
+            def viewerSessionDuration = (params.VIEWER_SESSION_DURATION_SECONDS != null && params.VIEWER_SESSION_DURATION_SECONDS.toString().trim() != '') 
+                ? params.VIEWER_SESSION_DURATION_SECONDS 
+                : '600'
+
+            // Run prepare while master is still building
+            echo "Preparing viewer dependencies (parallel with master build)..."
+            sh """
+                export JS_PAGE_URL="${params.JS_BRANCH ?: 'master'}"
+                ./canary/webrtc-c/scripts/prepare-storage-viewer.sh
+            """
+
             if (waitMinutes > 0) {
                 echo "Waiting for master to be ready (timeout: ${waitMinutes} minutes)..."
                 def startWait = System.currentTimeMillis()
@@ -107,9 +120,6 @@ def runViewerSessions(viewerId = "", waitMinutes = 2, viewerCount = "1") {
                 }
             }
             
-            def endpointValue = params.ENDPOINT ?: ''
-            def metricSuffixValue = params.METRIC_SUFFIX ?: ''
-            
             echo "=========================================="
             echo "Viewer Configuration"
             echo "=========================================="
@@ -121,10 +131,6 @@ def runViewerSessions(viewerId = "", waitMinutes = 2, viewerCount = "1") {
             
             def viewerKey = viewerId ?: 'viewer'
             VIEWER_SESSION_RESULTS[viewerKey] = [attempts: 1, successes: 0]
-
-            def viewerSessionDuration = (params.VIEWER_SESSION_DURATION_SECONDS != null && params.VIEWER_SESSION_DURATION_SECONDS.toString().trim() != '') 
-                ? params.VIEWER_SESSION_DURATION_SECONDS 
-                : '600'
 
             echo "Starting ${viewerId ? viewerId + ' ' : ''}viewer session"
             
@@ -142,9 +148,9 @@ def runViewerSessions(viewerId = "", waitMinutes = 2, viewerCount = "1") {
                         export ENDPOINT="${endpointValue}"
                         export METRIC_SUFFIX="${metricSuffixValue}"
                         export KEEP_RECORDING="${params.KEEP_RECORDING}"
-                        export JS_PAGE_URL="${params.JS_PAGE_URL ?: ''}"
+                        export JS_PAGE_URL="${params.JS_BRANCH ?: 'master'}"
                         
-                        ./canary/webrtc-c/scripts/setup-storage-viewer.sh
+                        ./canary/webrtc-c/scripts/run-storage-viewer.sh
                     """,
                     returnStdout: true
                 ).trim()
@@ -379,7 +385,7 @@ pipeline {
         booleanParam(name: 'USE_IOT', defaultValue: false)
         booleanParam(name: 'TRICKLE_ICE', defaultValue: false)
         booleanParam(name: 'FORCE_TURN', defaultValue: false)
-        string(name: 'JS_PAGE_URL', defaultValue: '', description: 'Custom JS viewer page URL (leave empty for default GitHub Pages)')
+        string(name: 'JS_BRANCH', defaultValue: 'master', description: 'JS SDK branch name to clone and serve locally (default: master)')
     }
     
     environment {
@@ -663,7 +669,7 @@ pipeline {
                             booleanParam(name: 'USE_IOT', value: params.USE_IOT),
                             booleanParam(name: 'TRICKLE_ICE', value: params.TRICKLE_ICE),
                             booleanParam(name: 'FORCE_TURN', value: params.FORCE_TURN),
-                            string(name: 'JS_PAGE_URL', value: params.JS_PAGE_URL),
+                            string(name: 'JS_BRANCH', value: params.JS_BRANCH),
                         ],
                         wait: false
                     )

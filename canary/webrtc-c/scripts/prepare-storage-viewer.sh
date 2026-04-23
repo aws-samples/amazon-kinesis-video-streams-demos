@@ -1,0 +1,123 @@
+#!/bin/bash
+# prepare-storage-viewer.sh
+#
+# Installs all dependencies needed by the storage viewer test. This script is
+# designed to run while the storage master is still building, so that the
+# viewer node is ready to go the moment the master signals MASTER_READY.
+#
+# Expected env vars (optional):
+#   JS_PAGE_URL  — branch name or full URL for the JS SDK viewer page
+
+# Install or upgrade Node.js to v20+ if needed
+NODE_VERSION=$(node --version 2>/dev/null | sed 's/v//' | cut -d. -f1)
+if ! command -v npm &> /dev/null || [ "${NODE_VERSION:-0}" -lt 20 ]; then
+    echo "Node.js ${NODE_VERSION:-not found}, installing v20..."
+
+    # Remove old version
+    sudo apt-get remove -y libnode72 nodejs 2>/dev/null || true
+    sudo apt-get autoremove -y 2>/dev/null || true
+
+    for i in {1..3}; do
+        if curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash - && sudo apt-get install -y nodejs; then
+            break
+        else
+            echo "Installation attempt $i failed, retrying in 10 seconds..."
+            sleep 10
+        fi
+    done
+    echo "Node.js installation completed"
+else
+    echo "Node.js already installed: $(node --version)"
+fi
+
+# Verify npm is available after installation
+if ! command -v npm &> /dev/null; then
+    echo "ERROR: npm command not found after installation. Node.js installation failed."
+    exit 1
+fi
+echo "npm verified: $(npm --version)"
+
+cd ./canary/webrtc-c/scripts || { echo "ERROR: Failed to change directory to ./canary/webrtc-c/scripts"; exit 1; }
+
+npm install || { echo "ERROR: Failed to install Node.js dependencies"; exit 1; }
+
+# Verify Puppeteer can find Chrome. If the cached version doesn't match what
+# Puppeteer expects (e.g., after a Puppeteer upgrade), force-install the correct one.
+#
+# Puppeteer 24.x requires both "chrome" and "chrome-headless-shell". A partial
+# download (e.g., from a previous job abort or disk-full event) can leave the
+# cache directory present but the executable missing, causing npm install to
+# fail on subsequent runs. We validate both binaries and nuke stale caches.
+CHROME_PATH=$(node -e "try { console.log(require('puppeteer').executablePath()) } catch(e) { console.log('') }" 2>/dev/null)
+CHROME_HEADLESS_SHELL_OK=true
+# Check if chrome-headless-shell executable actually exists in any cached folder
+if ls "$HOME/.cache/puppeteer/chrome-headless-shell"/linux-*/chrome-headless-shell-linux64/chrome-headless-shell 2>/dev/null; then
+    echo "chrome-headless-shell binary found"
+else
+    if [ -d "$HOME/.cache/puppeteer/chrome-headless-shell" ]; then
+        echo "WARNING: chrome-headless-shell cache directory exists but executable is missing (corrupt cache)"
+    fi
+    CHROME_HEADLESS_SHELL_OK=false
+fi
+
+if [ -z "$CHROME_PATH" ] || [ ! -f "$CHROME_PATH" ] || [ "$CHROME_HEADLESS_SHELL_OK" = false ]; then
+    echo "Puppeteer browser(s) missing or corrupt, reinstalling..."
+    # Clear stale caches for both browser types to avoid partial-state issues
+    rm -rf "$HOME/.cache/puppeteer/chrome" 2>/dev/null || true
+    rm -rf "$HOME/.cache/puppeteer/chrome-headless-shell" 2>/dev/null || true
+    npx puppeteer browsers install chrome || { echo "ERROR: Failed to install Chrome for Puppeteer"; exit 1; }
+    npx puppeteer browsers install chrome-headless-shell || { echo "ERROR: Failed to install chrome-headless-shell for Puppeteer"; exit 1; }
+    echo "All Puppeteer browsers installed successfully"
+else
+    echo "Puppeteer Chrome verified at: $CHROME_PATH"
+    echo "Puppeteer chrome-headless-shell verified"
+fi
+
+# Install video verification dependencies (ffmpeg, Tesseract OCR, Python packages)
+if ! command -v ffmpeg &> /dev/null || ! command -v tesseract &> /dev/null; then
+    echo "Installing ffmpeg and tesseract-ocr..."
+    sudo apt-get update -y
+    sudo apt-get install -y ffmpeg tesseract-ocr || { echo "ERROR: Failed to install ffmpeg/tesseract"; exit 1; }
+fi
+echo "ffmpeg verified: $(ffmpeg -version | head -1)"
+echo "tesseract verified: $(tesseract --version 2>&1 | head -1)"
+
+# Set up Python virtual environment for video verification dependencies.
+# Modern Ubuntu (24.04+) marks the system Python as "externally managed" (PEP 668),
+# which blocks pip install outside a venv to prevent breaking system packages.
+VENV_DIR="${HOME}/.venv/video-verify"
+if [ ! -d "$VENV_DIR" ]; then
+    echo "Creating Python virtual environment at $VENV_DIR..."
+    sudo apt-get install -y python3-venv 2>/dev/null || true
+    python3 -m venv "$VENV_DIR" || { echo "ERROR: Failed to create Python venv"; exit 1; }
+fi
+source "$VENV_DIR/bin/activate"
+pip install pytesseract Pillow scikit-image numpy || { echo "ERROR: Failed to install Python dependencies"; exit 1; }
+echo "Python venv active: $(python3 --version), packages installed"
+
+# Clone and install JS SDK branch if provided (so it's ready when run-storage-viewer.sh starts)
+if [ -n "${JS_PAGE_URL}" ] && [[ "${JS_PAGE_URL}" != *"://"* ]]; then
+    JS_SDK_DIR="/tmp/kvs-webrtc-js-sdk-${JS_PAGE_URL}"
+    if [ ! -d "$JS_SDK_DIR" ]; then
+        echo "Cloning JS SDK branch '${JS_PAGE_URL}'..."
+        git clone -b "${JS_PAGE_URL}" --depth 1 \
+            https://github.com/awslabs/amazon-kinesis-video-streams-webrtc-sdk-js.git \
+            "$JS_SDK_DIR" || { echo "ERROR: Failed to clone branch ${JS_PAGE_URL}"; exit 1; }
+        echo "Installing dependencies..."
+        (cd "$JS_SDK_DIR" && npm install) || { echo "ERROR: Failed to install JS SDK dependencies"; exit 1; }
+    else
+        # Check for remote changes
+        echo "Checking for updates on branch '${JS_PAGE_URL}'..."
+        LOCAL_HEAD=$(cd "$JS_SDK_DIR" && git rev-parse HEAD)
+        REMOTE_HEAD=$(git ls-remote https://github.com/awslabs/amazon-kinesis-video-streams-webrtc-sdk-js.git "${JS_PAGE_URL}" | cut -f1)
+        if [ "$LOCAL_HEAD" != "$REMOTE_HEAD" ] && [ -n "$REMOTE_HEAD" ]; then
+            echo "Remote has new commits ($LOCAL_HEAD -> $REMOTE_HEAD), pulling..."
+            (cd "$JS_SDK_DIR" && git fetch origin "${JS_PAGE_URL}" && git reset --hard FETCH_HEAD && npm install) \
+                || { echo "ERROR: Failed to update JS SDK"; exit 1; }
+        else
+            echo "JS SDK branch '${JS_PAGE_URL}' is up to date at $JS_SDK_DIR"
+        fi
+    fi
+fi
+
+echo "Viewer preparation complete"

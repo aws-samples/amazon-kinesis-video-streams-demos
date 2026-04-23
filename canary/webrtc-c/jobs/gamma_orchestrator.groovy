@@ -97,9 +97,9 @@ pipeline {
             description: 'Enable continuous testing (reschedule after each run completes)'
         )
         string(
-            name: 'JS_PAGE_URL',
-            defaultValue: '',
-            description: 'Custom JS viewer page URL (e.g., https://raw.githack.com/awslabs/amazon-kinesis-video-streams-webrtc-sdk-js/ICE-offer-order-fix/examples/index.html)'
+            name: 'JS_BRANCH',
+            defaultValue: 'master',
+            description: 'JS SDK branch name to clone and serve locally (default: master)'
         )
     }
 
@@ -184,7 +184,7 @@ pipeline {
                                     booleanParam(name: 'KEEP_RECORDING', value: params.KEEP_RECORDING),
                                     booleanParam(name: 'FIRST_ITERATION', value: true),
                                     booleanParam(name: 'RESCHEDULE', value: params.RESCHEDULE),
-                                    string(name: 'JS_PAGE_URL', value: params.JS_PAGE_URL),
+                                    string(name: 'JS_BRANCH', value: params.JS_BRANCH),
                                 ],
                                 wait: true,
                                 propagate: false
@@ -226,7 +226,7 @@ pipeline {
                                     booleanParam(name: 'KEEP_RECORDING', value: params.KEEP_RECORDING),
                                     booleanParam(name: 'FIRST_ITERATION', value: true),
                                     booleanParam(name: 'RESCHEDULE', value: params.RESCHEDULE),
-                                    string(name: 'JS_PAGE_URL', value: params.JS_PAGE_URL),
+                                    string(name: 'JS_BRANCH', value: params.JS_BRANCH),
                                 ],
                                 wait: true,
                                 propagate: false
@@ -269,7 +269,7 @@ pipeline {
                                     booleanParam(name: 'KEEP_RECORDING', value: params.KEEP_RECORDING),
                                     booleanParam(name: 'FIRST_ITERATION', value: true),
                                     booleanParam(name: 'RESCHEDULE', value: params.RESCHEDULE),
-                                    string(name: 'JS_PAGE_URL', value: params.JS_PAGE_URL),
+                                    string(name: 'JS_BRANCH', value: params.JS_BRANCH),
                                 ],
                                 wait: true,
                                 propagate: false
@@ -307,7 +307,7 @@ pipeline {
                                     booleanParam(name: 'TRICKLE_ICE', value: true),
                                     booleanParam(name: 'FIRST_ITERATION', value: true),
                                     booleanParam(name: 'RESCHEDULE', value: params.RESCHEDULE),
-                                    string(name: 'JS_PAGE_URL', value: params.JS_PAGE_URL),
+                                    string(name: 'JS_BRANCH', value: params.JS_BRANCH),
                                 ],
                                 wait: true,
                                 propagate: false
@@ -345,7 +345,7 @@ pipeline {
                                     booleanParam(name: 'TRICKLE_ICE', value: true),
                                     booleanParam(name: 'FIRST_ITERATION', value: true),
                                     booleanParam(name: 'RESCHEDULE', value: params.RESCHEDULE),
-                                    string(name: 'JS_PAGE_URL', value: params.JS_PAGE_URL),
+                                    string(name: 'JS_BRANCH', value: params.JS_BRANCH),
                                 ],
                                 wait: true,
                                 propagate: false
@@ -383,7 +383,7 @@ pipeline {
                                     booleanParam(name: 'TRICKLE_ICE', value: true),
                                     booleanParam(name: 'FIRST_ITERATION', value: true),
                                     booleanParam(name: 'RESCHEDULE', value: params.RESCHEDULE),
-                                    string(name: 'JS_PAGE_URL', value: params.JS_PAGE_URL),
+                                    string(name: 'JS_BRANCH', value: params.JS_BRANCH),
                                 ],
                                 wait: true,
                                 propagate: false

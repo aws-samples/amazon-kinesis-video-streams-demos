@@ -183,6 +183,16 @@ def runViewerSessions(viewerId = "", waitMinutes = 10, viewerCount = "1", stagge
             checkout([$class: 'GitSCM', branches: [[name: params.GIT_HASH ]],
                       userRemoteConfigs: [[url: params.GIT_URL]]])
             
+            def endpointValue = params.ENDPOINT ?: ''
+            def metricSuffixValue = params.METRIC_SUFFIX ?: ''
+
+            // Run prepare while master is still building
+            echo "Preparing viewer dependencies (parallel with master build)..."
+            sh """
+                export JS_PAGE_URL="${params.JS_PAGE_URL ?: ''}"
+                ./canary/webrtc-c/scripts/prepare-storage-viewer.sh
+            """
+
             if (waitMinutes > 0) {
                 echo "Waiting for master to be ready (timeout: ${waitMinutes} minutes)..."
                 def startWait = System.currentTimeMillis()
@@ -203,9 +213,6 @@ def runViewerSessions(viewerId = "", waitMinutes = 10, viewerCount = "1", stagge
                 echo "Staggered start - waiting ${staggerDelaySeconds} seconds before starting ${viewerId ?: 'viewer'}"
                 sleep staggerDelaySeconds
             }
-            
-            def endpointValue = params.ENDPOINT ?: ''
-            def metricSuffixValue = params.METRIC_SUFFIX ?: ''
             
             def viewerKey = viewerId ?: 'viewer'
             // Default stats in case parsing fails
@@ -228,8 +235,9 @@ def runViewerSessions(viewerId = "", waitMinutes = 10, viewerCount = "1", stagge
                         export CLIENT_ID="${viewerId ? viewerId.toLowerCase() + '-' : 'viewer-'}${BUILD_NUMBER}"
                         export ENDPOINT="${endpointValue}"
                         export METRIC_SUFFIX="${metricSuffixValue}"
+                        export JS_PAGE_URL="${params.JS_PAGE_URL ?: ''}"
                         
-                        ./canary/webrtc-c/scripts/setup-storage-viewer.sh
+                        ./canary/webrtc-c/scripts/run-storage-viewer.sh
                     """,
                     returnStdout: true
                 ).trim()
