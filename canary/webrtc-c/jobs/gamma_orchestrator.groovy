@@ -58,13 +58,28 @@ pipeline {
         )
         booleanParam(
             name: 'RUN_STORAGE_TWO_VIEWERS',
-            defaultValue: false,
+            defaultValue: true,
             description: 'Run StorageTwoViewers test (2 viewers)'
         )
         booleanParam(
             name: 'RUN_STORAGE_THREE_VIEWERS',
-            defaultValue: false,
+            defaultValue: true,
             description: 'Run StorageThreeViewers test (3 viewers)'
+        )
+        booleanParam(
+            name: 'RUN_STORAGE_PERIODIC',
+            defaultValue: true,
+            description: 'Run StoragePeriodic test (master + consumer, 156s)'
+        )
+        booleanParam(
+            name: 'RUN_STORAGE_SUB_RECONNECT',
+            defaultValue: true,
+            description: 'Run StorageSubReconnect test (master + consumer, 45 min)'
+        )
+        booleanParam(
+            name: 'RUN_STORAGE_SINGLE_RECONNECT',
+            defaultValue: true,
+            description: 'Run StorageSingleReconnect test (master + consumer, 65 min)'
         )
         string(
             name: 'GIT_HASH',
@@ -96,7 +111,7 @@ pipeline {
                         error "ENDPOINT parameter is required. Please provide the gamma endpoint URL."
                     }
                     
-                    if (!params.RUN_STORAGE_WITH_VIEWER && !params.RUN_STORAGE_TWO_VIEWERS && !params.RUN_STORAGE_THREE_VIEWERS) {
+                    if (!params.RUN_STORAGE_WITH_VIEWER && !params.RUN_STORAGE_TWO_VIEWERS && !params.RUN_STORAGE_THREE_VIEWERS && !params.RUN_STORAGE_PERIODIC && !params.RUN_STORAGE_SUB_RECONNECT && !params.RUN_STORAGE_SINGLE_RECONNECT) {
                         error "At least one test must be selected to run."
                     }
                     
@@ -108,6 +123,9 @@ pipeline {
                     echo "Viewer Wait: ${params.VIEWER_WAIT_MINUTES} minutes"
                     echo "Git Hash: ${params.GIT_HASH}"
                     echo "Tests to run:"
+                    if (params.RUN_STORAGE_PERIODIC) echo "  - StoragePeriodic (master + consumer, 156s)"
+                    if (params.RUN_STORAGE_SUB_RECONNECT) echo "  - StorageSubReconnect (master + consumer, 45 min)"
+                    if (params.RUN_STORAGE_SINGLE_RECONNECT) echo "  - StorageSingleReconnect (master + consumer, 65 min)"
                     if (params.RUN_STORAGE_WITH_VIEWER) echo "  - StorageWithViewer (1 viewer)"
                     if (params.RUN_STORAGE_TWO_VIEWERS) echo "  - StorageTwoViewers (2 viewers)"
                     if (params.RUN_STORAGE_THREE_VIEWERS) echo "  - StorageThreeViewers (3 viewers)"
@@ -249,6 +267,117 @@ pipeline {
                                 propagate: false
                             )
                             echo "StorageThreeViewers result: ${result.result}"
+                        }
+                    }
+                }
+
+                stage('StoragePeriodic') {
+                    when {
+                        expression { return params.RUN_STORAGE_PERIODIC }
+                    }
+                    steps {
+                        script {
+                            echo "Starting StoragePeriodic test..."
+                            def result = build(
+                                job: GAMMA_RUNNER_JOB,
+                                parameters: [
+                                    string(name: 'AWS_KVS_LOG_LEVEL', value: "2"),
+                                    string(name: 'GIT_URL', value: GIT_URL),
+                                    string(name: 'GIT_HASH', value: env.CURRENT_GIT_HASH),
+                                    string(name: 'LOG_GROUP_NAME', value: "WebrtcSDK"),
+                                    booleanParam(name: 'IS_STORAGE', value: true),
+                                    booleanParam(name: 'VIDEO_VERIFY_ENABLED', value: true),
+                                    string(name: 'DURATION_IN_SECONDS', value: "156"),
+                                    string(name: 'MASTER_NODE_LABEL', value: "webrtc-storage-master"),
+                                    string(name: 'CONSUMER_NODE_LABEL', value: "webrtc-storage-consumer"),
+                                    string(name: 'RUNNER_LABEL', value: "GammaStoragePeriodic"),
+                                    string(name: 'SCENARIO_LABEL', value: "GammaStoragePeriodic"),
+                                    string(name: 'AWS_DEFAULT_REGION', value: params.AWS_DEFAULT_REGION),
+                                    string(name: 'ENDPOINT', value: params.ENDPOINT),
+                                    string(name: 'METRIC_SUFFIX', value: "-gamma"),
+                                    booleanParam(name: 'USE_TURN', value: true),
+                                    booleanParam(name: 'TRICKLE_ICE', value: true),
+                                    booleanParam(name: 'FIRST_ITERATION', value: true),
+                                    booleanParam(name: 'RESCHEDULE', value: params.RESCHEDULE),
+                                ],
+                                wait: true,
+                                propagate: false
+                            )
+                            echo "StoragePeriodic result: ${result.result}"
+                        }
+                    }
+                }
+
+                stage('StorageSubReconnect') {
+                    when {
+                        expression { return params.RUN_STORAGE_SUB_RECONNECT }
+                    }
+                    steps {
+                        script {
+                            echo "Starting StorageSubReconnect test..."
+                            def result = build(
+                                job: GAMMA_RUNNER_JOB,
+                                parameters: [
+                                    string(name: 'AWS_KVS_LOG_LEVEL', value: "2"),
+                                    string(name: 'GIT_URL', value: GIT_URL),
+                                    string(name: 'GIT_HASH', value: env.CURRENT_GIT_HASH),
+                                    string(name: 'LOG_GROUP_NAME', value: "WebrtcSDK"),
+                                    booleanParam(name: 'IS_STORAGE', value: true),
+                                    booleanParam(name: 'VIDEO_VERIFY_ENABLED', value: true),
+                                    string(name: 'DURATION_IN_SECONDS', value: "2700"),
+                                    string(name: 'MASTER_NODE_LABEL', value: "webrtc-storage-master"),
+                                    string(name: 'CONSUMER_NODE_LABEL', value: "webrtc-storage-consumer"),
+                                    string(name: 'RUNNER_LABEL', value: "GammaStorageSubReconnect"),
+                                    string(name: 'SCENARIO_LABEL', value: "GammaStorageSubReconnect"),
+                                    string(name: 'AWS_DEFAULT_REGION', value: params.AWS_DEFAULT_REGION),
+                                    string(name: 'ENDPOINT', value: params.ENDPOINT),
+                                    string(name: 'METRIC_SUFFIX', value: "-gamma"),
+                                    booleanParam(name: 'USE_TURN', value: true),
+                                    booleanParam(name: 'TRICKLE_ICE', value: true),
+                                    booleanParam(name: 'FIRST_ITERATION', value: true),
+                                    booleanParam(name: 'RESCHEDULE', value: params.RESCHEDULE),
+                                ],
+                                wait: true,
+                                propagate: false
+                            )
+                            echo "StorageSubReconnect result: ${result.result}"
+                        }
+                    }
+                }
+
+                stage('StorageSingleReconnect') {
+                    when {
+                        expression { return params.RUN_STORAGE_SINGLE_RECONNECT }
+                    }
+                    steps {
+                        script {
+                            echo "Starting StorageSingleReconnect test..."
+                            def result = build(
+                                job: GAMMA_RUNNER_JOB,
+                                parameters: [
+                                    string(name: 'AWS_KVS_LOG_LEVEL', value: "2"),
+                                    string(name: 'GIT_URL', value: GIT_URL),
+                                    string(name: 'GIT_HASH', value: env.CURRENT_GIT_HASH),
+                                    string(name: 'LOG_GROUP_NAME', value: "WebrtcSDK"),
+                                    booleanParam(name: 'IS_STORAGE', value: true),
+                                    booleanParam(name: 'VIDEO_VERIFY_ENABLED', value: true),
+                                    string(name: 'DURATION_IN_SECONDS', value: "3900"),
+                                    string(name: 'MASTER_NODE_LABEL', value: "webrtc-storage-master"),
+                                    string(name: 'CONSUMER_NODE_LABEL', value: "webrtc-storage-consumer"),
+                                    string(name: 'RUNNER_LABEL', value: "GammaStorageSingleReconnect"),
+                                    string(name: 'SCENARIO_LABEL', value: "GammaStorageSingleReconnect"),
+                                    string(name: 'AWS_DEFAULT_REGION', value: params.AWS_DEFAULT_REGION),
+                                    string(name: 'ENDPOINT', value: params.ENDPOINT),
+                                    string(name: 'METRIC_SUFFIX', value: "-gamma"),
+                                    booleanParam(name: 'USE_TURN', value: true),
+                                    booleanParam(name: 'TRICKLE_ICE', value: true),
+                                    booleanParam(name: 'FIRST_ITERATION', value: true),
+                                    booleanParam(name: 'RESCHEDULE', value: params.RESCHEDULE),
+                                ],
+                                wait: true,
+                                propagate: false
+                            )
+                            echo "StorageSingleReconnect result: ${result.result}"
                         }
                     }
                 }

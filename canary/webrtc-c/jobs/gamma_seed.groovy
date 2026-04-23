@@ -71,6 +71,9 @@ pipelineJob("${NAMESPACE}-orchestrator") {
         booleanParam('RUN_STORAGE_WITH_VIEWER', true, 'Run StorageWithViewer test (1 viewer)')
         booleanParam('RUN_STORAGE_TWO_VIEWERS', true, 'Run StorageTwoViewers test (2 viewers)')
         booleanParam('RUN_STORAGE_THREE_VIEWERS', true, 'Run StorageThreeViewers test (3 viewers)')
+        booleanParam('RUN_STORAGE_PERIODIC', true, 'Run StoragePeriodic test (master + consumer, 156s)')
+        booleanParam('RUN_STORAGE_SUB_RECONNECT', true, 'Run StorageSubReconnect test (master + consumer, 45 min)')
+        booleanParam('RUN_STORAGE_SINGLE_RECONNECT', true, 'Run StorageSingleReconnect test (master + consumer, 65 min)')
         booleanParam('KEEP_RECORDING', false, 'Keep viewer video recordings after verification')
         booleanParam('RESCHEDULE', true, 'Enable continuous testing (reschedule after each run completes)')
     }

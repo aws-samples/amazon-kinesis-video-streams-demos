@@ -1,14 +1,15 @@
 #!/bin/bash
-# Install Node.js if not present with retry logic
-if ! command -v npm &> /dev/null; then
-    echo "Node.js not found, installing..."
+# Install or upgrade Node.js to v20+ if needed
+NODE_VERSION=$(node --version 2>/dev/null | sed 's/v//' | cut -d. -f1)
+if ! command -v npm &> /dev/null || [ "${NODE_VERSION:-0}" -lt 20 ]; then
+    echo "Node.js ${NODE_VERSION:-not found}, installing v20..."
     
-    # Remove conflicting packages first
+    # Remove old version
     sudo apt-get remove -y libnode72 nodejs 2>/dev/null || true
     sudo apt-get autoremove -y 2>/dev/null || true
     
     for i in {1..3}; do
-        if curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash - && sudo apt-get install -y nodejs; then
+        if curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash - && sudo apt-get install -y nodejs; then
             break
         else
             echo "Installation attempt $i failed, retrying in 10 seconds..."
