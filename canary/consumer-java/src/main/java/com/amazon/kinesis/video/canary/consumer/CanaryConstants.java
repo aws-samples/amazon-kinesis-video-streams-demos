@@ -23,6 +23,11 @@ public final class CanaryConstants {
     public static final String SINGLE_RECONNECT_LABEL = "StorageSingleReconnect"; // 1 Media Server forced reconnect, currently must be 60-120min.
     public static final String EXTENDED_LABEL = "StorageExtended"; // > 1 Media Server forced reconnect, currently must be > 120min.
 
+    // Gamma variants
+    public static final String GAMMA_PERIODIC_LABEL = "GammaStoragePeriodic";
+    public static final String GAMMA_SUB_RECONNECT_LABEL = "GammaStorageSubReconnect";
+    public static final String GAMMA_SINGLE_RECONNECT_LABEL = "GammaStorageSingleReconnect";
+
     public static final String CW_DIMENSION_INDIVIDUAL = "StorageWebRTCSDKCanaryStreamName";
     public static final String CW_DIMENSION_AGGREGATE = "StorageWebRTCSDKCanaryLabel";
 

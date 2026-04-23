@@ -268,7 +268,8 @@ public class WebrtcStorageCanaryConsumer {
                 .build();
 
         switch (mCanaryLabel) {
-            case CanaryConstants.PERIODIC_LABEL: {
+            case CanaryConstants.PERIODIC_LABEL:
+            case CanaryConstants.GAMMA_PERIODIC_LABEL: {
                 logger.info("Periodic case: canaryRunTime=" + canaryRunTime
                         + "s, mCanaryStartTime=" + mCanaryStartTime
                         + ", now=" + new Date()
@@ -310,7 +311,9 @@ public class WebrtcStorageCanaryConsumer {
                 // Handle if incorrect label.
                 if (!mCanaryLabel.equals(CanaryConstants.EXTENDED_LABEL) &&
                         !mCanaryLabel.equals(CanaryConstants.SINGLE_RECONNECT_LABEL) &&
-                        !mCanaryLabel.equals(CanaryConstants.SUB_RECONNECT_LABEL)) {
+                        !mCanaryLabel.equals(CanaryConstants.SUB_RECONNECT_LABEL) &&
+                        !mCanaryLabel.equals(CanaryConstants.GAMMA_SINGLE_RECONNECT_LABEL) &&
+                        !mCanaryLabel.equals(CanaryConstants.GAMMA_SUB_RECONNECT_LABEL)) {
                     logger.error(String.format("Env var CANARY_LABEL: %s must be set to either %s, %s, %s, or %s.",
                             mCanaryLabel, CanaryConstants.PERIODIC_LABEL, CanaryConstants.EXTENDED_LABEL,
                             CanaryConstants.SINGLE_RECONNECT_LABEL, CanaryConstants.SUB_RECONNECT_LABEL));
