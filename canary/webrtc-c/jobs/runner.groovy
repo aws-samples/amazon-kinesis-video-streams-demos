@@ -28,91 +28,21 @@ def buildWebRTCProject(useMbedTLS, thing_prefix) {
     checkout([$class: 'GitSCM', branches: [[name: params.GIT_HASH ]],
               userRemoteConfigs: [[url: params.GIT_URL]]])
 
-    // Determine cache key from both the demos repo and the WebRTC C SDK repo.
-    // The CMakeLists.txt pins a GIT_TAG for the SDK, but we resolve it to a
-    // commit hash so we detect any tag force-pushes or branch changes too.
-    def demosHash = sh(returnStdout: true, script: 'git rev-parse HEAD').trim()
-    def webrtcSdkTag = sh(returnStdout: true, script: """
-        awk '/FetchContent_Declare/{found=1} found && /GIT_TAG/{print \$2; exit}' canary/webrtc-c/CMakeLists.txt
-    """).trim()
-    def webrtcSdkHash = sh(returnStdout: true, script: """
-        git ls-remote https://github.com/awslabs/amazon-kinesis-video-streams-webrtc-sdk-c '${webrtcSdkTag}' | cut -f1
-    """).trim()
+    def configureCmd = "cmake .. -DCMAKE_BUILD_TYPE=Debug -DCMAKE_INSTALL_PREFIX=\"\$PWD\""
+    if (useMbedTLS) {
+      echo 'Using mbedtls'
+      configureCmd += " -DCANARY_USE_OPENSSL=OFF -DCANARY_USE_MBEDTLS=ON"
+    }     
 
-    echo "Demos repo hash: ${demosHash}"
-    echo "WebRTC C SDK tag: ${webrtcSdkTag} -> ${webrtcSdkHash}"
-
-    def combinedHash = "${demosHash}-${webrtcSdkHash}"
-    def cacheKey = useMbedTLS ? "mbedtls" : "openssl"
-    def cacheDir = "/tmp/kvs-webrtc-build-cache/${cacheKey}"
-    def cachedHashFile = "${cacheDir}/.git-hash"
-    def lockFile = "/tmp/kvs-webrtc-build-cache/.${cacheKey}.lock"
-    def buildDir = "${env.WORKSPACE}/canary/webrtc-c/build"
-
-    // Always run cert_setup (certs are per-job, not cacheable)
     sh """
         cd ./canary/webrtc-c/scripts &&
         chmod a+x cert_setup.sh &&
-        ./cert_setup.sh ${thing_prefix}"""
-
-    // Use flock to serialize builds across concurrent jobs on the same node.
-    // The first job to acquire the lock builds and caches. Others wait, then
-    // find the cache populated and skip the build.
-    def binDir = sh(returnStdout: true, script: """
-        mkdir -p /tmp/kvs-webrtc-build-cache
-        exec 9>'${lockFile}'
-        flock 9
-        echo "Lock acquired for ${cacheKey}" >&2
-
-        CACHED_HASH=\$(cat '${cachedHashFile}' 2>/dev/null || echo '')
-        echo "Cache check: cached=\$CACHED_HASH, current=${combinedHash}" >&2
-        if [ "\$CACHED_HASH" = '${combinedHash}' ]; then
-            echo "Build cache hit for ${cacheKey} — demos and WebRTC SDK unchanged" >&2
-            echo '${cacheDir}'
-        else
-            if [ -z "\$CACHED_HASH" ]; then
-                echo "Build cache miss — no previous cache" >&2
-            else
-                # Log which part changed
-                OLD_DEMOS=\$(echo "\$CACHED_HASH" | cut -d- -f1)
-                OLD_SDK=\$(echo "\$CACHED_HASH" | cut -d- -f2)
-                if [ "\$OLD_DEMOS" != '${demosHash}' ]; then
-                    echo "Build cache miss — demos repo changed (\$OLD_DEMOS -> ${demosHash})" >&2
-                fi
-                if [ "\$OLD_SDK" != '${webrtcSdkHash}' ]; then
-                    echo "Build cache miss — WebRTC C SDK changed (\$OLD_SDK -> ${webrtcSdkHash})" >&2
-                fi
-            fi
-
-            cd ./canary/webrtc-c
-            rm -rf build
-            mkdir -p build
-            cd build
-            cmake .. -DCMAKE_BUILD_TYPE=Debug -DCMAKE_INSTALL_PREFIX="\$PWD" ${useMbedTLS ? '-DCANARY_USE_OPENSSL=OFF -DCANARY_USE_MBEDTLS=ON' : ''} >&2 2>&1
-            make >&2 2>&1
-
-            echo "Caching binaries to ${cacheDir}..." >&2
-            TMPDIR=\$(mktemp -d /tmp/kvs-webrtc-build-cache/.${cacheKey}.XXXXXX)
-            cp '${buildDir}/kvsWebrtcCanaryWebrtc' "\$TMPDIR/" 2>/dev/null || true
-            cp '${buildDir}/kvsWebrtcCanarySignaling' "\$TMPDIR/" 2>/dev/null || true
-            cp '${buildDir}/kvsWebrtcStorageSample' "\$TMPDIR/" 2>/dev/null || true
-            cp '${buildDir}/libkvsWebrtcCanary.so' "\$TMPDIR/" 2>/dev/null || true
-            if [ -d '${buildDir}/lib' ]; then
-                cp -a '${buildDir}/lib' "\$TMPDIR/"
-            fi
-            echo '${combinedHash}' > "\$TMPDIR/.git-hash"
-            # Atomic swap: rename old cache out, rename new cache in
-            rm -rf '${cacheDir}.old' 2>/dev/null || true
-            mv '${cacheDir}' '${cacheDir}.old' 2>/dev/null || true
-            mv "\$TMPDIR" '${cacheDir}'
-            rm -rf '${cacheDir}.old' 2>/dev/null || true
-            echo "Build cached for ${cacheKey} at ${combinedHash}" >&2
-            echo '${cacheDir}'
-        fi
-    """).trim()
-
-    echo "Using binaries from: ${binDir}"
-    return binDir
+        ./cert_setup.sh ${thing_prefix} &&
+        cd .. &&
+        mkdir -p build &&
+        cd build &&
+        ${configureCmd} &&
+        make"""
 }
 
 def buildConsumerProject() {
@@ -158,7 +88,7 @@ def buildPeer(isMaster, params) {
 
     // TODO: get the branch and version from orchestrator
     def thing_prefix = "${env.JOB_NAME}-${params.RUNNER_LABEL}"
-    def binDir = buildWebRTCProject(params.USE_MBEDTLS, thing_prefix)
+    buildWebRTCProject(params.USE_MBEDTLS, thing_prefix)
 
     RUNNING_NODES_IN_BUILDING--
     
@@ -198,10 +128,9 @@ def buildPeer(isMaster, params) {
 
     withRunnerWrapper(envs) {
         sh """
-            cd ./canary/webrtc-c &&
-            export LD_LIBRARY_PATH='${binDir}:\${LD_LIBRARY_PATH:-}' &&
+            cd ./canary/webrtc-c/build &&
             ${isMaster ? "" : "sleep 10 &&"}
-            '${binDir}/kvsWebrtcCanaryWebrtc'"""
+            ./kvsWebrtcCanaryWebrtc"""
     }
 }
 
@@ -215,7 +144,7 @@ def buildSignaling(params) {
         }
     }
     def thing_prefix = "${env.JOB_NAME}-${params.RUNNER_LABEL}"
-    def binDir = buildWebRTCProject(params.USE_MBEDTLS, thing_prefix)
+    buildWebRTCProject(params.USE_MBEDTLS, thing_prefix)
 
     def scripts_dir = "$WORKSPACE/canary/webrtc-c/scripts"
     def endpoint = "${scripts_dir}/iot-credential-provider.txt"
@@ -241,9 +170,8 @@ def buildSignaling(params) {
 
     withRunnerWrapper(envs) {
         sh """
-            cd ./canary/webrtc-c &&
-            export LD_LIBRARY_PATH='${binDir}:\${LD_LIBRARY_PATH:-}' &&
-            '${binDir}/kvsWebrtcCanarySignaling'"""
+            cd ./canary/webrtc-c/build && 
+            ./kvsWebrtcCanarySignaling"""
     }
 }
 
@@ -433,9 +361,8 @@ def buildStorageCanary(isConsumer, params) {
     if (!isConsumer) {
         MASTER_READY = false
     }
-    def binDir = null
     if (!isConsumer){
-        binDir = buildWebRTCProject(params.USE_MBEDTLS, thing_prefix)
+        buildWebRTCProject(params.USE_MBEDTLS, thing_prefix)
     } else {
         buildConsumerProject()
     }
@@ -452,9 +379,8 @@ def buildStorageCanary(isConsumer, params) {
         withRunnerWrapper(envs) {
             timeout(time: params.DURATION_IN_SECONDS.toInteger() + 900, unit: 'SECONDS') {
                 sh """
-                    cd ./canary/webrtc-c &&
-                    export LD_LIBRARY_PATH='${binDir}:\${LD_LIBRARY_PATH:-}' &&
-                    '${binDir}/kvsWebrtcStorageSample'"""
+                    cd ./canary/webrtc-c/build &&
+                    ./kvsWebrtcStorageSample"""
             }
         }
     } else {
