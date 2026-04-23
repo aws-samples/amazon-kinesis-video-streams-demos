@@ -256,6 +256,9 @@ public class WebrtcStorageCanaryConsumer {
         final Integer canaryRunTime = Integer.parseInt(System.getenv("CANARY_DURATION_IN_SECONDS"));
 
         logger.info("Stream name: " + mStreamName);
+        logger.info("Region: " + mRegion);
+        logger.info("Canary label: " + mCanaryLabel);
+        logger.info("Canary run time: " + canaryRunTime + "s");
 
         mCredentialsProvider = new EnvironmentVariableCredentialsProvider();
         mAmazonKinesisVideo = AmazonKinesisVideoClientBuilder.standard()
