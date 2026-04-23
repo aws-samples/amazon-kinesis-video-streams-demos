@@ -37,17 +37,48 @@ def buildWebRTCProject(thing_prefix) {
     checkout([$class: 'GitSCM', branches: [[name: params.GIT_HASH]],
               userRemoteConfigs: [[url: params.GIT_URL]]])
 
-    def configureCmd = "cmake .. -DCMAKE_BUILD_TYPE=Debug -DCMAKE_INSTALL_PREFIX=\"\$PWD\""
+    // Determine the actual commit hash for cache keying
+    def currentHash = sh(returnStdout: true, script: 'git rev-parse HEAD').trim()
+    def cacheDir = "/tmp/kvs-webrtc-build-cache/openssl"
+    def cachedHashFile = "${cacheDir}/.git-hash"
+    def buildDir = "${env.WORKSPACE}/canary/webrtc-c/build"
 
+    // Always run cert_setup (certs are per-job, not cacheable)
     sh """
         cd ./canary/webrtc-c/scripts &&
         chmod a+x cert_setup.sh &&
-        ./cert_setup.sh ${thing_prefix} &&
-        cd .. &&
-        mkdir -p build &&
-        cd build &&
-        ${configureCmd} &&
-        make"""
+        ./cert_setup.sh ${thing_prefix}"""
+
+    // Check if we have a cached build for this exact commit
+    def cachedHash = sh(returnStdout: true, returnStatus: false,
+                        script: "cat '${cachedHashFile}' 2>/dev/null || echo ''").trim()
+
+    if (cachedHash == currentHash) {
+        echo "Build cache hit at ${currentHash}, restoring binaries..."
+        sh """
+            mkdir -p '${buildDir}'
+            cp -a '${cacheDir}/build/'* '${buildDir}/'"""
+        echo "Restored cached binaries, skipping rebuild"
+    } else {
+        echo "Build cache miss (cached=${cachedHash}, current=${currentHash}), building..."
+        def configureCmd = "cmake .. -DCMAKE_BUILD_TYPE=Debug -DCMAKE_INSTALL_PREFIX=\"\$PWD\""
+
+        sh """
+            cd ./canary/webrtc-c &&
+            mkdir -p build &&
+            cd build &&
+            ${configureCmd} &&
+            make"""
+
+        // Cache the build artifacts for next run
+        echo "Caching build artifacts to ${cacheDir}..."
+        sh """
+            rm -rf '${cacheDir}'
+            mkdir -p '${cacheDir}/build'
+            cp -a '${buildDir}/'* '${cacheDir}/build/'
+            echo '${currentHash}' > '${cachedHashFile}'"""
+        echo "Build cached at ${currentHash}"
+    }
 }
 
 def buildConsumerProject() {
@@ -319,6 +350,7 @@ def buildStorageCanary(isConsumer, params) {
                 sh """
                     aws cloudwatch put-metric-data \
                         --namespace KinesisVideoSDKCanary \
+                        --region ${params.AWS_DEFAULT_REGION} \
                         --metric-data \
                             MetricName=ConsumerStorageAvailability,Value=${storageAvailability},Unit=Count,Dimensions="[{Name=StorageWebRTCSDKCanaryStreamName,Value=${streamName}},{Name=StorageWebRTCSDKCanaryLabel,Value=${scenarioLabel}}]"
                 """
@@ -330,6 +362,7 @@ def buildStorageCanary(isConsumer, params) {
                 sh """
                     aws cloudwatch put-metric-data \
                         --namespace KinesisVideoSDKCanary \
+                        --region ${params.AWS_DEFAULT_REGION} \
                         --metric-data \
                             MetricName=ConsumerSSIMAvg,Value=${avgSsim},Unit=None,Dimensions="[{Name=StorageWebRTCSDKCanaryStreamName,Value=${streamName}},{Name=StorageWebRTCSDKCanaryLabel,Value=${scenarioLabel}}]" \
                             MetricName=ConsumerSSIMMin,Value=${minSsim},Unit=None,Dimensions="[{Name=StorageWebRTCSDKCanaryStreamName,Value=${streamName}},{Name=StorageWebRTCSDKCanaryLabel,Value=${scenarioLabel}}]" \
