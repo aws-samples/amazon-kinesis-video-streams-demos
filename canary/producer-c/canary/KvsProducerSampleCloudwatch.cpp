@@ -508,8 +508,8 @@ INT32 main(INT32 argc, CHAR* argv[])
             // putKinesisVideoFrame() call
             if (firstFrame) {
                 startUpLatency = (DOUBLE)(GETTIME() - startTime) / (DOUBLE) HUNDREDS_OF_NANOS_IN_A_MILLISECOND;
-                CHK_STATUS(pushStartUpLatency(c.pCanaryStreamCallbacks, startUpLatency));
-                DLOGD("Start up latency: %lf ms", startUpLatency);
+                STATUS startupLatencyStatus = pushStartUpLatency(c.pCanaryStreamCallbacks, startUpLatency);
+                DLOGD("Start up latency: %lf ms (push status: 0x%08x)", startUpLatency, startupLatencyStatus);
 
                 CHK_STATUS(timerQueueAddTimer(timerQueueHandle, 60 * HUNDREDS_OF_NANOS_IN_A_SECOND, 60 * HUNDREDS_OF_NANOS_IN_A_SECOND,
                                               publishMetrics, (UINT64) &c, &timeoutTimerId));

@@ -66,11 +66,9 @@ public class RealTimeFrameProcessor extends WebrtcStorageCanaryConsumer implemen
                 logger.error("IO Exception: " + ioEx);
             } finally {
                 isFirstFrame = true;
-                super.shutdownCanaryResources();
-                System.exit(0);
             }
-        } else {
-            logger.info("Non first frame. Skipping...");
+            // Stop the GetMediaWorker — we only needed the first frame
+            throw new FrameProcessException("First frame processed, stopping worker", null);
         }
 
     }

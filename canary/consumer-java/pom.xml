@@ -13,13 +13,18 @@
         <dependency>
             <groupId>com.amazonaws</groupId>
             <artifactId>aws-java-sdk-cloudwatch</artifactId>
-            <version>1.11.742</version>
+            <version>1.12.797</version>
         </dependency>
         <!-- https://mvnrepository.com/artifact/com.amazonaws/amazon-kinesis-video-streams-parser-library -->
         <dependency>
             <groupId>com.amazonaws</groupId>
             <artifactId>amazon-kinesis-video-streams-parser-library</artifactId>
             <version>1.2.1</version>
+        </dependency>
+        <dependency>
+            <groupId>com.amazonaws</groupId>
+            <artifactId>aws-java-sdk-kinesisvideo</artifactId>
+            <version>1.12.797</version>
         </dependency>
         <dependency>
             <groupId>org.projectlombok</groupId>

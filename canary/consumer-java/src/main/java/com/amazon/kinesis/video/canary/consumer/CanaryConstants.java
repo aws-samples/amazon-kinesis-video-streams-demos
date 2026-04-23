@@ -23,8 +23,18 @@ public final class CanaryConstants {
     public static final String SINGLE_RECONNECT_LABEL = "StorageSingleReconnect"; // 1 Media Server forced reconnect, currently must be 60-120min.
     public static final String EXTENDED_LABEL = "StorageExtended"; // > 1 Media Server forced reconnect, currently must be > 120min.
 
+    // Gamma variants
+    public static final String GAMMA_PERIODIC_LABEL = "GammaStoragePeriodic";
+    public static final String GAMMA_SUB_RECONNECT_LABEL = "GammaStorageSubReconnect";
+    public static final String GAMMA_SINGLE_RECONNECT_LABEL = "GammaStorageSingleReconnect";
+
     public static final String CW_DIMENSION_INDIVIDUAL = "StorageWebRTCSDKCanaryStreamName";
     public static final String CW_DIMENSION_AGGREGATE = "StorageWebRTCSDKCanaryLabel";
+
+    // Video verification via GetClip
+    public static final String VIDEO_VERIFY_ENABLED_ENV_VAR = "VIDEO_VERIFY_ENABLED";
+    public static final String CLIP_OUTPUT_PATH_ENV_VAR = "CANARY_CLIP_OUTPUT_PATH";
+    public static final String DEFAULT_CLIP_OUTPUT_PATH = "clip.mp4";
 
     public static final String FIRST_FRAME_TS_FILE_PATH = "../webrtc-c/";
     public static final String DEFAULT_FIRST_FRAME_TS_FILE = "DefaultFirstFrameSentTSFileName.txt";
