@@ -33,7 +33,7 @@ def buildWebRTCProject(useMbedTLS, thing_prefix) {
     // commit hash so we detect any tag force-pushes or branch changes too.
     def demosHash = sh(returnStdout: true, script: 'git rev-parse HEAD').trim()
     def webrtcSdkTag = sh(returnStdout: true, script: """
-        grep -A2 'FetchContent_Declare' canary/webrtc-c/CMakeLists.txt | grep 'GIT_TAG' | head -1 | awk '{print \$2}'
+        awk '/FetchContent_Declare/{found=1} found && /GIT_TAG/{print \$2; exit}' canary/webrtc-c/CMakeLists.txt
     """).trim()
     def webrtcSdkHash = sh(returnStdout: true, script: """
         git ls-remote https://github.com/awslabs/amazon-kinesis-video-streams-webrtc-sdk-c '${webrtcSdkTag}' | cut -f1
@@ -198,9 +198,10 @@ def buildPeer(isMaster, params) {
 
     withRunnerWrapper(envs) {
         sh """
-            cd '${binDir}' &&
+            cd ./canary/webrtc-c &&
+            export LD_LIBRARY_PATH='${binDir}:\${LD_LIBRARY_PATH:-}' &&
             ${isMaster ? "" : "sleep 10 &&"}
-            ./kvsWebrtcCanaryWebrtc"""
+            '${binDir}/kvsWebrtcCanaryWebrtc'"""
     }
 }
 
@@ -240,8 +241,9 @@ def buildSignaling(params) {
 
     withRunnerWrapper(envs) {
         sh """
-            cd '${binDir}' && 
-            ./kvsWebrtcCanarySignaling"""
+            cd ./canary/webrtc-c &&
+            export LD_LIBRARY_PATH='${binDir}:\${LD_LIBRARY_PATH:-}' &&
+            '${binDir}/kvsWebrtcCanarySignaling'"""
     }
 }
 
@@ -450,8 +452,9 @@ def buildStorageCanary(isConsumer, params) {
         withRunnerWrapper(envs) {
             timeout(time: params.DURATION_IN_SECONDS.toInteger() + 900, unit: 'SECONDS') {
                 sh """
-                    cd '${binDir}' &&
-                    ./kvsWebrtcStorageSample"""
+                    cd ./canary/webrtc-c &&
+                    export LD_LIBRARY_PATH='${binDir}:\${LD_LIBRARY_PATH:-}' &&
+                    '${binDir}/kvsWebrtcStorageSample'"""
             }
         }
     } else {
