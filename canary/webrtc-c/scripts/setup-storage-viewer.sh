@@ -108,7 +108,7 @@ fi
 
 # Set JS page URL if provided — supports branch names or full URLs
 if [ -n "${JS_PAGE_URL}" ]; then
-    # If it looks like a branch name (no ://), clone the repo and serve locally
+    # If it looks like a branch name (no ://), clone the repo, build, and serve locally
     if [[ "${JS_PAGE_URL}" != *"://"* ]]; then
         JS_SDK_DIR="/tmp/kvs-webrtc-js-sdk-${JS_PAGE_URL}"
         if [ ! -d "$JS_SDK_DIR" ]; then
@@ -116,10 +116,34 @@ if [ -n "${JS_PAGE_URL}" ]; then
             git clone -b "${JS_PAGE_URL}" --depth 1 \
                 https://github.com/awslabs/amazon-kinesis-video-streams-webrtc-sdk-js.git \
                 "$JS_SDK_DIR" || { echo "ERROR: Failed to clone branch ${JS_PAGE_URL}"; exit 1; }
+            echo "Installing dependencies..."
+            (cd "$JS_SDK_DIR" && npm install) || { echo "ERROR: Failed to install JS SDK dependencies"; exit 1; }
         else
-            echo "JS SDK branch '${JS_PAGE_URL}' already cloned at $JS_SDK_DIR"
+            # Check for remote changes
+            echo "Checking for updates on branch '${JS_PAGE_URL}'..."
+            LOCAL_HEAD=$(cd "$JS_SDK_DIR" && git rev-parse HEAD)
+            REMOTE_HEAD=$(git ls-remote https://github.com/awslabs/amazon-kinesis-video-streams-webrtc-sdk-js.git "${JS_PAGE_URL}" | cut -f1)
+            if [ "$LOCAL_HEAD" != "$REMOTE_HEAD" ] && [ -n "$REMOTE_HEAD" ]; then
+                echo "Remote has new commits ($LOCAL_HEAD -> $REMOTE_HEAD), pulling..."
+                (cd "$JS_SDK_DIR" && git fetch origin "${JS_PAGE_URL}" && git reset --hard FETCH_HEAD && npm install) \
+                    || { echo "ERROR: Failed to update JS SDK"; exit 1; }
+            else
+                echo "JS SDK branch '${JS_PAGE_URL}' is up to date at $JS_SDK_DIR"
+            fi
         fi
-        export JS_PAGE_URL="file://${JS_SDK_DIR}/examples/index.html"
+        # Start the dev server in the background
+        echo "Starting JS SDK dev server..."
+        (cd "$JS_SDK_DIR" && npm run develop &>/dev/null &)
+        # Wait for the dev server to start
+        JS_PORT=3001
+        for i in $(seq 1 30); do
+            if curl -s "http://localhost:${JS_PORT}" >/dev/null 2>&1; then
+                echo "Dev server ready on port ${JS_PORT}"
+                break
+            fi
+            sleep 1
+        done
+        export JS_PAGE_URL="http://localhost:${JS_PORT}/index.html"
         echo "Using local JS page: ${JS_PAGE_URL}"
     else
         export JS_PAGE_URL="${JS_PAGE_URL}"
