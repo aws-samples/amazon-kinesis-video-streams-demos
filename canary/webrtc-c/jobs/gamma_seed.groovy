@@ -76,6 +76,7 @@ pipelineJob("${NAMESPACE}-orchestrator") {
         booleanParam('RUN_STORAGE_SINGLE_RECONNECT', true, 'Run StorageSingleReconnect test (master + consumer, 65 min)')
         booleanParam('KEEP_RECORDING', false, 'Keep viewer video recordings after verification')
         booleanParam('RESCHEDULE', true, 'Enable continuous testing (reschedule after each run completes)')
+        stringParam('JS_PAGE_URL', '', 'Custom JS viewer page URL (leave empty for default GitHub Pages)')
     }
     throttleConcurrentBuilds {
         maxTotal(1)
