@@ -106,6 +106,12 @@ else
     echo "No custom endpoint provided, using default"
 fi
 
+# Set JS page URL if provided
+if [ -n "${JS_PAGE_URL}" ]; then
+    export JS_PAGE_URL="${JS_PAGE_URL}"
+    echo "Using custom JS page URL: ${JS_PAGE_URL}"
+fi
+
 # Set metric suffix if provided (defaults to empty)
 if [ -n "${METRIC_SUFFIX}" ]; then
     export METRIC_SUFFIX="${METRIC_SUFFIX}"

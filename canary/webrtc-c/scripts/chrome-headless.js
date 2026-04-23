@@ -528,7 +528,9 @@ class ViewerCanaryTest {
       params.set('forceTURN', 'true');
     }
     
-    return `https://awslabs.github.io/amazon-kinesis-video-streams-webrtc-sdk-js/examples/index.html?${params}`;
+    const defaultUrl = 'https://awslabs.github.io/amazon-kinesis-video-streams-webrtc-sdk-js/examples/index.html';
+    const baseUrl = process.env.JS_PAGE_URL || defaultUrl;
+    return `${baseUrl}?${params}`;
   }
 
   async initializePage(page) {

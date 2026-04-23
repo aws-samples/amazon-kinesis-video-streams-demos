@@ -142,6 +142,7 @@ def runViewerSessions(viewerId = "", waitMinutes = 2, viewerCount = "1") {
                         export ENDPOINT="${endpointValue}"
                         export METRIC_SUFFIX="${metricSuffixValue}"
                         export KEEP_RECORDING="${params.KEEP_RECORDING}"
+                        export JS_PAGE_URL="${params.JS_PAGE_URL ?: ''}"
                         
                         ./canary/webrtc-c/scripts/setup-storage-viewer.sh
                     """,
@@ -377,6 +378,7 @@ pipeline {
         booleanParam(name: 'USE_IOT', defaultValue: false)
         booleanParam(name: 'TRICKLE_ICE', defaultValue: false)
         booleanParam(name: 'FORCE_TURN', defaultValue: false)
+        string(name: 'JS_PAGE_URL', defaultValue: '', description: 'Custom JS viewer page URL (leave empty for default GitHub Pages)')
     }
     
     environment {
@@ -660,6 +662,7 @@ pipeline {
                             booleanParam(name: 'USE_IOT', value: params.USE_IOT),
                             booleanParam(name: 'TRICKLE_ICE', value: params.TRICKLE_ICE),
                             booleanParam(name: 'FORCE_TURN', value: params.FORCE_TURN),
+                            string(name: 'JS_PAGE_URL', value: params.JS_PAGE_URL),
                         ],
                         wait: false
                     )
