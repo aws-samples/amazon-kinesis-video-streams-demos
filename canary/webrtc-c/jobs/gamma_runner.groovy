@@ -611,50 +611,6 @@ pipeline {
             }
         }
 
-        stage('Reschedule') {
-            when {
-                equals expected: true, actual: params.RESCHEDULE
-            }
-            steps {
-                build(
-                    job: env.JOB_NAME,
-                    parameters: [
-                        string(name: 'AWS_KVS_LOG_LEVEL', value: params.AWS_KVS_LOG_LEVEL),
-                        string(name: 'LOG_GROUP_NAME', value: params.LOG_GROUP_NAME),
-                        string(name: 'MASTER_NODE_LABEL', value: params.MASTER_NODE_LABEL),
-                        string(name: 'STORAGE_VIEWER_NODE_LABEL', value: params.STORAGE_VIEWER_NODE_LABEL),
-                        string(name: 'STORAGE_VIEWER_ONE_NODE_LABEL', value: params.STORAGE_VIEWER_ONE_NODE_LABEL),
-                        string(name: 'STORAGE_VIEWER_TWO_NODE_LABEL', value: params.STORAGE_VIEWER_TWO_NODE_LABEL),
-                        string(name: 'STORAGE_VIEWER_THREE_NODE_LABEL', value: params.STORAGE_VIEWER_THREE_NODE_LABEL),
-                        string(name: 'RUNNER_LABEL', value: params.RUNNER_LABEL),
-                        string(name: 'SCENARIO_LABEL', value: params.SCENARIO_LABEL),
-                        string(name: 'DURATION_IN_SECONDS', value: params.DURATION_IN_SECONDS),
-                        string(name: 'GIT_URL', value: params.GIT_URL),
-                        string(name: 'GIT_HASH', value: params.GIT_HASH),
-                        string(name: 'AWS_DEFAULT_REGION', value: params.AWS_DEFAULT_REGION),
-                        string(name: 'ENDPOINT', value: params.ENDPOINT),
-                        string(name: 'METRIC_SUFFIX', value: params.METRIC_SUFFIX),
-                        string(name: 'VIEWER_WAIT_MINUTES', value: params.VIEWER_WAIT_MINUTES),
-                        string(name: 'VIEWER_SESSION_DURATION_SECONDS', value: params.VIEWER_SESSION_DURATION_SECONDS),
-                        booleanParam(name: 'DEBUG_LOG_SDP', value: params.DEBUG_LOG_SDP),
-                        booleanParam(name: 'FIRST_ITERATION', value: false),
-                        booleanParam(name: 'IS_STORAGE', value: params.IS_STORAGE),
-                        booleanParam(name: 'IS_STORAGE_SINGLE_NODE', value: params.IS_STORAGE_SINGLE_NODE),
-                        booleanParam(name: 'VIDEO_VERIFY_ENABLED', value: params.VIDEO_VERIFY_ENABLED),
-                        string(name: 'CONSUMER_NODE_LABEL', value: params.CONSUMER_NODE_LABEL),
-                        booleanParam(name: 'JS_STORAGE_VIEWER_JOIN', value: params.JS_STORAGE_VIEWER_JOIN),
-                        booleanParam(name: 'JS_STORAGE_TWO_VIEWERS', value: params.JS_STORAGE_TWO_VIEWERS),
-                        booleanParam(name: 'JS_STORAGE_THREE_VIEWERS', value: params.JS_STORAGE_THREE_VIEWERS),
-                        booleanParam(name: 'RESCHEDULE', value: params.RESCHEDULE),
-                        booleanParam(name: 'USE_TURN', value: params.USE_TURN),
-                        booleanParam(name: 'USE_IOT', value: params.USE_IOT),
-                        booleanParam(name: 'TRICKLE_ICE', value: params.TRICKLE_ICE),
-                        booleanParam(name: 'FORCE_TURN', value: params.FORCE_TURN),
-                    ],
-                    wait: false
-                )
-            }
-        }
     }
     
     post {
@@ -666,6 +622,48 @@ pipeline {
                 echo "Build result: ${currentBuild.result ?: 'SUCCESS'}"
                 echo "Has errors: ${HAS_ERROR}"
                 echo "=========================================="
+
+                if (currentBuild.result == 'ABORTED') {
+                    echo "Build was aborted, skipping reschedule"
+                } else if (params.RESCHEDULE) {
+                    build(
+                        job: env.JOB_NAME,
+                        parameters: [
+                            string(name: 'AWS_KVS_LOG_LEVEL', value: params.AWS_KVS_LOG_LEVEL),
+                            string(name: 'LOG_GROUP_NAME', value: params.LOG_GROUP_NAME),
+                            string(name: 'MASTER_NODE_LABEL', value: params.MASTER_NODE_LABEL),
+                            string(name: 'STORAGE_VIEWER_NODE_LABEL', value: params.STORAGE_VIEWER_NODE_LABEL),
+                            string(name: 'STORAGE_VIEWER_ONE_NODE_LABEL', value: params.STORAGE_VIEWER_ONE_NODE_LABEL),
+                            string(name: 'STORAGE_VIEWER_TWO_NODE_LABEL', value: params.STORAGE_VIEWER_TWO_NODE_LABEL),
+                            string(name: 'STORAGE_VIEWER_THREE_NODE_LABEL', value: params.STORAGE_VIEWER_THREE_NODE_LABEL),
+                            string(name: 'RUNNER_LABEL', value: params.RUNNER_LABEL),
+                            string(name: 'SCENARIO_LABEL', value: params.SCENARIO_LABEL),
+                            string(name: 'DURATION_IN_SECONDS', value: params.DURATION_IN_SECONDS),
+                            string(name: 'GIT_URL', value: params.GIT_URL),
+                            string(name: 'GIT_HASH', value: params.GIT_HASH),
+                            string(name: 'AWS_DEFAULT_REGION', value: params.AWS_DEFAULT_REGION),
+                            string(name: 'ENDPOINT', value: params.ENDPOINT),
+                            string(name: 'METRIC_SUFFIX', value: params.METRIC_SUFFIX),
+                            string(name: 'VIEWER_WAIT_MINUTES', value: params.VIEWER_WAIT_MINUTES),
+                            string(name: 'VIEWER_SESSION_DURATION_SECONDS', value: params.VIEWER_SESSION_DURATION_SECONDS),
+                            booleanParam(name: 'DEBUG_LOG_SDP', value: params.DEBUG_LOG_SDP),
+                            booleanParam(name: 'FIRST_ITERATION', value: false),
+                            booleanParam(name: 'IS_STORAGE', value: params.IS_STORAGE),
+                            booleanParam(name: 'IS_STORAGE_SINGLE_NODE', value: params.IS_STORAGE_SINGLE_NODE),
+                            booleanParam(name: 'VIDEO_VERIFY_ENABLED', value: params.VIDEO_VERIFY_ENABLED),
+                            string(name: 'CONSUMER_NODE_LABEL', value: params.CONSUMER_NODE_LABEL),
+                            booleanParam(name: 'JS_STORAGE_VIEWER_JOIN', value: params.JS_STORAGE_VIEWER_JOIN),
+                            booleanParam(name: 'JS_STORAGE_TWO_VIEWERS', value: params.JS_STORAGE_TWO_VIEWERS),
+                            booleanParam(name: 'JS_STORAGE_THREE_VIEWERS', value: params.JS_STORAGE_THREE_VIEWERS),
+                            booleanParam(name: 'RESCHEDULE', value: params.RESCHEDULE),
+                            booleanParam(name: 'USE_TURN', value: params.USE_TURN),
+                            booleanParam(name: 'USE_IOT', value: params.USE_IOT),
+                            booleanParam(name: 'TRICKLE_ICE', value: params.TRICKLE_ICE),
+                            booleanParam(name: 'FORCE_TURN', value: params.FORCE_TURN),
+                        ],
+                        wait: false
+                    )
+                }
             }
         }
     }
