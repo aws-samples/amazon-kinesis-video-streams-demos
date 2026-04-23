@@ -131,11 +131,13 @@ if [ -n "${JS_PAGE_URL}" ]; then
                 echo "JS SDK branch '${JS_PAGE_URL}' is up to date at $JS_SDK_DIR"
             fi
         fi
+        # Find a free port to avoid collisions with other processes
+        JS_PORT=$(python3 -c 'import socket; s=socket.socket(); s.bind(("",0)); print(s.getsockname()[1]); s.close()')
+        echo "Selected free port: ${JS_PORT}"
         # Start the dev server in the background
-        echo "Starting JS SDK dev server..."
-        (cd "$JS_SDK_DIR" && npm run develop &>/dev/null &)
-        # Wait for the dev server to start
-        JS_PORT=3001
+        echo "Starting JS SDK dev server on port ${JS_PORT}..."
+        (cd "$JS_SDK_DIR" && npm run develop -- --port "$JS_PORT" &>/dev/null) &
+        DEV_SERVER_PID=$!
         for i in $(seq 1 30); do
             if curl -s "http://localhost:${JS_PORT}" >/dev/null 2>&1; then
                 echo "Dev server ready on port ${JS_PORT}"
@@ -159,3 +161,9 @@ fi
 
 # Run storage viewer test
 node chrome-headless.js || { echo "ERROR: Chrome headless test failed"; exit 1; }
+
+# Clean up the dev server if we started one
+if [ -n "$DEV_SERVER_PID" ]; then
+    echo "Stopping JS SDK dev server (PID $DEV_SERVER_PID)..."
+    kill "$DEV_SERVER_PID" 2>/dev/null
+fi
