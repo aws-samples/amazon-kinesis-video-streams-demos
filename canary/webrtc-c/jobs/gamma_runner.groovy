@@ -247,7 +247,8 @@ def buildStorageCanary(isConsumer, params) {
         'CANARY_STREAM_NAME': "${env.JOB_NAME}-${params.RUNNER_LABEL}",
         'CANARY_DURATION_IN_SECONDS': "${params.DURATION_IN_SECONDS.toInteger() + 120}",
         'VIDEO_VERIFY_ENABLED': params.VIDEO_VERIFY_ENABLED?.toString() ?: 'false',
-        'CANARY_CLIP_OUTPUT_PATH': "${env.WORKSPACE}/canary/consumer-java/clip-${START_TIMESTAMP}.mp4"
+        'CANARY_CLIP_OUTPUT_PATH': "${env.WORKSPACE}/canary/consumer-java/clip-${START_TIMESTAMP}.mp4",
+        'CONTROL_PLANE_URI': params.ENDPOINT ?: ''
     ]
 
     RUNNING_NODES_IN_BUILDING++

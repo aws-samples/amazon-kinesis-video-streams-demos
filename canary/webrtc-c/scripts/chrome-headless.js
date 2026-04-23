@@ -146,7 +146,7 @@ class ViewerCanaryTest {
   async createBrowser() {
     return await puppeteer.launch({ 
       headless: true,
-      args: ['--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream']
+      args: ['--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream', '--allow-file-access-from-files']
     });
   }
 

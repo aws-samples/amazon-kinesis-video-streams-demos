@@ -106,10 +106,25 @@ else
     echo "No custom endpoint provided, using default"
 fi
 
-# Set JS page URL if provided
+# Set JS page URL if provided — supports branch names or full URLs
 if [ -n "${JS_PAGE_URL}" ]; then
-    export JS_PAGE_URL="${JS_PAGE_URL}"
-    echo "Using custom JS page URL: ${JS_PAGE_URL}"
+    # If it looks like a branch name (no ://), clone the repo and serve locally
+    if [[ "${JS_PAGE_URL}" != *"://"* ]]; then
+        JS_SDK_DIR="/tmp/kvs-webrtc-js-sdk-${JS_PAGE_URL}"
+        if [ ! -d "$JS_SDK_DIR" ]; then
+            echo "Cloning JS SDK branch '${JS_PAGE_URL}'..."
+            git clone -b "${JS_PAGE_URL}" --depth 1 \
+                https://github.com/awslabs/amazon-kinesis-video-streams-webrtc-sdk-js.git \
+                "$JS_SDK_DIR" || { echo "ERROR: Failed to clone branch ${JS_PAGE_URL}"; exit 1; }
+        else
+            echo "JS SDK branch '${JS_PAGE_URL}' already cloned at $JS_SDK_DIR"
+        fi
+        export JS_PAGE_URL="file://${JS_SDK_DIR}/examples/index.html"
+        echo "Using local JS page: ${JS_PAGE_URL}"
+    else
+        export JS_PAGE_URL="${JS_PAGE_URL}"
+        echo "Using custom JS page URL: ${JS_PAGE_URL}"
+    fi
 fi
 
 # Set metric suffix if provided (defaults to empty)
