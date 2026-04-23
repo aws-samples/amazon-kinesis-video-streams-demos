@@ -48,7 +48,7 @@ if [ -n "${JS_PAGE_URL}" ]; then
         # Start the dev server in the background, logging output so we can detect readiness
         DEV_SERVER_LOG=$(mktemp /tmp/dev-server-XXXXXX.log)
         echo "Starting JS SDK dev server on port ${JS_PORT}..."
-        (cd "$JS_SDK_DIR" && npm run develop -- --port "$JS_PORT" --host 127.0.0.1 > "$DEV_SERVER_LOG" 2>&1) &
+        (cd "$JS_SDK_DIR" && npm run develop -- --port "$JS_PORT" --host 127.0.0.1 --allowed-hosts all > "$DEV_SERVER_LOG" 2>&1) &
         DEV_SERVER_PID=$!
         # Wait for webpack to finish compiling and the server to start
         READY_MSG="compiled successfully"
