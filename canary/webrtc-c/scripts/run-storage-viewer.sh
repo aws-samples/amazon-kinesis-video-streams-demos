@@ -51,7 +51,7 @@ if [ -n "${JS_PAGE_URL}" ]; then
         (cd "$JS_SDK_DIR" && npm run develop -- --port "$JS_PORT" > "$DEV_SERVER_LOG" 2>&1) &
         DEV_SERVER_PID=$!
         # Wait for webpack to finish compiling and the server to start
-        READY_MSG="Server started"
+        READY_MSG="compiled successfully"
         for i in $(seq 1 120); do
             if grep -q "$READY_MSG" "$DEV_SERVER_LOG" 2>/dev/null; then
                 echo "Dev server ready on port ${JS_PORT} (took ${i}s)"
