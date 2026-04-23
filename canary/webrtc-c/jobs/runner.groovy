@@ -368,9 +368,11 @@ def buildStorageCanary(isConsumer, params) {
         MASTER_READY = true
         echo "Master build complete, signaling viewers (MASTER_READY=true)"
         withRunnerWrapper(envs) {
-            sh """
-                cd ./canary/webrtc-c/build &&
-                ./kvsWebrtcStorageSample"""
+            timeout(time: params.DURATION_IN_SECONDS.toInteger() + 900, unit: 'SECONDS') {
+                sh """
+                    cd ./canary/webrtc-c/build &&
+                    ./kvsWebrtcStorageSample"""
+            }
         }
     } else {
         def envs = (commonEnvs + consumerEnvs).collect{ k, v -> "${k}=${v}" }
