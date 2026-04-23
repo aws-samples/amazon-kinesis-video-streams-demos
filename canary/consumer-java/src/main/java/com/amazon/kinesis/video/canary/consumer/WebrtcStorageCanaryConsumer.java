@@ -260,11 +260,21 @@ public class WebrtcStorageCanaryConsumer {
         logger.info("Canary label: " + mCanaryLabel);
         logger.info("Canary run time: " + canaryRunTime + "s");
 
+        String controlPlaneUri = System.getenv("CONTROL_PLANE_URI");
+        logger.info("Control plane URI: " + (controlPlaneUri != null ? controlPlaneUri : "(default)"));
+
         mCredentialsProvider = new EnvironmentVariableCredentialsProvider();
-        mAmazonKinesisVideo = AmazonKinesisVideoClientBuilder.standard()
-                .withRegion(mRegion)
-                .withCredentials(mCredentialsProvider)
-                .build();
+
+        AmazonKinesisVideoClientBuilder kvsBuilder = AmazonKinesisVideoClientBuilder.standard()
+                .withCredentials(mCredentialsProvider);
+        if (controlPlaneUri != null && !controlPlaneUri.isEmpty()) {
+            kvsBuilder.withEndpointConfiguration(
+                    new com.amazonaws.client.builder.AwsClientBuilder.EndpointConfiguration(controlPlaneUri, mRegion));
+        } else {
+            kvsBuilder.withRegion(mRegion);
+        }
+        mAmazonKinesisVideo = kvsBuilder.build();
+
         mCwClient = AmazonCloudWatchClientBuilder.standard()
                 .withRegion(mRegion)
                 .withCredentials(mCredentialsProvider)
