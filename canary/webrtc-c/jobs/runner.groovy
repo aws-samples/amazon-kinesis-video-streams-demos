@@ -28,11 +28,25 @@ def buildWebRTCProject(useMbedTLS, thing_prefix) {
     checkout([$class: 'GitSCM', branches: [[name: params.GIT_HASH ]],
               userRemoteConfigs: [[url: params.GIT_URL]]])
 
-    // Determine the actual commit hash for cache keying
-    def currentHash = sh(returnStdout: true, script: 'git rev-parse HEAD').trim()
+    // Determine cache key from both the demos repo and the WebRTC C SDK repo.
+    // The CMakeLists.txt pins a GIT_TAG for the SDK, but we resolve it to a
+    // commit hash so we detect any tag force-pushes or branch changes too.
+    def demosHash = sh(returnStdout: true, script: 'git rev-parse HEAD').trim()
+    def webrtcSdkTag = sh(returnStdout: true, script: """
+        grep -A2 'FetchContent_Declare' canary/webrtc-c/CMakeLists.txt | grep 'GIT_TAG' | head -1 | awk '{print \$2}'
+    """).trim()
+    def webrtcSdkHash = sh(returnStdout: true, script: """
+        git ls-remote https://github.com/awslabs/amazon-kinesis-video-streams-webrtc-sdk-c '${webrtcSdkTag}' | cut -f1
+    """).trim()
+
+    echo "Demos repo hash: ${demosHash}"
+    echo "WebRTC C SDK tag: ${webrtcSdkTag} -> ${webrtcSdkHash}"
+
+    def combinedHash = "${demosHash}-${webrtcSdkHash}"
     def cacheKey = useMbedTLS ? "mbedtls" : "openssl"
     def cacheDir = "/tmp/kvs-webrtc-build-cache/${cacheKey}"
     def cachedHashFile = "${cacheDir}/.git-hash"
+    def lockFile = "/tmp/kvs-webrtc-build-cache/.${cacheKey}.lock"
     def buildDir = "${env.WORKSPACE}/canary/webrtc-c/build"
 
     // Always run cert_setup (certs are per-job, not cacheable)
@@ -41,44 +55,64 @@ def buildWebRTCProject(useMbedTLS, thing_prefix) {
         chmod a+x cert_setup.sh &&
         ./cert_setup.sh ${thing_prefix}"""
 
-    // Check if we have a cached build for this exact commit
-    def cachedHash = sh(returnStdout: true, returnStatus: false,
-                        script: "cat '${cachedHashFile}' 2>/dev/null || echo ''").trim()
+    // Use flock to serialize builds across concurrent jobs on the same node.
+    // The first job to acquire the lock builds and caches. Others wait, then
+    // find the cache populated and skip the build.
+    def binDir = sh(returnStdout: true, script: """
+        mkdir -p /tmp/kvs-webrtc-build-cache
+        exec 9>'${lockFile}'
+        flock 9
+        echo "Lock acquired for ${cacheKey}" >&2
 
-    if (cachedHash == currentHash) {
-        echo "Build cache hit for ${cacheKey} at ${currentHash}, running from cache"
-        return cacheDir
-    }
+        CACHED_HASH=\$(cat '${cachedHashFile}' 2>/dev/null || echo '')
+        echo "Cache check: cached=\$CACHED_HASH, current=${combinedHash}" >&2
+        if [ "\$CACHED_HASH" = '${combinedHash}' ]; then
+            echo "Build cache hit for ${cacheKey} — demos and WebRTC SDK unchanged" >&2
+            echo '${cacheDir}'
+        else
+            if [ -z "\$CACHED_HASH" ]; then
+                echo "Build cache miss — no previous cache" >&2
+            else
+                # Log which part changed
+                OLD_DEMOS=\$(echo "\$CACHED_HASH" | cut -d- -f1)
+                OLD_SDK=\$(echo "\$CACHED_HASH" | cut -d- -f2)
+                if [ "\$OLD_DEMOS" != '${demosHash}' ]; then
+                    echo "Build cache miss — demos repo changed (\$OLD_DEMOS -> ${demosHash})" >&2
+                fi
+                if [ "\$OLD_SDK" != '${webrtcSdkHash}' ]; then
+                    echo "Build cache miss — WebRTC C SDK changed (\$OLD_SDK -> ${webrtcSdkHash})" >&2
+                fi
+            fi
 
-    echo "Build cache miss (cached=${cachedHash}, current=${currentHash}), building..."
-    def configureCmd = "cmake .. -DCMAKE_BUILD_TYPE=Debug -DCMAKE_INSTALL_PREFIX=\"\$PWD\""
-    if (useMbedTLS) {
-        echo 'Using mbedtls'
-        configureCmd += " -DCANARY_USE_OPENSSL=OFF -DCANARY_USE_MBEDTLS=ON"
-    }
+            cd ./canary/webrtc-c
+            rm -rf build
+            mkdir -p build
+            cd build
+            cmake .. -DCMAKE_BUILD_TYPE=Debug -DCMAKE_INSTALL_PREFIX="\$PWD" ${useMbedTLS ? '-DCANARY_USE_OPENSSL=OFF -DCANARY_USE_MBEDTLS=ON' : ''} >&2 2>&1
+            make >&2 2>&1
 
-    sh """
-        cd ./canary/webrtc-c &&
-        mkdir -p build &&
-        cd build &&
-        ${configureCmd} &&
-        make"""
-
-    // Cache only the binaries we need (not the entire build tree)
-    echo "Caching binaries to ${cacheDir}..."
-    sh """
-        rm -rf '${cacheDir}'
-        mkdir -p '${cacheDir}'
-        cp '${buildDir}/kvsWebrtcCanaryWebrtc' '${cacheDir}/' 2>/dev/null || true
-        cp '${buildDir}/kvsWebrtcCanarySignaling' '${cacheDir}/' 2>/dev/null || true
-        cp '${buildDir}/kvsWebrtcStorageSample' '${cacheDir}/' 2>/dev/null || true
-        cp '${buildDir}/libkvsWebrtcCanary.so' '${cacheDir}/' 2>/dev/null || true
-        if [ -d '${buildDir}/lib' ]; then
-            cp -a '${buildDir}/lib' '${cacheDir}/'
+            echo "Caching binaries to ${cacheDir}..." >&2
+            TMPDIR=\$(mktemp -d /tmp/kvs-webrtc-build-cache/.${cacheKey}.XXXXXX)
+            cp '${buildDir}/kvsWebrtcCanaryWebrtc' "\$TMPDIR/" 2>/dev/null || true
+            cp '${buildDir}/kvsWebrtcCanarySignaling' "\$TMPDIR/" 2>/dev/null || true
+            cp '${buildDir}/kvsWebrtcStorageSample' "\$TMPDIR/" 2>/dev/null || true
+            cp '${buildDir}/libkvsWebrtcCanary.so' "\$TMPDIR/" 2>/dev/null || true
+            if [ -d '${buildDir}/lib' ]; then
+                cp -a '${buildDir}/lib' "\$TMPDIR/"
+            fi
+            echo '${combinedHash}' > "\$TMPDIR/.git-hash"
+            # Atomic swap: rename old cache out, rename new cache in
+            rm -rf '${cacheDir}.old' 2>/dev/null || true
+            mv '${cacheDir}' '${cacheDir}.old' 2>/dev/null || true
+            mv "\$TMPDIR" '${cacheDir}'
+            rm -rf '${cacheDir}.old' 2>/dev/null || true
+            echo "Build cached for ${cacheKey} at ${combinedHash}" >&2
+            echo '${cacheDir}'
         fi
-        echo '${currentHash}' > '${cachedHashFile}'"""
-    echo "Build cached for ${cacheKey} at ${currentHash}"
-    return buildDir
+    """).trim()
+
+    echo "Using binaries from: ${binDir}"
+    return binDir
 }
 
 def buildConsumerProject() {
