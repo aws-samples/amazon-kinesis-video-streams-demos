@@ -112,9 +112,6 @@ pipeline {
         stage('Validate Parameters') {
             steps {
                 script {
-                    if (!params.ENDPOINT?.trim()) {
-                        error "ENDPOINT parameter is required. Please provide the gamma endpoint URL."
-                    }
                     
                     if (!params.RUN_STORAGE_WITH_VIEWER && !params.RUN_STORAGE_TWO_VIEWERS && !params.RUN_STORAGE_THREE_VIEWERS && !params.RUN_STORAGE_PERIODIC && !params.RUN_STORAGE_SUB_RECONNECT && !params.RUN_STORAGE_SINGLE_RECONNECT) {
                         error "At least one test must be selected to run."
