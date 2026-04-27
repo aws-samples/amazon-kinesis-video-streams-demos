@@ -57,7 +57,7 @@ if [ -n "${JS_PAGE_URL:-}" ]; then
         # Dev server log with timestamp for debugging
         DEV_SERVER_LOG="${LOGS_DIR}/dev-server-$(date +%s).log"
         echo "Starting JS SDK dev server on port ${JS_PORT}..."
-        (cd "$JS_SDK_DIR" && npm run develop -- --port "$JS_PORT" --host 127.0.0.1 --allowed-hosts all > "$DEV_SERVER_LOG" 2>&1) &
+        (cd "$JS_SDK_DIR" && npm run develop -- --port "$JS_PORT" --host 127.0.0.1 --allowed-hosts all --no-hot --no-live-reload > "$DEV_SERVER_LOG" 2>&1) &
         DEV_SERVER_PID=$!
 
         # Wait for webpack to finish compiling and the server to start
