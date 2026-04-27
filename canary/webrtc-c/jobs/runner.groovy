@@ -28,11 +28,13 @@ def buildWebRTCProject(useMbedTLS, thing_prefix) {
     checkout([$class: 'GitSCM', branches: [[name: params.GIT_HASH ]],
               userRemoteConfigs: [[url: params.GIT_URL]]])
 
-    // Generate IoT certs in the workspace (these are per-job/per-label)
+    // Generate IoT certs in a persistent directory outside the workspace.
+    def certsDir = "${env.HOME}/webrtc-c-storage-master/certs/${thing_prefix}"
     sh """
-        cd ./canary/webrtc-c/scripts &&
-        chmod a+x cert_setup.sh &&
-        ./cert_setup.sh ${thing_prefix}"""
+        mkdir -p ${certsDir} &&
+        cd ${certsDir} &&
+        chmod a+x $WORKSPACE/canary/webrtc-c/scripts/cert_setup.sh &&
+        $WORKSPACE/canary/webrtc-c/scripts/cert_setup.sh ${thing_prefix}"""
 
     // Build the binary in a persistent directory outside the workspace.
     // The script handles skip-rebuild logic and flock-based locking.
@@ -93,10 +95,10 @@ def buildPeer(isMaster, params) {
         RUNNING_NODES_IN_BUILDING == 0
     }
 
-    def scripts_dir = "$WORKSPACE/canary/webrtc-c/scripts"
-    def endpoint = "${scripts_dir}/iot-credential-provider.txt"
-    def core_cert_file = "${scripts_dir}/${thing_prefix}_certificate.pem"
-    def private_key_file = "${scripts_dir}/${thing_prefix}_private.key"
+    def certsDir = "${env.HOME}/webrtc-c-storage-master/certs/${thing_prefix}"
+    def endpoint = "${certsDir}/iot-credential-provider.txt"
+    def core_cert_file = "${certsDir}/${thing_prefix}_certificate.pem"
+    def private_key_file = "${certsDir}/${thing_prefix}_private.key"
     def role_alias = "${thing_prefix}_role_alias"
     def thing_name = "${thing_prefix}_thing"
 
@@ -144,10 +146,10 @@ def buildSignaling(params) {
     def thing_prefix = "${env.JOB_NAME}-${params.RUNNER_LABEL}"
     buildWebRTCProject(params.USE_MBEDTLS, thing_prefix)
 
-    def scripts_dir = "$WORKSPACE/canary/webrtc-c/scripts"
-    def endpoint = "${scripts_dir}/iot-credential-provider.txt"
-    def core_cert_file = "${scripts_dir}/${thing_prefix}_certificate.pem"
-    def private_key_file = "${scripts_dir}/${thing_prefix}_private.key"
+    def certsDir = "${env.HOME}/webrtc-c-storage-master/certs/${thing_prefix}"
+    def endpoint = "${certsDir}/iot-credential-provider.txt"
+    def core_cert_file = "${certsDir}/${thing_prefix}_certificate.pem"
+    def private_key_file = "${certsDir}/${thing_prefix}_private.key"
     def role_alias = "${thing_prefix}_role_alias"
     def thing_name = "${thing_prefix}_thing"
 
@@ -312,12 +314,11 @@ def publishViewerConnectionSuccessRate(scenarioLabel) {
 }
 
 def buildStorageCanary(isConsumer, params) {
-    def scripts_dir = !isConsumer ? "$WORKSPACE/canary/webrtc-c/scripts" :
-        "$WORKSPACE/canary/webrtc-c/scripts"
     def thing_prefix = "${env.JOB_NAME}-${params.RUNNER_LABEL}"
-    def endpoint = "${scripts_dir}/iot-credential-provider.txt"
-    def core_cert_file = "${scripts_dir}/${thing_prefix}_certificate.pem"
-    def private_key_file = "${scripts_dir}/${thing_prefix}_private.key"
+    def certsDir = "${env.HOME}/webrtc-c-storage-master/certs/${thing_prefix}"
+    def endpoint = "${certsDir}/iot-credential-provider.txt"
+    def core_cert_file = "${certsDir}/${thing_prefix}_certificate.pem"
+    def private_key_file = "${certsDir}/${thing_prefix}_private.key"
     def role_alias = "${thing_prefix}_role_alias"
     def thing_name = "${thing_prefix}_thing"
 
