@@ -25,23 +25,27 @@ def extractViewerStats(String output) {
 
 def buildWebRTCProject(useMbedTLS, thing_prefix) {
     echo 'Flag set to ' + useMbedTLS
-    checkout([$class: 'GitSCM', branches: [[name: params.GIT_HASH ]],
-              userRemoteConfigs: [[url: params.GIT_URL]]])
-
-    // Generate IoT certs in a persistent directory outside the workspace.
+    def repoDir = "${env.HOME}/webrtc-c-storage-master/repo"
     def certsDir = "${env.HOME}/webrtc-c-storage-master/certs/${thing_prefix}"
-    sh """
-        mkdir -p ${certsDir} &&
-        cd ${certsDir} &&
-        chmod a+x $WORKSPACE/canary/webrtc-c/scripts/cert_setup.sh &&
-        $WORKSPACE/canary/webrtc-c/scripts/cert_setup.sh ${thing_prefix}"""
 
-    // Build the binary in a persistent directory outside the workspace.
-    // The script handles skip-rebuild logic and flock-based locking.
+    // Bootstrap: clone the repo if it doesn't exist yet on this node
+    sh """
+        if [ ! -d '${repoDir}/.git' ]; then
+            git clone '${params.GIT_URL}' '${repoDir}'
+        fi"""
+
+    // Build the binary (handles git fetch, skip-rebuild, and flock internally)
     def tlsBackend = useMbedTLS ? "mbedtls" : "openssl"
     sh """
-        chmod a+x ./canary/webrtc-c/scripts/build-storage-master.sh &&
-        ./canary/webrtc-c/scripts/build-storage-master.sh '${params.GIT_URL}' '${params.GIT_HASH}' '${tlsBackend}'"""
+        chmod a+x '${repoDir}/canary/webrtc-c/scripts/build-storage-master.sh' &&
+        '${repoDir}/canary/webrtc-c/scripts/build-storage-master.sh' '${params.GIT_URL}' '${params.GIT_HASH}' '${tlsBackend}'"""
+
+    // Generate IoT certs in a persistent directory outside the repo
+    sh """
+        mkdir -p '${certsDir}' &&
+        cd '${certsDir}' &&
+        chmod a+x '${repoDir}/canary/webrtc-c/scripts/cert_setup.sh' &&
+        '${repoDir}/canary/webrtc-c/scripts/cert_setup.sh' '${thing_prefix}'"""
 }
 
 def buildConsumerProject() {

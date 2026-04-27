@@ -34,24 +34,26 @@ def extractViewerStats(String output) {
 }
 
 def buildWebRTCProject(thing_prefix) {
-    checkout([$class: 'GitSCM', branches: [[name: params.GIT_HASH]],
-              userRemoteConfigs: [[url: params.GIT_URL]]])
-
-    // Generate IoT certs in a persistent directory outside the workspace.
-    // Uses ~/webrtc-c-storage-master/certs/{thing_prefix}/ so certs survive
-    // across builds and are immune to git clean operations on the repo.
+    def repoDir = "${env.HOME}/webrtc-c-storage-master/repo"
     def certsDir = "${env.HOME}/webrtc-c-storage-master/certs/${thing_prefix}"
-    sh """
-        mkdir -p ${certsDir} &&
-        cd ${certsDir} &&
-        chmod a+x $WORKSPACE/canary/webrtc-c/scripts/cert_setup.sh &&
-        $WORKSPACE/canary/webrtc-c/scripts/cert_setup.sh ${thing_prefix}"""
 
-    // Build the binary in a persistent directory outside the workspace.
-    // The script handles skip-rebuild logic and flock-based locking.
+    // Bootstrap: clone the repo if it doesn't exist yet on this node
     sh """
-        chmod a+x ./canary/webrtc-c/scripts/build-storage-master.sh &&
-        ./canary/webrtc-c/scripts/build-storage-master.sh '${params.GIT_URL}' '${params.GIT_HASH}'"""
+        if [ ! -d '${repoDir}/.git' ]; then
+            git clone '${params.GIT_URL}' '${repoDir}'
+        fi"""
+
+    // Build the binary (handles git fetch, skip-rebuild, and flock internally)
+    sh """
+        chmod a+x '${repoDir}/canary/webrtc-c/scripts/build-storage-master.sh' &&
+        '${repoDir}/canary/webrtc-c/scripts/build-storage-master.sh' '${params.GIT_URL}' '${params.GIT_HASH}'"""
+
+    // Generate IoT certs in a persistent directory outside the repo
+    sh """
+        mkdir -p '${certsDir}' &&
+        cd '${certsDir}' &&
+        chmod a+x '${repoDir}/canary/webrtc-c/scripts/cert_setup.sh' &&
+        '${repoDir}/canary/webrtc-c/scripts/cert_setup.sh' '${thing_prefix}'"""
 }
 
 def buildConsumerProject() {
