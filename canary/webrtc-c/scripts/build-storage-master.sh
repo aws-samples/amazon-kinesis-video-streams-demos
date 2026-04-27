@@ -83,6 +83,9 @@ CACHED_COMMIT=$(cat "$COMMIT_FILE" 2>/dev/null || echo "")
 CACHED_WEBRTC_VERSION=$(cat "$WEBRTC_VERSION_FILE" 2>/dev/null || echo "")
 BINARY_PATH="${BUILD_DIR}/kvsWebrtcStorageSample"
 
+echo "Comparing: current commit=${CURRENT_COMMIT:0:12} vs cached commit=${CACHED_COMMIT:0:12}"
+echo "Comparing: current webrtc-c=${CURRENT_WEBRTC_VERSION} vs cached webrtc-c=${CACHED_WEBRTC_VERSION}"
+
 NEED_REBUILD=false
 if [ ! -f "$BINARY_PATH" ]; then
     echo "Binary not found, rebuild needed"

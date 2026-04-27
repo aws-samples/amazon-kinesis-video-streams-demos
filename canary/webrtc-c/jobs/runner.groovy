@@ -53,8 +53,15 @@ def buildConsumerProject() {
     def consumerStartUpDelay = 45
     sleep consumerStartUpDelay
 
-    checkout([$class: 'GitSCM', branches: [[name: params.GIT_HASH ]],
-              userRemoteConfigs: [[url: params.GIT_URL]]])
+    def repoDir = "${env.HOME}/webrtc-c-storage-master/repo"
+
+    // Bootstrap: clone the repo if it doesn't exist yet on this node
+    sh """
+        if [ ! -d '${repoDir}/.git' ]; then
+            git clone '${params.GIT_URL}' '${repoDir}'
+        else
+            cd '${repoDir}' && git fetch origin && git checkout '${params.GIT_HASH}'
+        fi"""
               
     def consumerEnvs = [        
         'JAVA_HOME': "/usr/lib/jvm/default-java",
@@ -62,11 +69,11 @@ def buildConsumerProject() {
     ].collect({k,v -> "${k}=${v}" })
 
     withEnv(consumerEnvs) {
-        sh '''
-            PATH="$JAVA_HOME/bin:$PATH"
-            export PATH="$M2_HOME/bin:$PATH"
-            cd ./canary/consumer-java
-            make -j4'''
+        sh """
+            PATH="\$JAVA_HOME/bin:\$PATH"
+            export PATH="\$M2_HOME/bin:\$PATH"
+            cd '${repoDir}/canary/consumer-java'
+            make -j4"""
     }
 }
 
@@ -350,6 +357,8 @@ def buildStorageCanary(isConsumer, params) {
       'CONTROL_PLANE_URI': params.ENDPOINT ?: ''
     ]
 
+    def repoDir = "${env.HOME}/webrtc-c-storage-master/repo"
+
     def consumerEnvs = [
       'JAVA_HOME': "/opt/jdk-11.0.20",
       'M2_HOME': "/opt/apache-maven-3.6.3",
@@ -357,7 +366,7 @@ def buildStorageCanary(isConsumer, params) {
       'CANARY_STREAM_NAME': "${env.JOB_NAME}-${params.RUNNER_LABEL}",
       'CANARY_DURATION_IN_SECONDS': "${params.DURATION_IN_SECONDS.toInteger() + 120}",
       'VIDEO_VERIFY_ENABLED': params.VIDEO_VERIFY_ENABLED?.toString() ?: 'false',
-      'CANARY_CLIP_OUTPUT_PATH': "${env.WORKSPACE}/canary/consumer-java/clip-${START_TIMESTAMP}.mp4",
+      'CANARY_CLIP_OUTPUT_PATH': "${repoDir}/canary/consumer-java/clip-${START_TIMESTAMP}.mp4",
       'CONTROL_PLANE_URI': params.ENDPOINT ?: ''
     ]
 
@@ -391,16 +400,16 @@ def buildStorageCanary(isConsumer, params) {
     } else {
         def envs = (commonEnvs + consumerEnvs).collect{ k, v -> "${k}=${v}" }
         withRunnerWrapper(envs) {
-            sh '''
-                cd $WORKSPACE/canary/consumer-java
-                java -classpath target/aws-kinesisvideo-producer-sdk-canary-consumer-1.0-SNAPSHOT.jar:$(cat tmp_jar) -Daws.accessKeyId=${AWS_ACCESS_KEY_ID} -Daws.secretKey=${AWS_SECRET_ACCESS_KEY} -Daws.sessionToken=${AWS_SESSION_TOKEN} com.amazon.kinesis.video.canary.consumer.WebrtcStorageCanaryConsumer
-            '''
+            sh """
+                cd '${repoDir}/canary/consumer-java'
+                java -classpath target/aws-kinesisvideo-producer-sdk-canary-consumer-1.0-SNAPSHOT.jar:\$(cat tmp_jar) -Daws.accessKeyId=\${AWS_ACCESS_KEY_ID} -Daws.secretKey=\${AWS_SECRET_ACCESS_KEY} -Daws.sessionToken=\${AWS_SESSION_TOKEN} com.amazon.kinesis.video.canary.consumer.WebrtcStorageCanaryConsumer
+            """
         }
 
         // Run video verification on the GetClip MP4 if the consumer downloaded one
-        def clipPath = "${env.WORKSPACE}/canary/consumer-java/clip-${START_TIMESTAMP}.mp4"
-        def verifyScript = "${env.WORKSPACE}/canary/webrtc-c/scripts/video-verification/verify.py"
-        def sourceFrames = "${env.WORKSPACE}/canary/webrtc-c/assets/h264SampleFrames"
+        def clipPath = "${repoDir}/canary/consumer-java/clip-${START_TIMESTAMP}.mp4"
+        def verifyScript = "${repoDir}/canary/webrtc-c/scripts/video-verification/verify.py"
+        def sourceFrames = "${repoDir}/canary/webrtc-c/assets/h264SampleFrames"
         def streamName = "${env.JOB_NAME}-${params.RUNNER_LABEL}"
         def scenarioLabel = params.SCENARIO_LABEL
 
@@ -410,7 +419,17 @@ def buildStorageCanary(isConsumer, params) {
             try {
                 echo "Running consumer-side video verification on GetClip MP4..."
                 def output = sh(
-                    script: "python3 '${verifyScript}' --recording '${clipPath}' --source-frames '${sourceFrames}' --expected-duration '${params.DURATION_IN_SECONDS}' --json",
+                    script: """
+                        # Ensure Python venv with video verification deps exists
+                        VENV_DIR="\${HOME}/.venv/video-verify"
+                        if [ ! -d "\$VENV_DIR" ]; then
+                            sudo apt-get install -y python3-venv ffmpeg tesseract-ocr 2>/dev/null || true
+                            python3 -m venv "\$VENV_DIR"
+                        fi
+                        . "\$VENV_DIR/bin/activate"
+                        pip install -q pytesseract Pillow scikit-image numpy 2>/dev/null
+                        python3 '${verifyScript}' --recording '${clipPath}' --source-frames '${sourceFrames}' --expected-duration '${params.DURATION_IN_SECONDS}' --json
+                    """,
                     returnStdout: true
                 ).trim()
                 echo "Consumer video verification results: ${output}"
