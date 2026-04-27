@@ -183,14 +183,22 @@ ensure_js_sdk() {
     local branch_dir="${VIEWER_BUILD_HOME}/${branch}"
     local repo_dir="${branch_dir}/repo"
     local commit_file="${branch_dir}/.last-commit"
+    local lock_file="${branch_dir}/.build.lock"
 
     mkdir -p "$branch_dir"
+
+    # Acquire exclusive lock — blocks if another viewer is cloning/updating
+    exec 8>"$lock_file"
+    echo "Acquiring JS SDK lock for branch '$branch'..."
+    flock 8
+    echo "JS SDK lock acquired"
 
     local remote_head
     remote_head=$(git ls-remote https://github.com/awslabs/amazon-kinesis-video-streams-webrtc-sdk-js.git "$branch" | cut -f1)
 
     if [ -z "$remote_head" ]; then
         echo "ERROR: Could not resolve remote HEAD for branch '$branch'"
+        flock -u 8
         exit 1
     fi
 
@@ -200,14 +208,16 @@ ensure_js_sdk() {
         cached_commit=$(cat "$commit_file")
         if [ "$cached_commit" = "$remote_head" ]; then
             echo "JS SDK branch '$branch' up to date at ${remote_head:0:8}"
+            flock -u 8
             return 0
         fi
         echo "JS SDK has new commits ($cached_commit -> $remote_head), updating..."
         (cd "$repo_dir" && git fetch origin "$branch" && git reset --hard FETCH_HEAD) \
-            || { echo "ERROR: git update failed"; exit 1; }
+            || { echo "ERROR: git update failed"; flock -u 8; exit 1; }
         (cd "$repo_dir" && npm install) \
-            || { echo "ERROR: npm install failed after update"; exit 1; }
+            || { echo "ERROR: npm install failed after update"; flock -u 8; exit 1; }
         echo "$remote_head" > "$commit_file"
+        flock -u 8
         return 0
     fi
 
@@ -216,11 +226,12 @@ ensure_js_sdk() {
     rm -rf "$repo_dir"
     git clone -b "$branch" --depth 1 \
         https://github.com/awslabs/amazon-kinesis-video-streams-webrtc-sdk-js.git \
-        "$repo_dir" || { echo "ERROR: git clone failed"; exit 1; }
+        "$repo_dir" || { echo "ERROR: git clone failed"; flock -u 8; exit 1; }
     (cd "$repo_dir" && npm install) \
-        || { echo "ERROR: npm install failed"; exit 1; }
+        || { echo "ERROR: npm install failed"; flock -u 8; exit 1; }
     echo "$remote_head" > "$commit_file"
     echo "JS SDK cloned and built at $repo_dir"
+    flock -u 8
 }
 
 # ---------------------------------------------------------------------------

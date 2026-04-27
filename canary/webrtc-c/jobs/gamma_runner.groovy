@@ -37,17 +37,17 @@ def buildWebRTCProject(thing_prefix) {
     checkout([$class: 'GitSCM', branches: [[name: params.GIT_HASH]],
               userRemoteConfigs: [[url: params.GIT_URL]]])
 
-    def configureCmd = "cmake .. -DCMAKE_BUILD_TYPE=Debug -DCMAKE_INSTALL_PREFIX=\"\$PWD\""
-
+    // Generate IoT certs in the workspace (these are per-job/per-label)
     sh """
         cd ./canary/webrtc-c/scripts &&
         chmod a+x cert_setup.sh &&
-        ./cert_setup.sh ${thing_prefix} &&
-        cd .. &&
-        mkdir -p build &&
-        cd build &&
-        ${configureCmd} &&
-        make"""
+        ./cert_setup.sh ${thing_prefix}"""
+
+    // Build the binary in a persistent directory outside the workspace.
+    // The script handles skip-rebuild logic and flock-based locking.
+    sh """
+        chmod a+x ./canary/webrtc-c/scripts/build-storage-master.sh &&
+        ./canary/webrtc-c/scripts/build-storage-master.sh '${params.GIT_URL}' '${params.GIT_HASH}'"""
 }
 
 def buildConsumerProject() {
@@ -276,13 +276,14 @@ def buildStorageCanary(isConsumer, params) {
         def envs = (commonEnvs + masterEnvs).collect{ k, v -> "${k}=${v}" }
         MASTER_READY = true
         echo "Master build complete, signaling viewers (MASTER_READY=true)"
+        def buildDir = "${env.HOME}/webrtc-c-storage-master/build"
         withRunnerWrapper(envs) {
             // Timeout: duration + 5 min buffer. The C binary should exit on its own
             // after CANARY_DURATION_IN_SECONDS, but if it hangs (e.g., ICE agent
             // threads not cleaned up after connection failure), Jenkins kills it.
             timeout(time: params.DURATION_IN_SECONDS.toInteger() + 900, unit: 'SECONDS') {
                 sh """
-                    cd ./canary/webrtc-c/build &&
+                    cd ${buildDir} &&
                     ./kvsWebrtcStorageSample"""
             }
         }

@@ -28,21 +28,18 @@ def buildWebRTCProject(useMbedTLS, thing_prefix) {
     checkout([$class: 'GitSCM', branches: [[name: params.GIT_HASH ]],
               userRemoteConfigs: [[url: params.GIT_URL]]])
 
-    def configureCmd = "cmake .. -DCMAKE_BUILD_TYPE=Debug -DCMAKE_INSTALL_PREFIX=\"\$PWD\""
-    if (useMbedTLS) {
-      echo 'Using mbedtls'
-      configureCmd += " -DCANARY_USE_OPENSSL=OFF -DCANARY_USE_MBEDTLS=ON"
-    }     
-
+    // Generate IoT certs in the workspace (these are per-job/per-label)
     sh """
         cd ./canary/webrtc-c/scripts &&
         chmod a+x cert_setup.sh &&
-        ./cert_setup.sh ${thing_prefix} &&
-        cd .. &&
-        mkdir -p build &&
-        cd build &&
-        ${configureCmd} &&
-        make"""
+        ./cert_setup.sh ${thing_prefix}"""
+
+    // Build the binary in a persistent directory outside the workspace.
+    // The script handles skip-rebuild logic and flock-based locking.
+    def tlsBackend = useMbedTLS ? "mbedtls" : "openssl"
+    sh """
+        chmod a+x ./canary/webrtc-c/scripts/build-storage-master.sh &&
+        ./canary/webrtc-c/scripts/build-storage-master.sh '${params.GIT_URL}' '${params.GIT_HASH}' '${tlsBackend}'"""
 }
 
 def buildConsumerProject() {
@@ -127,8 +124,9 @@ def buildPeer(isMaster, params) {
     ].collect{ k, v -> "${k}=${v}" }
 
     withRunnerWrapper(envs) {
+        def buildDir = "${env.HOME}/webrtc-c-storage-master/build"
         sh """
-            cd ./canary/webrtc-c/build &&
+            cd ${buildDir} &&
             ${isMaster ? "" : "sleep 10 &&"}
             ./kvsWebrtcCanaryWebrtc"""
     }
@@ -169,8 +167,9 @@ def buildSignaling(params) {
     ].collect({ k, v -> "${k}=${v}" })
 
     withRunnerWrapper(envs) {
+        def buildDir = "${env.HOME}/webrtc-c-storage-master/build"
         sh """
-            cd ./canary/webrtc-c/build && 
+            cd ${buildDir} && 
             ./kvsWebrtcCanarySignaling"""
     }
 }
@@ -376,10 +375,11 @@ def buildStorageCanary(isConsumer, params) {
         def envs = (commonEnvs + masterEnvs).collect{ k, v -> "${k}=${v}" }
         MASTER_READY = true
         echo "Master build complete, signaling viewers (MASTER_READY=true)"
+        def buildDir = "${env.HOME}/webrtc-c-storage-master/build"
         withRunnerWrapper(envs) {
             timeout(time: params.DURATION_IN_SECONDS.toInteger() + 900, unit: 'SECONDS') {
                 sh """
-                    cd ./canary/webrtc-c/build &&
+                    cd ${buildDir} &&
                     ./kvsWebrtcStorageSample"""
             }
         }
