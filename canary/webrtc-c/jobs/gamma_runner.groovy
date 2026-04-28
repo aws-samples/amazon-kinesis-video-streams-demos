@@ -41,6 +41,7 @@ def buildWebRTCProject(thing_prefix) {
     sh """
         if [ ! -d '${repoDir}/.git' ]; then
             git clone '${params.GIT_URL}' '${repoDir}'
+            cd '${repoDir}' && git checkout -f '${params.GIT_HASH}'
         fi"""
 
     // Build the binary (handles git fetch, skip-rebuild, and flock internally)
