@@ -28,15 +28,15 @@ def buildWebRTCProject(useMbedTLS, thing_prefix) {
     def repoDir = "${env.HOME}/webrtc-c-storage-master/repo"
     def certsDir = "${env.HOME}/webrtc-c-storage-master/certs/${thing_prefix}"
 
-    // Bootstrap: clone the repo if it doesn't exist yet on this node
+    // Bootstrap: ensure repo exists and is on the correct commit
     sh """
         mkdir -p '${env.HOME}/webrtc-c-storage-master'
         exec 9>'${env.HOME}/webrtc-c-storage-master/.build.lock'
         flock 9
         if [ ! -d '${repoDir}/.git' ]; then
             git clone '${params.GIT_URL}' '${repoDir}'
-            cd '${repoDir}' && git checkout -f '${params.GIT_HASH}'
         fi
+        cd '${repoDir}' && git fetch origin && git checkout -f '${params.GIT_HASH}'
         flock -u 9"""
 
     // Build the binary (handles git fetch, skip-rebuild, and flock internally)
