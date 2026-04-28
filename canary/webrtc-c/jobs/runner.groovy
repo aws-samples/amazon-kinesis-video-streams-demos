@@ -81,7 +81,7 @@ def buildConsumerProject() {
         # Skip rebuild if commit unchanged and jar exists
         CURRENT_COMMIT=\$(cd '${repoDir}' && git rev-parse HEAD)
         CACHED_COMMIT=\$(cat '${commitFile}' 2>/dev/null || echo '')
-        echo "Consumer: current commit=\${CURRENT_COMMIT:0:12} vs cached=\${CACHED_COMMIT:0:12}"
+        echo "Consumer: current commit=\$(echo \$CURRENT_COMMIT | cut -c1-12) vs cached=\$(echo \$CACHED_COMMIT | cut -c1-12)"
 
         if [ -f '${jarPath}' ] && [ "\$CURRENT_COMMIT" = "\$CACHED_COMMIT" ]; then
             echo "Consumer jar up to date, skipping build"
