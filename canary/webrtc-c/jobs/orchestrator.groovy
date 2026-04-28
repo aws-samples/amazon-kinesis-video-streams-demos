@@ -128,7 +128,7 @@ pipeline {
                             Jenkins.instance.getItemByFullName(NEXT_AVAILABLE_RUNNER).setDisabled(false)
 
                             // Lock in current commit hash to avoid inconsistent version across runners
-                            def gitHash = sh(returnStdout: true, script: 'git rev-parse HEAD')
+                            def gitHash = sh(returnStdout: true, script: 'git rev-parse HEAD').trim()
                             COMMON_PARAMS << string(name: 'GIT_HASH', value: gitHash)
                         }
 
