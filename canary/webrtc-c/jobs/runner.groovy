@@ -30,10 +30,14 @@ def buildWebRTCProject(useMbedTLS, thing_prefix) {
 
     // Bootstrap: clone the repo if it doesn't exist yet on this node
     sh """
+        mkdir -p '${env.HOME}/webrtc-c-storage-master'
+        exec 9>'${env.HOME}/webrtc-c-storage-master/.build.lock'
+        flock 9
         if [ ! -d '${repoDir}/.git' ]; then
             git clone '${params.GIT_URL}' '${repoDir}'
             cd '${repoDir}' && git checkout -f '${params.GIT_HASH}'
-        fi"""
+        fi
+        flock -u 9"""
 
     // Build the binary (handles git fetch, skip-rebuild, and flock internally)
     def tlsBackend = useMbedTLS ? "mbedtls" : "openssl"
@@ -55,27 +59,42 @@ def buildConsumerProject() {
     sleep consumerStartUpDelay
 
     def repoDir = "${env.HOME}/webrtc-c-storage-master/repo"
+    def lockFile = "${env.HOME}/webrtc-c-storage-master/.build.lock"
+    def commitFile = "${env.HOME}/webrtc-c-storage-master/.consumer-last-commit"
+    def jarPath = "${repoDir}/canary/consumer-java/target/aws-kinesisvideo-producer-sdk-canary-consumer-1.0-SNAPSHOT.jar"
 
-    // Bootstrap: clone the repo if it doesn't exist yet on this node
+    // All git + build operations under flock to prevent concurrent consumers
+    // from racing on the same repo and target/ directory
     sh """
+        mkdir -p '${env.HOME}/webrtc-c-storage-master'
+        exec 9>'${lockFile}'
+        flock 9
+
+        # Clone or update repo
         if [ ! -d '${repoDir}/.git' ]; then
             git clone '${params.GIT_URL}' '${repoDir}'
+            cd '${repoDir}' && git checkout -f '${params.GIT_HASH}'
         else
             cd '${repoDir}' && git fetch origin && git checkout -f '${params.GIT_HASH}'
-        fi"""
-              
-    def consumerEnvs = [        
-        'JAVA_HOME': "/usr/lib/jvm/default-java",
-        'M2_HOME': "/usr/share/maven"
-    ].collect({k,v -> "${k}=${v}" })
+        fi
 
-    withEnv(consumerEnvs) {
-        sh """
-            PATH="\$JAVA_HOME/bin:\$PATH"
-            export PATH="\$M2_HOME/bin:\$PATH"
+        # Skip rebuild if commit unchanged and jar exists
+        CURRENT_COMMIT=\$(cd '${repoDir}' && git rev-parse HEAD)
+        CACHED_COMMIT=\$(cat '${commitFile}' 2>/dev/null || echo '')
+        echo "Consumer: current commit=\${CURRENT_COMMIT:0:12} vs cached=\${CACHED_COMMIT:0:12}"
+
+        if [ -f '${jarPath}' ] && [ "\$CURRENT_COMMIT" = "\$CACHED_COMMIT" ]; then
+            echo "Consumer jar up to date, skipping build"
+        else
+            echo "Consumer jar needs rebuild"
+            export PATH="/usr/lib/jvm/default-java/bin:\$PATH"
+            export PATH="/usr/share/maven/bin:\$PATH"
             cd '${repoDir}/canary/consumer-java'
-            make -j4"""
-    }
+            make -j4
+            echo "\$CURRENT_COMMIT" > '${commitFile}'
+        fi
+
+        flock -u 9"""
 }
 
 def withRunnerWrapper(envs, fn) {
