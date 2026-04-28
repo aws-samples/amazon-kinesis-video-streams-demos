@@ -29,7 +29,7 @@ install_system_deps() {
 
     # Check Node.js
     local node_ver
-    node_ver=$(node --version 2>/dev/null | sed 's/v//' | cut -d. -f1)
+    node_ver=$(node --version 2>/dev/null | sed 's/v//' | cut -d. -f1 || true)
     if ! command -v npm &> /dev/null || [ "${node_ver:-0}" -lt 20 ]; then
         need_apt=true
     fi
