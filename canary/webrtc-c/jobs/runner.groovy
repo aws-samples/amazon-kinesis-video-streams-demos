@@ -23,8 +23,31 @@ def extractViewerStats(String output) {
     return m.find() ? m.group(1) : null
 }
 
+// Original workspace-based build for non-storage jobs (WebRTC peer, signaling, profiling)
 def buildWebRTCProject(useMbedTLS, thing_prefix) {
     echo 'Flag set to ' + useMbedTLS
+    checkout([$class: 'GitSCM', branches: [[name: params.GIT_HASH ]],
+              userRemoteConfigs: [[url: params.GIT_URL]]])
+
+    def configureCmd = "cmake .. -DCMAKE_BUILD_TYPE=Debug -DCMAKE_INSTALL_PREFIX=\"\$PWD\""
+    if (useMbedTLS) {
+      echo 'Using mbedtls'
+      configureCmd += " -DCANARY_USE_OPENSSL=OFF -DCANARY_USE_MBEDTLS=ON"
+    }
+
+    sh """
+        cd ./canary/webrtc-c/scripts &&
+        chmod a+x cert_setup.sh &&
+        ./cert_setup.sh ${thing_prefix} &&
+        cd .. &&
+        mkdir -p build &&
+        cd build &&
+        ${configureCmd} &&
+        make"""
+}
+
+// Persistent build for storage jobs — uses ~/webrtc-c-storage-master/ with skip-rebuild
+def buildStorageProject(thing_prefix) {
     def repoDir = "${env.HOME}/webrtc-c-storage-master/repo"
     def certsDir = "${env.HOME}/webrtc-c-storage-master/certs/${thing_prefix}"
 
@@ -40,10 +63,9 @@ def buildWebRTCProject(useMbedTLS, thing_prefix) {
         flock -u 9"""
 
     // Build the binary (handles git fetch, skip-rebuild, and flock internally)
-    def tlsBackend = useMbedTLS ? "mbedtls" : "openssl"
     sh """
         chmod a+x '${repoDir}/canary/webrtc-c/scripts/build-storage-master.sh' &&
-        '${repoDir}/canary/webrtc-c/scripts/build-storage-master.sh' '${params.GIT_URL}' '${params.GIT_HASH}' '${tlsBackend}'"""
+        '${repoDir}/canary/webrtc-c/scripts/build-storage-master.sh' '${params.GIT_URL}' '${params.GIT_HASH}'"""
 
     // Generate IoT certs in a persistent directory outside the repo
     sh """
@@ -126,10 +148,10 @@ def buildPeer(isMaster, params) {
         RUNNING_NODES_IN_BUILDING == 0
     }
 
-    def certsDir = "${env.HOME}/webrtc-c-storage-master/certs/${thing_prefix}"
-    def endpoint = "${certsDir}/iot-credential-provider.txt"
-    def core_cert_file = "${certsDir}/${thing_prefix}_certificate.pem"
-    def private_key_file = "${certsDir}/${thing_prefix}_private.key"
+    def scripts_dir = "$WORKSPACE/canary/webrtc-c/scripts"
+    def endpoint = "${scripts_dir}/iot-credential-provider.txt"
+    def core_cert_file = "${scripts_dir}/${thing_prefix}_certificate.pem"
+    def private_key_file = "${scripts_dir}/${thing_prefix}_private.key"
     def role_alias = "${thing_prefix}_role_alias"
     def thing_name = "${thing_prefix}_thing"
 
@@ -157,9 +179,8 @@ def buildPeer(isMaster, params) {
     ].collect{ k, v -> "${k}=${v}" }
 
     withRunnerWrapper(envs) {
-        def buildDir = "${env.HOME}/webrtc-c-storage-master/build"
         sh """
-            cd ${buildDir} &&
+            cd ./canary/webrtc-c/build &&
             ${isMaster ? "" : "sleep 10 &&"}
             ./kvsWebrtcCanaryWebrtc"""
     }
@@ -177,10 +198,10 @@ def buildSignaling(params) {
     def thing_prefix = "${env.JOB_NAME}-${params.RUNNER_LABEL}"
     buildWebRTCProject(params.USE_MBEDTLS, thing_prefix)
 
-    def certsDir = "${env.HOME}/webrtc-c-storage-master/certs/${thing_prefix}"
-    def endpoint = "${certsDir}/iot-credential-provider.txt"
-    def core_cert_file = "${certsDir}/${thing_prefix}_certificate.pem"
-    def private_key_file = "${certsDir}/${thing_prefix}_private.key"
+    def scripts_dir = "$WORKSPACE/canary/webrtc-c/scripts"
+    def endpoint = "${scripts_dir}/iot-credential-provider.txt"
+    def core_cert_file = "${scripts_dir}/${thing_prefix}_certificate.pem"
+    def private_key_file = "${scripts_dir}/${thing_prefix}_private.key"
     def role_alias = "${thing_prefix}_role_alias"
     def thing_name = "${thing_prefix}_thing"
 
@@ -200,9 +221,8 @@ def buildSignaling(params) {
     ].collect({ k, v -> "${k}=${v}" })
 
     withRunnerWrapper(envs) {
-        def buildDir = "${env.HOME}/webrtc-c-storage-master/build"
         sh """
-            cd ${buildDir} && 
+            cd ./canary/webrtc-c/build && 
             ./kvsWebrtcCanarySignaling"""
     }
 }
@@ -395,7 +415,7 @@ def buildStorageCanary(isConsumer, params) {
         MASTER_READY = false
     }
     if (!isConsumer){
-        buildWebRTCProject(params.USE_MBEDTLS, thing_prefix)
+        buildStorageProject(thing_prefix)
     } else {
         buildConsumerProject()
     }
