@@ -60,7 +60,7 @@ def buildConsumerProject() {
         if [ ! -d '${repoDir}/.git' ]; then
             git clone '${params.GIT_URL}' '${repoDir}'
         else
-            cd '${repoDir}' && git fetch origin && git checkout '${params.GIT_HASH}'
+            cd '${repoDir}' && git fetch origin && git checkout -f '${params.GIT_HASH}'
         fi"""
               
     def consumerEnvs = [        
