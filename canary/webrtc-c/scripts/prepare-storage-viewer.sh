@@ -45,6 +45,23 @@ install_system_deps() {
         return 0
     fi
 
+    # Acquire lock so only one viewer installs deps at a time on this node
+    local lock_file="${VIEWER_BUILD_HOME}/.deps.lock"
+    exec 8>"$lock_file"
+    echo "Acquiring system deps lock..."
+    flock 8
+    echo "System deps lock acquired"
+
+    # Re-check after acquiring lock — another process may have installed while we waited
+    node_ver=$(node --version 2>/dev/null | sed 's/v//' | cut -d. -f1 || true)
+    if command -v npm &> /dev/null && [ "${node_ver:-0}" -ge 20 ] \
+        && command -v ffmpeg &> /dev/null && command -v tesseract &> /dev/null \
+        && [ -f "$DEPS_STAMP" ]; then
+        echo "System dependencies installed by another process while waiting for lock"
+        flock -u 8
+        return 0
+    fi
+
     echo "Installing missing system dependencies..."
 
     # Node.js 20+
@@ -65,6 +82,7 @@ install_system_deps() {
 
     if ! command -v npm &> /dev/null; then
         echo "ERROR: npm not found after installation"
+        flock -u 8
         exit 1
     fi
     echo "Node.js: $(node --version), npm: $(npm --version)"
@@ -74,12 +92,13 @@ install_system_deps() {
         echo "Installing ffmpeg and tesseract-ocr..."
         sudo apt-get update -y
         sudo apt-get install -y ffmpeg tesseract-ocr \
-            || { echo "ERROR: Failed to install ffmpeg/tesseract"; exit 1; }
+            || { echo "ERROR: Failed to install ffmpeg/tesseract"; flock -u 8; exit 1; }
     fi
 
     # Write stamp
     mkdir -p "$VIEWER_BUILD_HOME"
     date -u '+%Y-%m-%dT%H:%M:%SZ' > "$DEPS_STAMP"
+    flock -u 8
     echo "System dependencies ready"
 }
 
