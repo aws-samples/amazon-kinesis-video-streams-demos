@@ -59,7 +59,7 @@ def buildStorageProject(thing_prefix) {
         if [ ! -d '${repoDir}/.git' ]; then
             git clone '${params.GIT_URL}' '${repoDir}'
         fi
-        cd '${repoDir}' && git fetch origin && git checkout -f '${params.GIT_HASH}'
+        cd '${repoDir}' && git fetch origin '+refs/heads/*:refs/remotes/origin/*' && git checkout -f '${params.GIT_HASH}'
         flock -u 9"""
 
     // Build the binary (handles git fetch, skip-rebuild, and flock internally)
@@ -97,7 +97,7 @@ def buildConsumerProject() {
             git clone '${params.GIT_URL}' '${repoDir}'
             cd '${repoDir}' && git checkout -f '${params.GIT_HASH}'
         else
-            cd '${repoDir}' && git fetch origin && git checkout -f '${params.GIT_HASH}'
+            cd '${repoDir}' && git fetch origin '+refs/heads/*:refs/remotes/origin/*' && git checkout -f '${params.GIT_HASH}'
         fi
 
         # Skip rebuild if commit unchanged and jar exists
