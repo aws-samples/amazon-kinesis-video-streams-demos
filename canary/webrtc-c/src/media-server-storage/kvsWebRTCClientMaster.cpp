@@ -221,6 +221,8 @@ PVOID sendVideoPackets(PVOID args)
     STATUS status;
     UINT32 i;
     UINT64 startTime, lastFrameTime, elapsed;
+    PCHAR pNoLoopFrames;
+    BOOL noLoopFrames;
     MEMSET(&encoderStats, 0x00, SIZEOF(RtcEncoderStats));
     CHK_ERR(pSampleConfiguration != NULL, STATUS_NULL_ARG, "[KVS Master] Streaming session is NULL");
 
@@ -229,9 +231,9 @@ PVOID sendVideoPackets(PVOID args)
     lastFrameTime = startTime;
 
     // Check if we should stop after one pass through all frames (no looping)
-    PCHAR pNoLoopFrames = GETENV("CANARY_NO_LOOP_FRAMES");
-    BOOL noLoopFrames = (pNoLoopFrames != NULL && pNoLoopFrames[0] != '\0' &&
-                         (TOLOWER(pNoLoopFrames[0]) == 't' || pNoLoopFrames[0] == '1'));
+    pNoLoopFrames = GETENV("CANARY_NO_LOOP_FRAMES");
+    noLoopFrames = (pNoLoopFrames != NULL && pNoLoopFrames[0] != '\0' &&
+                    (TOLOWER(pNoLoopFrames[0]) == 't' || pNoLoopFrames[0] == '1'));
 
     while (!ATOMIC_LOAD_BOOL(&pSampleConfiguration->appTerminateFlag)) {
         fileIndex = fileIndex % NUMBER_OF_H264_FRAME_FILES + 1;
