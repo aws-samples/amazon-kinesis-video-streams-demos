@@ -338,6 +338,7 @@ pipeline {
                                 string(name: 'RUNNER_LABEL', value: "StoragePeriodic"),
                                 string(name: 'SCENARIO_LABEL', value: "StoragePeriodic"),
                                 string(name: 'AWS_DEFAULT_REGION', value: "us-west-2"),
+                                booleanParam(name: 'NO_LOOP_FRAMES', value: true),
                             ],
                             wait: false
                         )
@@ -431,6 +432,7 @@ pipeline {
                                 string(name: 'SCENARIO_LABEL', value: "StorageWithViewer"),
                                 string(name: 'AWS_DEFAULT_REGION', value: "us-west-2"),
                                 string(name: 'VIEWER_WAIT_MINUTES', value: "20"),
+                                booleanParam(name: 'NO_LOOP_FRAMES', value: true),
                             ],
                             wait: false
                         )
@@ -456,6 +458,7 @@ pipeline {
                                 string(name: 'SCENARIO_LABEL', value: "StorageTwoViewers"),
                                 string(name: 'AWS_DEFAULT_REGION', value: "us-west-2"),
                                 string(name: 'VIEWER_WAIT_MINUTES', value: "20"),
+                                booleanParam(name: 'NO_LOOP_FRAMES', value: true),
                             ],
                             wait: false
                         )
@@ -483,6 +486,7 @@ pipeline {
                                 string(name: 'SCENARIO_LABEL', value: "StorageThreeViewers"),
                                 string(name: 'AWS_DEFAULT_REGION', value: "us-west-2"),
                                 string(name: 'VIEWER_WAIT_MINUTES', value: "20"),
+                                booleanParam(name: 'NO_LOOP_FRAMES', value: true),
                             ],
                             wait: false
                         )

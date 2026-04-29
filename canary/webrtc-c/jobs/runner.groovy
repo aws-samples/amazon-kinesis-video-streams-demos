@@ -394,7 +394,8 @@ def buildStorageCanary(isConsumer, params) {
       'CANARY_IS_MASTER': true,
       'CANARY_CHANNEL_NAME': "${env.JOB_NAME}-${params.RUNNER_LABEL}",
       'AWS_DEFAULT_REGION': params.AWS_DEFAULT_REGION,
-      'CONTROL_PLANE_URI': params.ENDPOINT ?: ''
+      'CONTROL_PLANE_URI': params.ENDPOINT ?: '',
+      'CANARY_NO_LOOP_FRAMES': params.NO_LOOP_FRAMES ?: false
     ]
 
     def repoDir = "${env.HOME}/webrtc-c-storage-master/repo"
@@ -550,6 +551,7 @@ pipeline {
         string(name: 'VIEWER_WAIT_MINUTES', defaultValue: '20')
         string(name: 'VIEWER_SESSION_DURATION_SECONDS', defaultValue: '900', description: 'Hard timeout in seconds for the viewer process (default 15 minutes, must be larger than monitoring duration)')
         booleanParam(name: 'VIDEO_VERIFY_ENABLED', defaultValue: false, description: 'Enable consumer-side video verification via GetClip')
+        booleanParam(name: 'NO_LOOP_FRAMES', defaultValue: false, description: 'Stop after sending all frames once instead of looping')
     }
     
     // Set the role ARN to environment to avoid string interpolation to follow Jenkins security guidelines.
@@ -923,6 +925,7 @@ pipeline {
                       string(name: 'VIEWER_WAIT_MINUTES', value: params.VIEWER_WAIT_MINUTES),
                       string(name: 'VIEWER_SESSION_DURATION_SECONDS', value: params.VIEWER_SESSION_DURATION_SECONDS),
                       booleanParam(name: 'VIDEO_VERIFY_ENABLED', value: params.VIDEO_VERIFY_ENABLED),
+                      booleanParam(name: 'NO_LOOP_FRAMES', value: params.NO_LOOP_FRAMES),
                       booleanParam(name: 'FIRST_ITERATION', value: false)
                     ],
                     wait: false

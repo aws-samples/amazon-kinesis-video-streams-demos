@@ -281,7 +281,8 @@ def buildStorageCanary(isConsumer, params) {
         'CANARY_IS_MASTER': true,
         'CANARY_CHANNEL_NAME': "${env.JOB_NAME}-${params.RUNNER_LABEL}",
         'AWS_DEFAULT_REGION': params.AWS_DEFAULT_REGION,
-        'CONTROL_PLANE_URI': params.ENDPOINT ?: ''
+        'CONTROL_PLANE_URI': params.ENDPOINT ?: '',
+        'CANARY_NO_LOOP_FRAMES': params.NO_LOOP_FRAMES ?: false
     ]
 
     def repoDir = "${env.HOME}/webrtc-c-storage-master/repo"
@@ -417,7 +418,7 @@ pipeline {
         string(name: 'SCENARIO_LABEL', defaultValue: 'GammaTest')
         string(name: 'DURATION_IN_SECONDS', defaultValue: '156')
         string(name: 'GIT_URL', defaultValue: 'https://github.com/aws-samples/amazon-kinesis-video-streams-demos.git')
-        string(name: 'GIT_HASH', defaultValue: 'clean_viewer_test')
+        string(name: 'GIT_HASH', defaultValue: 'pre-built-package-enhancement')
         string(name: 'AWS_DEFAULT_REGION', defaultValue: 'us-west-2')
         string(name: 'ENDPOINT', defaultValue: '', description: 'Custom endpoint URL (e.g., gamma endpoint)')
         string(name: 'METRIC_SUFFIX', defaultValue: '-gamma')
@@ -438,6 +439,7 @@ pipeline {
         booleanParam(name: 'USE_IOT', defaultValue: false)
         booleanParam(name: 'TRICKLE_ICE', defaultValue: false)
         booleanParam(name: 'FORCE_TURN', defaultValue: false)
+        booleanParam(name: 'NO_LOOP_FRAMES', defaultValue: false, description: 'Stop after sending all frames once instead of looping')
         string(name: 'JS_BRANCH', defaultValue: 'master', description: 'JS SDK branch name to clone and serve locally (default: master)')
     }
     
@@ -722,6 +724,7 @@ pipeline {
                             booleanParam(name: 'USE_IOT', value: params.USE_IOT),
                             booleanParam(name: 'TRICKLE_ICE', value: params.TRICKLE_ICE),
                             booleanParam(name: 'FORCE_TURN', value: params.FORCE_TURN),
+                            booleanParam(name: 'NO_LOOP_FRAMES', value: params.NO_LOOP_FRAMES),
                             string(name: 'JS_BRANCH', value: params.JS_BRANCH),
                         ],
                         wait: false

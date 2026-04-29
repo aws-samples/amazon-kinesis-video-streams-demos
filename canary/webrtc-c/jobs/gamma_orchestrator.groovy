@@ -17,7 +17,7 @@
  */
 
 GIT_URL = 'https://github.com/aws-samples/amazon-kinesis-video-streams-demos.git'
-GIT_HASH = 'clean_viewer_test'
+GIT_HASH = 'pre-built-package-enhancement'
 
 // Dedicated gamma runner job name
 GAMMA_RUNNER_JOB = "webrtc-gamma-runner"
@@ -181,6 +181,7 @@ pipeline {
                                     booleanParam(name: 'KEEP_RECORDING', value: params.KEEP_RECORDING),
                                     booleanParam(name: 'FIRST_ITERATION', value: true),
                                     booleanParam(name: 'RESCHEDULE', value: params.RESCHEDULE),
+                                    booleanParam(name: 'NO_LOOP_FRAMES', value: true),
                                     string(name: 'JS_BRANCH', value: params.JS_BRANCH),
                                 ],
                                 wait: true,
@@ -223,6 +224,7 @@ pipeline {
                                     booleanParam(name: 'KEEP_RECORDING', value: params.KEEP_RECORDING),
                                     booleanParam(name: 'FIRST_ITERATION', value: true),
                                     booleanParam(name: 'RESCHEDULE', value: params.RESCHEDULE),
+                                    booleanParam(name: 'NO_LOOP_FRAMES', value: true),
                                     string(name: 'JS_BRANCH', value: params.JS_BRANCH),
                                 ],
                                 wait: true,
@@ -266,6 +268,7 @@ pipeline {
                                     booleanParam(name: 'KEEP_RECORDING', value: params.KEEP_RECORDING),
                                     booleanParam(name: 'FIRST_ITERATION', value: true),
                                     booleanParam(name: 'RESCHEDULE', value: params.RESCHEDULE),
+                                    booleanParam(name: 'NO_LOOP_FRAMES', value: true),
                                     string(name: 'JS_BRANCH', value: params.JS_BRANCH),
                                 ],
                                 wait: true,
@@ -304,6 +307,7 @@ pipeline {
                                     booleanParam(name: 'TRICKLE_ICE', value: true),
                                     booleanParam(name: 'FIRST_ITERATION', value: true),
                                     booleanParam(name: 'RESCHEDULE', value: params.RESCHEDULE),
+                                    booleanParam(name: 'NO_LOOP_FRAMES', value: true),
                                     string(name: 'JS_BRANCH', value: params.JS_BRANCH),
                                 ],
                                 wait: true,

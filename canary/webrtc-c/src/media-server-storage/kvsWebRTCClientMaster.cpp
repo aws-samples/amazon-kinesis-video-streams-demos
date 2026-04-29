@@ -228,8 +228,20 @@ PVOID sendVideoPackets(PVOID args)
     startTime = GETTIME();
     lastFrameTime = startTime;
 
+    // Check if we should stop after one pass through all frames (no looping)
+    PCHAR pNoLoopFrames = GETENV("CANARY_NO_LOOP_FRAMES");
+    BOOL noLoopFrames = (pNoLoopFrames != NULL && pNoLoopFrames[0] != '\0' &&
+                         (TOLOWER(pNoLoopFrames[0]) == 't' || pNoLoopFrames[0] == '1'));
+
     while (!ATOMIC_LOAD_BOOL(&pSampleConfiguration->appTerminateFlag)) {
         fileIndex = fileIndex % NUMBER_OF_H264_FRAME_FILES + 1;
+
+        // If no-loop mode is enabled, stop after sending all frames once
+        if (noLoopFrames && fileIndex == 1 && frame.presentationTs > 0) {
+            DLOGI("[KVS Master] All %u frames sent (no-loop mode), stopping video thread", NUMBER_OF_H264_FRAME_FILES);
+            break;
+        }
+
         SNPRINTF(filePath, MAX_PATH_LEN, "./assets/h264SampleFrames/frame-%04d.h264", fileIndex);
 
         CHK_STATUS(readFrameFromDisk(NULL, &frameSize, filePath));
