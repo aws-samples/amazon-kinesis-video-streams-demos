@@ -204,6 +204,8 @@ struct __SampleStreamingSession {
     UINT32 metricsTimerId;
     UINT32 streamingAvailabilityTimerId;
     std::atomic<BOOL> recorded;
+    std::atomic<BOOL> firstIceSent;
+    std::atomic<BOOL> firstIceReceived;
     std::mutex countUpdateMutex;
     std::thread pushProfilingThread;
 

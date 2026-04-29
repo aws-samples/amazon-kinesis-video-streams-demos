@@ -648,6 +648,16 @@ VOID onIceCandidateHandler(UINT64 customData, PCHAR candidateJson)
         STRNCPY(message.payload, candidateJson, message.payloadLen);
         message.correlationId[0] = '\0';
         CHK_STATUS(sendSignalingMessage(pSampleStreamingSession, &message));
+
+        // Push TimeToSendIce on the first ICE candidate sent
+        if (!ATOMIC_EXCHANGE_BOOL(&pSampleStreamingSession->firstIceSent, TRUE)) {
+            PSampleConfiguration pConfig = pSampleStreamingSession->pSampleConfiguration;
+            if (pConfig != NULL && pConfig->joinSSCallStartTime != 0) {
+                UINT64 timeToSendIce = (GETTIME() - pConfig->joinSSCallStartTime) / HUNDREDS_OF_NANOS_IN_A_MILLISECOND;
+                DLOGI("[Canary] TimeToSendIce: %" PRIu64 " ms", timeToSendIce);
+                Canary::Cloudwatch::getInstance().monitoring.pushTimeToSendIce(timeToSendIce, Aws::CloudWatch::Model::StandardUnit::Milliseconds);
+            }
+        }
     }
 
 CleanUp:
@@ -802,6 +812,9 @@ STATUS createSampleStreamingSession(PSampleConfiguration pSampleConfiguration, P
 
     pSampleStreamingSession->metricsTimerId = MAX_UINT32;
     pSampleStreamingSession->streamingAvailabilityTimerId = MAX_UINT32;
+
+    ATOMIC_STORE_BOOL(&pSampleStreamingSession->firstIceSent, FALSE);
+    ATOMIC_STORE_BOOL(&pSampleStreamingSession->firstIceReceived, FALSE);
 
     // if we're the viewer, we control the trickle ice mode
     pSampleStreamingSession->remoteCanTrickleIce = !isMaster && pSampleConfiguration->trickleIce;
@@ -1000,6 +1013,16 @@ STATUS handleRemoteCandidate(PSampleStreamingSession pSampleStreamingSession, PS
 
     CHK_STATUS(deserializeRtcIceCandidateInit(pSignalingMessage->payload, pSignalingMessage->payloadLen, &iceCandidate));
     CHK_STATUS(addIceCandidate(pSampleStreamingSession->pPeerConnection, iceCandidate.candidate));
+
+    // Push TimeToReceiveIce on the first ICE candidate received
+    if (!ATOMIC_EXCHANGE_BOOL(&pSampleStreamingSession->firstIceReceived, TRUE)) {
+        PSampleConfiguration pConfig = pSampleStreamingSession->pSampleConfiguration;
+        if (pConfig != NULL && pConfig->joinSSCallStartTime != 0) {
+            UINT64 timeToReceiveIce = (GETTIME() - pConfig->joinSSCallStartTime) / HUNDREDS_OF_NANOS_IN_A_MILLISECOND;
+            DLOGI("[Canary] TimeToReceiveIce: %" PRIu64 " ms", timeToReceiveIce);
+            Canary::Cloudwatch::getInstance().monitoring.pushTimeToReceiveIce(timeToReceiveIce, Aws::CloudWatch::Model::StandardUnit::Milliseconds);
+        }
+    }
 
 CleanUp:
 

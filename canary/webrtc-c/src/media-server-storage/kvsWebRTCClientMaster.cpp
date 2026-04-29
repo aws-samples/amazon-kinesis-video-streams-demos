@@ -280,6 +280,14 @@ PVOID sendVideoPackets(PVOID args)
                 DLOGD("[Canary] Start up latency from offer received to first frame sent (timeToFirstFrame): %lf ms", timeToFirstFrame);
                 Canary::Cloudwatch::getInstance().monitoring.pushTimeToFirstFrame(timeToFirstFrame,
                                                                                 Aws::CloudWatch::Model::StandardUnit::Milliseconds);
+
+                // Push JoinSSCallToFirstFrame — time from JoinStorageSession call to first frame sent
+                if (pSampleConfiguration->joinSSCallStartTime != 0) {
+                    UINT64 joinSSToFirstFrame = (GETTIME() - pSampleConfiguration->joinSSCallStartTime) / HUNDREDS_OF_NANOS_IN_A_MILLISECOND;
+                    DLOGI("[Canary] JoinSSCallToFirstFrame: %" PRIu64 " ms", joinSSToFirstFrame);
+                    Canary::Cloudwatch::getInstance().monitoring.pushJoinSSCallToFirstFrame(joinSSToFirstFrame, Aws::CloudWatch::Model::StandardUnit::Milliseconds);
+                }
+
                 calculateDisconnectToFrameSentTime(pSampleConfiguration);
 
                 pSampleConfiguration->sampleStreamingSessionList[i]->firstFrame = FALSE;
@@ -360,6 +368,13 @@ PVOID sendAudioPackets(PVOID args)
                 DLOGD("[Canary] Start up latency from offer received to first frame sent (timeToFirstFrame): %lf ms", timeToFirstFrame);
                     Canary::Cloudwatch::getInstance().monitoring.pushTimeToFirstFrame(timeToFirstFrame,
                                                                                 Aws::CloudWatch::Model::StandardUnit::Milliseconds);
+
+                    // Push JoinSSCallToFirstFrame — time from JoinStorageSession call to first frame sent
+                    if (pSampleConfiguration->joinSSCallStartTime != 0) {
+                        UINT64 joinSSToFirstFrame = (GETTIME() - pSampleConfiguration->joinSSCallStartTime) / HUNDREDS_OF_NANOS_IN_A_MILLISECOND;
+                        DLOGI("[Canary] JoinSSCallToFirstFrame (audio): %" PRIu64 " ms", joinSSToFirstFrame);
+                        Canary::Cloudwatch::getInstance().monitoring.pushJoinSSCallToFirstFrame(joinSSToFirstFrame, Aws::CloudWatch::Model::StandardUnit::Milliseconds);
+                    }
 
                     calculateDisconnectToFrameSentTime(pSampleConfiguration);
 
