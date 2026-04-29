@@ -252,6 +252,30 @@ CleanUp:
     return retStatus;
 }
 
+STATUS canaryMasterStreamingAvailability(UINT32 timerId, UINT64 currentTime, UINT64 customData)
+{
+    UNUSED_PARAM(timerId);
+    UNUSED_PARAM(currentTime);
+    STATUS retStatus = STATUS_SUCCESS;
+
+    PSampleStreamingSession pSampleStreamingSession = (PSampleStreamingSession) customData;
+    PSampleConfiguration pSampleConfiguration;
+
+    CHK(pSampleStreamingSession != NULL, STATUS_NULL_ARG);
+    CHK(!ATOMIC_LOAD_BOOL(&pSampleStreamingSession->terminateFlag), STATUS_TIMER_QUEUE_STOP_SCHEDULING);
+
+    pSampleConfiguration = pSampleStreamingSession->pSampleConfiguration;
+    CHK(pSampleConfiguration != NULL, STATUS_NULL_ARG);
+    CHK(!ATOMIC_LOAD_BOOL(&pSampleConfiguration->appTerminateFlag), STATUS_TIMER_QUEUE_STOP_SCHEDULING);
+
+    if (ATOMIC_LOAD_BOOL(&pSampleConfiguration->connected)) {
+        Canary::Cloudwatch::getInstance().monitoring.pushMasterStreamingAvailability(1.0);
+    }
+
+CleanUp:
+    return retStatus;
+}
+
 STATUS initMetricsTimers(PSampleStreamingSession pSampleStreamingSession)
 {
     STATUS retStatus = STATUS_SUCCESS;
@@ -267,6 +291,11 @@ STATUS initMetricsTimers(PSampleStreamingSession pSampleStreamingSession)
     CHK_STATUS(timerQueueAddTimer(pSampleConfiguration->timerQueueHandle, METRICS_INVOCATION_PERIOD, METRICS_INVOCATION_PERIOD, canaryRtpOutboundStats, (UINT64) pSampleStreamingSession,
                                       &pSampleStreamingSession->metricsTimerId));
     DLOGD("[Canary] Added metricsTimer");
+
+    CHK_STATUS(timerQueueAddTimer(pSampleConfiguration->timerQueueHandle, STREAMING_AVAILABILITY_PERIOD, STREAMING_AVAILABILITY_PERIOD,
+                                      canaryMasterStreamingAvailability, (UINT64) pSampleStreamingSession,
+                                      &pSampleStreamingSession->streamingAvailabilityTimerId));
+    DLOGD("[Canary] Added MasterStreamingAvailability timer");
 
 CleanUp:
     return retStatus;
@@ -318,6 +347,8 @@ VOID onConnectionStateChange(UINT64 customData, RTC_PEER_CONNECTION_STATE newSta
         case RTC_PEER_CONNECTION_STATE_FAILED:
             DLOGE("[Canary] Peer connection FAILED — pushing PeerConnectionAvailability = 0");
             Canary::Cloudwatch::getInstance().monitoring.pushPeerConnectionAvailability(0.0);
+            DLOGE("[Canary] Peer connection FAILED — pushing MasterStreamingAvailability = 0");
+            Canary::Cloudwatch::getInstance().monitoring.pushMasterStreamingAvailability(0.0);
             // explicit fallthrough
         case RTC_PEER_CONNECTION_STATE_CLOSED:
             // explicit fallthrough
@@ -332,6 +363,15 @@ VOID onConnectionStateChange(UINT64 customData, RTC_PEER_CONNECTION_STATE newSta
                 gCMasterUnexpectedDisconnectionCount++;
                 DLOGE("[Canary] Unexpected disconnection detected (was CONNECTED, now state %u). Count: %u",
                       newState, gCMasterUnexpectedDisconnectionCount);
+                if (newState == RTC_PEER_CONNECTION_STATE_DISCONNECTED) {
+                    DLOGE("[Canary] Peer connection DISCONNECTED unexpectedly — pushing MasterStreamingAvailability = 0");
+                    Canary::Cloudwatch::getInstance().monitoring.pushMasterStreamingAvailability(0.0);
+                }
+            }
+            // CLOSED is expected (clean bye from backend after ~1hr) — push 1.0
+            if (newState == RTC_PEER_CONNECTION_STATE_CLOSED && ATOMIC_LOAD_BOOL(&pSampleConfiguration->connected)) {
+                DLOGI("[Canary] Peer connection CLOSED (clean bye) — pushing MasterStreamingAvailability = 1");
+                Canary::Cloudwatch::getInstance().monitoring.pushMasterStreamingAvailability(1.0);
             }
             DLOGD("p2p connection disconnected");
             ATOMIC_STORE_BOOL(&pSampleStreamingSession->terminateFlag, TRUE);
@@ -761,6 +801,7 @@ STATUS createSampleStreamingSession(PSampleConfiguration pSampleConfiguration, P
     pSampleStreamingSession->iceMetrics.version = ICE_AGENT_METRICS_CURRENT_VERSION;
 
     pSampleStreamingSession->metricsTimerId = MAX_UINT32;
+    pSampleStreamingSession->streamingAvailabilityTimerId = MAX_UINT32;
 
     // if we're the viewer, we control the trickle ice mode
     pSampleStreamingSession->remoteCanTrickleIce = !isMaster && pSampleConfiguration->trickleIce;
@@ -864,6 +905,12 @@ STATUS freeSampleStreamingSession(PSampleStreamingSession* ppSampleStreamingSess
     // Free the metrics timer, make new one for each session (therefore making a new one for each 60min storage session).
     if (pSampleStreamingSession->metricsTimerId != MAX_UINT32 && IS_VALID_TIMER_QUEUE_HANDLE(pSampleConfiguration->timerQueueHandle)) {
         CHK_LOG_ERR(timerQueueCancelTimer(pSampleConfiguration->timerQueueHandle, pSampleStreamingSession->metricsTimerId,
+                                          (UINT64) pSampleStreamingSession));
+    }
+
+    // Free the streaming availability timer
+    if (pSampleStreamingSession->streamingAvailabilityTimerId != MAX_UINT32 && IS_VALID_TIMER_QUEUE_HANDLE(pSampleConfiguration->timerQueueHandle)) {
+        CHK_LOG_ERR(timerQueueCancelTimer(pSampleConfiguration->timerQueueHandle, pSampleStreamingSession->streamingAvailabilityTimerId,
                                           (UINT64) pSampleStreamingSession));
     }
 

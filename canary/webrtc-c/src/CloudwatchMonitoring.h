@@ -31,6 +31,7 @@ class CloudwatchMonitoring {
     VOID pushJoinSSTimeout(UINT32);
     VOID pushJoinSSCallToSessionJoined(UINT64, Aws::CloudWatch::Model::StandardUnit);
     VOID pushCMasterUnexpectedDisconnection(UINT32);
+    VOID pushMasterStreamingAvailability(DOUBLE);
 
   private:
     Dimension channelDimension;

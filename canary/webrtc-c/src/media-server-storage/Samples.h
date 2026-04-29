@@ -202,6 +202,7 @@ struct __SampleStreamingSession {
     RtcStats canaryMetrics;
     OutgoingRTPMetricsContext canaryOutgoingRTPMetricsContext;
     UINT32 metricsTimerId;
+    UINT32 streamingAvailabilityTimerId;
     std::atomic<BOOL> recorded;
     std::mutex countUpdateMutex;
     std::thread pushProfilingThread;
@@ -257,6 +258,8 @@ STATUS getPendingMessageQueueForHash(PStackQueue, UINT64, BOOL, PPendingMessageQ
 STATUS initSignaling(PSampleConfiguration, PCHAR);
 BOOL sampleFilterNetworkInterfaces(UINT64, PCHAR);
 UINT32 setLogLevel();
+
+STATUS canaryMasterStreamingAvailability(UINT32, UINT64, UINT64);
 
 STATUS handleWriteFrameMetricIncrementation(PSampleStreamingSession pSampleStreamingSession, UINT32 frameSize);
 

@@ -520,4 +520,15 @@ VOID CloudwatchMonitoring::pushCMasterUnexpectedDisconnection(UINT32 disconnecti
     this->push(datum);
 }
 
+VOID CloudwatchMonitoring::pushMasterStreamingAvailability(DOUBLE availability)
+{
+    MetricDatum datum;
+
+    datum.SetMetricName("MasterStreamingAvailability");
+    datum.SetValue(availability);
+    datum.SetUnit(Aws::CloudWatch::Model::StandardUnit::None);
+
+    this->push(datum);
+}
+
 } // namespace Canary
