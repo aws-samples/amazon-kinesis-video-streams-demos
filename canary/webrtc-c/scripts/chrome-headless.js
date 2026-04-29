@@ -410,6 +410,14 @@ class ViewerCanaryTest {
           this.config.channelName,
           0
         );
+
+        // Also push ViewerStreamingAvailability = 0 on connection timeout
+        log('[Canary] Connection timed out — pushing ViewerStreamingAvailability = 0');
+        await CloudWatchMetrics.publishCountMetric(
+          this.getMetricName('ViewerStreamingAvailability'),
+          this.config.channelName,
+          0
+        );
       }
 
       // Track peer connection state explicitly transitioning to "failed" (ICE connectivity check failed)
@@ -433,6 +441,14 @@ class ViewerCanaryTest {
         log('Peer connection state transitioned to FAILED — pushing PeerConnectionAvailability = 0');
         await CloudWatchMetrics.publishCountMetric(
           this.getMetricName('PeerConnectionAvailability'),
+          this.config.channelName,
+          0
+        );
+
+        // Also push ViewerStreamingAvailability = 0 immediately on failure
+        log('[Canary] Peer connection FAILED — pushing ViewerStreamingAvailability = 0');
+        await CloudWatchMetrics.publishCountMetric(
+          this.getMetricName('ViewerStreamingAvailability'),
           this.config.channelName,
           0
         );
@@ -941,6 +957,10 @@ class ViewerCanaryTest {
     let lastStatusLog = 0;
     const statusLogInterval = 10000;
     
+    // ViewerStreamingAvailability heartbeat — push every 20 seconds
+    let lastAvailabilityPush = Date.now();
+    const availabilityInterval = 20000;
+    
     // Track RTCStats snapshots for final packet loss calculation
     this.firstRTCStats = null;
     this.lastRTCStats = null;
@@ -954,6 +974,12 @@ class ViewerCanaryTest {
       
       if (!frameStats.viewerExists) {
         log('Viewer object lost!');
+        log('[Canary] Viewer object lost — pushing ViewerStreamingAvailability = 0');
+        await CloudWatchMetrics.publishCountMetric(
+          this.getMetricName('ViewerStreamingAvailability'),
+          this.config.channelName,
+          0
+        );
         this.testCompleted = true;
         break;
       }
@@ -969,6 +995,18 @@ class ViewerCanaryTest {
       }
       
       const now = Date.now();
+
+      // Push ViewerStreamingAvailability heartbeat every 20 seconds
+      if (now - lastAvailabilityPush >= availabilityInterval) {
+        const availability = frameStats.storageSessionActive ? 1.0 : 0.0;
+        await CloudWatchMetrics.publishCountMetric(
+          this.getMetricName('ViewerStreamingAvailability'),
+          this.config.channelName,
+          availability
+        );
+        lastAvailabilityPush = now;
+      }
+
       if (now - lastStatusLog >= statusLogInterval) {
         const elapsed = Math.floor((now - this.sessionStartTime) / 1000);
         let statusMsg = `[${elapsed}s]ActiveVideo: ${frameStats.hasActiveVideo}`;
@@ -981,6 +1019,16 @@ class ViewerCanaryTest {
       }
       
       await new Promise(resolve => setTimeout(resolve, 2000));
+    }
+
+    // If monitoring loop completed normally (timeout, not failure), push final 1.0
+    if (this.storageSessionJoined) {
+      log('[Canary] Viewer monitoring completed normally — pushing ViewerStreamingAvailability = 1 (clean exit)');
+      await CloudWatchMetrics.publishCountMetric(
+        this.getMetricName('ViewerStreamingAvailability'),
+        this.config.channelName,
+        1
+      );
     }
   }
 
