@@ -273,6 +273,18 @@ class ViewerCanaryTest {
             answerToFirstIceTime
           );
         }
+
+        // Calculate Join API call to first ICE candidate received
+        if (this.joinSSCallTime && this.firstIceCandidateReceivedTime) {
+          const timeToReceiveIce = this.firstIceCandidateReceivedTime - this.joinSSCallTime;
+          log(`TimeToReceiveIce (Join API to first ICE received): ${timeToReceiveIce}ms`);
+          
+          await CloudWatchMetrics.publishMsMetric(
+            this.getMetricName('TimeToReceiveIce'),
+            this.config.channelName,
+            timeToReceiveIce
+          );
+        }
       }
       
       // Track first ICE candidate sent to remote
@@ -290,6 +302,18 @@ class ViewerCanaryTest {
             this.getMetricName('FirstIceReceivedToFirstIceSentTime'),
             this.config.channelName,
             firstIceReceivedToSentTime
+          );
+        }
+
+        // Calculate Join API call to first ICE candidate sent
+        if (this.joinSSCallTime && this.firstIceCandidateSentTime) {
+          const timeToSendIce = this.firstIceCandidateSentTime - this.joinSSCallTime;
+          log(`TimeToSendIce (Join API to first ICE sent): ${timeToSendIce}ms`);
+          
+          await CloudWatchMetrics.publishMsMetric(
+            this.getMetricName('TimeToSendIce'),
+            this.config.channelName,
+            timeToSendIce
           );
         }
       }
@@ -393,6 +417,18 @@ class ViewerCanaryTest {
             this.getMetricName('TotalConnectionEstablishmentTime'),
             this.config.channelName,
             totalConnectionTime
+          );
+        }
+
+        // Calculate Join API call to peer connection established
+        if (this.joinSSCallTime && this.peerConnectionEstablishedTime) {
+          const timeToPeerConnection = this.peerConnectionEstablishedTime - this.joinSSCallTime;
+          log(`TimeToPeerConnection (Join API to peer connection): ${timeToPeerConnection}ms`);
+          
+          await CloudWatchMetrics.publishMsMetric(
+            this.getMetricName('TimeToPeerConnection'),
+            this.config.channelName,
+            timeToPeerConnection
           );
         }
       }
@@ -936,6 +972,18 @@ class ViewerCanaryTest {
       this.config.channelName,
       frameDetectionTime
     );
+
+    // Calculate Join API call to first frame received
+    if (this.joinSSCallTime) {
+      const joinToFirstFrame = Date.now() - this.joinSSCallTime;
+      log(`TimeToFirstFrame from Join API: ${joinToFirstFrame}ms`);
+      
+      await CloudWatchMetrics.publishMsMetric(
+        this.getMetricName('JoinSSToFirstFrame'),
+        this.config.channelName,
+        joinToFirstFrame
+      );
+    }
     
     this.framesReceived = true;
 
