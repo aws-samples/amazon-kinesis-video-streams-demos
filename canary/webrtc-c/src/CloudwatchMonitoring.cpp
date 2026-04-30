@@ -564,4 +564,15 @@ VOID CloudwatchMonitoring::pushJoinSSCallToFirstFrame(UINT64 duration, Aws::Clou
     this->push(datum);
 }
 
+VOID CloudwatchMonitoring::pushRoundTripTime(DOUBLE rttMs, Aws::CloudWatch::Model::StandardUnit unit)
+{
+    MetricDatum datum;
+
+    datum.SetMetricName("RoundTripTime");
+    datum.SetValue(rttMs);
+    datum.SetUnit(unit);
+
+    this->push(datum);
+}
+
 } // namespace Canary

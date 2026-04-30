@@ -157,6 +157,17 @@ STATUS canaryRtpOutboundStats(UINT32 timerId, UINT64 currentTime, UINT64 customD
                 Canary::POutgoingRTPMetricsContext pCanaryOutgoingRTPMetricsContext = reinterpret_cast<Canary::POutgoingRTPMetricsContext>(&(pSampleStreamingSession->canaryOutgoingRTPMetricsContext));
                 Canary::Cloudwatch::getInstance().monitoring.pushOutboundRtpStats(pCanaryOutgoingRTPMetricsContext);
             }
+
+        // Extract RTT from ICE candidate pair stats
+        {
+            RtcStats rtcCandidatePairMetrics;
+            rtcCandidatePairMetrics.requestedTypeOfStats = RTC_STATS_TYPE_CANDIDATE_PAIR;
+            if (STATUS_SUCCEEDED(rtcPeerConnectionGetMetrics(pSampleStreamingSession->pPeerConnection, NULL, &rtcCandidatePairMetrics))) {
+                DOUBLE rttMs = rtcCandidatePairMetrics.rtcStatsObject.iceCandidatePairStats.currentRoundTripTime * 1000.0;
+                DLOGD("[Canary] RoundTripTime: %lf ms", rttMs);
+                Canary::Cloudwatch::getInstance().monitoring.pushRoundTripTime(rttMs, Aws::CloudWatch::Model::StandardUnit::Milliseconds);
+            }
+        }
     } else {
         retStatus = STATUS_TIMER_QUEUE_STOP_SCHEDULING;
     }

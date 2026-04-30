@@ -35,6 +35,7 @@ class CloudwatchMonitoring {
     VOID pushTimeToSendIce(UINT64, Aws::CloudWatch::Model::StandardUnit);
     VOID pushTimeToReceiveIce(UINT64, Aws::CloudWatch::Model::StandardUnit);
     VOID pushJoinSSCallToFirstFrame(UINT64, Aws::CloudWatch::Model::StandardUnit);
+    VOID pushRoundTripTime(DOUBLE, Aws::CloudWatch::Model::StandardUnit);
 
   private:
     Dimension channelDimension;
