@@ -729,8 +729,11 @@ class ViewerCanaryTest {
       }
 
       const report = await pc.getStats();
-      const result = { video: null, audio: null };
+      const result = { video: null, audio: null, roundTripTime: null };
       report.forEach(stat => {
+        if (stat.type === 'candidate-pair' && stat.nominated) {
+          result.roundTripTime = stat.currentRoundTripTime || 0;
+        }
         if (stat.type !== 'inbound-rtp') return;
         const entry = {
           packetsReceived: stat.packetsReceived || 0,
@@ -742,6 +745,9 @@ class ViewerCanaryTest {
           framesPerSecond: stat.framesPerSecond || 0,
           nackCount: stat.nackCount || 0,
           pliCount: stat.pliCount || 0,
+          jitterBufferDelay: stat.jitterBufferDelay || 0,
+          jitterBufferEmittedCount: stat.jitterBufferEmittedCount || 0,
+          totalDecodeTime: stat.totalDecodeTime || 0,
         };
         if (stat.kind === 'video') result.video = entry;
         else if (stat.kind === 'audio') result.audio = entry;
@@ -1165,6 +1171,39 @@ class ViewerCanaryTest {
         this.config.channelName,
         v.pliCount
       );
+
+      // Jitter Buffer Delay — average time frames spend in the jitter buffer (ms)
+      if (v.jitterBufferEmittedCount > 0) {
+        const avgJitterBufferDelay = (v.jitterBufferDelay / v.jitterBufferEmittedCount) * 1000;
+        log(`Jitter Buffer Delay: ${avgJitterBufferDelay.toFixed(2)}ms (total=${v.jitterBufferDelay}s, emitted=${v.jitterBufferEmittedCount})`);
+        await CloudWatchMetrics.publishMsMetric(
+          this.getMetricName('JitterBufferDelay'),
+          this.config.channelName,
+          avgJitterBufferDelay
+        );
+      }
+
+      // Decode Time — average time spent decoding each frame (ms)
+      if (v.framesDecoded > 0) {
+        const avgDecodeTime = (v.totalDecodeTime / v.framesDecoded) * 1000;
+        log(`Decode Time: ${avgDecodeTime.toFixed(2)}ms (total=${v.totalDecodeTime}s, frames=${v.framesDecoded})`);
+        await CloudWatchMetrics.publishMsMetric(
+          this.getMetricName('DecodeTime'),
+          this.config.channelName,
+          avgDecodeTime
+        );
+      }
+
+      // Round Trip Time — from nominated ICE candidate pair (ms)
+      if (this.lastRTCStats.roundTripTime !== null) {
+        const rttMs = this.lastRTCStats.roundTripTime * 1000;
+        log(`Round Trip Time: ${rttMs.toFixed(2)}ms`);
+        await CloudWatchMetrics.publishMsMetric(
+          this.getMetricName('RoundTripTime'),
+          this.config.channelName,
+          rttMs
+        );
+      }
     } else {
       log('No RTCStats video data available for packet loss calculation');
     }
