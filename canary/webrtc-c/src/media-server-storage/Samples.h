@@ -170,6 +170,7 @@ typedef struct {
     UINT64 prevFramesSent;
     UINT64 prevNackCount;
     UINT64 prevRetxBytesSent;
+    UINT64 prevPliCount;
     std::atomic<UINT64> videoFramesGenerated;
     UINT64 videoBytesGenerated;
     DOUBLE framesPercentageDiscarded;

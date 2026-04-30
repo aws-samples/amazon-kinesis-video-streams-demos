@@ -37,6 +37,19 @@ class CloudwatchMonitoring {
     VOID pushJoinSSCallToFirstFrame(UINT64, Aws::CloudWatch::Model::StandardUnit);
     VOID pushRoundTripTime(DOUBLE, Aws::CloudWatch::Model::StandardUnit);
 
+    // Periodic during-session metrics
+    VOID pushPacketsSentPerSecond(DOUBLE);
+    VOID pushPacketsReceivedPerSecond(DOUBLE);
+    VOID pushOutgoingBitrate(DOUBLE);
+    VOID pushPliCountPerSecond(DOUBLE);
+
+    // End-of-session totals
+    VOID pushTotalPacketsSent(UINT64);
+    VOID pushTotalPacketsReceived(UINT64);
+    VOID pushTotalNackCount(UINT64);
+    VOID pushTotalPliCount(UINT64);
+    VOID pushTotalFramesDiscardedPercentage(DOUBLE);
+
   private:
     Dimension channelDimension;
     Dimension labelDimension;
