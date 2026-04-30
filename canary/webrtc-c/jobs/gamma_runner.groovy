@@ -418,7 +418,7 @@ pipeline {
         string(name: 'SCENARIO_LABEL', defaultValue: 'GammaTest')
         string(name: 'DURATION_IN_SECONDS', defaultValue: '156')
         string(name: 'GIT_URL', defaultValue: 'https://github.com/aws-samples/amazon-kinesis-video-streams-demos.git')
-        string(name: 'GIT_HASH', defaultValue: 'pre-built-package-enhancement')
+        string(name: 'GIT_HASH', defaultValue: 'metric-implementation')
         string(name: 'AWS_DEFAULT_REGION', defaultValue: 'us-west-2')
         string(name: 'ENDPOINT', defaultValue: '', description: 'Custom endpoint URL (e.g., gamma endpoint)')
         string(name: 'METRIC_SUFFIX', defaultValue: '-gamma')

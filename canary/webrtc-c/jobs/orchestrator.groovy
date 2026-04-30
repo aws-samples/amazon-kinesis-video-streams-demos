@@ -18,7 +18,7 @@ STORAGE_EXTENDED_DURATION_IN_SECONDS = 43200 // 12 hr
 MIN_RETRY_DELAY_IN_SECONDS = 60
 COLD_STARTUP_DELAY_IN_SECONDS = 60 * 60
 GIT_URL = 'https://github.com/aws-samples/amazon-kinesis-video-streams-demos.git'
-GIT_HASH = 'pre-built-package-enhancement'
+GIT_HASH = 'metric-implementation'
 COMMON_PARAMS = [
     string(name: 'AWS_KVS_LOG_LEVEL', value: "2"),
     string(name: 'DEBUG_LOG_SDP', value: "TRUE"),
