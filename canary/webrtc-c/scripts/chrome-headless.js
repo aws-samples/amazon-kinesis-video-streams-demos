@@ -1015,6 +1015,12 @@ class ViewerCanaryTest {
     let lastAvailabilityPush = Date.now();
     const availabilityInterval = 20000;
     
+    // Periodic RTP metrics — push every 60 seconds
+    let lastPeriodicMetricsPush = Date.now();
+    const periodicMetricsInterval = 60000;
+    let prevRTCStats = null;
+    let prevRTCStatsTime = null;
+
     // Track RTCStats snapshots for final packet loss calculation
     this.firstRTCStats = null;
     this.lastRTCStats = null;
@@ -1059,6 +1065,41 @@ class ViewerCanaryTest {
           availability
         );
         lastAvailabilityPush = now;
+      }
+
+      // Push periodic RTP metrics every 60 seconds
+      if (now - lastPeriodicMetricsPush >= periodicMetricsInterval && rtcStats?.video && prevRTCStats?.video) {
+        const v = rtcStats.video;
+        const pv = prevRTCStats.video;
+        const durationSec = (now - prevRTCStatsTime) / 1000;
+
+        if (durationSec > 0) {
+          const nackPerSec = (v.nackCount - pv.nackCount) / durationSec;
+          const pliPerSec = (v.pliCount - pv.pliCount) / durationSec;
+          const framesDecodedPerSec = (v.framesDecoded - pv.framesDecoded) / durationSec;
+          const framesDroppedPerSec = (v.framesDropped - pv.framesDropped) / durationSec;
+          const incomingBitrateKbps = ((v.bytesReceived - pv.bytesReceived) * 8) / durationSec / 1000;
+          const packetsReceivedPerSec = (v.packetsReceived - pv.packetsReceived) / durationSec;
+          const packetsLostPerSec = (v.packetsLost - pv.packetsLost) / durationSec;
+
+          await CloudWatchMetrics.publishCountMetric(this.getMetricName('NackCountPerSecond'), this.config.channelName, nackPerSec);
+          await CloudWatchMetrics.publishCountMetric(this.getMetricName('PliCountPerSecond'), this.config.channelName, pliPerSec);
+          await CloudWatchMetrics.publishCountMetric(this.getMetricName('FramesDecodedPerSecond'), this.config.channelName, framesDecodedPerSec);
+          await CloudWatchMetrics.publishCountMetric(this.getMetricName('FramesDroppedPerSecond'), this.config.channelName, framesDroppedPerSec);
+          await CloudWatchMetrics.publishCountMetric(this.getMetricName('IncomingBitrateKbps'), this.config.channelName, incomingBitrateKbps);
+          await CloudWatchMetrics.publishCountMetric(this.getMetricName('PacketsReceivedPerSecond'), this.config.channelName, packetsReceivedPerSec);
+          await CloudWatchMetrics.publishCountMetric(this.getMetricName('PacketsLostPerSecond'), this.config.channelName, packetsLostPerSec);
+
+          log(`[Canary] Periodic RTP: nack/s=${nackPerSec.toFixed(2)} pli/s=${pliPerSec.toFixed(2)} decoded/s=${framesDecodedPerSec.toFixed(1)} dropped/s=${framesDroppedPerSec.toFixed(2)} bitrate=${incomingBitrateKbps.toFixed(1)}kbps pktsRecv/s=${packetsReceivedPerSec.toFixed(1)} pktsLost/s=${packetsLostPerSec.toFixed(2)}`);
+        }
+
+        lastPeriodicMetricsPush = now;
+      }
+
+      // Update prev snapshot for next periodic calculation
+      if (rtcStats?.video) {
+        prevRTCStats = rtcStats;
+        prevRTCStatsTime = now;
       }
 
       if (now - lastStatusLog >= statusLogInterval) {
@@ -1202,6 +1243,32 @@ class ViewerCanaryTest {
           this.getMetricName('RoundTripTime'),
           this.config.channelName,
           rttMs
+        );
+      }
+
+      // Total Packets Received
+      await CloudWatchMetrics.publishCountMetric(
+        this.getMetricName('TotalPacketsReceived'),
+        this.config.channelName,
+        v.packetsReceived
+      );
+
+      // Total Frames Decoded
+      await CloudWatchMetrics.publishCountMetric(
+        this.getMetricName('TotalFramesDecoded'),
+        this.config.channelName,
+        v.framesDecoded
+      );
+
+      // Total Frames Dropped Percentage
+      const totalFramesProcessed = v.framesDecoded + v.framesDropped;
+      if (totalFramesProcessed > 0) {
+        const framesDroppedPct = (v.framesDropped / totalFramesProcessed) * 100;
+        log(`Total Frames Dropped: ${framesDroppedPct.toFixed(2)}% (${v.framesDropped}/${totalFramesProcessed})`);
+        await CloudWatchMetrics.publishPercentageMetric(
+          this.getMetricName('TotalFramesDroppedPercentage'),
+          this.config.channelName,
+          framesDroppedPct
         );
       }
     } else {
