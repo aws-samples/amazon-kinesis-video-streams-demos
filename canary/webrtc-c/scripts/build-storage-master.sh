@@ -106,7 +106,7 @@ else
 fi
 
 # ---------------------------------------------------------------------------
-# 4. Build
+# 4. Build (clean rebuild to avoid stale CMake cache / FetchContent artifacts)
 # ---------------------------------------------------------------------------
 BUILD_LOG="${LOGS_DIR}/build-$(date +%s).log"
 echo "Building... (log: $BUILD_LOG)"
@@ -116,6 +116,7 @@ if [ "$TLS_BACKEND" = "mbedtls" ]; then
     CMAKE_FLAGS="$CMAKE_FLAGS -DCANARY_USE_OPENSSL=OFF -DCANARY_USE_MBEDTLS=ON"
 fi
 
+rm -rf "$BUILD_DIR"
 mkdir -p "$BUILD_DIR"
 
 (
