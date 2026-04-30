@@ -11,8 +11,8 @@ MASTER_HOME="${HOME}/webrtc-c-storage-master"
 
 echo "$(date -u '+%Y-%m-%dT%H:%M:%SZ') [cleanup-master] Starting cleanup"
 
-# Build logs older than 1 hour (keep recent for debugging)
-find "${MASTER_HOME}/logs" -name 'build-*.log' -mmin +60 -delete 2>/dev/null || true
+# Build logs older than 24 hours (keep recent for debugging)
+find "${MASTER_HOME}/logs" -name 'build-*.log' -mmin +1440 -delete 2>/dev/null || true
 
 # IoT cert artifacts older than 1 hour
 # Certs are regenerated each run, old ones are stale
