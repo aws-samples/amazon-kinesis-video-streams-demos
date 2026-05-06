@@ -248,11 +248,11 @@ class ViewerCanaryTest {
           if (httpStatus >= 400) {
             const nameMatch = text.match(/"name"\s*:\s*"([^"]+)"/);
             const errorName = nameMatch ? nameMatch[1] : 'Unknown';
-            log(`JoinStorageSessionAsViewer HTTP error detected: ${httpStatus} (${errorName}) — pushing availability = 0`);
+            log(`ViewerHttpError detected: ${httpStatus} (${errorName})`);
             await CloudWatchMetrics.publishCountMetric(
-              this.getMetricName('JoinSSAsViewerAvailability'),
+              this.getMetricName('ViewerHttpError'),
               this.config.channelName,
-              0
+              1
             );
           }
         }
