@@ -82,6 +82,7 @@ class ViewerCanaryTest {
 
     // Unexpected disconnect tracking — after peer connection was successfully established
     this.peerConnectionEstablished = false;
+    this.lastPeerConnectionState = 'new'; // Track state for transition detection
     this.unexpectedDisconnectCount = 0;
 
     // Viewer reconnect tracking — counts "[VIEWER] Reconnecting..." log lines
@@ -404,6 +405,7 @@ class ViewerCanaryTest {
       if (text.includes('[VIEWER] Connection to peer successful!')) {
         this.peerConnectionEstablishedTime = Date.now();
         this.peerConnectionEstablished = true;
+        this.lastPeerConnectionState = 'connected';
         this.successfulConnections++;
         log(`Peer connection established timestamp captured (successful connections: ${this.successfulConnections}/${this.connectionAttempts})`);
 
@@ -478,22 +480,17 @@ class ViewerCanaryTest {
       // Track peer connection state explicitly transitioning to "failed" (ICE connectivity check failed)
       // This is mutually exclusive with the 30s timeout above — covers the case where ICE fails outright
       if (text.includes('[VIEWER] PeerConnection state: failed')) {
-        if (this.peerConnectionEstablished) {
-          // Connection was previously established — this is an unexpected disconnect.
-          // The master's printPeerConnectionStateInfo only triggers onPeerConnectionFailed
-          // (and reconnect) on 'failed', not on 'disconnected'. So 'failed' after 'connected'
-          // is the only real unexpected disconnect we should track.
+        // Unexpected disconnect = connected → failed (the only transition we care about)
+        if (this.lastPeerConnectionState === 'connected') {
           this.unexpectedDisconnectCount++;
-          log(`Unexpected disconnect detected (failed after connected)! Count: ${this.unexpectedDisconnectCount}`);
+          log(`Unexpected disconnect detected (connected → failed)! Count: ${this.unexpectedDisconnectCount}`);
           await CloudWatchMetrics.publishCountMetric(
             this.getMetricName('UnexpectedDisconnect'),
             this.config.channelName,
             1
           );
-          // Don't push PeerConnectionAvailability = 0 here — connected→failed is tracked
-          // by UnexpectedDisconnect, not PeerConnectionAvailability.
         } else {
-          // Never reached connected — this is an initial connection failure (connecting → failed)
+          // connecting → failed (initial connection failure)
           log('Peer connection state transitioned to FAILED (never connected) — pushing PeerConnectionAvailability = 0');
           await CloudWatchMetrics.publishCountMetric(
             this.getMetricName('PeerConnectionAvailability'),
@@ -501,6 +498,8 @@ class ViewerCanaryTest {
             0
           );
         }
+
+        this.lastPeerConnectionState = 'failed';
 
         // Also push ViewerStreamingAvailability = 0 immediately on failure
         log('[Canary] Peer connection FAILED — pushing ViewerStreamingAvailability = 0');
@@ -521,6 +520,7 @@ class ViewerCanaryTest {
       if (text.includes('[VIEWER] Reconnecting...')) {
         this.viewerReconnectCount++;
         this.connectionAttempts++;
+        this.lastPeerConnectionState = 'connecting';
         log(`Viewer reconnect attempt detected! Count: ${this.viewerReconnectCount}, total attempts: ${this.connectionAttempts}`);
       }
       
