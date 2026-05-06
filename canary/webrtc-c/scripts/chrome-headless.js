@@ -237,6 +237,25 @@ class ViewerCanaryTest {
           1
         );
       }
+
+      // Track HTTP errors from JoinStorageSessionAsViewer API (400s, 500s)
+      // These appear as JSON objects with $metadata.httpStatusCode in the console
+      if (text.includes('"httpStatusCode"') && text.includes('"$metadata"')) {
+        const statusMatch = text.match(/"httpStatusCode"\s*:\s*(\d+)/);
+        if (statusMatch) {
+          const httpStatus = parseInt(statusMatch[1]);
+          if (httpStatus >= 400) {
+            const nameMatch = text.match(/"name"\s*:\s*"([^"]+)"/);
+            const errorName = nameMatch ? nameMatch[1] : 'Unknown';
+            log(`JoinStorageSessionAsViewer HTTP error detected: ${httpStatus} (${errorName}) — pushing availability = 0`);
+            await CloudWatchMetrics.publishCountMetric(
+              this.getMetricName('JoinSSAsViewerAvailability'),
+              this.config.channelName,
+              0
+            );
+          }
+        }
+      }
       
       // Track SDP answer sent and calculate offer-to-answer metric
       if (text.includes('[VIEWER] Sending SDP answer to remote')) {
@@ -471,15 +490,17 @@ class ViewerCanaryTest {
             this.config.channelName,
             1
           );
+          // Don't push PeerConnectionAvailability = 0 here — connected→failed is tracked
+          // by UnexpectedDisconnect, not PeerConnectionAvailability.
+        } else {
+          // Never reached connected — this is an initial connection failure (connecting → failed)
+          log('Peer connection state transitioned to FAILED (never connected) — pushing PeerConnectionAvailability = 0');
+          await CloudWatchMetrics.publishCountMetric(
+            this.getMetricName('PeerConnectionAvailability'),
+            this.config.channelName,
+            0
+          );
         }
-
-        // Always push PeerConnectionAvailability = 0 for any 'failed' state
-        log('Peer connection state transitioned to FAILED — pushing PeerConnectionAvailability = 0');
-        await CloudWatchMetrics.publishCountMetric(
-          this.getMetricName('PeerConnectionAvailability'),
-          this.config.channelName,
-          0
-        );
 
         // Also push ViewerStreamingAvailability = 0 immediately on failure
         log('[Canary] Peer connection FAILED — pushing ViewerStreamingAvailability = 0');
@@ -729,10 +750,27 @@ class ViewerCanaryTest {
       }
 
       const report = await pc.getStats();
-      const result = { video: null, audio: null, roundTripTime: null };
+      const result = { video: null, audio: null, roundTripTime: null, selectedCandidatePair: null };
       report.forEach(stat => {
         if (stat.type === 'candidate-pair' && stat.nominated) {
           result.roundTripTime = stat.currentRoundTripTime || 0;
+          // Find the local and remote candidate details
+          const localCandidate = report.get(stat.localCandidateId);
+          const remoteCandidate = report.get(stat.remoteCandidateId);
+          result.selectedCandidatePair = {
+            local: localCandidate ? {
+              address: localCandidate.address || localCandidate.ip,
+              port: localCandidate.port,
+              protocol: localCandidate.protocol,
+              candidateType: localCandidate.candidateType,
+            } : null,
+            remote: remoteCandidate ? {
+              address: remoteCandidate.address || remoteCandidate.ip,
+              port: remoteCandidate.port,
+              protocol: remoteCandidate.protocol,
+              candidateType: remoteCandidate.candidateType,
+            } : null,
+          };
         }
         if (stat.type !== 'inbound-rtp') return;
         const entry = {
@@ -1047,7 +1085,14 @@ class ViewerCanaryTest {
       // Collect RTCStats snapshot
       const rtcStats = await this.getRTCStats(page);
       if (rtcStats?.video) {
-        if (!this.firstRTCStats) this.firstRTCStats = rtcStats;
+        if (!this.firstRTCStats) {
+          this.firstRTCStats = rtcStats;
+          // Log selected candidate pair on first successful stats collection
+          if (rtcStats.selectedCandidatePair) {
+            const pair = rtcStats.selectedCandidatePair;
+            log(`Selected ICE candidate pair — Local: ${pair.local?.candidateType} ${pair.local?.address}:${pair.local?.port} ${pair.local?.protocol} | Remote: ${pair.remote?.candidateType} ${pair.remote?.address}:${pair.remote?.port} ${pair.remote?.protocol}`);
+          }
+        }
         this.lastRTCStats = rtcStats;
       } else if (rtcStats?.debug && !this.rtcStatsDebugLogged) {
         log(`RTCStats debug: ${rtcStats.debug}`);
