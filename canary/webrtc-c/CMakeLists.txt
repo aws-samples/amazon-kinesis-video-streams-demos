@@ -68,6 +68,7 @@ add_library(
   src/media-server-storage/Common.cpp)
 target_link_libraries(
   kvsWebrtcCanary
+  PUBLIC
   kvsWebrtcClient
   kvsWebrtcSignalingClient
   kvspicUtils
