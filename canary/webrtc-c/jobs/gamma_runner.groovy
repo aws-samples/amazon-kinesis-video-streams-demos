@@ -523,9 +523,11 @@ pipeline {
                     }
                     steps {
                         script {
-                            def mutableParams = [:] + params
-                            mutableParams.DURATION_IN_SECONDS = "156"
-                            buildStorageCanary(false, mutableParams)
+                            ws("${env.JOB_NAME}-master-${BUILD_NUMBER}") {
+                                def mutableParams = [:] + params
+                                mutableParams.DURATION_IN_SECONDS = "156"
+                                buildStorageCanary(false, mutableParams)
+                            }
                         }
                     }
                 }
@@ -556,9 +558,11 @@ pipeline {
                     }
                     steps {
                         script {
-                            def mutableParams = [:] + params
-                            mutableParams.DURATION_IN_SECONDS = "156"
-                            buildStorageCanary(false, mutableParams)
+                            ws("${env.JOB_NAME}-master-${BUILD_NUMBER}") {
+                                def mutableParams = [:] + params
+                                mutableParams.DURATION_IN_SECONDS = "156"
+                                buildStorageCanary(false, mutableParams)
+                            }
                         }
                     }
                 }
@@ -602,9 +606,11 @@ pipeline {
                     }
                     steps {
                         script {
-                            def mutableParams = [:] + params
-                            mutableParams.DURATION_IN_SECONDS = "156"
-                            buildStorageCanary(false, mutableParams)
+                            ws("${env.JOB_NAME}-master-${BUILD_NUMBER}") {
+                                def mutableParams = [:] + params
+                                mutableParams.DURATION_IN_SECONDS = "156"
+                                buildStorageCanary(false, mutableParams)
+                            }
                         }
                     }
                 }

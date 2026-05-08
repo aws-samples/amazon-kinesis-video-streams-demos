@@ -721,9 +721,11 @@ pipeline {
                     }
                     steps {
                         script {
-                            def mutableParams = [:] + params
-                            mutableParams.DURATION_IN_SECONDS = "156"
-                            buildStorageCanary(false, mutableParams)
+                            ws("${env.JOB_NAME}-master-${BUILD_NUMBER}") {
+                                def mutableParams = [:] + params
+                                mutableParams.DURATION_IN_SECONDS = "156"
+                                buildStorageCanary(false, mutableParams)
+                            }
                         }
                     }
                 }
@@ -752,9 +754,11 @@ pipeline {
                     }
                     steps {
                         script {
-                            def mutableParams = [:] + params
-                            mutableParams.DURATION_IN_SECONDS = "156"
-                            buildStorageCanary(false, mutableParams)
+                            ws("${env.JOB_NAME}-master-${BUILD_NUMBER}") {
+                                def mutableParams = [:] + params
+                                mutableParams.DURATION_IN_SECONDS = "156"
+                                buildStorageCanary(false, mutableParams)
+                            }
                         }
                     }
                 }
@@ -796,9 +800,11 @@ pipeline {
                     }
                     steps {
                         script {
-                            def mutableParams = [:] + params
-                            mutableParams.DURATION_IN_SECONDS = "156"
-                            buildStorageCanary(false, mutableParams)
+                            ws("${env.JOB_NAME}-master-${BUILD_NUMBER}") {
+                                def mutableParams = [:] + params
+                                mutableParams.DURATION_IN_SECONDS = "156"
+                                buildStorageCanary(false, mutableParams)
+                            }
                         }
                     }
                 }
@@ -886,9 +892,7 @@ pipeline {
                 if (currentBuild.result == 'ABORTED') {
                     echo "Build was aborted, skipping reschedule"
                 } else {
-                    build(
-                    job: env.JOB_NAME,
-                    parameters: [
+                    def rescheduleParams = [
                       string(name: 'AWS_DEFAULT_REGION', value: params.AWS_DEFAULT_REGION),
                       string(name: 'AWS_KVS_LOG_LEVEL', value: params.AWS_KVS_LOG_LEVEL),
                       booleanParam(name: 'DEBUG_LOG_SDP', value: params.DEBUG_LOG_SDP),
@@ -927,9 +931,19 @@ pipeline {
                       booleanParam(name: 'VIDEO_VERIFY_ENABLED', value: params.VIDEO_VERIFY_ENABLED),
                       booleanParam(name: 'NO_LOOP_FRAMES', value: params.NO_LOOP_FRAMES),
                       booleanParam(name: 'FIRST_ITERATION', value: false)
-                    ],
-                    wait: false
-                )
+                    ]
+
+                    try {
+                        build(job: env.JOB_NAME, parameters: rescheduleParams, wait: false)
+                    } catch (err) {
+                        echo "WARNING: Reschedule failed: ${err.getMessage()}, retrying in 5s..."
+                        try {
+                            sleep 5
+                            build(job: env.JOB_NAME, parameters: rescheduleParams, wait: false)
+                        } catch (retryErr) {
+                            echo "ERROR: Reschedule retry also failed: ${retryErr.getMessage()}"
+                        }
+                    }
                 }
             }
         }
