@@ -17,6 +17,7 @@ import org.jenkinsci.plugins.workflow.steps.FlowInterruptedException
 START_TIMESTAMP = new Date().getTime()
 RUNNING_NODES_IN_BUILDING = 0
 HAS_ERROR = false
+IS_ABORTED = false
 VIEWER_SESSION_RESULTS = [:]
 
 // Signal flag: set to true when the storage master build is complete and the binary
@@ -115,6 +116,7 @@ def withRunnerWrapper(envs, fn) {
             fn()
         } catch (FlowInterruptedException err) {
             echo 'Aborted due to cancellation'
+            IS_ABORTED = true
             throw err
         } catch (err) {
             HAS_ERROR = true
@@ -204,6 +206,7 @@ def runViewerSessions(viewerId = "", waitMinutes = 2, viewerCount = "1") {
                 }
             } catch (FlowInterruptedException err) {
                 echo 'Aborted due to cancellation'
+                IS_ABORTED = true
                 throw err
             } catch (err) {
                 HAS_ERROR = true
@@ -693,7 +696,7 @@ pipeline {
                 echo "Has errors: ${HAS_ERROR}"
                 echo "=========================================="
 
-                if (currentBuild.result == 'ABORTED') {
+                if (currentBuild.result == 'ABORTED' || IS_ABORTED) {
                     echo "Build was aborted, skipping reschedule"
                 } else if (params.RESCHEDULE) {
                     def rescheduleParams = [
