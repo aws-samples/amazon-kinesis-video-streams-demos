@@ -1040,8 +1040,11 @@ class ViewerCanaryTest {
     
     // Start timer immediately since we already joined the storage session
     this.timerStarted = true;
-    const monitorDurationMs = 156000; // 2 min 36 sec
-    log(`Storage session joined, monitoring connection for ${monitorDurationMs / 1000} seconds...`);
+    // Monitor for the master's streaming duration (passed via env var)
+    // This ensures the viewer stops when the master stops streaming.
+    const masterDurationSec = parseInt(process.env.MASTER_DURATION) || 153;
+    const monitorDurationMs = masterDurationSec * 1000;
+    log(`Storage session joined, monitoring connection for ${masterDurationSec} seconds (master duration)...`);
     setTimeout(() => {
       this.testCompleted = true;
     }, monitorDurationMs);

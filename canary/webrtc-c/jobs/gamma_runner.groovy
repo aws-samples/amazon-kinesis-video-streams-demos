@@ -125,7 +125,7 @@ def withRunnerWrapper(envs, fn) {
     }
 }
 
-def runViewerSessions(viewerId = "", waitMinutes = 2, viewerCount = "1") {
+def runViewerSessions(viewerId = "", waitMinutes = 2, viewerCount = "1", staggerDelaySeconds = 0) {
     def workspaceName = "${env.JOB_NAME}-${viewerId ?: 'viewer'}-${BUILD_NUMBER}"
     ws(workspaceName) {
         try {
@@ -144,6 +144,12 @@ def runViewerSessions(viewerId = "", waitMinutes = 2, viewerCount = "1") {
                 export JS_PAGE_URL="${params.JS_BRANCH ?: 'master'}"
                 ./canary/webrtc-c/scripts/prepare-storage-viewer.sh
             """
+
+            // Staggered start delay to avoid all viewers starting at the exact same time
+            if (staggerDelaySeconds > 0) {
+                echo "Staggered start — waiting ${staggerDelaySeconds} seconds before starting ${viewerId ?: 'viewer'}"
+                sleep staggerDelaySeconds
+            }
 
             if (waitMinutes > 0) {
                 echo "Waiting for master to be ready (timeout: ${waitMinutes} minutes)..."
@@ -181,6 +187,7 @@ def runViewerSessions(viewerId = "", waitMinutes = 2, viewerCount = "1") {
                         export RUNNER_LABEL="${params.RUNNER_LABEL}"
                         export AWS_DEFAULT_REGION="${params.AWS_DEFAULT_REGION}"
                         export DURATION_IN_SECONDS="${viewerSessionDuration}"
+                        export MASTER_DURATION="${params.DURATION_IN_SECONDS ?: '153'}"
                         export FORCE_TURN="${params.FORCE_TURN ?: 'false'}"
                         export VIEWER_COUNT="${viewerCount}"
                         export VIEWER_ID="${viewerId}"
@@ -578,7 +585,7 @@ pipeline {
                             def waitMins = (params.VIEWER_WAIT_MINUTES != null && params.VIEWER_WAIT_MINUTES.toString().trim() != '') 
                                 ? params.VIEWER_WAIT_MINUTES.toInteger() 
                                 : 20
-                            runViewerSessions("Viewer1", waitMins, "2")
+                            runViewerSessions("Viewer1", waitMins, "2", 0)
                         }
                     }
                 }
@@ -591,7 +598,7 @@ pipeline {
                             def waitMins = (params.VIEWER_WAIT_MINUTES != null && params.VIEWER_WAIT_MINUTES.toString().trim() != '') 
                                 ? params.VIEWER_WAIT_MINUTES.toInteger() 
                                 : 20
-                            runViewerSessions("Viewer2", waitMins, "2")
+                            runViewerSessions("Viewer2", waitMins, "2", 5)
                         }
                     }
                 }
@@ -626,7 +633,7 @@ pipeline {
                             def waitMins = (params.VIEWER_WAIT_MINUTES != null && params.VIEWER_WAIT_MINUTES.toString().trim() != '') 
                                 ? params.VIEWER_WAIT_MINUTES.toInteger() 
                                 : 20
-                            runViewerSessions("Viewer1", waitMins, "3")
+                            runViewerSessions("Viewer1", waitMins, "3", 0)
                         }
                     }
                 }
@@ -639,7 +646,7 @@ pipeline {
                             def waitMins = (params.VIEWER_WAIT_MINUTES != null && params.VIEWER_WAIT_MINUTES.toString().trim() != '') 
                                 ? params.VIEWER_WAIT_MINUTES.toInteger() 
                                 : 20
-                            runViewerSessions("Viewer2", waitMins, "3")
+                            runViewerSessions("Viewer2", waitMins, "3", 5)
                         }
                     }
                 }
@@ -652,7 +659,7 @@ pipeline {
                             def waitMins = (params.VIEWER_WAIT_MINUTES != null && params.VIEWER_WAIT_MINUTES.toString().trim() != '') 
                                 ? params.VIEWER_WAIT_MINUTES.toInteger() 
                                 : 20
-                            runViewerSessions("Viewer3", waitMins, "3")
+                            runViewerSessions("Viewer3", waitMins, "3", 10)
                         }
                     }
                 }

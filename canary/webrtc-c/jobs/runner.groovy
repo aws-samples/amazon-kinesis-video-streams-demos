@@ -282,6 +282,7 @@ def runViewerSessions(viewerId = "", waitMinutes = 10, viewerCount = "1", stagge
                         export RUNNER_LABEL="${params.RUNNER_LABEL}"
                         export AWS_DEFAULT_REGION="${params.AWS_DEFAULT_REGION}"
                         export DURATION_IN_SECONDS="${(params.VIEWER_SESSION_DURATION_SECONDS != null && params.VIEWER_SESSION_DURATION_SECONDS.toString().trim() != '') ? params.VIEWER_SESSION_DURATION_SECONDS : '900'}"
+                        export MASTER_DURATION="${params.DURATION_IN_SECONDS ?: '153'}"
                         export FORCE_TURN="${params.FORCE_TURN}"
                         export VIEWER_COUNT="${viewerCount}"
                         export VIEWER_ID="${viewerId}"
@@ -782,8 +783,8 @@ pipeline {
                     steps {
                         script {
                             def waitMins = (params.VIEWER_WAIT_MINUTES != null && params.VIEWER_WAIT_MINUTES.toString().trim() != '') ? params.VIEWER_WAIT_MINUTES.toInteger() : 20
-                            // Viewer2 starts 15 seconds after Viewer1
-                            runViewerSessions("Viewer2", waitMins, "2", 15)
+                            // Viewer2 starts 5 seconds after Viewer1
+                            runViewerSessions("Viewer2", waitMins, "2", 5)
                         }
                     }
                 }
@@ -828,8 +829,8 @@ pipeline {
                     steps {
                         script {
                             def waitMins = (params.VIEWER_WAIT_MINUTES != null && params.VIEWER_WAIT_MINUTES.toString().trim() != '') ? params.VIEWER_WAIT_MINUTES.toInteger() : 20
-                            // Viewer2 starts 15 seconds after Viewer1
-                            runViewerSessions("Viewer2", waitMins, "3", 15)
+                            // Viewer2 starts 5 seconds after Viewer1
+                            runViewerSessions("Viewer2", waitMins, "3", 5)
                         }
                     }
                 }
@@ -840,8 +841,8 @@ pipeline {
                     steps {
                         script {
                             def waitMins = (params.VIEWER_WAIT_MINUTES != null && params.VIEWER_WAIT_MINUTES.toString().trim() != '') ? params.VIEWER_WAIT_MINUTES.toInteger() : 20
-                            // Viewer3 starts 30 seconds after Viewer1
-                            runViewerSessions("Viewer3", waitMins, "3", 30)
+                            // Viewer3 starts 10 seconds after Viewer1
+                            runViewerSessions("Viewer3", waitMins, "3", 10)
                         }
                     }
                 }
