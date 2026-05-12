@@ -40,6 +40,7 @@ def buildWebRTCProject(useMbedTLS, thing_prefix) {
         chmod a+x cert_setup.sh &&
         ./cert_setup.sh ${thing_prefix} &&
         cd .. &&
+        rm -rf build &&
         mkdir -p build &&
         cd build &&
         ${configureCmd} &&
