@@ -931,17 +931,19 @@ STATUS createSampleStreamingSession(PSampleConfiguration pSampleConfiguration, P
     CHK_STATUS(transceiverOnBandwidthEstimation(pSampleStreamingSession->pVideoRtcRtpTransceiver, (UINT64) pSampleStreamingSession,
                                                 sampleBandwidthEstimationHandler));
 
-    // Add a SendRecv Transceiver of type audio
-    audioTrack.kind = MEDIA_STREAM_TRACK_KIND_AUDIO;
-    audioTrack.codec = RTC_CODEC_OPUS;
-    audioRtpTransceiverInit.direction = RTC_RTP_TRANSCEIVER_DIRECTION_SENDRECV;
-    STRCPY(audioTrack.streamId, "myKvsVideoStream");
-    STRCPY(audioTrack.trackId, "myAudioTrack");
-    CHK_STATUS(addTransceiver(pSampleStreamingSession->pPeerConnection, &audioTrack, &audioRtpTransceiverInit,
-                              &pSampleStreamingSession->pAudioRtcRtpTransceiver));
+    // Add a SendRecv Transceiver of type audio (only if not video-only mode)
+    if (pSampleConfiguration->mediaType == SAMPLE_STREAMING_AUDIO_VIDEO) {
+        audioTrack.kind = MEDIA_STREAM_TRACK_KIND_AUDIO;
+        audioTrack.codec = RTC_CODEC_OPUS;
+        audioRtpTransceiverInit.direction = RTC_RTP_TRANSCEIVER_DIRECTION_SENDRECV;
+        STRCPY(audioTrack.streamId, "myKvsVideoStream");
+        STRCPY(audioTrack.trackId, "myAudioTrack");
+        CHK_STATUS(addTransceiver(pSampleStreamingSession->pPeerConnection, &audioTrack, &audioRtpTransceiverInit,
+                                  &pSampleStreamingSession->pAudioRtcRtpTransceiver));
 
-    CHK_STATUS(transceiverOnBandwidthEstimation(pSampleStreamingSession->pAudioRtcRtpTransceiver, (UINT64) pSampleStreamingSession,
-                                                sampleBandwidthEstimationHandler));
+        CHK_STATUS(transceiverOnBandwidthEstimation(pSampleStreamingSession->pAudioRtcRtpTransceiver, (UINT64) pSampleStreamingSession,
+                                                    sampleBandwidthEstimationHandler));
+    }
     // twcc bandwidth estimation
     CHK_STATUS(peerConnectionOnSenderBandwidthEstimation(pSampleStreamingSession->pPeerConnection, (UINT64) pSampleStreamingSession,
                                                          sampleSenderBandwidthEstimationHandler));
