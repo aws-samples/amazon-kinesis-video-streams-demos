@@ -13,6 +13,7 @@ INT32 main(INT32 argc, CHAR* argv[])
     PSampleConfiguration pSampleConfiguration = NULL;
     PCHAR pChannelName;
     PCHAR pControlPlaneUri = NULL;
+    PCHAR pMediaType = NULL;
     CHAR controlPlaneUrl[MAX_CONTROL_PLANE_URI_CHAR_LEN];
     SignalingClientMetrics signalingClientMetrics;
     signalingClientMetrics.version = SIGNALING_CLIENT_METRICS_CURRENT_VERSION;
@@ -57,7 +58,7 @@ INT32 main(INT32 argc, CHAR* argv[])
     pSampleConfiguration->channelInfo.useMediaStorage = TRUE;
 
     // Determine media type from environment variable
-    PCHAR pMediaType = GETENV("CANARY_MEDIA_TYPE");
+    pMediaType = GETENV("CANARY_MEDIA_TYPE");
     if (pMediaType != NULL && STRCMP(pMediaType, "video_only") == 0) {
         pSampleConfiguration->mediaType = SAMPLE_STREAMING_VIDEO_ONLY;
         pSampleConfiguration->audioSource = NULL;
@@ -96,7 +97,7 @@ INT32 main(INT32 argc, CHAR* argv[])
     DLOGI("[KVS Master] Checked sample video frame availability....available");
 
     if (pSampleConfiguration->mediaType == SAMPLE_STREAMING_AUDIO_VIDEO) {
-        CHK_STATUS(readFrameFromDisk(NULL, &frameSize, "./assets/opusSampleFrames/sample-001.opus"));
+        CHK_STATUS(readFrameFromDisk(NULL, &frameSize, "./assets/opusSampleFrames/sample-0001.opus"));
         DLOGI("[KVS Master] Checked sample audio frame availability....available");
     }
 
@@ -366,7 +367,7 @@ PVOID sendAudioPackets(PVOID args)
 
     while (!ATOMIC_LOAD_BOOL(&pSampleConfiguration->appTerminateFlag)) {
         fileIndex = fileIndex % NUMBER_OF_OPUS_FRAME_FILES + 1;
-        SNPRINTF(filePath, MAX_PATH_LEN, "./assets/opusSampleFrames/sample-%03d.opus", fileIndex);
+        SNPRINTF(filePath, MAX_PATH_LEN, "./assets/opusSampleFrames/sample-%04d.opus", fileIndex);
 
         CHK_STATUS(readFrameFromDisk(NULL, &frameSize, filePath));
 
