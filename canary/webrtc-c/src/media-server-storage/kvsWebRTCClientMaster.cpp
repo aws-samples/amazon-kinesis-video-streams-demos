@@ -50,12 +50,23 @@ INT32 main(INT32 argc, CHAR* argv[])
     DLOGD("[Canary] Canary init time: %d [ms]", (GETTIME() / HUNDREDS_OF_NANOS_IN_A_MILLISECOND) - t1);
 
     // Set the audio and video handlers
-    pSampleConfiguration->audioSource = sendAudioPackets;
     pSampleConfiguration->videoSource = sendVideoPackets;
     pSampleConfiguration->receiveAudioVideoSource = sampleReceiveAudioVideoFrame;
 
     // Set sample to use storage mode
     pSampleConfiguration->channelInfo.useMediaStorage = TRUE;
+
+    // Determine media type from environment variable
+    PCHAR pMediaType = GETENV("CANARY_MEDIA_TYPE");
+    if (pMediaType != NULL && STRCMP(pMediaType, "video_only") == 0) {
+        pSampleConfiguration->mediaType = SAMPLE_STREAMING_VIDEO_ONLY;
+        pSampleConfiguration->audioSource = NULL;
+        DLOGI("[KVS Master] Media type: VIDEO_ONLY");
+    } else {
+        pSampleConfiguration->mediaType = SAMPLE_STREAMING_AUDIO_VIDEO;
+        pSampleConfiguration->audioSource = sendAudioPackets;
+        DLOGI("[KVS Master] Media type: AUDIO_VIDEO");
+    }
 
     // Set custom control plane URL if CONTROL_PLANE_URI is provided (e.g., for gamma testing).
     // This overrides the default control plane URL so that all control plane API calls
@@ -77,7 +88,6 @@ INT32 main(INT32 argc, CHAR* argv[])
 #ifdef ENABLE_DATA_CHANNEL
     pSampleConfiguration->onDataChannel = onDataChannel;
 #endif
-    pSampleConfiguration->mediaType = SAMPLE_STREAMING_AUDIO_VIDEO;
     DLOGI("[KVS Master] Finished setting handlers");
 
     // Check if the samples are present
@@ -85,8 +95,10 @@ INT32 main(INT32 argc, CHAR* argv[])
     CHK_STATUS(readFrameFromDisk(NULL, &frameSize, "./assets/h264SampleFrames/frame-0001.h264"));
     DLOGI("[KVS Master] Checked sample video frame availability....available");
 
-    CHK_STATUS(readFrameFromDisk(NULL, &frameSize, "./assets/opusSampleFrames/sample-001.opus"));
-    DLOGI("[KVS Master] Checked sample audio frame availability....available");
+    if (pSampleConfiguration->mediaType == SAMPLE_STREAMING_AUDIO_VIDEO) {
+        CHK_STATUS(readFrameFromDisk(NULL, &frameSize, "./assets/opusSampleFrames/sample-001.opus"));
+        DLOGI("[KVS Master] Checked sample audio frame availability....available");
+    }
 
     // Initialize KVS WebRTC. This must be done before anything else, and must only be done once.
     CHK_STATUS(initKvsWebRtc());
