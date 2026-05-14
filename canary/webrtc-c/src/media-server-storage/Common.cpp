@@ -943,6 +943,16 @@ STATUS createSampleStreamingSession(PSampleConfiguration pSampleConfiguration, P
 
         CHK_STATUS(transceiverOnBandwidthEstimation(pSampleStreamingSession->pAudioRtcRtpTransceiver, (UINT64) pSampleStreamingSession,
                                                     sampleBandwidthEstimationHandler));
+    } else {
+        // Video-only mode: still add audio transceiver but set direction to recvonly
+        // The media server requires an audio m-line with a valid direction (not inactive)
+        audioTrack.kind = MEDIA_STREAM_TRACK_KIND_AUDIO;
+        audioTrack.codec = RTC_CODEC_OPUS;
+        audioRtpTransceiverInit.direction = RTC_RTP_TRANSCEIVER_DIRECTION_RECVONLY;
+        STRCPY(audioTrack.streamId, "myKvsVideoStream");
+        STRCPY(audioTrack.trackId, "myAudioTrack");
+        CHK_STATUS(addTransceiver(pSampleStreamingSession->pPeerConnection, &audioTrack, &audioRtpTransceiverInit,
+                                  &pSampleStreamingSession->pAudioRtcRtpTransceiver));
     }
     // twcc bandwidth estimation
     CHK_STATUS(peerConnectionOnSenderBandwidthEstimation(pSampleStreamingSession->pPeerConnection, (UINT64) pSampleStreamingSession,

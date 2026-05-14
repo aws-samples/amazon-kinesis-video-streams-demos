@@ -145,9 +145,22 @@ class ViewerCanaryTest {
   }
 
   async createBrowser() {
+    const launchArgs = [
+      '--use-fake-ui-for-media-stream',
+      '--use-fake-device-for-media-stream',
+      '--allow-file-access-from-files'
+    ];
+
+    // If an audio file is provided, use it as the fake audio capture source
+    const audioFile = process.env.VIEWER_AUDIO_FILE || '';
+    if (audioFile && fs.existsSync(audioFile)) {
+      launchArgs.push(`--use-file-for-fake-audio-capture=${audioFile}`);
+      log(`Using audio file for fake capture: ${audioFile}`);
+    }
+
     return await puppeteer.launch({ 
       headless: true,
-      args: ['--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream', '--allow-file-access-from-files']
+      args: launchArgs
     });
   }
 
