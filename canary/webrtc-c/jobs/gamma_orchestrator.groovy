@@ -81,6 +81,11 @@ pipeline {
             defaultValue: true,
             description: 'Run StorageSingleReconnect test (master + consumer, 65 min)'
         )
+        booleanParam(
+            name: 'RUN_VO_MIXED_VIEWERS',
+            defaultValue: true,
+            description: 'Run VOMasterMixedViewer test (VO master + 2 AO viewers + 1 RO viewer)'
+        )
         string(
             name: 'GIT_HASH',
             defaultValue: GIT_HASH,
@@ -113,7 +118,7 @@ pipeline {
             steps {
                 script {
                     
-                    if (!params.RUN_STORAGE_WITH_VIEWER && !params.RUN_STORAGE_TWO_VIEWERS && !params.RUN_STORAGE_THREE_VIEWERS && !params.RUN_STORAGE_PERIODIC && !params.RUN_STORAGE_SUB_RECONNECT && !params.RUN_STORAGE_SINGLE_RECONNECT) {
+                    if (!params.RUN_STORAGE_WITH_VIEWER && !params.RUN_STORAGE_TWO_VIEWERS && !params.RUN_STORAGE_THREE_VIEWERS && !params.RUN_STORAGE_PERIODIC && !params.RUN_STORAGE_SUB_RECONNECT && !params.RUN_STORAGE_SINGLE_RECONNECT && !params.RUN_VO_MIXED_VIEWERS) {
                         error "At least one test must be selected to run."
                     }
                     
@@ -390,6 +395,48 @@ pipeline {
                                 propagate: false
                             )
                             echo "StorageSingleReconnect result: ${result.result}"
+                        }
+                    }
+                }
+
+                stage('VOMasterMixedViewer') {
+                    when {
+                        expression { return params.RUN_VO_MIXED_VIEWERS }
+                    }
+                    steps {
+                        script {
+                            echo "Starting VOMasterMixedViewer test..."
+                            def result = build(
+                                job: GAMMA_RUNNER_JOB,
+                                parameters: [
+                                    string(name: 'AWS_KVS_LOG_LEVEL', value: "2"),
+                                    string(name: 'GIT_URL', value: GIT_URL),
+                                    string(name: 'GIT_HASH', value: env.CURRENT_GIT_HASH),
+                                    string(name: 'LOG_GROUP_NAME', value: "WebrtcSDK"),
+                                    booleanParam(name: 'DEBUG_LOG_SDP', value: true),
+                                    booleanParam(name: 'JS_STORAGE_VO_MIXED_VIEWERS', value: true),
+                                    string(name: 'DURATION_IN_SECONDS', value: "156"),
+                                    string(name: 'MASTER_NODE_LABEL', value: "gamma-webrtc-storage-master"),
+                                    string(name: 'STORAGE_VIEWER_ONE_NODE_LABEL', value: "gamma-webrtc-storage-viewer"),
+                                    string(name: 'STORAGE_VIEWER_TWO_NODE_LABEL', value: "gamma-webrtc-storage-viewer"),
+                                    string(name: 'STORAGE_VIEWER_THREE_NODE_LABEL', value: "gamma-webrtc-storage-viewer"),
+                                    string(name: 'RUNNER_LABEL', value: "GammaVOMasterMixedViewer"),
+                                    string(name: 'SCENARIO_LABEL', value: "GammaVOMasterMixedViewer"),
+                                    string(name: 'AWS_DEFAULT_REGION', value: params.AWS_DEFAULT_REGION),
+                                    string(name: 'ENDPOINT', value: params.ENDPOINT),
+                                    string(name: 'METRIC_SUFFIX', value: "-gamma"),
+                                    string(name: 'VIEWER_WAIT_MINUTES', value: params.VIEWER_WAIT_MINUTES),
+                                    string(name: 'VIEWER_SESSION_DURATION_SECONDS', value: params.VIEWER_SESSION_DURATION_SECONDS),
+                                    booleanParam(name: 'KEEP_RECORDING', value: params.KEEP_RECORDING),
+                                    booleanParam(name: 'FIRST_ITERATION', value: true),
+                                    booleanParam(name: 'RESCHEDULE', value: params.RESCHEDULE),
+                                    booleanParam(name: 'NO_LOOP_FRAMES', value: true),
+                                    string(name: 'JS_BRANCH', value: params.JS_BRANCH),
+                                ],
+                                wait: true,
+                                propagate: false
+                            )
+                            echo "VOMasterMixedViewer result: ${result.result}"
                         }
                     }
                 }
