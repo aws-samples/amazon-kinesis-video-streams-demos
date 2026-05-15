@@ -490,6 +490,31 @@ pipeline {
                             ],
                             wait: false
                         )
+
+                        // VO Master with Mixed Viewers (2 AO + 1 RO)
+                        build(
+                            job: NEXT_AVAILABLE_RUNNER,
+                            parameters: [
+                                booleanParam(name: 'IS_SIGNALING', value: false),
+                                booleanParam(name: 'IS_STORAGE', value: false),
+                                booleanParam(name: 'IS_STORAGE_SINGLE_NODE', value: false),
+                                booleanParam(name: 'USE_TURN', value: false),
+                                booleanParam(name: 'TRICKLE_ICE', value: false),
+                                booleanParam(name: 'USE_IOT', value: false),
+                                booleanParam(name: 'JS_STORAGE_VO_MIXED_VIEWERS', value: true),
+                                string(name: 'DURATION_IN_SECONDS', value: STORAGE_WITH_VIEWER_DURATION_IN_SECONDS.toString()),
+                                string(name: 'MASTER_NODE_LABEL', value: "webrtc-storage-master"),
+                                string(name: 'STORAGE_VIEWER_ONE_NODE_LABEL', value: "webrtc-storage-multi-viewer-1"),
+                                string(name: 'STORAGE_VIEWER_TWO_NODE_LABEL', value: "webrtc-storage-multi-viewer-2"),
+                                string(name: 'STORAGE_VIEWER_THREE_NODE_LABEL', value: "webrtc-storage-consumer"),
+                                string(name: 'RUNNER_LABEL', value: "VOMasterMixedViewer"),
+                                string(name: 'SCENARIO_LABEL', value: "VOMasterMixedViewer"),
+                                string(name: 'AWS_DEFAULT_REGION', value: "us-west-2"),
+                                string(name: 'VIEWER_WAIT_MINUTES', value: "20"),
+                                booleanParam(name: 'NO_LOOP_FRAMES', value: true),
+                            ],
+                            wait: false
+                        )
                     }
                 }
 
