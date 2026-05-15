@@ -19,10 +19,15 @@ RUNNING_NODES_IN_BUILDING = 0
 HAS_ERROR = false
 IS_ABORTED = false
 VIEWER_SESSION_RESULTS = [:]
+MASTER_BUILD_CACHED = false
 
 // Signal flag: set to true when the storage master build is complete and the binary
-// is about to start streaming. Viewers poll this instead of sleeping a fixed duration.
+// is ready to start streaming. Viewers poll this instead of sleeping a fixed duration.
 MASTER_READY = false
+
+// Signal flag: set to true when the viewer has started and is ready to receive media.
+// The master waits for this before starting the C binary.
+VIEWER_STARTED = false
 
 // @NonCPS prevents Jenkins CPS from trying to serialize local variables in this
 // method.  java.util.regex.Matcher is NOT serializable — holding one across a CPS
@@ -125,7 +130,7 @@ def withRunnerWrapper(envs, fn) {
     }
 }
 
-def runViewerSessions(viewerId = "", waitMinutes = 2, viewerCount = "1", staggerDelaySeconds = 0) {
+def runViewerSessions(viewerId = "", waitMinutes = 2, viewerCount = "1", staggerDelaySeconds = 0, sendAudio = false) {
     def workspaceName = "${env.JOB_NAME}-${viewerId ?: 'viewer'}-${BUILD_NUMBER}"
     ws(workspaceName) {
         try {
@@ -151,7 +156,9 @@ def runViewerSessions(viewerId = "", waitMinutes = 2, viewerCount = "1", stagger
                 sleep staggerDelaySeconds
             }
 
-            if (waitMinutes > 0) {
+            if (MASTER_BUILD_CACHED) {
+                echo "Master build is cached, skipping MASTER_READY wait"
+            } else if (waitMinutes > 0) {
                 echo "Waiting for master to be ready (timeout: ${waitMinutes} minutes)..."
                 def startWait = System.currentTimeMillis()
                 def timeoutMs = waitMinutes * 60 * 1000
@@ -179,6 +186,9 @@ def runViewerSessions(viewerId = "", waitMinutes = 2, viewerCount = "1", stagger
             VIEWER_SESSION_RESULTS[viewerKey] = [attempts: 1, successes: 0]
 
             echo "Starting ${viewerId ? viewerId + ' ' : ''}viewer session"
+
+            // Signal master that viewer is ready — master waits for this before streaming
+            VIEWER_STARTED = true
             
             try {
                 def output = sh(
@@ -196,6 +206,8 @@ def runViewerSessions(viewerId = "", waitMinutes = 2, viewerCount = "1", stagger
                         export METRIC_SUFFIX="${metricSuffixValue}"
                         export KEEP_RECORDING="${params.KEEP_RECORDING}"
                         export JS_PAGE_URL="${params.JS_BRANCH ?: 'master'}"
+                        export VIEWER_SEND_AUDIO="${sendAudio}"
+                        export VIEWER_AUDIO_FILE="\${WORKSPACE}/canary/webrtc-c/assets/audio-source.wav"
                         
                         ./canary/webrtc-c/scripts/run-storage-viewer.sh
                     """,
@@ -292,7 +304,8 @@ def buildStorageCanary(isConsumer, params) {
         'CANARY_CHANNEL_NAME': "${env.JOB_NAME}-${params.RUNNER_LABEL}",
         'AWS_DEFAULT_REGION': params.AWS_DEFAULT_REGION,
         'CONTROL_PLANE_URI': params.ENDPOINT ?: '',
-        'CANARY_NO_LOOP_FRAMES': params.NO_LOOP_FRAMES ?: false
+        'CANARY_NO_LOOP_FRAMES': params.NO_LOOP_FRAMES ?: false,
+        'CANARY_MEDIA_TYPE': env.CANARY_MEDIA_TYPE ?: ''
     ]
 
     def repoDir = "${env.HOME}/webrtc-c-storage-master/repo"
@@ -311,6 +324,15 @@ def buildStorageCanary(isConsumer, params) {
     RUNNING_NODES_IN_BUILDING++
     if (!isConsumer) {
         MASTER_READY = false
+        // Check if the master build is already cached (same commit)
+        def commitFile = "${env.HOME}/webrtc-c-storage-master/.last-commit"
+        def cachedCommit = sh(script: "cat '${commitFile}' 2>/dev/null || echo ''", returnStdout: true).trim()
+        def currentCommit = sh(script: "cd '${env.HOME}/webrtc-c-storage-master/repo' && git rev-parse HEAD 2>/dev/null || echo ''", returnStdout: true).trim()
+        MASTER_BUILD_CACHED = (currentCommit != '' && currentCommit == cachedCommit)
+        if (MASTER_BUILD_CACHED) {
+            echo "Master build is cached (commit ${currentCommit.take(12)}), viewers can start immediately"
+            MASTER_READY = true
+        }
     }
     if (!isConsumer) {
         buildWebRTCProject(thing_prefix)
@@ -327,6 +349,20 @@ def buildStorageCanary(isConsumer, params) {
         def envs = (commonEnvs + masterEnvs).collect{ k, v -> "${k}=${v}" }
         MASTER_READY = true
         echo "Master build complete, signaling viewers (MASTER_READY=true)"
+
+        // Wait for viewer to start before running the binary
+        echo "Waiting for viewer to start (VIEWER_STARTED)..."
+        def viewerWaitStart = System.currentTimeMillis()
+        def viewerWaitTimeout = 120 * 1000 // 2 minutes max
+        while (!VIEWER_STARTED && (System.currentTimeMillis() - viewerWaitStart) < viewerWaitTimeout) {
+            sleep 2
+        }
+        if (VIEWER_STARTED) {
+            echo "Viewer started! Launching master binary..."
+        } else {
+            echo "WARNING: Viewer not started after 2 minutes, launching master anyway"
+        }
+
         def buildDir = "${env.HOME}/webrtc-c-storage-master/build"
         withRunnerWrapper(envs) {
             // Timeout: duration + 5 min buffer. The C binary should exit on its own
@@ -444,6 +480,7 @@ pipeline {
         booleanParam(name: 'JS_STORAGE_VIEWER_JOIN', defaultValue: false)
         booleanParam(name: 'JS_STORAGE_TWO_VIEWERS', defaultValue: false)
         booleanParam(name: 'JS_STORAGE_THREE_VIEWERS', defaultValue: false)
+        booleanParam(name: 'JS_STORAGE_VO_MIXED_VIEWERS', defaultValue: false, description: 'VO master + 2 AO viewers + 1 RO viewer')
         booleanParam(name: 'RESCHEDULE', defaultValue: false, description: 'Whether to reschedule after completion')
         booleanParam(name: 'USE_TURN', defaultValue: false)
         booleanParam(name: 'USE_IOT', defaultValue: false)
@@ -666,12 +703,76 @@ pipeline {
             }
         }
 
+        stage('VO Master with Mixed Viewers') {
+            when {
+                equals expected: true, actual: params.JS_STORAGE_VO_MIXED_VIEWERS
+            }
+            parallel {
+                stage('VO StorageMaster') {
+                    agent {
+                        label params.MASTER_NODE_LABEL
+                    }
+                    steps {
+                        script {
+                            ws("${env.JOB_NAME}-master-${BUILD_NUMBER}") {
+                                def mutableParams = [:] + params
+                                mutableParams.DURATION_IN_SECONDS = "156"
+                                // Set video-only mode for the master
+                                env.CANARY_MEDIA_TYPE = "video_only"
+                                buildStorageCanary(false, mutableParams)
+                            }
+                        }
+                    }
+                }
+                stage('AOViewer1') {
+                    agent {
+                        label params.STORAGE_VIEWER_ONE_NODE_LABEL
+                    }
+                    steps {
+                        script {
+                            def waitMins = (params.VIEWER_WAIT_MINUTES != null && params.VIEWER_WAIT_MINUTES.toString().trim() != '') 
+                                ? params.VIEWER_WAIT_MINUTES.toInteger() 
+                                : 20
+                            runViewerSessions("Viewer1", waitMins, "3", 0, true)
+                        }
+                    }
+                }
+                stage('AOViewer2') {
+                    agent {
+                        label params.STORAGE_VIEWER_TWO_NODE_LABEL
+                    }
+                    steps {
+                        script {
+                            def waitMins = (params.VIEWER_WAIT_MINUTES != null && params.VIEWER_WAIT_MINUTES.toString().trim() != '') 
+                                ? params.VIEWER_WAIT_MINUTES.toInteger() 
+                                : 20
+                            runViewerSessions("Viewer2", waitMins, "3", 5, true)
+                        }
+                    }
+                }
+                stage('ROViewer3') {
+                    agent {
+                        label params.STORAGE_VIEWER_THREE_NODE_LABEL
+                    }
+                    steps {
+                        script {
+                            def waitMins = (params.VIEWER_WAIT_MINUTES != null && params.VIEWER_WAIT_MINUTES.toString().trim() != '') 
+                                ? params.VIEWER_WAIT_MINUTES.toInteger() 
+                                : 20
+                            runViewerSessions("Viewer3", waitMins, "3", 10, false)
+                        }
+                    }
+                }
+            }
+        }
+
         stage('Publish Viewer Connection Success Rate') {
             when {
                 anyOf {
                     equals expected: true, actual: params.JS_STORAGE_VIEWER_JOIN
                     equals expected: true, actual: params.JS_STORAGE_TWO_VIEWERS
                     equals expected: true, actual: params.JS_STORAGE_THREE_VIEWERS
+                    equals expected: true, actual: params.JS_STORAGE_VO_MIXED_VIEWERS
                 }
             }
             steps {

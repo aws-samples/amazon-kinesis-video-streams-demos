@@ -146,6 +146,7 @@ class ViewerCanaryTest {
 
   async createBrowser() {
     const launchArgs = [
+      '--no-sandbox',
       '--use-fake-ui-for-media-stream',
       '--use-fake-device-for-media-stream',
       '--allow-file-access-from-files'
@@ -597,6 +598,7 @@ class ViewerCanaryTest {
   }
 
   buildTestUrl() {
+    const sendAudio = process.env.VIEWER_SEND_AUDIO === 'true' ? 'true' : (this.config.sendAudio || 'false');
     const params = new URLSearchParams({
       channelName: this.config.channelName,
       region: this.config.region || 'us-west-2',
@@ -604,7 +606,7 @@ class ViewerCanaryTest {
       secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
       sessionToken: process.env.AWS_SESSION_TOKEN || '',
       sendVideo: this.config.sendVideo || 'false',
-      sendAudio: this.config.sendAudio || 'false',
+      sendAudio: sendAudio,
       useTrickleICE: 'true',
       endpoint: this.config.endpoint || '',
     });
