@@ -765,7 +765,7 @@ class ViewerCanaryTest {
       }
 
       const report = await pc.getStats();
-      const result = { video: null, audio: null, roundTripTime: null, selectedCandidatePair: null };
+      const result = { video: null, audio: null, audioOutbound: null, roundTripTime: null, selectedCandidatePair: null };
       report.forEach(stat => {
         if (stat.type === 'candidate-pair' && stat.nominated) {
           result.roundTripTime = stat.currentRoundTripTime || 0;
@@ -785,6 +785,12 @@ class ViewerCanaryTest {
               protocol: remoteCandidate.protocol,
               candidateType: remoteCandidate.candidateType,
             } : null,
+          };
+        }
+        if (stat.type === 'outbound-rtp' && stat.kind === 'audio') {
+          result.audioOutbound = {
+            packetsSent: stat.packetsSent || 0,
+            bytesSent: stat.bytesSent || 0,
           };
         }
         if (stat.type !== 'inbound-rtp') return;
@@ -1172,6 +1178,9 @@ class ViewerCanaryTest {
           const v = rtcStats.video;
           statusMsg += ` | pktsRecv:${v.packetsReceived} pktsLost:${v.packetsLost} fps:${v.framesPerSecond} jitter:${(v.jitter * 1000).toFixed(1)}ms`;
         }
+        if (rtcStats?.audioOutbound) {
+          statusMsg += ` | audioOut: pktsSent:${rtcStats.audioOutbound.packetsSent} bytesSent:${rtcStats.audioOutbound.bytesSent}`;
+        }
         log(statusMsg);
         lastStatusLog = now;
       }
@@ -1186,6 +1195,34 @@ class ViewerCanaryTest {
         this.getMetricName('ViewerStreamingAvailability'),
         this.config.channelName,
         1
+      );
+    }
+
+    // Audio send verification — for AO viewers that are supposed to send audio
+    const sendAudio = process.env.VIEWER_SEND_AUDIO === 'true';
+    if (sendAudio && this.lastRTCStats?.audioOutbound) {
+      const ao = this.lastRTCStats.audioOutbound;
+      if (ao.bytesSent > 0 && ao.packetsSent > 0) {
+        log(`AUDIO_VERIFY: PASS — packetsSent=${ao.packetsSent} bytesSent=${ao.bytesSent}`);
+        await CloudWatchMetrics.publishCountMetric(
+          this.getMetricName('AudioSendVerified'),
+          this.config.channelName,
+          1
+        );
+      } else {
+        log(`AUDIO_VERIFY: FAIL — packetsSent=${ao.packetsSent} bytesSent=${ao.bytesSent}`);
+        await CloudWatchMetrics.publishCountMetric(
+          this.getMetricName('AudioSendVerified'),
+          this.config.channelName,
+          0
+        );
+      }
+    } else if (sendAudio) {
+      log('AUDIO_VERIFY: FAIL — no outbound audio stats collected');
+      await CloudWatchMetrics.publishCountMetric(
+        this.getMetricName('AudioSendVerified'),
+        this.config.channelName,
+        0
       );
     }
   }

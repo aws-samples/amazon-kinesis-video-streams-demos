@@ -455,17 +455,22 @@ def buildStorageCanary(isConsumer, params) {
         MASTER_READY = true
         echo "Master build complete, signaling viewers (MASTER_READY=true)"
 
-        // Wait for viewer to start before running the binary
-        echo "Waiting for viewer to start (VIEWER_STARTED)..."
-        def viewerWaitStart = System.currentTimeMillis()
-        def viewerWaitTimeout = 120 * 1000 // 2 minutes max
-        while (!VIEWER_STARTED && (System.currentTimeMillis() - viewerWaitStart) < viewerWaitTimeout) {
-            sleep 2
-        }
-        if (VIEWER_STARTED) {
-            echo "Viewer started! Launching master binary..."
+        // Wait for viewer to start before running the binary (only when a viewer stage exists)
+        def hasViewer = params.JS_STORAGE_VIEWER_JOIN || params.JS_STORAGE_TWO_VIEWERS || params.JS_STORAGE_THREE_VIEWERS || params.JS_STORAGE_VO_MIXED_VIEWERS
+        if (hasViewer) {
+            echo "Waiting for viewer to start (VIEWER_STARTED)..."
+            def viewerWaitStart = System.currentTimeMillis()
+            def viewerWaitTimeout = 120 * 1000 // 2 minutes max
+            while (!VIEWER_STARTED && (System.currentTimeMillis() - viewerWaitStart) < viewerWaitTimeout) {
+                sleep 2
+            }
+            if (VIEWER_STARTED) {
+                echo "Viewer started! Launching master binary..."
+            } else {
+                echo "WARNING: Viewer not started after 2 minutes, launching master anyway"
+            }
         } else {
-            echo "WARNING: Viewer not started after 2 minutes, launching master anyway"
+            echo "No viewer stage, skipping VIEWER_STARTED wait"
         }
 
         def buildDir = "${env.HOME}/webrtc-c-storage-master/build"
