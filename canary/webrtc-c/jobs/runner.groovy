@@ -415,6 +415,19 @@ def buildStorageCanary(isConsumer, params) {
     RUNNING_NODES_IN_BUILDING++
     if (!isConsumer) {
         MASTER_READY = false
+        // Check if the master build is already cached (same commit)
+        // Compare params.GIT_HASH against the cached commit file rather than
+        // the repo's current HEAD, which hasn't been updated yet at this point.
+        def commitFile = "${env.HOME}/webrtc-c-storage-master/.last-commit"
+        def cachedCommit = sh(script: "cat '${commitFile}' 2>/dev/null || echo ''", returnStdout: true).trim()
+        def targetCommit = sh(script: "git rev-parse '${params.GIT_HASH}' 2>/dev/null || echo '${params.GIT_HASH}'", returnStdout: true).trim()
+        MASTER_BUILD_CACHED = (targetCommit != '' && targetCommit == cachedCommit)
+        if (MASTER_BUILD_CACHED) {
+            echo "Master build is cached (target ${targetCommit.take(12)} matches cached), viewers can start immediately"
+            MASTER_READY = true
+        } else {
+            echo "Master rebuild needed (target ${targetCommit.take(12)} vs cached ${cachedCommit.take(12)})"
+        }
     }
     if (!isConsumer){
         buildStorageProject(thing_prefix)
