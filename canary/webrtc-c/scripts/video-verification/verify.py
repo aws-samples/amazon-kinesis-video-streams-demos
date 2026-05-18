@@ -32,6 +32,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+from multiprocessing import Pool, cpu_count
 
 import pytesseract
 import numpy as np
@@ -96,7 +97,26 @@ def get_video_duration(video_path):
 
 
 def build_reference_video(source_dir, output_path):
-    """Build a reference MP4 from the raw H.264 sample frames."""
+    """Build a reference MP4 from the raw H.264 sample frames.
+    Uses a cached version if available and source frames haven't changed."""
+    # Store cache in the persistent build directory (same as the binary)
+    cache_dir = os.path.join(os.path.expanduser('~'), 'webrtc-c-storage-master', 'cache')
+    cached_video = os.path.join(cache_dir, 'reference.mp4')
+    cached_hash_file = os.path.join(cache_dir, 'source_hash.txt')
+
+    # Compute a quick hash based on file count and total size of source frames
+    frame_files = sorted(glob.glob(os.path.join(source_dir, 'frame-*.h264')))
+    total_size = sum(os.path.getsize(f) for f in frame_files)
+    source_hash = f"{len(frame_files)}:{total_size}"
+
+    # Check if cache is valid
+    if os.path.exists(cached_video) and os.path.exists(cached_hash_file):
+        with open(cached_hash_file, 'r') as f:
+            if f.read().strip() == source_hash:
+                print(f"Using cached reference video: {cached_video}")
+                shutil.copy2(cached_video, output_path)
+                return output_path
+
     print("Building reference video from source frames...")
     stream_path = output_path + '.h264'
     with open(stream_path, 'wb') as out:
@@ -115,7 +135,14 @@ def build_reference_video(source_dir, output_path):
     if result.returncode != 0:
         print(f"ffmpeg error building reference: {result.stderr}", file=sys.stderr)
         return None
-    print(f"Reference video built: {output_path}")
+
+    # Cache the reference video for future runs
+    os.makedirs(cache_dir, exist_ok=True)
+    shutil.copy2(output_path, cached_video)
+    with open(cached_hash_file, 'w') as f:
+        f.write(source_hash)
+    print(f"Reference video built and cached: {cached_video}")
+
     return output_path
 
 
@@ -243,12 +270,15 @@ def main():
             print("Failed to extract clip frames", file=sys.stderr)
             sys.exit(1)
 
-        # Phase 4: OCR all clip frames to get frame numbers
-        print(f"\n--- Phase 4: OCR {len(clip_frames)} clip frames ---")
+        # Phase 4: OCR all clip frames to get frame numbers (parallel)
+        print(f"\n--- Phase 4: OCR {len(clip_frames)} clip frames (parallel, {min(cpu_count(), 8)} workers) ---")
+        num_workers = min(cpu_count(), 8)
+        with Pool(processes=num_workers) as pool:
+            ocr_results = pool.map(ocr_frame_number, clip_frames)
+
         clip_to_ref = []  # list of (clip_frame_path, ref_frame_number)
         ocr_failures = 0
-        for i, clip_frame in enumerate(clip_frames):
-            frame_num = ocr_frame_number(clip_frame)
+        for i, (clip_frame, frame_num) in enumerate(zip(clip_frames, ocr_results)):
             if frame_num is None or frame_num < 1 or frame_num > TOTAL_SOURCE_FRAMES:
                 if i < 5 or args.verbose:
                     print(f"  [clip sec {i+1}] OCR: {frame_num} — skipping")
