@@ -998,6 +998,7 @@ pipeline {
                       booleanParam(name: 'JS_STORAGE_VIEWER_JOIN', value: params.JS_STORAGE_VIEWER_JOIN),
                       booleanParam(name: 'JS_STORAGE_TWO_VIEWERS', value: params.JS_STORAGE_TWO_VIEWERS),
                       booleanParam(name: 'JS_STORAGE_THREE_VIEWERS', value: params.JS_STORAGE_THREE_VIEWERS),
+                      booleanParam(name: 'JS_STORAGE_VO_MIXED_VIEWERS', value: params.JS_STORAGE_VO_MIXED_VIEWERS),
                       booleanParam(name: 'USE_TURN', value: params.USE_TURN),
                       booleanParam(name: 'FORCE_TURN', value: params.FORCE_TURN),
                       booleanParam(name: 'USE_IOT', value: params.USE_IOT),

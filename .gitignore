@@ -17,6 +17,9 @@ canary/consumer-java/target/maven-status/maven-compiler-plugin/compile/default-c
 canary/webrtc-c/.vscode/settings.json
 canary/consumer-java/tmp_jar
 canary/webrtc-c/.vscode/settings.json
+canary/webrtc-c/node_modules
+canary/webrtc-c/scripts/.venv
+canary/webrtc-c/scripts/node_modules
 .vscode/*
 canary/webrtc-c/firstFrameSentTimeStamp.txt
 canary/consumer-java/target/*

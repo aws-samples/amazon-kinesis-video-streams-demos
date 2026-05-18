@@ -494,7 +494,7 @@ pipeline {
                         // VO Master with Mixed Viewers (2 AO + 1 RO)
                         build(
                             job: NEXT_AVAILABLE_RUNNER,
-                            parameters: [
+                            parameters: COMMON_PARAMS + [
                                 booleanParam(name: 'IS_SIGNALING', value: false),
                                 booleanParam(name: 'IS_STORAGE', value: false),
                                 booleanParam(name: 'IS_STORAGE_SINGLE_NODE', value: false),
