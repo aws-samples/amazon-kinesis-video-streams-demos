@@ -324,14 +324,19 @@ def main():
             max_ssim_ok = max_ssim > 0.99
             avg_ssim_ok = avg_ssim > 0.85
             min_ssim_ok = min_ssim > 0.03
-            frames_ok = clip_total_frames >= (TOTAL_SOURCE_FRAMES - DROPPED_FRAME_THRESHOLD)
+            # Use OCR-matched frame count vs expected 1fps frames (matching framework logic:
+            # droppedFrames = expectedFrames - matchedFrames, threshold < 33% loss)
+            expected_1fps_frames = int(clip_duration) if clip_duration else 0
+            dropped_frames = expected_1fps_frames - len(scores)
+            max_dropped = int(expected_1fps_frames * 0.33)
+            frames_ok = dropped_frames < max_dropped
             available = 1 if (duration_ok and max_ssim_ok and avg_ssim_ok and min_ssim_ok and frames_ok) else 0
 
             print(f"Duration:           {clip_duration:.2f}s ({'PASS' if duration_ok else 'FAIL'} — threshold: >= 120s)")
             print(f"Max SSIM:           {max_ssim:.4f} ({'PASS' if max_ssim_ok else 'FAIL'} — threshold: > 0.99)")
             print(f"Avg SSIM:           {avg_ssim:.4f} ({'PASS' if avg_ssim_ok else 'FAIL'} — threshold: > 0.85)")
             print(f"Min SSIM:           {min_ssim:.4f} ({'PASS' if min_ssim_ok else 'FAIL'} — threshold: > 0.03)")
-            print(f"Clip frames:        {clip_total_frames} ({'PASS' if frames_ok else 'FAIL'} — threshold: >= {TOTAL_SOURCE_FRAMES - DROPPED_FRAME_THRESHOLD})")
+            print(f"Dropped frames:     {dropped_frames}/{expected_1fps_frames} ({'PASS' if frames_ok else 'FAIL'} — threshold: < 33% loss)")
             print(f"SSIM comparisons:   {len(scores)}")
             print(f"OCR failures:       {ocr_failures}")
             print(f"Storage available:  {available}")
@@ -342,6 +347,8 @@ def main():
                 'avg_ssim': round(avg_ssim, 4),
                 'min_ssim': round(min_ssim, 4),
                 'frames_compared': len(scores),
+                'dropped_frames': dropped_frames,
+                'expected_frames': expected_1fps_frames,
                 'ocr_failures': ocr_failures,
                 'clip_duration': round(clip_duration, 2) if clip_duration else None,
                 'expected_duration': round(expected, 2),
