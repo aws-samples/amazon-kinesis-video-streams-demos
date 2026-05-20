@@ -429,14 +429,25 @@ def buildStorageCanary(isConsumer, params) {
     RUNNING_NODES_IN_BUILDING++
     if (!isConsumer) {
         MASTER_READY = false
-        // Check if the master build is already cached (same commit)
+        // Check if the master build is already cached (same canary commit AND same webrtc-c SDK version)
         def commitFile = "${env.HOME}/webrtc-c-storage-master/.last-commit"
+        def webrtcVersionFile = "${env.HOME}/webrtc-c-storage-master/.webrtc-c-version"
         def cachedCommit = sh(script: "cat '${commitFile}' 2>/dev/null || echo ''", returnStdout: true).trim()
+        def cachedWebrtcVersion = sh(script: "cat '${webrtcVersionFile}' 2>/dev/null || echo ''", returnStdout: true).trim()
         def currentCommit = sh(script: "cd '${env.HOME}/webrtc-c-storage-master/repo' && git rev-parse HEAD 2>/dev/null || echo ''", returnStdout: true).trim()
-        MASTER_BUILD_CACHED = (currentCommit != '' && currentCommit == cachedCommit)
+        // Resolve current webrtc-c version from CMakeLists.txt (same logic as build-storage-master.sh)
+        def currentWebrtcTag = sh(script: "grep 'GIT_TAG' '${env.HOME}/webrtc-c-storage-master/repo/canary/webrtc-c/CMakeLists.txt' | head -1 | sed 's/.*GIT_TAG\\s*//' | tr -d '[:space:]'", returnStdout: true).trim()
+        def webrtcRepoUrl = sh(script: "grep 'GIT_REPOSITORY' '${env.HOME}/webrtc-c-storage-master/repo/canary/webrtc-c/CMakeLists.txt' | head -1 | sed 's/.*GIT_REPOSITORY\\s*//' | tr -d '[:space:]'", returnStdout: true).trim()
+        def currentWebrtcVersion = sh(script: "git ls-remote '${webrtcRepoUrl}' '${currentWebrtcTag}' 2>/dev/null | awk '{print \$1}' | head -1", returnStdout: true).trim() ?: currentWebrtcTag
+
+        def commitMatch = (currentCommit != '' && currentCommit == cachedCommit)
+        def webrtcMatch = (cachedWebrtcVersion != '' && currentWebrtcVersion == cachedWebrtcVersion)
+        MASTER_BUILD_CACHED = commitMatch && webrtcMatch
         if (MASTER_BUILD_CACHED) {
-            echo "Master build is cached (commit ${currentCommit.take(12)}), viewers can start immediately"
+            echo "Master build is cached (commit ${currentCommit.take(12)}, sdk ${currentWebrtcVersion.take(12)}), viewers can start immediately"
             MASTER_READY = true
+        } else {
+            echo "Master rebuild needed (commit ${currentCommit.take(12)} vs cached ${cachedCommit.take(12)}, sdk ${currentWebrtcVersion.take(12)} vs cached ${cachedWebrtcVersion.take(12)})"
         }
     }
     if (!isConsumer){
