@@ -615,7 +615,14 @@ class ViewerCanaryTest {
       document.querySelector('#ingest-media-manual-on').setAttribute('data-selected', 'true');
     });
     
-    log('Page loaded, clicking viewer button...');
+    log('Page loaded, checking JS SDK version...');
+    const sdkVersion = await page.evaluate(() => {
+      try { return typeof KVSWebRTC !== 'undefined' ? KVSWebRTC.VERSION : 'unknown'; }
+      catch (e) { return 'error: ' + e.message; }
+    });
+    log(`JS SDK version: ${sdkVersion}`);
+
+    log('Clicking viewer button...');
     await page.click('#viewer-button');
   }
 
