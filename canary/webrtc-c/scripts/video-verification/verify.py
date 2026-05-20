@@ -234,16 +234,22 @@ def main():
 
     work_dir = tempfile.mkdtemp(prefix='video-verify-')
     try:
+        import time as _time
+        timings = {}
+
         # Phase 1: Build reference video
         print("\n--- Phase 1: Building reference video ---")
+        t0 = _time.time()
         ref_video = build_reference_video(
             args.source_frames, os.path.join(work_dir, 'reference.mp4'))
+        timings['phase1_reference_video'] = _time.time() - t0
         if not ref_video:
             print("Failed to build reference video", file=sys.stderr)
             sys.exit(1)
 
         # Phase 2: Duration and frame count check
         print("\n--- Phase 2: Duration and frame count ---")
+        t0 = _time.time()
         clip_duration = get_video_duration(args.recording)
         expected = args.expected_duration
 
@@ -262,16 +268,20 @@ def main():
         print(f"Clip duration:      {clip_duration:.2f}s")
         print(f"Clip total frames:  {clip_total_frames}")
         print(f"Expected duration:  {expected:.2f}s")
+        timings['phase2_duration_check'] = _time.time() - t0
 
         # Phase 3: Extract 1fps from clip
         print("\n--- Phase 3: Extracting clip frames at 1 FPS ---")
+        t0 = _time.time()
         clip_frames = extract_frames_1fps(args.recording, os.path.join(work_dir, 'clip'))
+        timings['phase3_extract_clip'] = _time.time() - t0
         if not clip_frames:
             print("Failed to extract clip frames", file=sys.stderr)
             sys.exit(1)
 
         # Phase 4: OCR all clip frames to get frame numbers (parallel)
         print(f"\n--- Phase 4: OCR {len(clip_frames)} clip frames (parallel, {min(cpu_count(), 8)} workers) ---")
+        t0 = _time.time()
         num_workers = min(cpu_count(), 8)
         with Pool(processes=num_workers) as pool:
             ocr_results = pool.map(ocr_frame_number, clip_frames)
@@ -289,15 +299,19 @@ def main():
                 print(f"  [clip sec {i+1}] frame #{frame_num}")
 
         print(f"OCR complete: {len(clip_to_ref)} matched, {ocr_failures} failed")
+        timings['phase4_ocr'] = _time.time() - t0
 
         # Phase 5: Extract only the needed reference frames
         needed_frames = set(num for _, num in clip_to_ref)
         print(f"\n--- Phase 5: Extracting {len(needed_frames)} reference frames ---")
+        t0 = _time.time()
         ref_frame_map = extract_specific_frames(
             ref_video, os.path.join(work_dir, 'ref'), needed_frames)
+        timings['phase5_extract_ref'] = _time.time() - t0
 
         # Phase 6: SSIM comparison
         print(f"\n--- Phase 6: SSIM comparison ---")
+        t0 = _time.time()
         scores = []
         for i, (clip_frame, ref_num) in enumerate(clip_to_ref):
             ref_path = ref_frame_map.get(ref_num)
@@ -310,6 +324,7 @@ def main():
                 print(f"  [clip sec {clip_sec}] frame #{ref_num} -> SSIM={score:.4f}")
 
         # Phase 7: Compute availability
+        timings['phase6_ssim'] = _time.time() - t0
         print("\n--- Results ---")
         if not scores:
             print("No frames compared!", file=sys.stderr)
@@ -355,8 +370,17 @@ def main():
             }
 
         if args.json_output:
+            result['timings'] = {k: round(v, 2) for k, v in timings.items()}
             json.dump(result, sys.stdout)
             print()
+
+        # Print timing summary
+        print("\n--- Timing ---")
+        total = sum(timings.values())
+        for phase, elapsed in timings.items():
+            pct = (elapsed / total * 100) if total > 0 else 0
+            print(f"  {phase}: {elapsed:.2f}s ({pct:.0f}%)")
+        print(f"  TOTAL: {total:.2f}s")
         sys.exit(0)
 
     finally:
