@@ -52,6 +52,9 @@ TIMER_CROP = (25, 20, 145, 90)
 def ocr_frame_number(frame_path):
     """Read the frame counter from the sync box region.
     Returns the frame number as an integer, or None if OCR fails."""
+    import time as _t
+    t_start = _t.time()
+
     img = Image.open(frame_path)
     timer_region = img.crop(TIMER_CROP)
     upscaled = timer_region.resize(
@@ -65,8 +68,22 @@ def ocr_frame_number(frame_path):
         tight = threshold.crop((white_cols[0]+5, white_rows[0]+5, white_cols[-1]-5, white_rows[-1]-5))
     else:
         tight = threshold
+
+    t_preprocess = _t.time()
+
     text = pytesseract.image_to_string(
         tight, config='--psm 7 -c tessedit_char_whitelist=0123456789').strip()
+
+    t_tesseract = _t.time()
+
+    total_ms = (t_tesseract - t_start) * 1000
+    # Log slow frames (>2s) to help diagnose contention
+    if total_ms > 2000:
+        preprocess_ms = (t_preprocess - t_start) * 1000
+        tesseract_ms = (t_tesseract - t_preprocess) * 1000
+        import sys
+        print(f"  [SLOW OCR] {os.path.basename(frame_path)}: total={total_ms:.0f}ms (preprocess={preprocess_ms:.0f}ms, tesseract={tesseract_ms:.0f}ms)", file=sys.stderr)
+
     if text and text.isdigit():
         return int(text)
     return None
@@ -282,6 +299,24 @@ def main():
         # Phase 4: OCR all clip frames to get frame numbers (parallel)
         print(f"\n--- Phase 4: OCR {len(clip_frames)} clip frames (parallel, {min(cpu_count(), 8)} workers) ---")
         t0 = _time.time()
+
+        # Log system state at OCR start for diagnosing contention
+        try:
+            import subprocess as _sp
+            load = os.getloadavg()
+            print(f"  System load at OCR start: {load[0]:.2f} {load[1]:.2f} {load[2]:.2f} (1/5/15 min)")
+            # Check for cgroup CPU limits
+            cgroup_quota = _sp.run(['cat', '/sys/fs/cgroup/cpu/cpu.cfs_quota_us'], capture_output=True, text=True)
+            cgroup_period = _sp.run(['cat', '/sys/fs/cgroup/cpu/cpu.cfs_period_us'], capture_output=True, text=True)
+            if cgroup_quota.returncode == 0 and cgroup_period.returncode == 0:
+                quota = int(cgroup_quota.stdout.strip())
+                period = int(cgroup_period.stdout.strip())
+                if quota > 0:
+                    print(f"  Cgroup CPU limit: {quota/period:.1f} cores (quota={quota}, period={period})")
+                else:
+                    print(f"  Cgroup CPU: unlimited (quota={quota})")
+        except Exception:
+            pass
         num_workers = min(cpu_count(), 8)
         with Pool(processes=num_workers) as pool:
             ocr_results = pool.map(ocr_frame_number, clip_frames)
