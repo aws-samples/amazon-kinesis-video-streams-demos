@@ -4,6 +4,20 @@
 
 PSampleConfiguration gSampleConfiguration = NULL;
 
+// Counter for JoinStorageSession timeouts (STATUS_OPERATION_TIMED_OUT = 0x0000000f).
+// Incremented each time signalingClientConnectSync() times out during the JoinStorageSession flow.
+// The signalingClientConnectSync() call includes WebSocket connect, JoinStorageSession API call,
+// and waiting for SDP offer.
+UINT32 gJoinSSTimeoutCount = 0;
+
+// Counter for unexpected peer connection disconnections.
+// Only incremented when RTC_PEER_CONNECTION_STATE_FAILED or RTC_PEER_CONNECTION_STATE_DISCONNECTED
+// fires AFTER the peer connection was already in CONNECTED state.
+// CLOSED is NOT counted (it's the expected ~1hr backend session termination).
+// If FAILED/DISCONNECTED fires before ever reaching CONNECTED, it is NOT counted
+// (that's a normal connection failure, not an unexpected disconnection).
+UINT32 gCMasterUnexpectedDisconnectionCount = 0;
+
 // To ensure we don't try to send outbound RTP metrics during freeing of session.
 MUTEX sessionCoummunalLock = MUTEX_CREATE(FALSE);
 
@@ -283,6 +297,16 @@ VOID onConnectionStateChange(UINT64 customData, RTC_PEER_CONNECTION_STATE newSta
             if (STATUS_FAILED(retStatus = logSelectedIceCandidatesInformation(pSampleStreamingSession))) {
                 DLOGW("Failed to get information about selected Ice candidates: 0x%08x", retStatus);
             }
+
+            DLOGI("[Canary] Peer connection established successfully — pushing PeerConnectionAvailability = 1");
+            Canary::Cloudwatch::getInstance().monitoring.pushPeerConnectionAvailability(1.0);
+
+            // Push JoinSSCallToSessionJoined metric — time from signalingClientConnectSync() call to peer connection established
+            if (pSampleConfiguration->joinSSCallStartTime != 0) {
+                UINT64 joinSSCallToSessionJoined = (GETTIME() - pSampleConfiguration->joinSSCallStartTime) / HUNDREDS_OF_NANOS_IN_A_MILLISECOND;
+                DLOGI("[Canary] JoinSSCallToSessionJoined: %" PRIu64 " ms", joinSSCallToSessionJoined);
+                Canary::Cloudwatch::getInstance().monitoring.pushJoinSSCallToSessionJoined(joinSSCallToSessionJoined, Aws::CloudWatch::Model::StandardUnit::Milliseconds);
+            }
             
             pSampleStreamingSession->canaryOutgoingRTPMetricsContext.prevTs = GETTIME();
             pSampleStreamingSession->canaryOutgoingRTPMetricsContext.prevFramesDiscardedOnSend = 0;
@@ -292,10 +316,23 @@ VOID onConnectionStateChange(UINT64 customData, RTC_PEER_CONNECTION_STATE newSta
             CHK_STATUS(initMetricsTimers(pSampleStreamingSession));
             break;
         case RTC_PEER_CONNECTION_STATE_FAILED:
+            DLOGE("[Canary] Peer connection FAILED — pushing PeerConnectionAvailability = 0");
+            Canary::Cloudwatch::getInstance().monitoring.pushPeerConnectionAvailability(0.0);
             // explicit fallthrough
         case RTC_PEER_CONNECTION_STATE_CLOSED:
             // explicit fallthrough
         case RTC_PEER_CONNECTION_STATE_DISCONNECTED:
+            // Count as unexpected disconnection if we were previously CONNECTED and the state
+            // is FAILED or DISCONNECTED. CLOSED is expected (backend terminates storage sessions
+            // after ~1 hour), so we don't count it.
+            // DISCONNECTED also terminates the session in this code (sets terminateFlag = TRUE),
+            // so it's effectively an unexpected termination if we were connected.
+            if ((newState == RTC_PEER_CONNECTION_STATE_FAILED || newState == RTC_PEER_CONNECTION_STATE_DISCONNECTED) &&
+                ATOMIC_LOAD_BOOL(&pSampleConfiguration->connected)) {
+                gCMasterUnexpectedDisconnectionCount++;
+                DLOGE("[Canary] Unexpected disconnection detected (was CONNECTED, now state %u). Count: %u",
+                      newState, gCMasterUnexpectedDisconnectionCount);
+            }
             DLOGD("p2p connection disconnected");
             ATOMIC_STORE_BOOL(&pSampleStreamingSession->terminateFlag, TRUE);
             CVAR_BROADCAST(pSampleConfiguration->cvar);
@@ -1121,8 +1158,22 @@ STATUS initSignaling(PSampleConfiguration pSampleConfiguration, PCHAR clientId)
 #ifdef ENABLE_DATA_CHANNEL
     pSampleConfiguration->onDataChannel = onDataChannel;
 #endif
-
-    CHK_STATUS(signalingClientConnectSync(pSampleConfiguration->signalingClientHandle));
+    pSampleConfiguration->joinSSCallStartTime = GETTIME();
+    retStatus = signalingClientConnectSync(pSampleConfiguration->signalingClientHandle);
+    if (pSampleConfiguration->channelInfo.useMediaStorage) {
+        if (STATUS_SUCCEEDED(retStatus)) {
+            DLOGI("[KVS Master] JoinStorageSession call succeeded (initial)");
+            Canary::Cloudwatch::getInstance().monitoring.pushJoinStorageSessionAvailability(1.0);
+        } else {
+            DLOGE("[KVS Master] JoinStorageSession call failed (initial) with 0x%08x", retStatus);
+            Canary::Cloudwatch::getInstance().monitoring.pushJoinStorageSessionAvailability(0.0);
+            if (retStatus == STATUS_OPERATION_TIMED_OUT) {
+                gJoinSSTimeoutCount++;
+                DLOGE("[KVS Master] JoinStorageSession timed out (initial). Timeout count: %u", gJoinSSTimeoutCount);
+            }
+        }
+    }
+    CHK_STATUS(retStatus);
 
     signalingClientGetMetrics(pSampleConfiguration->signalingClientHandle, &signalingClientMetrics);
 
@@ -1511,7 +1562,20 @@ STATUS sessionCleanupWait(PSampleConfiguration pSampleConfiguration)
             // offer.  The signalingClientConnectSync call will result in a JoinSession API call being made.
             CHK_STATUS(signalingClientDisconnectSync(pSampleConfiguration->signalingClientHandle));
             CHK_STATUS(signalingClientFetchSync(pSampleConfiguration->signalingClientHandle));
-            CHK_STATUS(signalingClientConnectSync(pSampleConfiguration->signalingClientHandle));
+            pSampleConfiguration->joinSSCallStartTime = GETTIME();
+            retStatus = signalingClientConnectSync(pSampleConfiguration->signalingClientHandle);
+            if (STATUS_SUCCEEDED(retStatus)) {
+                DLOGI("[KVS Master] JoinStorageSession call succeeded (reconnect)");
+                Canary::Cloudwatch::getInstance().monitoring.pushJoinStorageSessionAvailability(1.0);
+            } else {
+                DLOGE("[KVS Master] JoinStorageSession call failed (reconnect) with 0x%08x", retStatus);
+                Canary::Cloudwatch::getInstance().monitoring.pushJoinStorageSessionAvailability(0.0);
+                if (retStatus == STATUS_OPERATION_TIMED_OUT) {
+                    gJoinSSTimeoutCount++;
+                    DLOGE("[KVS Master] JoinStorageSession timed out (reconnect). Timeout count: %u", gJoinSSTimeoutCount);
+                }
+            }
+            CHK_STATUS(retStatus);
             sessionFreed = FALSE;
         }
 
@@ -1876,4 +1940,5 @@ STATUS handleWriteFrameMetricIncrementation(PSampleStreamingSession pSampleStrea
         }
         pSampleStreamingSession->canaryOutgoingRTPMetricsContext.videoFramesGenerated++;
         pSampleStreamingSession->canaryOutgoingRTPMetricsContext.videoBytesGenerated += frameSize;
+        return STATUS_SUCCESS;
 }

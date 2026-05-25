@@ -32,9 +32,20 @@ import com.amazonaws.kinesisvideo.parser.utilities.FrameVisitor;
 import com.amazonaws.kinesisvideo.parser.examples.GetMediaWorker;
 import com.amazonaws.services.kinesisvideo.model.FragmentSelectorType;
 import com.amazonaws.services.kinesisvideo.model.Fragment;
+import com.amazonaws.services.kinesisvideo.AmazonKinesisVideoArchivedMedia;
+import com.amazonaws.services.kinesisvideo.AmazonKinesisVideoArchivedMediaClient;
+import com.amazonaws.services.kinesisvideo.model.ClipFragmentSelector;
+import com.amazonaws.services.kinesisvideo.model.ClipTimestampRange;
+import com.amazonaws.services.kinesisvideo.model.GetClipRequest;
+import com.amazonaws.services.kinesisvideo.model.GetClipResult;
+import com.amazonaws.services.kinesisvideo.model.ClipFragmentSelectorType;
 
 import org.apache.log4j.Logger;
 import org.apache.log4j.BasicConfigurator;
+
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.InputStream;
 
 /*
  * Canary for WebRTC with Storage thro Media Server
@@ -170,33 +181,142 @@ public class WebrtcStorageCanaryConsumer {
         mAmazonKinesisVideo.shutdown();
     }
 
+    /**
+     * Downloads an MP4 clip of the stream via the GetClip API for video verification.
+     * The clip covers from canary start time to now.
+     */
+    private static void downloadClip(Date startTime, Date endTime) {
+        String outputPath = System.getenv().getOrDefault(
+                CanaryConstants.CLIP_OUTPUT_PATH_ENV_VAR,
+                CanaryConstants.DEFAULT_CLIP_OUTPUT_PATH);
+        logger.info("downloadClip: outputPath='" + outputPath + "', stream=" + mStreamName
+                + ", startTime=" + startTime + ", endTime=" + endTime);
+        try {
+            // Get the archived media endpoint
+            logger.info("downloadClip: getting data endpoint for GET_CLIP...");
+            final GetDataEndpointRequest endpointRequest = new GetDataEndpointRequest()
+                    .withAPIName(APIName.GET_CLIP)
+                    .withStreamName(mStreamName);
+            final String clipEndpoint = mAmazonKinesisVideo.getDataEndpoint(endpointRequest).getDataEndpoint();
+            logger.info("downloadClip: clipEndpoint=" + clipEndpoint);
+
+            AmazonKinesisVideoArchivedMedia archivedMediaClient = AmazonKinesisVideoArchivedMediaClient
+                    .builder()
+                    .withCredentials(mCredentialsProvider)
+                    .withEndpointConfiguration(
+                            new com.amazonaws.client.builder.AwsClientBuilder.EndpointConfiguration(
+                                    clipEndpoint, mRegion))
+                    .build();
+            logger.info("downloadClip: archived media client built");
+
+            ClipTimestampRange timestampRange = new ClipTimestampRange()
+                    .withStartTimestamp(startTime)
+                    .withEndTimestamp(endTime);
+
+            ClipFragmentSelector fragmentSelector = new ClipFragmentSelector()
+                    .withFragmentSelectorType(ClipFragmentSelectorType.SERVER_TIMESTAMP)
+                    .withTimestampRange(timestampRange);
+
+            GetClipRequest getClipRequest = new GetClipRequest()
+                    .withStreamName(mStreamName)
+                    .withClipFragmentSelector(fragmentSelector);
+
+            logger.info("Calling GetClip for stream " + mStreamName
+                    + " from " + startTime + " to " + endTime);
+
+            GetClipResult result = archivedMediaClient.getClip(getClipRequest);
+            logger.info("downloadClip: GetClip returned, content-type=" + result.getContentType());
+
+            try (InputStream payload = result.getPayload();
+                 FileOutputStream fos = new FileOutputStream(new File(outputPath))) {
+                byte[] buf = new byte[8192];
+                int bytesRead;
+                long totalBytes = 0;
+                while ((bytesRead = payload.read(buf)) != -1) {
+                    fos.write(buf, 0, bytesRead);
+                    totalBytes += bytesRead;
+                }
+                logger.info("GetClip saved " + totalBytes + " bytes to " + outputPath);
+            }
+
+            // Verify file was actually written
+            File clipFile = new File(outputPath);
+            logger.info("downloadClip: file exists=" + clipFile.exists() + ", size=" + clipFile.length());
+
+            archivedMediaClient.shutdown();
+            logger.info("downloadClip: done");
+        } catch (Exception e) {
+            logger.error("GetClip failed: " + e.getMessage(), e);
+        }
+    }
+
     public static void main(final String[] args) throws Exception {
         BasicConfigurator.configure();
 
         final Integer canaryRunTime = Integer.parseInt(System.getenv("CANARY_DURATION_IN_SECONDS"));
 
         logger.info("Stream name: " + mStreamName);
+        logger.info("Region: " + mRegion);
+        logger.info("Canary label: " + mCanaryLabel);
+        logger.info("Canary run time: " + canaryRunTime + "s");
+
+        String controlPlaneUri = System.getenv("CONTROL_PLANE_URI");
+        logger.info("Control plane URI: " + (controlPlaneUri != null ? controlPlaneUri : "(default)"));
 
         mCredentialsProvider = new EnvironmentVariableCredentialsProvider();
-        mAmazonKinesisVideo = AmazonKinesisVideoClientBuilder.standard()
-                .withRegion(mRegion)
-                .withCredentials(mCredentialsProvider)
-                .build();
+
+        AmazonKinesisVideoClientBuilder kvsBuilder = AmazonKinesisVideoClientBuilder.standard()
+                .withCredentials(mCredentialsProvider);
+        if (controlPlaneUri != null && !controlPlaneUri.isEmpty()) {
+            kvsBuilder.withEndpointConfiguration(
+                    new com.amazonaws.client.builder.AwsClientBuilder.EndpointConfiguration(controlPlaneUri, mRegion));
+        } else {
+            kvsBuilder.withRegion(mRegion);
+        }
+        mAmazonKinesisVideo = kvsBuilder.build();
+
         mCwClient = AmazonCloudWatchClientBuilder.standard()
                 .withRegion(mRegion)
                 .withCredentials(mCredentialsProvider)
                 .build();
 
         switch (mCanaryLabel) {
-            case CanaryConstants.PERIODIC_LABEL: {
-                // Continuously attempt getMedia() calls until footage is available.
-                // GetMedia() will return after ~3 sec if no footage is available. Once footage
-                // is available,
-                // it will continue to visit frames as long as there is footage available.
-                while ((System.currentTimeMillis() - mCanaryStartTime.getTime()) < canaryRunTime
-                        * CanaryConstants.MILLISECONDS_IN_A_SECOND) {
-                    calculateTimeToFirstFragment();
+            case CanaryConstants.PERIODIC_LABEL:
+            case CanaryConstants.GAMMA_PERIODIC_LABEL: {
+                logger.info("Periodic case: canaryRunTime=" + canaryRunTime
+                        + "s, mCanaryStartTime=" + mCanaryStartTime
+                        + ", now=" + new Date()
+                        + ", elapsed=" + (System.currentTimeMillis() - mCanaryStartTime.getTime()) + "ms");
+
+                // Fire off GetMedia to measure time-to-first-frame, but don't block on it
+                // for the full stream duration. Run it in a background thread and let it
+                // get interrupted when we're done waiting.
+                final ExecutorService periodicExecutor = Executors.newSingleThreadExecutor();
+                periodicExecutor.submit(new Runnable() {
+                    @Override
+                    public void run() {
+                        calculateTimeToFirstFragment();
+                    }
+                });
+
+                // Wait for the canary duration
+                long remainingMs = (canaryRunTime * CanaryConstants.MILLISECONDS_IN_A_SECOND)
+                        - (System.currentTimeMillis() - mCanaryStartTime.getTime());
+                if (remainingMs > 0) {
+                    logger.info("Sleeping for " + remainingMs + "ms until canary duration elapses");
+                    Thread.sleep(remainingMs);
                 }
+                logger.info("Periodic duration elapsed, shutting down GetMedia worker");
+                periodicExecutor.shutdownNow();
+
+                // Download clip for video verification if enabled
+                String videoVerifyEnabled = System.getenv(CanaryConstants.VIDEO_VERIFY_ENABLED_ENV_VAR);
+                logger.info("Periodic path: VIDEO_VERIFY_ENABLED='" + videoVerifyEnabled + "', canaryRunTime=" + canaryRunTime);
+                if ("true".equalsIgnoreCase(videoVerifyEnabled)) {
+                    downloadClip(mCanaryStartTime, new Date());
+                }
+
+                shutdownCanaryResources();
                 break;
             }
             // Non-periodic cases.
@@ -204,7 +324,9 @@ public class WebrtcStorageCanaryConsumer {
                 // Handle if incorrect label.
                 if (!mCanaryLabel.equals(CanaryConstants.EXTENDED_LABEL) &&
                         !mCanaryLabel.equals(CanaryConstants.SINGLE_RECONNECT_LABEL) &&
-                        !mCanaryLabel.equals(CanaryConstants.SUB_RECONNECT_LABEL)) {
+                        !mCanaryLabel.equals(CanaryConstants.SUB_RECONNECT_LABEL) &&
+                        !mCanaryLabel.equals(CanaryConstants.GAMMA_SINGLE_RECONNECT_LABEL) &&
+                        !mCanaryLabel.equals(CanaryConstants.GAMMA_SUB_RECONNECT_LABEL)) {
                     logger.error(String.format("Env var CANARY_LABEL: %s must be set to either %s, %s, %s, or %s.",
                             mCanaryLabel, CanaryConstants.PERIODIC_LABEL, CanaryConstants.EXTENDED_LABEL,
                             CanaryConstants.SINGLE_RECONNECT_LABEL, CanaryConstants.SUB_RECONNECT_LABEL));
@@ -227,6 +349,13 @@ public class WebrtcStorageCanaryConsumer {
                         CanaryConstants.LIST_FRAGMENTS_INITIAL_DELAY, CanaryConstants.LIST_FRAGMENTS_INTERVAL);
                 Thread.sleep(canaryRunTime * CanaryConstants.MILLISECONDS_IN_A_SECOND);
                 intervalMetricsTimer.cancel();
+
+                // Download clip for video verification if enabled
+                String videoVerifyEnabled = System.getenv(CanaryConstants.VIDEO_VERIFY_ENABLED_ENV_VAR);
+                if ("true".equalsIgnoreCase(videoVerifyEnabled)) {
+                    downloadClip(mCanaryStartTime, new Date());
+                }
+
                 shutdownCanaryResources();
                 break;
             }

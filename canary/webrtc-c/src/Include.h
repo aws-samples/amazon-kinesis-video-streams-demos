@@ -1,7 +1,7 @@
 #pragma once
 
 #define DEFAULT_CLOUDWATCH_NAMESPACE "KinesisVideoSDKCanary"
-#define DEFAULT_FPS_VALUE            25
+#define DEFAULT_FPS_VALUE            30
 // TODO: This value shouldn't matter. But, since we don't allow NULL value, we have to set to a value
 #define DEFAULT_VIEWER_PEER_ID           "ConsumerViewer"
 #define DEFAULT_FILE_LOGGING_BUFFER_SIZE (200 * 1024)
@@ -17,7 +17,7 @@
 #define MAX_CONTROL_PLANE_URI_CHAR_LEN 256
 #define MAX_UINT64_DIGIT_COUNT         20
 
-#define NUMBER_OF_H264_FRAME_FILES  1500
+#define NUMBER_OF_H264_FRAME_FILES  4676
 #define NUMBER_OF_OPUS_FRAME_FILES  618
 #define SAMPLE_VIDEO_FRAME_DURATION (HUNDREDS_OF_NANOS_IN_A_SECOND / DEFAULT_FPS_VALUE)
 #define SAMPLE_AUDIO_FRAME_DURATION (20 * HUNDREDS_OF_NANOS_IN_A_MILLISECOND)
@@ -73,6 +73,7 @@
 #define IOT_CORE_PRIVATE_KEY_ENV_VAR                     "AWS_IOT_CORE_PRIVATE_KEY"
 #define IOT_CORE_ROLE_ALIAS_ENV_VAR                      "AWS_IOT_CORE_ROLE_ALIAS"
 #define IOT_CORE_THING_NAME_ENV_VAR                      "AWS_IOT_CORE_THING_NAME"
+#define CONTROL_PLANE_URI_ENV_VAR                        "CONTROL_PLANE_URI"
 #define STORAGE_CANARY_FIRST_FRAME_TS_FILE_ENV_VAR       "STORAGE_CANARY_FIRST_FRAME_TS_FILE"
 
 #define CANARY_DEFAULT_LABEL                       "ScaryTestLabel"

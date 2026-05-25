@@ -1,0 +1,7 @@
+{
+  "dependencies": {
+    "@aws-sdk/client-cloudwatch": "^3.970.0",
+    "@aws-sdk/client-cloudwatch-logs": "^3.970.0",
+    "puppeteer": "^24.35.0"
+  }
+}
