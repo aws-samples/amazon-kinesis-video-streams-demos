@@ -75,8 +75,9 @@ pipelineJob("${NAMESPACE}-orchestrator") {
         booleanParam('RUN_STORAGE_SUB_RECONNECT', true, 'Run StorageSubReconnect test (master + consumer, 45 min)')
         booleanParam('RUN_STORAGE_SINGLE_RECONNECT', true, 'Run StorageSingleReconnect test (master + consumer, 65 min)')
         booleanParam('RUN_STORAGE_LOW_FPS', true, 'Run StorageLowFps test (master + consumer at 10 fps, 156s)')
+        booleanParam('RUN_VO_MIXED_VIEWERS', true, 'Run VOMasterMixedViewer test (VO master + 2 AO viewers + 1 RO viewer)')
         booleanParam('KEEP_RECORDING', false, 'Keep viewer video recordings after verification')
-        booleanParam('RESCHEDULE', true, 'Enable continuous testing (reschedule after each run completes)')
+        booleanParam('RESCHEDULE', false, 'Enable continuous testing (reschedule after each run completes)')
         stringParam('JS_BRANCH', 'master', 'JS SDK branch name to clone and serve locally (default: master)')
     }
     throttleConcurrentBuilds {

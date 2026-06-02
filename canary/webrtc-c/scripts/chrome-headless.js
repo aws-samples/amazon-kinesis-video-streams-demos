@@ -146,6 +146,7 @@ class ViewerCanaryTest {
 
   async createBrowser() {
     const launchArgs = [
+      '--no-sandbox',
       '--use-fake-ui-for-media-stream',
       '--use-fake-device-for-media-stream',
       '--allow-file-access-from-files'
@@ -597,6 +598,7 @@ class ViewerCanaryTest {
   }
 
   buildTestUrl() {
+    const sendAudio = process.env.VIEWER_SEND_AUDIO === 'true' ? 'true' : (this.config.sendAudio || 'false');
     const params = new URLSearchParams({
       channelName: this.config.channelName,
       region: this.config.region || 'us-west-2',
@@ -604,7 +606,7 @@ class ViewerCanaryTest {
       secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
       sessionToken: process.env.AWS_SESSION_TOKEN || '',
       sendVideo: this.config.sendVideo || 'false',
-      sendAudio: this.config.sendAudio || 'false',
+      sendAudio: sendAudio,
       useTrickleICE: 'true',
       endpoint: this.config.endpoint || '',
     });
@@ -628,14 +630,7 @@ class ViewerCanaryTest {
       document.querySelector('#ingest-media-manual-on').setAttribute('data-selected', 'true');
     });
     
-    log('Page loaded, checking JS SDK version...');
-    const sdkVersion = await page.evaluate(() => {
-      try { return typeof KVSWebRTC !== 'undefined' ? KVSWebRTC.VERSION : 'unknown'; }
-      catch (e) { return 'error: ' + e.message; }
-    });
-    log(`JS SDK version: ${sdkVersion}`);
-
-    log('Clicking viewer button...');
+    log('Page loaded, clicking viewer button...');
     await page.click('#viewer-button');
   }
 
@@ -770,7 +765,7 @@ class ViewerCanaryTest {
       }
 
       const report = await pc.getStats();
-      const result = { video: null, audio: null, roundTripTime: null, selectedCandidatePair: null };
+      const result = { video: null, audio: null, audioOutbound: null, roundTripTime: null, selectedCandidatePair: null };
       report.forEach(stat => {
         if (stat.type === 'candidate-pair' && stat.nominated) {
           result.roundTripTime = stat.currentRoundTripTime || 0;
@@ -790,6 +785,12 @@ class ViewerCanaryTest {
               protocol: remoteCandidate.protocol,
               candidateType: remoteCandidate.candidateType,
             } : null,
+          };
+        }
+        if (stat.type === 'outbound-rtp' && stat.kind === 'audio') {
+          result.audioOutbound = {
+            packetsSent: stat.packetsSent || 0,
+            bytesSent: stat.bytesSent || 0,
           };
         }
         if (stat.type !== 'inbound-rtp') return;
@@ -1060,8 +1061,11 @@ class ViewerCanaryTest {
     
     // Start timer immediately since we already joined the storage session
     this.timerStarted = true;
-    const monitorDurationMs = 156000; // 2 min 36 sec
-    log(`Storage session joined, monitoring connection for ${monitorDurationMs / 1000} seconds...`);
+    // Monitor for the master's streaming duration (passed via env var)
+    // This ensures the viewer stops when the master stops streaming.
+    const masterDurationSec = parseInt(process.env.MASTER_DURATION) || 153;
+    const monitorDurationMs = masterDurationSec * 1000;
+    log(`Storage session joined, monitoring connection for ${masterDurationSec} seconds (master duration)...`);
     setTimeout(() => {
       this.testCompleted = true;
     }, monitorDurationMs);
@@ -1174,6 +1178,9 @@ class ViewerCanaryTest {
           const v = rtcStats.video;
           statusMsg += ` | pktsRecv:${v.packetsReceived} pktsLost:${v.packetsLost} fps:${v.framesPerSecond} jitter:${(v.jitter * 1000).toFixed(1)}ms`;
         }
+        if (rtcStats?.audioOutbound) {
+          statusMsg += ` | audioOut: pktsSent:${rtcStats.audioOutbound.packetsSent} bytesSent:${rtcStats.audioOutbound.bytesSent}`;
+        }
         log(statusMsg);
         lastStatusLog = now;
       }
@@ -1188,6 +1195,34 @@ class ViewerCanaryTest {
         this.getMetricName('ViewerStreamingAvailability'),
         this.config.channelName,
         1
+      );
+    }
+
+    // Audio send verification — for AO viewers that are supposed to send audio
+    const sendAudio = process.env.VIEWER_SEND_AUDIO === 'true';
+    if (sendAudio && this.lastRTCStats?.audioOutbound) {
+      const ao = this.lastRTCStats.audioOutbound;
+      if (ao.bytesSent > 0 && ao.packetsSent > 0) {
+        log(`AUDIO_VERIFY: PASS — packetsSent=${ao.packetsSent} bytesSent=${ao.bytesSent}`);
+        await CloudWatchMetrics.publishCountMetric(
+          this.getMetricName('AudioSendVerified'),
+          this.config.channelName,
+          1
+        );
+      } else {
+        log(`AUDIO_VERIFY: FAIL — packetsSent=${ao.packetsSent} bytesSent=${ao.bytesSent}`);
+        await CloudWatchMetrics.publishCountMetric(
+          this.getMetricName('AudioSendVerified'),
+          this.config.channelName,
+          0
+        );
+      }
+    } else if (sendAudio) {
+      log('AUDIO_VERIFY: FAIL — no outbound audio stats collected');
+      await CloudWatchMetrics.publishCountMetric(
+        this.getMetricName('AudioSendVerified'),
+        this.config.channelName,
+        0
       );
     }
   }

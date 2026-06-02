@@ -63,35 +63,16 @@ echo "Current commit: ${CURRENT_COMMIT:0:12}"
 # ---------------------------------------------------------------------------
 # 2. Extract webrtc-c dependency version from CMakeLists.txt
 # ---------------------------------------------------------------------------
-WEBRTC_GIT_TAG=$(grep 'GIT_TAG' "$REPO_DIR/canary/webrtc-c/CMakeLists.txt" \
+CURRENT_WEBRTC_VERSION=$(grep 'GIT_TAG' "$REPO_DIR/canary/webrtc-c/CMakeLists.txt" \
     | head -1 \
     | sed 's/.*GIT_TAG\s*//' | tr -d '[:space:]') || true
-echo "Parsed webrtc-c GIT_TAG: '${WEBRTC_GIT_TAG}'"
+echo "Parsed webrtc-c GIT_TAG: '${CURRENT_WEBRTC_VERSION}'"
 
-if [ -z "$WEBRTC_GIT_TAG" ]; then
+if [ -z "$CURRENT_WEBRTC_VERSION" ]; then
     echo "WARNING: Could not parse webrtc-c version from CMakeLists.txt, forcing rebuild"
     echo "DEBUG: GIT_TAG lines in CMakeLists.txt:"
     grep 'GIT_TAG' "$REPO_DIR/canary/webrtc-c/CMakeLists.txt" || echo "  (none found)"
     CURRENT_WEBRTC_VERSION="unknown-$(date +%s)"
-else
-    # Resolve branch/tag names to actual commit SHA so we detect upstream changes
-    WEBRTC_REPO_URL=$(grep 'GIT_REPOSITORY' "$REPO_DIR/canary/webrtc-c/CMakeLists.txt" \
-        | head -1 \
-        | sed 's/.*GIT_REPOSITORY\s*//' | tr -d '[:space:]') || true
-    if [ -n "$WEBRTC_REPO_URL" ]; then
-        RESOLVED_SHA=$(git ls-remote "$WEBRTC_REPO_URL" "$WEBRTC_GIT_TAG" 2>/dev/null | awk '{print $1}' | head -1)
-        if [ -n "$RESOLVED_SHA" ]; then
-            CURRENT_WEBRTC_VERSION="$RESOLVED_SHA"
-            echo "Resolved webrtc-c '${WEBRTC_GIT_TAG}' to commit: ${RESOLVED_SHA:0:12}"
-        else
-            # GIT_TAG might be a commit SHA already, use as-is
-            CURRENT_WEBRTC_VERSION="$WEBRTC_GIT_TAG"
-            echo "Could not resolve '${WEBRTC_GIT_TAG}' via ls-remote, using as-is"
-        fi
-    else
-        CURRENT_WEBRTC_VERSION="$WEBRTC_GIT_TAG"
-        echo "Could not parse GIT_REPOSITORY URL, using GIT_TAG as-is"
-    fi
 fi
 echo "webrtc-c dependency version: $CURRENT_WEBRTC_VERSION"
 
