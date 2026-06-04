@@ -28,6 +28,10 @@ public final class CanaryConstants {
     public static final String GAMMA_SUB_RECONNECT_LABEL = "GammaStorageSubReconnect";
     public static final String GAMMA_SINGLE_RECONNECT_LABEL = "GammaStorageSingleReconnect";
 
+    // Low FPS variants
+    public static final String LOW_FPS_LABEL = "StorageLowFps";
+    public static final String GAMMA_LOW_FPS_LABEL = "GammaStorageLowFps";
+
     public static final String CW_DIMENSION_INDIVIDUAL = "StorageWebRTCSDKCanaryStreamName";
     public static final String CW_DIMENSION_AGGREGATE = "StorageWebRTCSDKCanaryLabel";
 

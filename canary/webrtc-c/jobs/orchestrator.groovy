@@ -343,6 +343,29 @@ pipeline {
                             wait: false
                         )
 
+                        // Storage Low FPS — streams at 10 fps instead of default 30 fps.
+                        build(
+                            job: NEXT_AVAILABLE_RUNNER,
+                            parameters: COMMON_PARAMS + [
+                                booleanParam(name: 'IS_SIGNALING', value: false),
+                                booleanParam(name: 'IS_STORAGE', value: true),
+                                booleanParam(name: 'IS_STORAGE_SINGLE_NODE', value: true),
+                                booleanParam(name: 'USE_TURN', value: true),
+                                booleanParam(name: 'TRICKLE_ICE', value: true),
+                                booleanParam(name: 'USE_IOT', value: false),
+                                booleanParam(name: 'VIDEO_VERIFY_ENABLED', value: true),
+                                string(name: 'DURATION_IN_SECONDS', value: STORAGE_PERIODIC_DURATION_IN_SECONDS.toString()),
+                                string(name: 'MASTER_NODE_LABEL', value: "webrtc-storage-master"),
+                                string(name: 'CONSUMER_NODE_LABEL', value: "webrtc-storage-consumer"),
+                                string(name: 'RUNNER_LABEL', value: "StorageLowFps"),
+                                string(name: 'SCENARIO_LABEL', value: "StorageLowFps"),
+                                string(name: 'AWS_DEFAULT_REGION', value: "us-west-2"),
+                                booleanParam(name: 'NO_LOOP_FRAMES', value: true),
+                                string(name: 'STORAGE_FPS', value: "10"),
+                            ],
+                            wait: false
+                        )
+
                         // Storage Sub-Reconnect.
                         build(
                             job: NEXT_AVAILABLE_RUNNER,
