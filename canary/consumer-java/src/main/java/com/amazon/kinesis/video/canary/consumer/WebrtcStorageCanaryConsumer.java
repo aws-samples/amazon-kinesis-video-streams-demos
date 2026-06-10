@@ -282,7 +282,9 @@ public class WebrtcStorageCanaryConsumer {
 
         switch (mCanaryLabel) {
             case CanaryConstants.PERIODIC_LABEL:
-            case CanaryConstants.GAMMA_PERIODIC_LABEL: {
+            case CanaryConstants.GAMMA_PERIODIC_LABEL:
+            case CanaryConstants.LOW_FPS_LABEL:
+            case CanaryConstants.GAMMA_LOW_FPS_LABEL: {
                 logger.info("Periodic case: canaryRunTime=" + canaryRunTime
                         + "s, mCanaryStartTime=" + mCanaryStartTime
                         + ", now=" + new Date()

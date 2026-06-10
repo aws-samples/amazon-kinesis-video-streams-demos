@@ -221,10 +221,28 @@ PVOID sendVideoPackets(PVOID args)
     STATUS status;
     UINT32 i;
     UINT64 startTime, lastFrameTime, elapsed;
+    UINT64 videoFrameDuration;
+    PCHAR pFrameRate;
     PCHAR pNoLoopFrames;
     BOOL noLoopFrames;
     MEMSET(&encoderStats, 0x00, SIZEOF(RtcEncoderStats));
     CHK_ERR(pSampleConfiguration != NULL, STATUS_NULL_ARG, "[KVS Master] Streaming session is NULL");
+
+    // Determine FPS from environment variable, defaulting to DEFAULT_FPS_VALUE (30)
+    pFrameRate = GETENV("CANARY_FRAME_RATE");
+    if (pFrameRate != NULL && pFrameRate[0] != '\0') {
+        UINT64 fps = (UINT64) strtoull(pFrameRate, NULL, 10);
+        if (fps > 0 && fps <= 120) {
+            videoFrameDuration = HUNDREDS_OF_NANOS_IN_A_SECOND / fps;
+            DLOGI("[KVS Master] Using configured frame rate: %llu fps (frame duration: %llu)", fps, videoFrameDuration);
+        } else {
+            videoFrameDuration = SAMPLE_VIDEO_FRAME_DURATION;
+            DLOGW("[KVS Master] Invalid CANARY_FRAME_RATE '%s', using default %u fps", pFrameRate, DEFAULT_FPS_VALUE);
+        }
+    } else {
+        videoFrameDuration = SAMPLE_VIDEO_FRAME_DURATION;
+        DLOGI("[KVS Master] No CANARY_FRAME_RATE set, using default %u fps", DEFAULT_FPS_VALUE);
+    }
 
     frame.presentationTs = 0;
     startTime = GETTIME();
@@ -264,7 +282,7 @@ PVOID sendVideoPackets(PVOID args)
         encoderStats.width = 640;
         encoderStats.height = 480;
         encoderStats.targetBitrate = 262000;
-        frame.presentationTs += SAMPLE_VIDEO_FRAME_DURATION;
+        frame.presentationTs += videoFrameDuration;
         MUTEX_LOCK(pSampleConfiguration->streamingSessionListReadLock);
 
         for (i = 0; i < pSampleConfiguration->streamingSessionCount; ++i) {
@@ -307,10 +325,10 @@ PVOID sendVideoPackets(PVOID args)
 
         // Adjust sleep in the case the sleep itself and writeFrame take longer than expected. Since sleep makes sure that the thread
         // will be paused at least until the given amount, we can assume that there's no too early frame scenario.
-        // Also, it's very unlikely to have a delay greater than SAMPLE_VIDEO_FRAME_DURATION, so the logic assumes that this is always
+        // Also, it's very unlikely to have a delay greater than videoFrameDuration, so the logic assumes that this is always
         // true for simplicity.
         elapsed = lastFrameTime - startTime;
-        THREAD_SLEEP(SAMPLE_VIDEO_FRAME_DURATION - elapsed % SAMPLE_VIDEO_FRAME_DURATION);
+        THREAD_SLEEP(videoFrameDuration - elapsed % videoFrameDuration);
         lastFrameTime = GETTIME();
     }
 

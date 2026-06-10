@@ -8,6 +8,7 @@
  *   - StorageWithViewer (1 viewer)
  *   - StorageTwoViewers (2 viewers)  
  *   - StorageThreeViewers (3 viewers)
+ *   - StorageLowFps (10 fps)
  * 
  * Usage:
  *   1. Click "Build with Parameters"
@@ -81,6 +82,11 @@ pipeline {
             defaultValue: true,
             description: 'Run StorageSingleReconnect test (master + consumer, 65 min)'
         )
+        booleanParam(
+            name: 'RUN_STORAGE_LOW_FPS',
+            defaultValue: true,
+            description: 'Run StorageLowFps test (master + consumer at 10 fps, 156s)'
+        )
         string(
             name: 'GIT_HASH',
             defaultValue: GIT_HASH,
@@ -113,7 +119,7 @@ pipeline {
             steps {
                 script {
                     
-                    if (!params.RUN_STORAGE_WITH_VIEWER && !params.RUN_STORAGE_TWO_VIEWERS && !params.RUN_STORAGE_THREE_VIEWERS && !params.RUN_STORAGE_PERIODIC && !params.RUN_STORAGE_SUB_RECONNECT && !params.RUN_STORAGE_SINGLE_RECONNECT) {
+                    if (!params.RUN_STORAGE_WITH_VIEWER && !params.RUN_STORAGE_TWO_VIEWERS && !params.RUN_STORAGE_THREE_VIEWERS && !params.RUN_STORAGE_PERIODIC && !params.RUN_STORAGE_SUB_RECONNECT && !params.RUN_STORAGE_SINGLE_RECONNECT && !params.RUN_STORAGE_LOW_FPS) {
                         error "At least one test must be selected to run."
                     }
                     
@@ -128,6 +134,7 @@ pipeline {
                     if (params.RUN_STORAGE_PERIODIC) echo "  - StoragePeriodic (master + consumer, 156s)"
                     if (params.RUN_STORAGE_SUB_RECONNECT) echo "  - StorageSubReconnect (master + consumer, 45 min)"
                     if (params.RUN_STORAGE_SINGLE_RECONNECT) echo "  - StorageSingleReconnect (master + consumer, 65 min)"
+                    if (params.RUN_STORAGE_LOW_FPS) echo "  - StorageLowFps (master + consumer at 10 fps, 156s)"
                     if (params.RUN_STORAGE_WITH_VIEWER) echo "  - StorageWithViewer (1 viewer)"
                     if (params.RUN_STORAGE_TWO_VIEWERS) echo "  - StorageTwoViewers (2 viewers)"
                     if (params.RUN_STORAGE_THREE_VIEWERS) echo "  - StorageThreeViewers (3 viewers)"
@@ -390,6 +397,46 @@ pipeline {
                                 propagate: false
                             )
                             echo "StorageSingleReconnect result: ${result.result}"
+                        }
+                    }
+                }
+
+                stage('StorageLowFps') {
+                    when {
+                        expression { return params.RUN_STORAGE_LOW_FPS }
+                    }
+                    steps {
+                        script {
+                            echo "Starting StorageLowFps test (10 fps)..."
+                            def result = build(
+                                job: GAMMA_RUNNER_JOB,
+                                parameters: [
+                                    string(name: 'AWS_KVS_LOG_LEVEL', value: "2"),
+                                    string(name: 'GIT_URL', value: GIT_URL),
+                                    string(name: 'GIT_HASH', value: env.CURRENT_GIT_HASH),
+                                    string(name: 'LOG_GROUP_NAME', value: "WebrtcSDK"),
+                                    booleanParam(name: 'IS_STORAGE', value: true),
+                                    booleanParam(name: 'VIDEO_VERIFY_ENABLED', value: true),
+                                    string(name: 'DURATION_IN_SECONDS', value: "156"),
+                                    string(name: 'MASTER_NODE_LABEL', value: "gamma-webrtc-storage-master"),
+                                    string(name: 'CONSUMER_NODE_LABEL', value: "gamma-webrtc-storage-consumer"),
+                                    string(name: 'RUNNER_LABEL', value: "GammaStorageLowFps"),
+                                    string(name: 'SCENARIO_LABEL', value: "GammaStorageLowFps"),
+                                    string(name: 'AWS_DEFAULT_REGION', value: params.AWS_DEFAULT_REGION),
+                                    string(name: 'ENDPOINT', value: params.ENDPOINT),
+                                    string(name: 'METRIC_SUFFIX', value: "-gamma"),
+                                    booleanParam(name: 'USE_TURN', value: true),
+                                    booleanParam(name: 'TRICKLE_ICE', value: true),
+                                    booleanParam(name: 'FIRST_ITERATION', value: true),
+                                    booleanParam(name: 'RESCHEDULE', value: params.RESCHEDULE),
+                                    booleanParam(name: 'NO_LOOP_FRAMES', value: true),
+                                    string(name: 'STORAGE_FPS', value: "10"),
+                                    string(name: 'JS_BRANCH', value: params.JS_BRANCH),
+                                ],
+                                wait: true,
+                                propagate: false
+                            )
+                            echo "StorageLowFps result: ${result.result}"
                         }
                     }
                 }

@@ -285,7 +285,8 @@ def buildStorageCanary(isConsumer, params) {
         'CANARY_CHANNEL_NAME': "${env.JOB_NAME}-${params.RUNNER_LABEL}",
         'AWS_DEFAULT_REGION': params.AWS_DEFAULT_REGION,
         'CONTROL_PLANE_URI': params.ENDPOINT ?: '',
-        'CANARY_NO_LOOP_FRAMES': params.NO_LOOP_FRAMES ?: false
+        'CANARY_NO_LOOP_FRAMES': params.NO_LOOP_FRAMES ?: false,
+        'CANARY_FRAME_RATE': params.STORAGE_FPS ?: ''
     ]
 
     def repoDir = "${env.HOME}/webrtc-c-storage-master/repo"
@@ -443,6 +444,7 @@ pipeline {
         booleanParam(name: 'TRICKLE_ICE', defaultValue: false)
         booleanParam(name: 'FORCE_TURN', defaultValue: false)
         booleanParam(name: 'NO_LOOP_FRAMES', defaultValue: false, description: 'Stop after sending all frames once instead of looping')
+        string(name: 'STORAGE_FPS', defaultValue: '', description: 'Override storage master frame rate (e.g., 10 for low FPS test). Empty uses default 30 fps.')
         string(name: 'JS_BRANCH', defaultValue: 'master', description: 'JS SDK branch name to clone and serve locally (default: master)')
     }
     
@@ -732,6 +734,7 @@ pipeline {
                         booleanParam(name: 'TRICKLE_ICE', value: params.TRICKLE_ICE),
                         booleanParam(name: 'FORCE_TURN', value: params.FORCE_TURN),
                         booleanParam(name: 'NO_LOOP_FRAMES', value: params.NO_LOOP_FRAMES),
+                        string(name: 'STORAGE_FPS', value: params.STORAGE_FPS),
                         string(name: 'JS_BRANCH', value: params.JS_BRANCH),
                     ]
 
