@@ -24,7 +24,7 @@ find "${MASTER_HOME}/certs" -type d -empty -delete 2>/dev/null || true
 # Jenkins workspace leftovers (old workspaces from previous runs)
 # Only clean workspaces, not the persistent repo/build dirs
 # Skip workspaces that have a .in_use file younger than 2 hours (active builds)
-for dir in "${HOME}/Jenkins/workspace"/webrtc-*; do
+for dir in "${HOME}/Jenkins/workspace"/webrtc-* "${HOME}/Jenkins"/webrtc-*; do
     [ -d "$dir" ] || continue
     # Skip if directory is less than 60 minutes old
     if ! find "$dir" -maxdepth 0 -mmin +60 | grep -q .; then
