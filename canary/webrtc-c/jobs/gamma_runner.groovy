@@ -49,6 +49,11 @@ def buildWebRTCProject(thing_prefix) {
         cd '${repoDir}' && git fetch origin '+refs/heads/*:refs/remotes/origin/*' && git checkout -f '${params.GIT_HASH}'
         flock -u 9"""
 
+    // Sync cleanup cron script if it changed
+    sh """
+        cmp -s '${repoDir}/canary/webrtc-c/scripts/cron/cleanup-master.sh' '${env.HOME}/webrtc-c-storage-master/cleanup-master.sh' \
+            || cp '${repoDir}/canary/webrtc-c/scripts/cron/cleanup-master.sh' '${env.HOME}/webrtc-c-storage-master/cleanup-master.sh'"""
+
     // Build the binary (handles git fetch, skip-rebuild, and flock internally)
     sh """
         chmod a+x '${repoDir}/canary/webrtc-c/scripts/build-storage-master.sh' &&
@@ -108,6 +113,11 @@ def buildConsumerProject() {
         fi
 
         flock -u 9"""
+
+    // Sync cleanup cron script if it changed
+    sh """
+        cmp -s '${repoDir}/canary/webrtc-c/scripts/cron/cleanup-consumer.sh' '${env.HOME}/webrtc-c-storage-master/cleanup-consumer.sh' \
+            || cp '${repoDir}/canary/webrtc-c/scripts/cron/cleanup-consumer.sh' '${env.HOME}/webrtc-c-storage-master/cleanup-consumer.sh'"""
 }
 
 def withRunnerWrapper(envs, fn) {
@@ -132,6 +142,11 @@ def runViewerSessions(viewerId = "", waitMinutes = 2, viewerCount = "1") {
         try {
             checkout([$class: 'GitSCM', branches: [[name: params.GIT_HASH]],
                       userRemoteConfigs: [[url: params.GIT_URL]]])
+
+            // Sync cleanup cron script if it changed
+            sh """
+                cmp -s './canary/webrtc-c/scripts/cron/cleanup-viewer.sh' '\${HOME}/JS-viewer-build/cleanup-viewer.sh' \
+                    || cp './canary/webrtc-c/scripts/cron/cleanup-viewer.sh' '\${HOME}/JS-viewer-build/cleanup-viewer.sh'"""
             
             def endpointValue = params.ENDPOINT ?: ''
             def metricSuffixValue = params.METRIC_SUFFIX ?: ''
