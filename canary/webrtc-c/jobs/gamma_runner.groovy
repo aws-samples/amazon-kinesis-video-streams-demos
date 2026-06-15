@@ -145,8 +145,9 @@ def runViewerSessions(viewerId = "", waitMinutes = 2, viewerCount = "1") {
 
             // Sync cleanup cron script if it changed
             sh """
-                cmp -s './canary/webrtc-c/scripts/cron/cleanup-viewer.sh' '\${HOME}/JS-viewer-build/cleanup-viewer.sh' \
-                    || cp './canary/webrtc-c/scripts/cron/cleanup-viewer.sh' '\${HOME}/JS-viewer-build/cleanup-viewer.sh'"""
+                mkdir -p '${env.HOME}/JS-viewer-build'
+                cmp -s './canary/webrtc-c/scripts/cron/cleanup-viewer.sh' '${env.HOME}/JS-viewer-build/cleanup-viewer.sh' \
+                    || cp './canary/webrtc-c/scripts/cron/cleanup-viewer.sh' '${env.HOME}/JS-viewer-build/cleanup-viewer.sh'"""
             
             def endpointValue = params.ENDPOINT ?: ''
             def metricSuffixValue = params.METRIC_SUFFIX ?: ''
