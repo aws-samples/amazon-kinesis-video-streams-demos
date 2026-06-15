@@ -654,7 +654,12 @@ pipeline {
 
                     steps {
                         script {
-                            buildPeer(false, params)
+                            sh "touch '${env.WORKSPACE}/.in_use'"
+                            try {
+                                buildPeer(false, params)
+                            } finally {
+                                sh "rm -f '${env.WORKSPACE}/.in_use'"
+                            }
                         }
                     }
                 }
