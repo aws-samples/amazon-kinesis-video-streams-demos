@@ -128,6 +128,7 @@ def withRunnerWrapper(envs, fn) {
 def runViewerSessions(viewerId = "", waitMinutes = 2, viewerCount = "1") {
     def workspaceName = "${env.JOB_NAME}-${viewerId ?: 'viewer'}-${BUILD_NUMBER}"
     ws(workspaceName) {
+        sh "touch '${env.WORKSPACE}/.in_use'"
         try {
             checkout([$class: 'GitSCM', branches: [[name: params.GIT_HASH]],
                       userRemoteConfigs: [[url: params.GIT_URL]]])
@@ -215,7 +216,7 @@ def runViewerSessions(viewerId = "", waitMinutes = 2, viewerCount = "1") {
 
             echo "${viewerId ? viewerId + ' ' : ''}viewer session completed"
         } finally {
-            // Cleanup handled by Pre Cleanup stage on next iteration
+            sh "rm -f '${env.WORKSPACE}/.in_use'"
         }
     }
 }
@@ -456,6 +457,9 @@ pipeline {
         stage('Fetch STS credentials') {
             steps {
                 script {
+                    // Mark workspace as in-use to prevent cron cleanup
+                    sh "touch '${env.WORKSPACE}/.in_use'"
+
                     def assumeRoleOutput = sh(script: 'aws sts assume-role --role-arn $AWS_KVS_STS_ROLE_ARN --role-session-name roleSessionName --duration-seconds 43200 --output json',
                                                 returnStdout: true).trim()
                     def assumeRoleJson = readJSON text: assumeRoleOutput
@@ -529,9 +533,14 @@ pipeline {
                     steps {
                         script {
                             ws("${env.JOB_NAME}-master-${BUILD_NUMBER}") {
-                                def mutableParams = [:] + params
-                                mutableParams.DURATION_IN_SECONDS = "156"
-                                buildStorageCanary(false, mutableParams)
+                                sh "touch '${env.WORKSPACE}/.in_use'"
+                                try {
+                                    def mutableParams = [:] + params
+                                    mutableParams.DURATION_IN_SECONDS = "156"
+                                    buildStorageCanary(false, mutableParams)
+                                } finally {
+                                    sh "rm -f '${env.WORKSPACE}/.in_use'"
+                                }
                             }
                         }
                     }
@@ -564,9 +573,14 @@ pipeline {
                     steps {
                         script {
                             ws("${env.JOB_NAME}-master-${BUILD_NUMBER}") {
-                                def mutableParams = [:] + params
-                                mutableParams.DURATION_IN_SECONDS = "156"
-                                buildStorageCanary(false, mutableParams)
+                                sh "touch '${env.WORKSPACE}/.in_use'"
+                                try {
+                                    def mutableParams = [:] + params
+                                    mutableParams.DURATION_IN_SECONDS = "156"
+                                    buildStorageCanary(false, mutableParams)
+                                } finally {
+                                    sh "rm -f '${env.WORKSPACE}/.in_use'"
+                                }
                             }
                         }
                     }
@@ -612,9 +626,14 @@ pipeline {
                     steps {
                         script {
                             ws("${env.JOB_NAME}-master-${BUILD_NUMBER}") {
-                                def mutableParams = [:] + params
-                                mutableParams.DURATION_IN_SECONDS = "156"
-                                buildStorageCanary(false, mutableParams)
+                                sh "touch '${env.WORKSPACE}/.in_use'"
+                                try {
+                                    def mutableParams = [:] + params
+                                    mutableParams.DURATION_IN_SECONDS = "156"
+                                    buildStorageCanary(false, mutableParams)
+                                } finally {
+                                    sh "rm -f '${env.WORKSPACE}/.in_use'"
+                                }
                             }
                         }
                     }
@@ -691,6 +710,9 @@ pipeline {
     post {
         always {
             script {
+                // Remove workspace lock so cron can clean it up later
+                sh "rm -f '${env.WORKSPACE}/.in_use'"
+
                 echo "=========================================="
                 echo "Gamma Runner Summary"
                 echo "=========================================="
