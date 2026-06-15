@@ -63,6 +63,11 @@ def buildStorageProject(thing_prefix) {
         cd '${repoDir}' && git fetch origin '+refs/heads/*:refs/remotes/origin/*' && git checkout -f '${params.GIT_HASH}'
         flock -u 9"""
 
+    // Sync cleanup cron script if it changed
+    sh """
+        cmp -s '${repoDir}/canary/webrtc-c/scripts/cron/cleanup-master.sh' '${env.HOME}/webrtc-c-storage-master/cleanup-master.sh' \
+            || cp '${repoDir}/canary/webrtc-c/scripts/cron/cleanup-master.sh' '${env.HOME}/webrtc-c-storage-master/cleanup-master.sh'"""
+
     // Build the binary (handles git fetch, skip-rebuild, and flock internally)
     sh """
         chmod a+x '${repoDir}/canary/webrtc-c/scripts/build-storage-master.sh' &&
@@ -118,6 +123,11 @@ def buildConsumerProject() {
         fi
 
         flock -u 9"""
+
+    // Sync cleanup cron script if it changed
+    sh """
+        cmp -s '${repoDir}/canary/webrtc-c/scripts/cron/cleanup-consumer.sh' '${env.HOME}/webrtc-c-storage-master/cleanup-consumer.sh' \
+            || cp '${repoDir}/canary/webrtc-c/scripts/cron/cleanup-consumer.sh' '${env.HOME}/webrtc-c-storage-master/cleanup-consumer.sh'"""
 }
 
 def withRunnerWrapper(envs, fn) {
@@ -232,9 +242,16 @@ def runViewerSessions(viewerId = "", waitMinutes = 10, viewerCount = "1", stagge
     // Create unique workspace for each viewer to prevent Git conflicts
     def workspaceName = "${env.JOB_NAME}-${viewerId ?: 'viewer'}-${BUILD_NUMBER}"
     ws(workspaceName) {
+        sh "touch '${env.WORKSPACE}/.in_use'"
         try {
             checkout([$class: 'GitSCM', branches: [[name: params.GIT_HASH ]],
                       userRemoteConfigs: [[url: params.GIT_URL]]])
+
+            // Sync cleanup cron script if it changed
+            sh """
+                mkdir -p '${env.HOME}/JS-viewer-build'
+                cmp -s './canary/webrtc-c/scripts/cron/cleanup-viewer.sh' '${env.HOME}/JS-viewer-build/cleanup-viewer.sh' \
+                    || cp './canary/webrtc-c/scripts/cron/cleanup-viewer.sh' '${env.HOME}/JS-viewer-build/cleanup-viewer.sh'"""
             
             def endpointValue = params.ENDPOINT ?: ''
             def metricSuffixValue = params.METRIC_SUFFIX ?: ''
@@ -317,7 +334,7 @@ def runViewerSessions(viewerId = "", waitMinutes = 10, viewerCount = "1", stagge
 
             echo "${viewerId ? viewerId + ' ' : ''}viewer session completed"
         } finally {
-            // Cleanup handled by Pre Cleanup stage on next iteration
+            sh "rm -f '${env.WORKSPACE}/.in_use'"
         }
     }
 }
@@ -579,6 +596,9 @@ pipeline {
         stage('Fetch STS credentials and export to env vars') {
             steps {
                 script {
+                    // Mark workspace as in-use to prevent cron cleanup
+                    sh "touch '${env.WORKSPACE}/.in_use'"
+
                     def assumeRoleOutput = sh(script: 'aws sts assume-role --role-arn $AWS_KVS_STS_ROLE_ARN --role-session-name roleSessionName --duration-seconds 43200 --output json',
                                                 returnStdout: true
                                                 ).trim()
@@ -691,7 +711,12 @@ pipeline {
                     }
                     steps {
                         script {
-                            buildStorageCanary(true, params)
+                            sh "touch '${env.WORKSPACE}/.in_use'"
+                            try {
+                                buildStorageCanary(true, params)
+                            } finally {
+                                sh "rm -f '${env.WORKSPACE}/.in_use'"
+                            }
                         }
                     }
                 }
@@ -738,9 +763,14 @@ pipeline {
                     steps {
                         script {
                             ws("${env.JOB_NAME}-master-${BUILD_NUMBER}") {
-                                def mutableParams = [:] + params
-                                mutableParams.DURATION_IN_SECONDS = "156"
-                                buildStorageCanary(false, mutableParams)
+                                sh "touch '${env.WORKSPACE}/.in_use'"
+                                try {
+                                    def mutableParams = [:] + params
+                                    mutableParams.DURATION_IN_SECONDS = "156"
+                                    buildStorageCanary(false, mutableParams)
+                                } finally {
+                                    sh "rm -f '${env.WORKSPACE}/.in_use'"
+                                }
                             }
                         }
                     }
@@ -771,9 +801,14 @@ pipeline {
                     steps {
                         script {
                             ws("${env.JOB_NAME}-master-${BUILD_NUMBER}") {
-                                def mutableParams = [:] + params
-                                mutableParams.DURATION_IN_SECONDS = "156"
-                                buildStorageCanary(false, mutableParams)
+                                sh "touch '${env.WORKSPACE}/.in_use'"
+                                try {
+                                    def mutableParams = [:] + params
+                                    mutableParams.DURATION_IN_SECONDS = "156"
+                                    buildStorageCanary(false, mutableParams)
+                                } finally {
+                                    sh "rm -f '${env.WORKSPACE}/.in_use'"
+                                }
                             }
                         }
                     }
@@ -817,9 +852,14 @@ pipeline {
                     steps {
                         script {
                             ws("${env.JOB_NAME}-master-${BUILD_NUMBER}") {
-                                def mutableParams = [:] + params
-                                mutableParams.DURATION_IN_SECONDS = "156"
-                                buildStorageCanary(false, mutableParams)
+                                sh "touch '${env.WORKSPACE}/.in_use'"
+                                try {
+                                    def mutableParams = [:] + params
+                                    mutableParams.DURATION_IN_SECONDS = "156"
+                                    buildStorageCanary(false, mutableParams)
+                                } finally {
+                                    sh "rm -f '${env.WORKSPACE}/.in_use'"
+                                }
                             }
                         }
                     }
@@ -904,6 +944,9 @@ pipeline {
     post {
         always {
             script {
+                // Remove workspace lock so cron can clean it up later
+                sh "rm -f '${env.WORKSPACE}/.in_use'"
+
                 // Don't reschedule if the build was manually aborted
                 if (currentBuild.result == 'ABORTED') {
                     echo "Build was aborted, skipping reschedule"
