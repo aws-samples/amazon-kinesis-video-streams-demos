@@ -514,7 +514,12 @@ pipeline {
                     }
                     steps {
                         script {
-                            buildStorageCanary(true, params)
+                            sh "touch '${env.WORKSPACE}/.in_use'"
+                            try {
+                                buildStorageCanary(true, params)
+                            } finally {
+                                sh "rm -f '${env.WORKSPACE}/.in_use'"
+                            }
                         }
                     }
                 }
