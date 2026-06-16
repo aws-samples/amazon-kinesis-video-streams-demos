@@ -125,9 +125,9 @@ def withRunnerWrapper(envs, fn) {
         try {
             fn()
         } catch (FlowInterruptedException err) {
-            echo 'Aborted due to cancellation'
-            IS_ABORTED = true
-            throw err
+            echo "Interrupted: ${err.getMessage()}"
+            HAS_ERROR = true
+            unstable err.toString()
         } catch (err) {
             HAS_ERROR = true
             unstable err.toString()
