@@ -135,8 +135,9 @@ def withRunnerWrapper(envs, fn) {
         try {
             fn()
         } catch (FlowInterruptedException err) {
-            echo 'Aborted due to cancellation'
-            throw err
+            echo "Interrupted: ${err.getMessage()}"
+            HAS_ERROR = true
+            unstable err.toString()
         } catch (err) {
             HAS_ERROR = true
             // Ignore errors so that we can auto recover by retrying
@@ -325,8 +326,9 @@ def runViewerSessions(viewerId = "", waitMinutes = 10, viewerCount = "1", stagge
                     echo "${viewerKey} stats: ${stats.attempts} attempts, ${stats.successes} successes"
                 }
             } catch (FlowInterruptedException err) {
-                echo 'Aborted due to cancellation'
-                throw err
+                echo "Interrupted: ${err.getMessage()}"
+                HAS_ERROR = true
+                unstable err.toString()
             } catch (err) {
                 HAS_ERROR = true
                 unstable err.toString()
