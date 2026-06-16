@@ -18,7 +18,7 @@
  */
 
 GIT_URL = 'https://github.com/aws-samples/amazon-kinesis-video-streams-demos.git'
-GIT_HASH = 'stability-fix'
+GIT_HASH = 'reschedule-logic'
 
 // Dedicated gamma runner job name
 GAMMA_RUNNER_JOB = "webrtc-gamma-runner"
