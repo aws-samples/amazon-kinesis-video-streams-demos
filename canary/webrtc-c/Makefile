@@ -8,5 +8,5 @@ build: install-system-dependencies
 	@echo "Build webrtc canary"
 	mkdir -p build && \
 		cd build && \
-		cmake .. -DCMAKE_INSTALL_PREFIX=$(shell pwd)/build && \
+		cmake .. -DCMAKE_INSTALL_PREFIX=$(shell pwd)/build -DUSE_LIBSRTP3=ON -DUSE_OPENSSL3=ON && \
 		make -j
