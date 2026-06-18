@@ -38,14 +38,16 @@ if(NOT webrtc_POPULATED)
   add_subdirectory(${webrtc_SOURCE_DIR} ${webrtc_BINARY_DIR} EXCLUDE_FROM_ALL)
 endif()
 
+# Force all subsequent find_package(OpenSSL) calls to use the version built by webrtc-c
+set(OPENSSL_ROOT_DIR "${webrtc_SOURCE_DIR}/open-source" CACHE PATH "" FORCE)
+set(OPENSSL_INCLUDE_DIR "${webrtc_SOURCE_DIR}/open-source/include" CACHE PATH "" FORCE)
+set(OPENSSL_CRYPTO_LIBRARY "${webrtc_SOURCE_DIR}/open-source/lib64/libcrypto.so" CACHE FILEPATH "" FORCE)
+set(OPENSSL_SSL_LIBRARY "${webrtc_SOURCE_DIR}/open-source/lib64/libssl.so" CACHE FILEPATH "" FORCE)
+list(PREPEND CMAKE_PREFIX_PATH "${webrtc_SOURCE_DIR}/open-source")
+
 FetchContent_GetProperties(cloudwatch)
 if(NOT cloudwatch_POPULATED)
   FetchContent_Populate(cloudwatch)
-  # Point cloudwatch SDK to the OpenSSL built by webrtc-c to avoid version mismatch
-  set(OPENSSL_ROOT_DIR "${webrtc_SOURCE_DIR}/open-source" CACHE PATH "" FORCE)
-  set(OPENSSL_INCLUDE_DIR "${webrtc_SOURCE_DIR}/open-source/include" CACHE PATH "" FORCE)
-  set(OPENSSL_CRYPTO_LIBRARY "${webrtc_SOURCE_DIR}/open-source/lib64/libcrypto.so" CACHE FILEPATH "" FORCE)
-  set(OPENSSL_SSL_LIBRARY "${webrtc_SOURCE_DIR}/open-source/lib64/libssl.so" CACHE FILEPATH "" FORCE)
   # AWS SDK options
   set(CUSTOM_MEMORY_MANAGEMENT OFF)
   set(ENABLE_TESTING OFF)
@@ -64,7 +66,7 @@ include_directories(${cloudwatch_SOURCE_DIR}/aws-cpp-sdk-monitoring/include)
 include_directories(${cloudwatch_SOURCE_DIR}/aws-cpp-sdk-logs/include)
 include_directories(${webrtc_SOURCE_DIR}/src/include)
 include_directories(${webrtc_SOURCE_DIR}/open-source/include)
-link_directories(${webrtc_SOURCE_DIR}/open-source/lib)
+link_directories(${webrtc_SOURCE_DIR}/open-source/lib ${webrtc_SOURCE_DIR}/open-source/lib64)
 add_library(
   kvsWebrtcCanary
   src/Config.cpp
