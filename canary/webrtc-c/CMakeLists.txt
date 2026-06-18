@@ -41,6 +41,11 @@ endif()
 FetchContent_GetProperties(cloudwatch)
 if(NOT cloudwatch_POPULATED)
   FetchContent_Populate(cloudwatch)
+  # Point cloudwatch SDK to the OpenSSL built by webrtc-c to avoid version mismatch
+  set(OPENSSL_ROOT_DIR "${webrtc_SOURCE_DIR}/open-source" CACHE PATH "" FORCE)
+  set(OPENSSL_INCLUDE_DIR "${webrtc_SOURCE_DIR}/open-source/include" CACHE PATH "" FORCE)
+  set(OPENSSL_CRYPTO_LIBRARY "${webrtc_SOURCE_DIR}/open-source/lib64/libcrypto.so" CACHE FILEPATH "" FORCE)
+  set(OPENSSL_SSL_LIBRARY "${webrtc_SOURCE_DIR}/open-source/lib64/libssl.so" CACHE FILEPATH "" FORCE)
   # AWS SDK options
   set(CUSTOM_MEMORY_MANAGEMENT OFF)
   set(ENABLE_TESTING OFF)
