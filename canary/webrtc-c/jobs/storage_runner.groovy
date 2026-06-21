@@ -1,4 +1,5 @@
 import org.jenkinsci.plugins.workflow.steps.FlowInterruptedException
+import jenkins.model.Jenkins
 
 /**
  * Storage Runner
@@ -463,15 +464,28 @@ pipeline {
         string(name: 'JS_BRANCH', defaultValue: 'master', description: 'JS SDK branch name to clone and serve locally (default: master)')
     }
     
-    options {
-        lock(resource: "${params.RUNNER_LABEL}")
-    }
-
     environment {
         AWS_KVS_STS_ROLE_ARN = credentials('CANARY_STS_ROLE_ARN')
     }
 
     stages {
+        stage('Skip if duplicate') {
+            steps {
+                script {
+                    def myLabel = params.RUNNER_LABEL
+                    def runningBuilds = Jenkins.instance.getItemByFullName(env.JOB_NAME).builds.findAll { b ->
+                        b.isBuilding() && b.number != currentBuild.number &&
+                        b.getAction(hudson.model.ParametersAction)?.getParameter('RUNNER_LABEL')?.value == myLabel
+                    }
+                    if (runningBuilds) {
+                        echo "Another ${myLabel} build is already running (#${runningBuilds[0].number}), skipping"
+                        currentBuild.result = 'NOT_BUILT'
+                        error("Duplicate skipped")
+                    }
+                }
+            }
+        }
+
         stage('Fetch STS credentials') {
             steps {
                 script {
