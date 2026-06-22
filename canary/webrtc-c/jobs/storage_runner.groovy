@@ -5,12 +5,11 @@ import jenkins.model.Jenkins
  * Storage Runner
  *
  * Unified runner for all WebRTC storage canary tests (prod and gamma).
- * Triggered by Jenkins cron — runs once per trigger unless RESCHEDULE=true.
+ * Triggered by Jenkins cron — runs once per trigger, no self-rescheduling.
  *
  * Supports:
  *   - Storage Master + Consumer (separate or same node)
  *   - Single/Two/Three viewer sessions
- *   - StorageExtended (long-running with RESCHEDULE=true)
  */
 
 START_TIMESTAMP = new Date().getTime()
@@ -446,7 +445,6 @@ pipeline {
         string(name: 'VIEWER_SESSION_DURATION_SECONDS', defaultValue: '900', description: 'Hard timeout in seconds for the viewer process (default 15 minutes, must be larger than monitoring duration)')
         booleanParam(name: 'KEEP_RECORDING', defaultValue: false, description: 'Keep viewer video recordings after verification')
         booleanParam(name: 'DEBUG_LOG_SDP', defaultValue: true)
-        booleanParam(name: 'FIRST_ITERATION', defaultValue: true)
         booleanParam(name: 'IS_STORAGE', defaultValue: false, description: 'Run storage master + consumer test')
         booleanParam(name: 'IS_STORAGE_SINGLE_NODE', defaultValue: false, description: 'Run master and consumer on same node')
         booleanParam(name: 'VIDEO_VERIFY_ENABLED', defaultValue: false, description: 'Enable consumer-side video verification via GetClip')
@@ -454,7 +452,6 @@ pipeline {
         booleanParam(name: 'JS_STORAGE_VIEWER_JOIN', defaultValue: false)
         booleanParam(name: 'JS_STORAGE_TWO_VIEWERS', defaultValue: false)
         booleanParam(name: 'JS_STORAGE_THREE_VIEWERS', defaultValue: false)
-        booleanParam(name: 'RESCHEDULE', defaultValue: false, description: 'Whether to reschedule after completion')
         booleanParam(name: 'USE_TURN', defaultValue: false)
         booleanParam(name: 'USE_IOT', defaultValue: false)
         booleanParam(name: 'TRICKLE_ICE', defaultValue: false)
@@ -776,7 +773,6 @@ pipeline {
     post {
         always {
             script {
-                // Remove workspace lock so cron can clean it up later
                 sh "rm -f '${env.WORKSPACE}/.in_use'"
 
                 echo "=========================================="
@@ -785,59 +781,6 @@ pipeline {
                 echo "Build result: ${currentBuild.result ?: 'SUCCESS'}"
                 echo "Has errors: ${HAS_ERROR}"
                 echo "=========================================="
-
-                if (currentBuild.result == 'ABORTED' || IS_ABORTED) {
-                    echo "Build was aborted, skipping reschedule"
-                } else if (params.RESCHEDULE) {
-                    def rescheduleParams = [
-                        string(name: 'AWS_KVS_LOG_LEVEL', value: params.AWS_KVS_LOG_LEVEL),
-                        string(name: 'LOG_GROUP_NAME', value: params.LOG_GROUP_NAME),
-                        string(name: 'MASTER_NODE_LABEL', value: params.MASTER_NODE_LABEL),
-                        string(name: 'STORAGE_VIEWER_NODE_LABEL', value: params.STORAGE_VIEWER_NODE_LABEL),
-                        string(name: 'STORAGE_VIEWER_ONE_NODE_LABEL', value: params.STORAGE_VIEWER_ONE_NODE_LABEL),
-                        string(name: 'STORAGE_VIEWER_TWO_NODE_LABEL', value: params.STORAGE_VIEWER_TWO_NODE_LABEL),
-                        string(name: 'STORAGE_VIEWER_THREE_NODE_LABEL', value: params.STORAGE_VIEWER_THREE_NODE_LABEL),
-                        string(name: 'RUNNER_LABEL', value: params.RUNNER_LABEL),
-                        string(name: 'SCENARIO_LABEL', value: params.SCENARIO_LABEL),
-                        string(name: 'DURATION_IN_SECONDS', value: params.DURATION_IN_SECONDS),
-                        string(name: 'GIT_URL', value: params.GIT_URL),
-                        string(name: 'GIT_HASH', value: params.GIT_HASH),
-                        string(name: 'AWS_DEFAULT_REGION', value: params.AWS_DEFAULT_REGION),
-                        string(name: 'ENDPOINT', value: params.ENDPOINT),
-                        string(name: 'METRIC_SUFFIX', value: params.METRIC_SUFFIX),
-                        string(name: 'VIEWER_WAIT_MINUTES', value: params.VIEWER_WAIT_MINUTES),
-                        string(name: 'VIEWER_SESSION_DURATION_SECONDS', value: params.VIEWER_SESSION_DURATION_SECONDS),
-                        booleanParam(name: 'DEBUG_LOG_SDP', value: params.DEBUG_LOG_SDP),
-                        booleanParam(name: 'FIRST_ITERATION', value: false),
-                        booleanParam(name: 'IS_STORAGE', value: params.IS_STORAGE),
-                        booleanParam(name: 'IS_STORAGE_SINGLE_NODE', value: params.IS_STORAGE_SINGLE_NODE),
-                        booleanParam(name: 'VIDEO_VERIFY_ENABLED', value: params.VIDEO_VERIFY_ENABLED),
-                        string(name: 'CONSUMER_NODE_LABEL', value: params.CONSUMER_NODE_LABEL),
-                        booleanParam(name: 'JS_STORAGE_VIEWER_JOIN', value: params.JS_STORAGE_VIEWER_JOIN),
-                        booleanParam(name: 'JS_STORAGE_TWO_VIEWERS', value: params.JS_STORAGE_TWO_VIEWERS),
-                        booleanParam(name: 'JS_STORAGE_THREE_VIEWERS', value: params.JS_STORAGE_THREE_VIEWERS),
-                        booleanParam(name: 'RESCHEDULE', value: params.RESCHEDULE),
-                        booleanParam(name: 'USE_TURN', value: params.USE_TURN),
-                        booleanParam(name: 'USE_IOT', value: params.USE_IOT),
-                        booleanParam(name: 'TRICKLE_ICE', value: params.TRICKLE_ICE),
-                        booleanParam(name: 'FORCE_TURN', value: params.FORCE_TURN),
-                        booleanParam(name: 'NO_LOOP_FRAMES', value: params.NO_LOOP_FRAMES),
-                        string(name: 'STORAGE_FPS', value: params.STORAGE_FPS),
-                        string(name: 'JS_BRANCH', value: params.JS_BRANCH),
-                    ]
-
-                    try {
-                        build(job: env.JOB_NAME, parameters: rescheduleParams, wait: false)
-                    } catch (err) {
-                        echo "WARNING: Reschedule failed: ${err.getMessage()}, retrying in 5s..."
-                        try {
-                            sleep 5
-                            build(job: env.JOB_NAME, parameters: rescheduleParams, wait: false)
-                        } catch (retryErr) {
-                            echo "ERROR: Reschedule retry also failed: ${retryErr.getMessage()}"
-                        }
-                    }
-                }
             }
         }
     }
