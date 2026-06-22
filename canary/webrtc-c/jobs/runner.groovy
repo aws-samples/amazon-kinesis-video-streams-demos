@@ -950,8 +950,12 @@ pipeline {
                 sh "rm -f '${env.WORKSPACE}/.in_use'"
 
                 // Don't reschedule if the build was manually aborted
+                // Don't reschedule storage jobs — those are now cron-triggered via storage_runner.groovy
+                def isStorageJob = params.IS_STORAGE || params.IS_STORAGE_SINGLE_NODE || params.JS_STORAGE_VIEWER_JOIN || params.JS_STORAGE_TWO_VIEWERS || params.JS_STORAGE_THREE_VIEWERS
                 if (currentBuild.result == 'ABORTED') {
                     echo "Build was aborted, skipping reschedule"
+                } else if (isStorageJob) {
+                    echo "Storage job — no reschedule (cron handles repetition)"
                 } else {
                     def rescheduleParams = [
                       string(name: 'AWS_DEFAULT_REGION', value: params.AWS_DEFAULT_REGION),
