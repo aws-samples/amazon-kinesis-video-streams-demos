@@ -20,8 +20,9 @@ find "${REPO_DIR}/canary/consumer-java" -name 'clip-*.mp4' -mmin +60 -delete 2>/
 find "${REPO_DIR}/canary/consumer-java" -name '*.log' -mmin +60 -delete 2>/dev/null || true
 
 # Jenkins workspace leftovers
+# Covers both ~/Jenkins/workspace/webrtc-* (default) and ~/Jenkins/webrtc-* (custom ws() calls)
 # Skip workspaces that have a .in_use file younger than 2 hours (active builds)
-for dir in "${HOME}/Jenkins/workspace"/webrtc-*; do
+for dir in "${HOME}/Jenkins/workspace"/webrtc-* "${HOME}/Jenkins"/webrtc-*; do
     [ -d "$dir" ] || continue
     # Skip if directory is less than 60 minutes old
     if ! find "$dir" -maxdepth 0 -mmin +60 | grep -q .; then
