@@ -787,9 +787,11 @@ pipeline {
             }
         }
 
-        stage('Unset credentials') {
+        stage('Cleanup') {
             steps {
                 script {
+                    sh "rm -f '${env.WORKSPACE}/.in_use'"
+                    pushKeepAlive('CleanupComplete')
                     env.AWS_ACCESS_KEY_ID = ''
                     env.AWS_SECRET_ACCESS_KEY = ''
                     env.AWS_SESSION_TOKEN = ''
@@ -803,11 +805,6 @@ pipeline {
         always {
             script {
                 sh "rm -f '${env.WORKSPACE}/.in_use'"
-                try {
-                    pushKeepAlive('CleanupComplete')
-                } catch (err) {
-                    echo "CleanupComplete keep-alive failed (credentials may be unset): ${err.getMessage()}"
-                }
 
                 echo "=========================================="
                 echo "Storage Runner Summary"
