@@ -445,6 +445,10 @@ pipeline {
         label params.MASTER_NODE_LABEL
     }
 
+    options {
+        skipDefaultCheckout()
+    }
+
     parameters {
         string(name: 'AWS_KVS_LOG_LEVEL', defaultValue: '2')
         string(name: 'LOG_GROUP_NAME', defaultValue: 'WebrtcSDK')
