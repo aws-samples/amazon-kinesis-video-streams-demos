@@ -22,15 +22,19 @@ def pushKeepAlive(stageName) {
     def region = params.AWS_DEFAULT_REGION ?: 'us-west-2'
     def scenarioLabel = params.SCENARIO_LABEL ?: 'StoragePeriodic'
     def runnerLabel = params.RUNNER_LABEL ?: 'StoragePeriodic'
-    sh """
+    def rc = sh(script: """
         export PATH="/usr/local/bin:/usr/bin:\$PATH"
         aws cloudwatch put-metric-data \
             --namespace KinesisVideoSDKCanary \
             --region ${region} \
             --metric-data \
                 'MetricName=PipelineKeepAlive,Value=1.0,Unit=None,Dimensions=[{Name=Stage,Value=${stageName}},{Name=StorageWebRTCSDKCanaryLabel,Value=${scenarioLabel}},{Name=RunnerLabel,Value=${runnerLabel}}]'
-    """
-    echo "KeepAlive: ${stageName}"
+    """, returnStatus: true)
+    if (rc == 0) {
+        echo "KeepAlive: ${stageName}"
+    } else {
+        echo "KeepAlive: ${stageName} (emit failed, rc=${rc} — aws CLI may not be installed on this node)"
+    }
 }
 
 // Signal flag: set to true when the storage master build is complete and the binary
