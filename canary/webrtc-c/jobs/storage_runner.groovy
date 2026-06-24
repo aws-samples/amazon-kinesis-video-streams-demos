@@ -23,6 +23,7 @@ def pushKeepAlive(stageName) {
     def scenarioLabel = params.SCENARIO_LABEL ?: 'StoragePeriodic'
     def runnerLabel = params.RUNNER_LABEL ?: 'StoragePeriodic'
     sh """
+        export PATH="/usr/local/bin:/usr/bin:\$PATH"
         aws cloudwatch put-metric-data \
             --namespace KinesisVideoSDKCanary \
             --region ${region} \
