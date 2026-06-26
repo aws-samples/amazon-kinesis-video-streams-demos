@@ -20,8 +20,6 @@ def buildWebRTCProject(useMbedTLS, thing_prefix) {
         chmod a+x cert_setup.sh &&
         ./cert_setup.sh ${thing_prefix} &&
         cd .. &&
-        echo "Cleaning up build and open-source directories..." &&
-        rm -rf build open-source &&
         mkdir -p build &&
         cd build &&
         ${configureCmd} &&
@@ -164,6 +162,57 @@ def buildSignaling(params) {
     }
 }
 
+def runViewerSessions(viewerId = "", waitMinutes = 10, viewerCount = "1") {
+    // Create unique workspace for each viewer to prevent Git conflicts
+    def workspaceName = "${env.JOB_NAME}-${viewerId ?: 'viewer'}-${BUILD_NUMBER}"
+    ws(workspaceName) {
+        try {
+            deleteDir()
+            checkout([$class: 'GitSCM', branches: [[name: params.GIT_HASH ]],
+                      userRemoteConfigs: [[url: params.GIT_URL]]])
+            
+            if (params.FIRST_ITERATION) {
+                echo "First iteration - waiting ${waitMinutes} minutes for master to build"
+                sleep waitMinutes * 60
+            }
+            
+            for (int session = 1; session <= 3; session++) {
+                echo "Starting ${viewerId ? viewerId + ' ' : ''}session ${session}/3"
+                
+                try {
+                    sh """
+                        export JOB_NAME="${env.JOB_NAME}"
+                        export RUNNER_LABEL="${params.RUNNER_LABEL}"
+                        export AWS_DEFAULT_REGION="${params.AWS_DEFAULT_REGION}"
+                        export DURATION_IN_SECONDS="180"
+                        export FORCE_TURN="${params.FORCE_TURN}"
+                        export VIEWER_COUNT="${viewerCount}"
+                        export VIEWER_ID="${viewerId}"
+                        export CLIENT_ID="${viewerId ? viewerId.toLowerCase() + '-' : 'viewer-'}session-${session}-${BUILD_NUMBER}"
+                        
+                        ./canary/webrtc-c/scripts/setup-storage-viewer.sh
+                    """
+                } catch (FlowInterruptedException err) {
+                    echo 'Aborted due to cancellation'
+                    throw err
+                } catch (err) {
+                    HAS_ERROR = true
+                    unstable err.toString()
+                }
+                
+                if (session < 3) {
+                    echo "${viewerId ? viewerId + ' ' : ''}session ${session} completed. Waiting 1 minute before next session."
+                    sleep 60
+                }
+            }
+            echo "All 3 ${viewerId ? viewerId + ' ' : ''}sessions completed"
+        } finally {
+            // Ensure complete cleanup
+            deleteDir()
+        }
+    }
+}
+
 def buildStorageCanary(isConsumer, params) {
     def scripts_dir = !isConsumer ? "$WORKSPACE/canary/webrtc-c/scripts" :
         "$WORKSPACE/canary/webrtc-c/scripts"
@@ -255,6 +304,11 @@ pipeline {
         string(name: 'MASTER_NODE_LABEL')
         string(name: 'CONSUMER_NODE_LABEL')
         string(name: 'VIEWER_NODE_LABEL')
+        string(name: 'STORAGE_VIEWER_NODE_LABEL')
+        string(name: 'STORAGE_VIEWER_ONE_NODE_LABEL')
+        string(name: 'STORAGE_VIEWER_TWO_NODE_LABEL')
+        string(name: 'STORAGE_VIEWER_THREE_NODE_LABEL')
+        string(name: 'VIEWER_COUNT')
         string(name: 'RUNNER_LABEL')
         string(name: 'SCENARIO_LABEL')
         string(name: 'DURATION_IN_SECONDS')
@@ -265,6 +319,7 @@ pipeline {
         booleanParam(name: 'FIRST_ITERATION', defaultValue: true)
         booleanParam(name: 'JS_STORAGE_VIEWER_JOIN', defaultValue: false)
         booleanParam(name: 'JS_STORAGE_TWO_VIEWERS', defaultValue: false)
+        booleanParam(name: 'JS_STORAGE_THREE_VIEWERS', defaultValue: false)
     }
     
     // Set the role ARN to environment to avoid string interpolation to follow Jenkins security guidelines.
@@ -273,6 +328,40 @@ pipeline {
     }
 
     stages {
+        stage('Pre Cleanup') {
+            steps {
+                script {
+                    sh """
+                        echo "Cleaning up workspace artifacts - Disk usage before cleanup:"
+                        df -h
+                        
+                        # Clean all @tmp directories older than 1 hour
+                        find ~/Jenkins -name "*@tmp" -type d -mmin +60 -exec rm -rf {} + 2>/dev/null || true
+                        
+                        # Keep only last 10 workspace directories per job
+                        cd ~/Jenkins 2>/dev/null || true
+                        ls -t | grep "webrtc-canary-runner" | grep -v "@tmp" | tail -n +11 | xargs -I {} rm -rf {} 2>/dev/null || true
+                        
+                        # Clean Puppeteer cache (keep only latest Chrome)
+                        find ~/.cache/puppeteer -type d -name "linux-*" 2>/dev/null | sort -r | tail -n +2 | xargs rm -rf 2>/dev/null || true
+                        
+                        # Clean npm cache if over 200MB
+                        if [ -d ~/.npm ] && [ \$(du -sm ~/.npm 2>/dev/null | cut -f1) -gt 200 ]; then
+                            npm cache clean --force 2>/dev/null || true
+                        fi
+                        
+                        # Clean temp files
+                        find /tmp -name "*storage*viewer*" -type d -mmin +60 -exec rm -rf {} + 2>/dev/null || true
+                        find /tmp -name "*webrtc-canary-runner*" -type d -mmin +60 -exec rm -rf {} + 2>/dev/null || true
+                        find /tmp -name "jenkins-*" -type d -mtime +1 -exec rm -rf {} + 2>/dev/null || true
+                        
+                        echo "Cleanup completed - Disk usage after cleanup:"
+                        df -h
+                    """
+                }
+            }
+        }
+
         stage('Fetch STS credentials and export to env vars') {
             steps {
                 script {
@@ -311,7 +400,8 @@ pipeline {
                     equals expected: false, actual: params.IS_STORAGE
                     equals expected: false, actual: params.IS_STORAGE_SINGLE_NODE 
                     equals expected: false, actual: params.JS_STORAGE_VIEWER_JOIN
-                    equals expected: false, actual: params.JS_STORAGE_TWO_VIEWERS 
+                    equals expected: false, actual: params.JS_STORAGE_TWO_VIEWERS
+                    equals expected: false, actual: params.JS_STORAGE_THREE_VIEWERS
                 }
             }
             parallel {
@@ -369,7 +459,8 @@ pipeline {
                     equals expected: true, actual: params.IS_STORAGE
                     equals expected: false, actual: params.IS_STORAGE_SINGLE_NODE
                     equals expected: false, actual: params.JS_STORAGE_VIEWER_JOIN
-                    equals expected: false, actual: params.JS_STORAGE_TWO_VIEWERS 
+                    equals expected: false, actual: params.JS_STORAGE_TWO_VIEWERS
+                    equals expected: false, actual: params.JS_STORAGE_THREE_VIEWERS
                 }
             }
             parallel {
@@ -421,20 +512,20 @@ pipeline {
             }
         }
 
-        stage('Build and Run Webrtc-storage Viewer') {
-            failFast true
+        stage('Single Viewer with Continuous Master') {
             when {
                 equals expected: true, actual: params.JS_STORAGE_VIEWER_JOIN
             }
             parallel {
-                stage('StorageMaster') {
+                stage('Continuous StorageMaster') {
                     agent {
                         label params.MASTER_NODE_LABEL
-                    }                    
+                    }
                     steps {
                         script {
-                            
-                            buildStorageCanary(false, params)
+                            def mutableParams = [:] + params
+                            mutableParams.DURATION_IN_SECONDS = "1380"
+                            buildStorageCanary(false, mutableParams)
                         }
                     }
                 }
@@ -444,52 +535,27 @@ pipeline {
                     }
                     steps {
                         script {
-                            
-                            sh """
-                                echo "DEBUG: Checking StorageViewer directory contents"
-                                echo "DEBUG: GIT_HASH parameter: ${params.GIT_HASH}"
-                                git rev-parse HEAD
-                                ls -la ./canary/webrtc-c/scripts/
-                                pwd
-                            """
-                            
-                            try {
-                                sh """
-                                    export JOB_NAME="${env.JOB_NAME}"
-                                    export RUNNER_LABEL="${params.RUNNER_LABEL}"
-                                    export AWS_DEFAULT_REGION="${params.AWS_DEFAULT_REGION}"
-                                    export DURATION_IN_SECONDS="${params.DURATION_IN_SECONDS}"
-                                    export FORCE_TURN="${params.FORCE_TURN}"
-                                    export VIEWER_COUNT="${params.VIEWER_COUNT}"
-                                    
-                                    ./canary/webrtc-c/scripts/setup-storage-viewer.sh
-                                """
-                            } catch (FlowInterruptedException err) {
-                                echo 'Aborted due to cancellation'
-                                throw err
-                            } catch (err) {
-                                HAS_ERROR = true
-                                unstable err.toString()
-                            }
+                            runViewerSessions("", 55, "1")
                         }
                     }
                 }
             }
         }
 
-        stage('Build and Run Webrtc-storage Two Viewers') {
-            failFast true
+        stage('Two Viewers with Continuous Master') {
             when {
                 equals expected: true, actual: params.JS_STORAGE_TWO_VIEWERS
             }
             parallel {
-                stage('StorageMaster') {
+                stage('Continuous StorageMaster') {
                     agent {
                         label params.MASTER_NODE_LABEL
-                    }                    
+                    }
                     steps {
                         script {
-                            buildStorageCanary(false, params)
+                            def mutableParams = [:] + params
+                            mutableParams.DURATION_IN_SECONDS = "1380"
+                            buildStorageCanary(false, mutableParams)
                         }
                     }
                 }
@@ -499,24 +565,7 @@ pipeline {
                     }
                     steps {
                         script {
-                            
-                            try {
-                                sh """
-                                    export JOB_NAME="${env.JOB_NAME}"
-                                    export RUNNER_LABEL="${params.RUNNER_LABEL}"
-                                    export AWS_DEFAULT_REGION="${params.AWS_DEFAULT_REGION}"
-                                    export DURATION_IN_SECONDS="${params.DURATION_IN_SECONDS}"
-                                    export FORCE_TURN="${params.FORCE_TURN}"
-                                    
-                                    ./canary/webrtc-c/scripts/setup-storage-viewer.sh
-                                """
-                            } catch (FlowInterruptedException err) {
-                                echo 'Aborted due to cancellation'
-                                throw err
-                            } catch (err) {
-                                HAS_ERROR = true
-                                unstable err.toString()
-                            }
+                            runViewerSessions("Viewer1", 55, "2")
                         }
                     }
                 }
@@ -525,26 +574,84 @@ pipeline {
                         label params.STORAGE_VIEWER_TWO_NODE_LABEL
                     }
                     steps {
-                        script {         
-                            try {
-                                sh """
-                                    export JOB_NAME="${env.JOB_NAME}"
-                                    export RUNNER_LABEL="${params.RUNNER_LABEL}"
-                                    export AWS_DEFAULT_REGION="${params.AWS_DEFAULT_REGION}"
-                                    export DURATION_IN_SECONDS="${params.DURATION_IN_SECONDS}"
-                                    export FORCE_TURN="${params.FORCE_TURN}"
-                                    
-                                    ./canary/webrtc-c/scripts/setup-storage-viewer.sh
-                                """
-                            } catch (FlowInterruptedException err) {
-                                echo 'Aborted due to cancellation'
-                                throw err
-                            } catch (err) {
-                                HAS_ERROR = true
-                                unstable err.toString()
-                            }
+                        script {
+                            runViewerSessions("Viewer2", 55, "2")
                         }
                     }
+                }
+            }
+        }
+
+        stage('Three Viewers with Continuous Master') {
+            when {
+                equals expected: true, actual: params.JS_STORAGE_THREE_VIEWERS
+            }
+            parallel {
+                stage('Continuous StorageMaster') {
+                    agent {
+                        label params.MASTER_NODE_LABEL
+                    }
+                    steps {
+                        script {
+                            def mutableParams = [:] + params
+                            mutableParams.DURATION_IN_SECONDS = "1380"
+                            buildStorageCanary(false, mutableParams)
+                        }
+                    }
+                }
+                stage('StorageViewer1') {
+                    agent {
+                        label params.STORAGE_VIEWER_ONE_NODE_LABEL
+                    }
+                    steps {
+                        script {
+                            runViewerSessions("Viewer1", 55, "3")
+                        }
+                    }
+                }
+                stage('StorageViewer2') {
+                    agent {
+                        label params.STORAGE_VIEWER_TWO_NODE_LABEL
+                    }
+                    steps {
+                        script {
+                            runViewerSessions("Viewer2", 55, "3")
+                        }
+                    }
+                }
+                stage('StorageViewer3') {
+                    agent {
+                        label params.STORAGE_VIEWER_THREE_NODE_LABEL
+                    }
+                    steps {
+                        script {
+                            runViewerSessions("Viewer3", 55, "3")
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Stop Continuous StorageMaster') {
+            when {
+                anyOf {
+                    equals expected: true, actual: params.JS_STORAGE_VIEWER_JOIN
+                    equals expected: true, actual: params.JS_STORAGE_TWO_VIEWERS
+                    equals expected: true, actual: params.JS_STORAGE_THREE_VIEWERS
+                }
+            }
+            agent {
+                label params.MASTER_NODE_LABEL
+            }
+            steps {
+                script {
+                    sh """
+                        # Stop the background master process
+                        if [ -f master.pid ]; then
+                            kill \$(cat master.pid) || true
+                            rm -f master.pid
+                        fi
+                    """
                 }
             }
         }
@@ -595,6 +702,11 @@ pipeline {
                       string(name: 'MASTER_NODE_LABEL', value: params.MASTER_NODE_LABEL),
                       string(name: 'CONSUMER_NODE_LABEL', value: params.CONSUMER_NODE_LABEL),
                       string(name: 'VIEWER_NODE_LABEL', value: params.VIEWER_NODE_LABEL),
+                      string(name: 'STORAGE_VIEWER_NODE_LABEL', value: params.STORAGE_VIEWER_NODE_LABEL),
+                      string(name: 'STORAGE_VIEWER_ONE_NODE_LABEL', value: params.STORAGE_VIEWER_ONE_NODE_LABEL),
+                      string(name: 'STORAGE_VIEWER_TWO_NODE_LABEL', value: params.STORAGE_VIEWER_TWO_NODE_LABEL),
+                      string(name: 'STORAGE_VIEWER_THREE_NODE_LABEL', value: params.STORAGE_VIEWER_THREE_NODE_LABEL),
+                      string(name: 'VIEWER_COUNT', value: params.VIEWER_COUNT),
                       string(name: 'RUNNER_LABEL', value: params.RUNNER_LABEL),
                       string(name: 'SCENARIO_LABEL', value: params.SCENARIO_LABEL),
                       string(name: 'DURATION_IN_SECONDS', value: params.DURATION_IN_SECONDS),
@@ -606,6 +718,17 @@ pipeline {
                     ],
                     wait: false
                 )
+            }
+        }
+    }
+    
+    post {
+        always {
+            script {
+                sh """
+                    echo "Post-build cleanup - removing current workspace @tmp directory"
+                    rm -rf ${env.WORKSPACE}@tmp 2>/dev/null || true
+                """
             }
         }
     }
