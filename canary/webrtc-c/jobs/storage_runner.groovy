@@ -18,6 +18,25 @@ HAS_ERROR = false
 IS_ABORTED = false
 VIEWER_SESSION_RESULTS = [:]
 
+def pushKeepAlive(stageName) {
+    def region = params.AWS_DEFAULT_REGION ?: 'us-west-2'
+    def scenarioLabel = params.SCENARIO_LABEL ?: 'StoragePeriodic'
+    def runnerLabel = params.RUNNER_LABEL ?: 'StoragePeriodic'
+    def rc = sh(script: """
+        export PATH="/usr/local/bin:/usr/bin:\$PATH"
+        aws cloudwatch put-metric-data \
+            --namespace KinesisVideoSDKCanary \
+            --region ${region} \
+            --metric-data \
+                'MetricName=PipelineKeepAlive,Value=1.0,Unit=None,Dimensions=[{Name=Stage,Value=${stageName}},{Name=StorageWebRTCSDKCanaryLabel,Value=${scenarioLabel}},{Name=RunnerLabel,Value=${runnerLabel}}]'
+    """, returnStatus: true)
+    if (rc == 0) {
+        echo "KeepAlive: ${stageName}"
+    } else {
+        echo "KeepAlive: ${stageName} (emit failed, rc=${rc} — aws CLI may not be installed on this node)"
+    }
+}
+
 // Signal flag: set to true when the storage master build is complete and the binary
 // is about to start streaming. Viewers poll this instead of sleeping a fixed duration.
 MASTER_READY = false
@@ -46,6 +65,8 @@ def buildWebRTCProject(thing_prefix) {
         fi
         cd '${repoDir}' && git fetch origin '+refs/heads/*:refs/remotes/origin/*' && git checkout -f '${params.GIT_HASH}'
         flock -u 9"""
+
+    pushKeepAlive('GitCheckoutComplete')
 
     // Sync cleanup cron script if it changed
     sh """
@@ -159,6 +180,7 @@ def runViewerSessions(viewerId = "", waitMinutes = 2, viewerCount = "1") {
                 export JS_PAGE_URL="${params.JS_BRANCH ?: 'master'}"
                 ./canary/webrtc-c/scripts/prepare-storage-viewer.sh
             """
+            pushKeepAlive('ViewerPrepareComplete')
 
             if (waitMinutes > 0) {
                 echo "Waiting for master to be ready (timeout: ${waitMinutes} minutes)..."
@@ -228,6 +250,7 @@ def runViewerSessions(viewerId = "", waitMinutes = 2, viewerCount = "1") {
                 unstable err.toString()
             }
 
+            pushKeepAlive('ViewerSessionComplete')
             echo "${viewerId ? viewerId + ' ' : ''}viewer session completed"
         } finally {
             sh "rm -f '${env.WORKSPACE}/.in_use'"
@@ -337,6 +360,7 @@ def buildStorageCanary(isConsumer, params) {
         MASTER_READY = true
         echo "Master build complete, signaling viewers (MASTER_READY=true)"
         def buildDir = "${env.HOME}/webrtc-c-storage-master/build"
+        pushKeepAlive('MasterStarted')
         withRunnerWrapper(envs) {
             // Timeout: duration + 5 min buffer. The C binary should exit on its own
             // after CANARY_DURATION_IN_SECONDS, but if it hangs (e.g., ICE agent
@@ -347,6 +371,7 @@ def buildStorageCanary(isConsumer, params) {
                     ./kvsWebrtcStorageSample"""
             }
         }
+        pushKeepAlive('MasterFinished')
     } else {
         def envs = (commonEnvs + consumerEnvs).collect{ k, v -> "${k}=${v}" }
         withRunnerWrapper(envs) {
@@ -423,6 +448,10 @@ def buildStorageCanary(isConsumer, params) {
 pipeline {
     agent {
         label params.MASTER_NODE_LABEL
+    }
+
+    options {
+        skipDefaultCheckout()
     }
 
     parameters {
@@ -758,9 +787,11 @@ pipeline {
             }
         }
 
-        stage('Unset credentials') {
+        stage('Cleanup') {
             steps {
                 script {
+                    sh "rm -f '${env.WORKSPACE}/.in_use'"
+                    pushKeepAlive('CleanupComplete')
                     env.AWS_ACCESS_KEY_ID = ''
                     env.AWS_SECRET_ACCESS_KEY = ''
                     env.AWS_SESSION_TOKEN = ''
