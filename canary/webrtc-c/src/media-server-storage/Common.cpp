@@ -381,6 +381,9 @@ VOID onConnectionStateChange(UINT64 customData, RTC_PEER_CONNECTION_STATE newSta
                 UINT64 joinSSCallToSessionJoined = (GETTIME() - pSampleConfiguration->joinSSCallStartTime) / HUNDREDS_OF_NANOS_IN_A_MILLISECOND;
                 DLOGI("[Canary] JoinSSCallToSessionJoined: %" PRIu64 " ms", joinSSCallToSessionJoined);
                 Canary::Cloudwatch::getInstance().monitoring.pushJoinSSCallToSessionJoined(joinSSCallToSessionJoined, Aws::CloudWatch::Model::StandardUnit::Milliseconds);
+
+                DLOGI("[Canary] TimeToPeerConnection: %" PRIu64 " ms", joinSSCallToSessionJoined);
+                Canary::Cloudwatch::getInstance().monitoring.pushTimeToPeerConnection(joinSSCallToSessionJoined, Aws::CloudWatch::Model::StandardUnit::Milliseconds);
             }
             
             pSampleStreamingSession->canaryOutgoingRTPMetricsContext.prevTs = GETTIME();
