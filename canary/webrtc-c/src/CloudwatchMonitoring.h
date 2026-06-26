@@ -32,6 +32,7 @@ class CloudwatchMonitoring {
     VOID pushJoinSSCallToSessionJoined(UINT64, Aws::CloudWatch::Model::StandardUnit);
     VOID pushCMasterUnexpectedDisconnection(UINT32);
     VOID pushMasterStreamingAvailability(DOUBLE);
+    VOID pushTimeToPeerConnection(UINT64, Aws::CloudWatch::Model::StandardUnit);
     VOID pushTimeToSendIce(UINT64, Aws::CloudWatch::Model::StandardUnit);
     VOID pushTimeToReceiveIce(UINT64, Aws::CloudWatch::Model::StandardUnit);
     VOID pushJoinSSCallToFirstFrame(UINT64, Aws::CloudWatch::Model::StandardUnit);
