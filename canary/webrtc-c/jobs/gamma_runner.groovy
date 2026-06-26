@@ -133,7 +133,7 @@ def withRunnerWrapper(envs, fn) {
     }
 }
 
-def runViewerSessions(viewerId = "", waitMinutes = 2, viewerCount = "1") {
+def runViewerSessions(viewerId = "", waitMinutes = 2, viewerCount = "1", staggerDelaySeconds = 0, sendAudio = false) {
     def workspaceName = "${env.JOB_NAME}-${viewerId ?: 'viewer'}-${BUILD_NUMBER}"
     ws(workspaceName) {
         sh "touch '${env.WORKSPACE}/.in_use'"
@@ -187,6 +187,11 @@ def runViewerSessions(viewerId = "", waitMinutes = 2, viewerCount = "1") {
             def viewerKey = viewerId ?: 'viewer'
             VIEWER_SESSION_RESULTS[viewerKey] = [attempts: 1, successes: 0]
 
+            if (staggerDelaySeconds > 0) {
+                echo "Stagger delay: waiting ${staggerDelaySeconds} seconds before starting viewer..."
+                sleep staggerDelaySeconds
+            }
+
             echo "Starting ${viewerId ? viewerId + ' ' : ''}viewer session"
             
             try {
@@ -196,6 +201,7 @@ def runViewerSessions(viewerId = "", waitMinutes = 2, viewerCount = "1") {
                         export RUNNER_LABEL="${params.RUNNER_LABEL}"
                         export AWS_DEFAULT_REGION="${params.AWS_DEFAULT_REGION}"
                         export DURATION_IN_SECONDS="${viewerSessionDuration}"
+                        export MASTER_DURATION="${params.DURATION_IN_SECONDS ?: '153'}"
                         export FORCE_TURN="${params.FORCE_TURN ?: 'false'}"
                         export VIEWER_COUNT="${viewerCount}"
                         export VIEWER_ID="${viewerId}"
@@ -204,6 +210,8 @@ def runViewerSessions(viewerId = "", waitMinutes = 2, viewerCount = "1") {
                         export METRIC_SUFFIX="${metricSuffixValue}"
                         export KEEP_RECORDING="${params.KEEP_RECORDING}"
                         export JS_PAGE_URL="${params.JS_BRANCH ?: 'master'}"
+                        export VIEWER_SEND_AUDIO="${sendAudio}"
+                        export VIEWER_AUDIO_FILE="\${WORKSPACE}/canary/webrtc-c/assets/audio-source.wav"
                         
                         ./canary/webrtc-c/scripts/run-storage-viewer.sh
                     """,
@@ -301,7 +309,8 @@ def buildStorageCanary(isConsumer, params) {
         'AWS_DEFAULT_REGION': params.AWS_DEFAULT_REGION,
         'CONTROL_PLANE_URI': params.ENDPOINT ?: '',
         'CANARY_NO_LOOP_FRAMES': params.NO_LOOP_FRAMES ?: false,
-        'CANARY_FRAME_RATE': params.STORAGE_FPS ?: ''
+        'CANARY_FRAME_RATE': params.STORAGE_FPS ?: '',
+        'CANARY_MEDIA_TYPE': env.CANARY_MEDIA_TYPE ?: ''
     ]
 
     def repoDir = "${env.HOME}/webrtc-c-storage-master/repo"
@@ -453,6 +462,7 @@ pipeline {
         booleanParam(name: 'JS_STORAGE_VIEWER_JOIN', defaultValue: false)
         booleanParam(name: 'JS_STORAGE_TWO_VIEWERS', defaultValue: false)
         booleanParam(name: 'JS_STORAGE_THREE_VIEWERS', defaultValue: false)
+        booleanParam(name: 'JS_STORAGE_VO_MIXED_VIEWERS', defaultValue: false, description: 'VO master + 2 AO viewers + 1 RO viewer')
         booleanParam(name: 'RESCHEDULE', defaultValue: false, description: 'Whether to reschedule after completion')
         booleanParam(name: 'USE_TURN', defaultValue: false)
         booleanParam(name: 'USE_IOT', defaultValue: false)
@@ -703,12 +713,81 @@ pipeline {
             }
         }
 
+        stage('VO Master with Mixed Viewers') {
+            when {
+                equals expected: true, actual: params.JS_STORAGE_VO_MIXED_VIEWERS
+            }
+            parallel {
+                stage('VO StorageMaster') {
+                    agent {
+                        label params.MASTER_NODE_LABEL
+                    }
+                    steps {
+                        script {
+                            ws("${env.JOB_NAME}-master-${BUILD_NUMBER}") {
+                                sh "touch '${env.WORKSPACE}/.in_use'"
+                                try {
+                                    def mutableParams = [:] + params
+                                    mutableParams.DURATION_IN_SECONDS = "156"
+                                    // Set video-only mode for the master
+                                    env.CANARY_MEDIA_TYPE = "video_only"
+                                    buildStorageCanary(false, mutableParams)
+                                } finally {
+                                    sh "rm -f '${env.WORKSPACE}/.in_use'"
+                                }
+                            }
+                        }
+                    }
+                }
+                stage('AOViewer1') {
+                    agent {
+                        label params.STORAGE_VIEWER_ONE_NODE_LABEL
+                    }
+                    steps {
+                        script {
+                            def waitMins = (params.VIEWER_WAIT_MINUTES != null && params.VIEWER_WAIT_MINUTES.toString().trim() != '')
+                                ? params.VIEWER_WAIT_MINUTES.toInteger()
+                                : 20
+                            runViewerSessions("Viewer1", waitMins, "3", 0, true)
+                        }
+                    }
+                }
+                stage('AOViewer2') {
+                    agent {
+                        label params.STORAGE_VIEWER_TWO_NODE_LABEL
+                    }
+                    steps {
+                        script {
+                            def waitMins = (params.VIEWER_WAIT_MINUTES != null && params.VIEWER_WAIT_MINUTES.toString().trim() != '')
+                                ? params.VIEWER_WAIT_MINUTES.toInteger()
+                                : 20
+                            runViewerSessions("Viewer2", waitMins, "3", 5, true)
+                        }
+                    }
+                }
+                stage('ROViewer3') {
+                    agent {
+                        label params.STORAGE_VIEWER_THREE_NODE_LABEL
+                    }
+                    steps {
+                        script {
+                            def waitMins = (params.VIEWER_WAIT_MINUTES != null && params.VIEWER_WAIT_MINUTES.toString().trim() != '')
+                                ? params.VIEWER_WAIT_MINUTES.toInteger()
+                                : 20
+                            runViewerSessions("Viewer3", waitMins, "3", 10, false)
+                        }
+                    }
+                }
+            }
+        }
+
         stage('Publish Viewer Connection Success Rate') {
             when {
                 anyOf {
                     equals expected: true, actual: params.JS_STORAGE_VIEWER_JOIN
                     equals expected: true, actual: params.JS_STORAGE_TWO_VIEWERS
                     equals expected: true, actual: params.JS_STORAGE_THREE_VIEWERS
+                    equals expected: true, actual: params.JS_STORAGE_VO_MIXED_VIEWERS
                 }
             }
             steps {
@@ -773,6 +852,7 @@ pipeline {
                         booleanParam(name: 'JS_STORAGE_VIEWER_JOIN', value: params.JS_STORAGE_VIEWER_JOIN),
                         booleanParam(name: 'JS_STORAGE_TWO_VIEWERS', value: params.JS_STORAGE_TWO_VIEWERS),
                         booleanParam(name: 'JS_STORAGE_THREE_VIEWERS', value: params.JS_STORAGE_THREE_VIEWERS),
+                        booleanParam(name: 'JS_STORAGE_VO_MIXED_VIEWERS', value: params.JS_STORAGE_VO_MIXED_VIEWERS),
                         booleanParam(name: 'RESCHEDULE', value: params.RESCHEDULE),
                         booleanParam(name: 'USE_TURN', value: params.USE_TURN),
                         booleanParam(name: 'USE_IOT', value: params.USE_IOT),
