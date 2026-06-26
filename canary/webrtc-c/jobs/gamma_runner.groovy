@@ -7,11 +7,9 @@ import org.jenkinsci.plugins.workflow.steps.FlowInterruptedException
  * and JS viewer tests against a custom endpoint.
  * 
  * Key differences from production runner:
- *   - No automatic rescheduling (runs once and stops)
+ *   - Triggered via cron schedule
  *   - Simplified configuration
  *   - Dedicated for gamma/testing purposes
- * 
- * Do not run this directly - use webrtc-gamma-orchestrator instead.
  */
 
 START_TIMESTAMP = new Date().getTime()
