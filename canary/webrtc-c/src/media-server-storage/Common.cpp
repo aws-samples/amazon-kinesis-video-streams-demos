@@ -659,6 +659,13 @@ STATUS sendSignalingMessage(PSampleStreamingSession pSampleStreamingSession, PSi
         CHK_STATUS(signalingClientGetMetrics(pSampleConfiguration->signalingClientHandle, &pSampleConfiguration->signalingClientMetrics));
         DLOGP("[Signaling offer received to answer sent time] %" PRIu64 " ms",
               pSampleConfiguration->signalingClientMetrics.signalingClientStats.offerToAnswerTime);
+
+        // Push TimeToSendAnswer — time from JoinStorageSession call to answer sent
+        if (pSampleConfiguration->joinSSCallStartTime != 0) {
+            UINT64 timeToSendAnswer = (GETTIME() - pSampleConfiguration->joinSSCallStartTime) / HUNDREDS_OF_NANOS_IN_A_MILLISECOND;
+            DLOGI("[Canary] TimeToSendAnswer: %" PRIu64 " ms", timeToSendAnswer);
+            Canary::Cloudwatch::getInstance().monitoring.pushTimeToSendAnswer(timeToSendAnswer, Aws::CloudWatch::Model::StandardUnit::Milliseconds);
+        }
     }
 
 CleanUp:
