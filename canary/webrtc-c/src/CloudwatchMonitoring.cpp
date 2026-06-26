@@ -553,6 +553,17 @@ VOID CloudwatchMonitoring::pushTimeToSendAnswer(UINT64 duration, Aws::CloudWatch
     this->push(datum);
 }
 
+VOID CloudwatchMonitoring::pushTimeToReceiveInboundMedia(UINT64 duration, Aws::CloudWatch::Model::StandardUnit unit)
+{
+    MetricDatum datum;
+
+    datum.SetMetricName("TimeToReceiveInboundMedia");
+    datum.SetValue(duration);
+    datum.SetUnit(unit);
+
+    this->push(datum);
+}
+
 VOID CloudwatchMonitoring::pushTimeToSendIce(UINT64 duration, Aws::CloudWatch::Model::StandardUnit unit)
 {
     MetricDatum datum;
