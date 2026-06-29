@@ -41,6 +41,10 @@ def pushKeepAlive(stageName) {
 // is about to start streaming. Viewers poll this instead of sleeping a fixed duration.
 MASTER_READY = false
 
+// Signal flag: set to true when a viewer has started and is ready to receive media.
+// The master waits for this before starting the C binary (used in VO Mixed Viewers).
+VIEWER_STARTED = false
+
 // @NonCPS prevents Jenkins CPS from trying to serialize local variables in this
 // method.  java.util.regex.Matcher is NOT serializable — holding one across a CPS
 // step boundary (sh, sleep, echo …) causes NotSerializableException and kills the
@@ -215,6 +219,9 @@ def runViewerSessions(viewerId = "", waitMinutes = 2, viewerCount = "1", stagger
             }
 
             echo "Starting ${viewerId ? viewerId + ' ' : ''}viewer session"
+
+            // Signal master that viewer is ready — master waits for this before streaming
+            VIEWER_STARTED = true
             
             try {
                 def output = sh(
@@ -368,6 +375,22 @@ def buildStorageCanary(isConsumer, params) {
         def envs = (commonEnvs + masterEnvs).collect{ k, v -> "${k}=${v}" }
         MASTER_READY = true
         echo "Master build complete, signaling viewers (MASTER_READY=true)"
+
+        // If CANARY_WAIT_FOR_VIEWERS is set, wait for viewers to join before starting the binary
+        if (env.CANARY_WAIT_FOR_VIEWERS == "true") {
+            echo "Waiting for viewer to start (VIEWER_STARTED)..."
+            def viewerWaitStart = System.currentTimeMillis()
+            def viewerWaitTimeout = 120 * 1000 // 2 minutes max
+            while (!VIEWER_STARTED && (System.currentTimeMillis() - viewerWaitStart) < viewerWaitTimeout) {
+                sleep 2
+            }
+            if (VIEWER_STARTED) {
+                echo "Viewer started! Launching master binary..."
+            } else {
+                echo "WARNING: Viewer not started after 2 minutes, launching master anyway"
+            }
+        }
+
         def buildDir = "${env.HOME}/webrtc-c-storage-master/build"
         pushKeepAlive('MasterStarted')
         withRunnerWrapper(envs) {
@@ -800,6 +823,8 @@ pipeline {
                                     mutableParams.DURATION_IN_SECONDS = "156"
                                     // Set video-only mode for the master
                                     env.CANARY_MEDIA_TYPE = "video_only"
+                                    // Wait for all viewers to join before starting the master binary
+                                    env.CANARY_WAIT_FOR_VIEWERS = "true"
                                     buildStorageCanary(false, mutableParams)
                                 } finally {
                                     sh "rm -f '${env.WORKSPACE}/.in_use'"
@@ -830,7 +855,7 @@ pipeline {
                             def waitMins = (params.VIEWER_WAIT_MINUTES != null && params.VIEWER_WAIT_MINUTES.toString().trim() != '')
                                 ? params.VIEWER_WAIT_MINUTES.toInteger()
                                 : 20
-                            runViewerSessions("Viewer2", waitMins, "3", 5, true)
+                            runViewerSessions("Viewer2", waitMins, "3", 2, true)
                         }
                     }
                 }
@@ -843,7 +868,7 @@ pipeline {
                             def waitMins = (params.VIEWER_WAIT_MINUTES != null && params.VIEWER_WAIT_MINUTES.toString().trim() != '')
                                 ? params.VIEWER_WAIT_MINUTES.toInteger()
                                 : 20
-                            runViewerSessions("Viewer3", waitMins, "3", 10, false)
+                            runViewerSessions("Viewer3", waitMins, "3", 4, false)
                         }
                     }
                 }
