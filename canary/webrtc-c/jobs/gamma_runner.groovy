@@ -48,7 +48,7 @@ def buildWebRTCProject(thing_prefix) {
         if [ ! -d '${repoDir}/.git' ]; then
             git clone '${params.GIT_URL}' '${repoDir}'
         fi
-        cd '${repoDir}' && git fetch origin '+refs/heads/*:refs/remotes/origin/*' && git checkout -f '${params.GIT_HASH}'
+        cd '${repoDir}' && git fetch origin '+refs/heads/*:refs/remotes/origin/*' && git checkout -f '${params.GIT_HASH}' && git reset --hard 'origin/${params.GIT_HASH}' 2>/dev/null || true
         flock -u 9"""
 
     // Sync cleanup cron script if it changed
@@ -95,7 +95,7 @@ def buildConsumerProject() {
             git clone '${params.GIT_URL}' '${repoDir}'
             cd '${repoDir}' && git checkout -f '${params.GIT_HASH}'
         else
-            cd '${repoDir}' && git fetch origin '+refs/heads/*:refs/remotes/origin/*' && git checkout -f '${params.GIT_HASH}'
+            cd '${repoDir}' && git fetch origin '+refs/heads/*:refs/remotes/origin/*' && git checkout -f '${params.GIT_HASH}' && git reset --hard 'origin/${params.GIT_HASH}' 2>/dev/null || true
         fi
 
         # Skip rebuild if commit unchanged and jar exists
