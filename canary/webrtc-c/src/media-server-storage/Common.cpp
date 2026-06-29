@@ -1076,8 +1076,17 @@ VOID sampleVideoFrameHandler(UINT64 customData, PFrame pFrame)
 
 VOID sampleAudioFrameHandler(UINT64 customData, PFrame pFrame)
 {
-    UNUSED_PARAM(customData);
+    PSampleStreamingSession pSampleStreamingSession = (PSampleStreamingSession) customData;
     DLOGV("Audio Frame received. TrackId: %" PRIu64 ", Size: %u, Flags %u", pFrame->trackId, pFrame->size, pFrame->flags);
+
+    if (pSampleStreamingSession != NULL && !ATOMIC_EXCHANGE_BOOL(&pSampleStreamingSession->firstInboundFrameReceived, TRUE)) {
+        PSampleConfiguration pConfig = pSampleStreamingSession->pSampleConfiguration;
+        if (pConfig != NULL && pConfig->joinSSCallStartTime != 0) {
+            UINT64 timeToReceiveInbound = (GETTIME() - pConfig->joinSSCallStartTime) / HUNDREDS_OF_NANOS_IN_A_MILLISECOND;
+            DLOGI("[Canary] TimeToReceiveInboundMedia: %" PRIu64 " ms (audio)", timeToReceiveInbound);
+            Canary::Cloudwatch::getInstance().monitoring.pushTimeToReceiveInboundMedia(timeToReceiveInbound, Aws::CloudWatch::Model::StandardUnit::Milliseconds);
+        }
+    }
 }
 
 VOID sampleFrameHandler(UINT64 customData, PFrame pFrame)
