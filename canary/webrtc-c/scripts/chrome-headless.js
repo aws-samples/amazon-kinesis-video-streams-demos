@@ -772,7 +772,7 @@ class ViewerCanaryTest {
       }
 
       const report = await pc.getStats();
-      const result = { video: null, audio: null, roundTripTime: null, selectedCandidatePair: null };
+      const result = { video: null, audio: null, roundTripTime: null, selectedCandidatePair: null, outboundAudio: null, outboundVideo: null };
       report.forEach(stat => {
         if (stat.type === 'candidate-pair' && stat.nominated) {
           result.roundTripTime = stat.currentRoundTripTime || 0;
@@ -793,6 +793,18 @@ class ViewerCanaryTest {
               candidateType: remoteCandidate.candidateType,
             } : null,
           };
+        }
+        if (stat.type === 'outbound-rtp') {
+          const outEntry = {
+            packetsSent: stat.packetsSent || 0,
+            bytesSent: stat.bytesSent || 0,
+            retransmittedPacketsSent: stat.retransmittedPacketsSent || 0,
+            retransmittedBytesSent: stat.retransmittedBytesSent || 0,
+            nackCount: stat.nackCount || 0,
+          };
+          if (stat.kind === 'audio') result.outboundAudio = outEntry;
+          else if (stat.kind === 'video') result.outboundVideo = outEntry;
+          return;
         }
         if (stat.type !== 'inbound-rtp') return;
         const entry = {
@@ -1158,6 +1170,19 @@ class ViewerCanaryTest {
           await CloudWatchMetrics.publishCountMetric(this.getMetricName('PacketsLostPerSecond'), this.config.channelName, packetsLostPerSec);
 
           log(`[Canary] Periodic RTP: nack/s=${nackPerSec.toFixed(2)} pli/s=${pliPerSec.toFixed(2)} decoded/s=${framesDecodedPerSec.toFixed(1)} dropped/s=${framesDroppedPerSec.toFixed(2)} bitrate=${incomingBitrateKbps.toFixed(1)}kbps pktsRecv/s=${packetsReceivedPerSec.toFixed(1)} pktsLost/s=${packetsLostPerSec.toFixed(2)}`);
+
+          // Outbound audio stats — confirm viewer is sending audio
+          if (rtcStats?.outboundAudio && prevRTCStats?.outboundAudio) {
+            const oa = rtcStats.outboundAudio;
+            const poa = prevRTCStats.outboundAudio;
+            const audioPktsSentPerSec = (oa.packetsSent - poa.packetsSent) / durationSec;
+            const audioBitrateKbps = ((oa.bytesSent - poa.bytesSent) * 8) / durationSec / 1000;
+
+            await CloudWatchMetrics.publishCountMetric(this.getMetricName('OutboundAudioPacketsSentPerSecond'), this.config.channelName, audioPktsSentPerSec);
+            await CloudWatchMetrics.publishCountMetric(this.getMetricName('OutboundAudioBitrateKbps'), this.config.channelName, audioBitrateKbps);
+
+            log(`[Canary] Outbound Audio: pktsSent/s=${audioPktsSentPerSec.toFixed(1)} bitrate=${audioBitrateKbps.toFixed(1)}kbps totalPkts=${oa.packetsSent}`);
+          }
         }
 
         lastPeriodicMetricsPush = now;
@@ -1175,6 +1200,9 @@ class ViewerCanaryTest {
         if (rtcStats?.video) {
           const v = rtcStats.video;
           statusMsg += ` | pktsRecv:${v.packetsReceived} pktsLost:${v.packetsLost} fps:${v.framesPerSecond} jitter:${(v.jitter * 1000).toFixed(1)}ms`;
+        }
+        if (rtcStats?.outboundAudio) {
+          statusMsg += ` | audioOut:${rtcStats.outboundAudio.packetsSent}pkts/${rtcStats.outboundAudio.bytesSent}B`;
         }
         log(statusMsg);
         lastStatusLog = now;
@@ -1340,6 +1368,25 @@ class ViewerCanaryTest {
       }
     } else {
       log('No RTCStats video data available for packet loss calculation');
+    }
+
+    // Outbound audio final summary — confirm viewer sent audio throughout the session
+    if (this.lastRTCStats?.outboundAudio) {
+      const oa = this.lastRTCStats.outboundAudio;
+      log(`RTCStats Outbound Audio Summary: packetsSent=${oa.packetsSent}, bytesSent=${oa.bytesSent}`);
+
+      await CloudWatchMetrics.publishCountMetric(
+        this.getMetricName('TotalOutboundAudioPacketsSent'),
+        this.config.channelName,
+        oa.packetsSent
+      );
+      await CloudWatchMetrics.publishCountMetric(
+        this.getMetricName('TotalOutboundAudioBytesSent'),
+        this.config.channelName,
+        oa.bytesSent
+      );
+    } else {
+      log('No outbound audio stats available — viewer may not be sending audio');
     }
     
     // Publish connection attempt stats for ViewerJoinPercentage aggregation
