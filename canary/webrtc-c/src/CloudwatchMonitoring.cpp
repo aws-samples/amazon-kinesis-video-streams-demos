@@ -454,4 +454,70 @@ VOID CloudwatchMonitoring::pushRetryCount(UINT32 retryCount)
     this->push(currentRetryCountDatum);
 }
 
+VOID CloudwatchMonitoring::pushJoinStorageSessionAvailability(DOUBLE availability)
+{
+    MetricDatum datum;
+
+    datum.SetMetricName("JoinStorageSessionAvailability");
+    datum.SetValue(availability);
+    datum.SetUnit(Aws::CloudWatch::Model::StandardUnit::None);
+
+    this->push(datum);
+}
+
+VOID CloudwatchMonitoring::pushPeerConnectionAvailability(DOUBLE availability)
+{
+    MetricDatum datum;
+
+    datum.SetMetricName("PeerConnectionAvailability");
+    datum.SetValue(availability);
+    datum.SetUnit(Aws::CloudWatch::Model::StandardUnit::None);
+
+    this->push(datum);
+}
+
+VOID CloudwatchMonitoring::pushCMasterRetryCount(UINT32 retryCount)
+{
+    MetricDatum datum;
+
+    datum.SetMetricName("CMasterRetryCount");
+    datum.SetValue(retryCount);
+    datum.SetUnit(Aws::CloudWatch::Model::StandardUnit::Count);
+
+    this->push(datum);
+}
+
+VOID CloudwatchMonitoring::pushJoinSSTimeout(UINT32 timeoutCount)
+{
+    MetricDatum datum;
+
+    datum.SetMetricName("JoinSSTimeout");
+    datum.SetValue(timeoutCount);
+    datum.SetUnit(Aws::CloudWatch::Model::StandardUnit::Count);
+
+    this->push(datum);
+}
+
+VOID CloudwatchMonitoring::pushJoinSSCallToSessionJoined(UINT64 duration, Aws::CloudWatch::Model::StandardUnit unit)
+{
+    MetricDatum datum;
+
+    datum.SetMetricName("JoinSSCallToSessionJoined");
+    datum.SetValue(duration);
+    datum.SetUnit(unit);
+
+    this->push(datum);
+}
+
+VOID CloudwatchMonitoring::pushCMasterUnexpectedDisconnection(UINT32 disconnectionCount)
+{
+    MetricDatum datum;
+
+    datum.SetMetricName("CMasterUnexpectedDisconnection");
+    datum.SetValue(disconnectionCount);
+    datum.SetUnit(Aws::CloudWatch::Model::StandardUnit::Count);
+
+    this->push(datum);
+}
+
 } // namespace Canary

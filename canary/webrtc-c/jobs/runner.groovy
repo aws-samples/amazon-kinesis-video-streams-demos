@@ -162,7 +162,7 @@ def buildSignaling(params) {
     }
 }
 
-def runViewerSessions(viewerId = "", waitMinutes = 10, viewerCount = "1") {
+def runViewerSessions(viewerId = "", waitMinutes = 10, viewerCount = "1", staggerDelaySeconds = 0) {
     // Create unique workspace for each viewer to prevent Git conflicts
     def workspaceName = "${env.JOB_NAME}-${viewerId ?: 'viewer'}-${BUILD_NUMBER}"
     ws(workspaceName) {
@@ -171,24 +171,40 @@ def runViewerSessions(viewerId = "", waitMinutes = 10, viewerCount = "1") {
             checkout([$class: 'GitSCM', branches: [[name: params.GIT_HASH ]],
                       userRemoteConfigs: [[url: params.GIT_URL]]])
             
-            if (params.FIRST_ITERATION) {
-                echo "First iteration - waiting ${waitMinutes} minutes for master to build"
+            if (waitMinutes > 0) {
+                echo "Waiting ${waitMinutes} minutes for master to build"
                 sleep waitMinutes * 60
             }
             
+            // Staggered start delay to avoid all viewers starting at the exact same time
+            if (staggerDelaySeconds > 0) {
+                echo "Staggered start - waiting ${staggerDelaySeconds} seconds before starting ${viewerId ?: 'viewer'}"
+                sleep staggerDelaySeconds
+            }
+            
+            // Capture endpoint value before loop to ensure it's available
+            def endpointValue = params.ENDPOINT ?: ''
+            def metricSuffixValue = params.METRIC_SUFFIX ?: ''
+            
             for (int session = 1; session <= 3; session++) {
                 echo "Starting ${viewerId ? viewerId + ' ' : ''}session ${session}/3"
+                echo "DEBUG: ENDPOINT value = '${endpointValue}'"
+                echo "DEBUG: METRIC_SUFFIX value = '${metricSuffixValue}'"
                 
                 try {
                     sh """
                         export JOB_NAME="${env.JOB_NAME}"
                         export RUNNER_LABEL="${params.RUNNER_LABEL}"
                         export AWS_DEFAULT_REGION="${params.AWS_DEFAULT_REGION}"
-                        export DURATION_IN_SECONDS="180"
+                        export DURATION_IN_SECONDS="${(params.VIEWER_SESSION_DURATION_SECONDS != null && params.VIEWER_SESSION_DURATION_SECONDS.toString().trim() != '') ? params.VIEWER_SESSION_DURATION_SECONDS : '600'}"
                         export FORCE_TURN="${params.FORCE_TURN}"
                         export VIEWER_COUNT="${viewerCount}"
                         export VIEWER_ID="${viewerId}"
                         export CLIENT_ID="${viewerId ? viewerId.toLowerCase() + '-' : 'viewer-'}session-${session}-${BUILD_NUMBER}"
+                        export ENDPOINT="${endpointValue}"
+                        export METRIC_SUFFIX="${metricSuffixValue}"
+                        
+                        echo "Shell ENDPOINT: \$ENDPOINT"
                         
                         ./canary/webrtc-c/scripts/setup-storage-viewer.sh
                     """
@@ -242,7 +258,9 @@ def buildStorageCanary(isConsumer, params) {
       'CANARY_LOG_STREAM_NAME': "${params.RUNNER_LABEL}-StorageMaster-${START_TIMESTAMP}",
       'CANARY_CLIENT_ID': "Master",
       'CANARY_IS_MASTER': true,
-      'CANARY_CHANNEL_NAME': "${env.JOB_NAME}-${params.RUNNER_LABEL}"
+      'CANARY_CHANNEL_NAME': "${env.JOB_NAME}-${params.RUNNER_LABEL}",
+      'AWS_DEFAULT_REGION': params.AWS_DEFAULT_REGION,
+      'CONTROL_PLANE_URI': params.ENDPOINT ?: ''
     ]
 
     def consumerEnvs = [
@@ -320,6 +338,10 @@ pipeline {
         booleanParam(name: 'JS_STORAGE_VIEWER_JOIN', defaultValue: false)
         booleanParam(name: 'JS_STORAGE_TWO_VIEWERS', defaultValue: false)
         booleanParam(name: 'JS_STORAGE_THREE_VIEWERS', defaultValue: false)
+        string(name: 'ENDPOINT', defaultValue: '')
+        string(name: 'METRIC_SUFFIX', defaultValue: '')
+        string(name: 'VIEWER_WAIT_MINUTES', defaultValue: '55')
+        string(name: 'VIEWER_SESSION_DURATION_SECONDS', defaultValue: '600', description: 'Duration in seconds for each viewer session (default 10 minutes)')
     }
     
     // Set the role ARN to environment to avoid string interpolation to follow Jenkins security guidelines.
@@ -523,8 +545,12 @@ pipeline {
                     }
                     steps {
                         script {
+                            def viewerWaitMin = (params.VIEWER_WAIT_MINUTES != null && params.VIEWER_WAIT_MINUTES.toString().trim() != '') ? params.VIEWER_WAIT_MINUTES.toInteger() : 55
+                            def sessionDurationSec = (params.VIEWER_SESSION_DURATION_SECONDS != null && params.VIEWER_SESSION_DURATION_SECONDS.toString().trim() != '') ? params.VIEWER_SESSION_DURATION_SECONDS.toInteger() : 600
+                            // Master duration = viewer wait + 3 sessions + 2 inter-session gaps + 10 min buffer
+                            def masterDuration = (viewerWaitMin * 60) + (3 * sessionDurationSec) + (2 * 60) + 600
                             def mutableParams = [:] + params
-                            mutableParams.DURATION_IN_SECONDS = "1380"
+                            mutableParams.DURATION_IN_SECONDS = "${masterDuration}"
                             buildStorageCanary(false, mutableParams)
                         }
                     }
@@ -535,7 +561,8 @@ pipeline {
                     }
                     steps {
                         script {
-                            runViewerSessions("", 55, "1")
+                            def waitMins = (params.VIEWER_WAIT_MINUTES != null && params.VIEWER_WAIT_MINUTES.toString().trim() != '') ? params.VIEWER_WAIT_MINUTES.toInteger() : 55
+                            runViewerSessions("", waitMins, "1")
                         }
                     }
                 }
@@ -553,8 +580,12 @@ pipeline {
                     }
                     steps {
                         script {
+                            def viewerWaitMin = (params.VIEWER_WAIT_MINUTES != null && params.VIEWER_WAIT_MINUTES.toString().trim() != '') ? params.VIEWER_WAIT_MINUTES.toInteger() : 55
+                            def sessionDurationSec = (params.VIEWER_SESSION_DURATION_SECONDS != null && params.VIEWER_SESSION_DURATION_SECONDS.toString().trim() != '') ? params.VIEWER_SESSION_DURATION_SECONDS.toInteger() : 600
+                            // Master duration = viewer wait + 3 sessions + 2 inter-session gaps + 10 min buffer
+                            def masterDuration = (viewerWaitMin * 60) + (3 * sessionDurationSec) + (2 * 60) + 600
                             def mutableParams = [:] + params
-                            mutableParams.DURATION_IN_SECONDS = "1380"
+                            mutableParams.DURATION_IN_SECONDS = "${masterDuration}"
                             buildStorageCanary(false, mutableParams)
                         }
                     }
@@ -565,7 +596,9 @@ pipeline {
                     }
                     steps {
                         script {
-                            runViewerSessions("Viewer1", 55, "2")
+                            def waitMins = (params.VIEWER_WAIT_MINUTES != null && params.VIEWER_WAIT_MINUTES.toString().trim() != '') ? params.VIEWER_WAIT_MINUTES.toInteger() : 55
+                            // Viewer1 starts immediately (0 second stagger)
+                            runViewerSessions("Viewer1", waitMins, "2", 0)
                         }
                     }
                 }
@@ -575,7 +608,9 @@ pipeline {
                     }
                     steps {
                         script {
-                            runViewerSessions("Viewer2", 55, "2")
+                            def waitMins = (params.VIEWER_WAIT_MINUTES != null && params.VIEWER_WAIT_MINUTES.toString().trim() != '') ? params.VIEWER_WAIT_MINUTES.toInteger() : 55
+                            // Viewer2 starts 15 seconds after Viewer1
+                            runViewerSessions("Viewer2", waitMins, "2", 15)
                         }
                     }
                 }
@@ -593,8 +628,12 @@ pipeline {
                     }
                     steps {
                         script {
+                            def viewerWaitMin = (params.VIEWER_WAIT_MINUTES != null && params.VIEWER_WAIT_MINUTES.toString().trim() != '') ? params.VIEWER_WAIT_MINUTES.toInteger() : 55
+                            def sessionDurationSec = (params.VIEWER_SESSION_DURATION_SECONDS != null && params.VIEWER_SESSION_DURATION_SECONDS.toString().trim() != '') ? params.VIEWER_SESSION_DURATION_SECONDS.toInteger() : 600
+                            // Master duration = viewer wait + 3 sessions + 2 inter-session gaps + 10 min buffer
+                            def masterDuration = (viewerWaitMin * 60) + (3 * sessionDurationSec) + (2 * 60) + 600
                             def mutableParams = [:] + params
-                            mutableParams.DURATION_IN_SECONDS = "1380"
+                            mutableParams.DURATION_IN_SECONDS = "${masterDuration}"
                             buildStorageCanary(false, mutableParams)
                         }
                     }
@@ -605,7 +644,9 @@ pipeline {
                     }
                     steps {
                         script {
-                            runViewerSessions("Viewer1", 55, "3")
+                            def waitMins = (params.VIEWER_WAIT_MINUTES != null && params.VIEWER_WAIT_MINUTES.toString().trim() != '') ? params.VIEWER_WAIT_MINUTES.toInteger() : 55
+                            // Viewer1 starts immediately (0 second stagger)
+                            runViewerSessions("Viewer1", waitMins, "3", 0)
                         }
                     }
                 }
@@ -615,7 +656,9 @@ pipeline {
                     }
                     steps {
                         script {
-                            runViewerSessions("Viewer2", 55, "3")
+                            def waitMins = (params.VIEWER_WAIT_MINUTES != null && params.VIEWER_WAIT_MINUTES.toString().trim() != '') ? params.VIEWER_WAIT_MINUTES.toInteger() : 55
+                            // Viewer2 starts 15 seconds after Viewer1
+                            runViewerSessions("Viewer2", waitMins, "3", 15)
                         }
                     }
                 }
@@ -625,7 +668,9 @@ pipeline {
                     }
                     steps {
                         script {
-                            runViewerSessions("Viewer3", 55, "3")
+                            def waitMins = (params.VIEWER_WAIT_MINUTES != null && params.VIEWER_WAIT_MINUTES.toString().trim() != '') ? params.VIEWER_WAIT_MINUTES.toInteger() : 55
+                            // Viewer3 starts 30 seconds after Viewer1
+                            runViewerSessions("Viewer3", waitMins, "3", 30)
                         }
                     }
                 }
@@ -714,6 +759,10 @@ pipeline {
                       string(name: 'MIN_RETRY_DELAY_IN_SECONDS', value: params.MIN_RETRY_DELAY_IN_SECONDS),
                       string(name: 'GIT_URL', value: params.GIT_URL),
                       string(name: 'GIT_HASH', value: params.GIT_HASH),
+                      string(name: 'ENDPOINT', value: params.ENDPOINT),
+                      string(name: 'METRIC_SUFFIX', value: params.METRIC_SUFFIX),
+                      string(name: 'VIEWER_WAIT_MINUTES', value: params.VIEWER_WAIT_MINUTES),
+                      string(name: 'VIEWER_SESSION_DURATION_SECONDS', value: params.VIEWER_SESSION_DURATION_SECONDS),
                       booleanParam(name: 'FIRST_ITERATION', value: false)
                     ],
                     wait: false
