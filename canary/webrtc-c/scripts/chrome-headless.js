@@ -2,6 +2,8 @@ const puppeteer = require('puppeteer');
 const { CloudWatchClient } = require('@aws-sdk/client-cloudwatch');
 const { CloudWatchMetrics, CloudWatchLogger } = require('./cloudwatch');
 const fs = require('fs');
+const { execSync } = require('child_process');
+const path = require('path');
 
 function log(message) {
   const timestamp = new Date().toISOString();
@@ -70,12 +72,20 @@ class ViewerCanaryTest {
     this.webrtcRetryCount = 0;
     this.hadWebRTCRetries = false;
     
+    // Connection attempt tracking for ViewerJoinPercentage
+    // Initial connection counts as attempt 1; each "Reconnecting..." adds another
+    this.connectionAttempts = 1;
+    this.successfulConnections = 0;
+    
     // JoinStorageSessionAsViewer retry tracking
     this.joinSSRetryCount = 0;
 
     // Unexpected disconnect tracking — after peer connection was successfully established
     this.peerConnectionEstablished = false;
     this.unexpectedDisconnectCount = 0;
+
+    // Viewer reconnect tracking — counts "[VIEWER] Reconnecting..." log lines
+    this.viewerReconnectCount = 0;
     
     // Storage session join failure tracking - sequence detection
     // Failure is confirmed when these 3 logs appear consecutively:
@@ -88,6 +98,11 @@ class ViewerCanaryTest {
     
     this.browser = null;
     this.page = null;
+
+    // Video recording state
+    this.isRecording = false;
+    this.recordingFilePath = null;
+    this.recordingWriteStream = null;
   }
 
   async initializeCloudWatch() {
@@ -131,7 +146,7 @@ class ViewerCanaryTest {
   async createBrowser() {
     return await puppeteer.launch({ 
       headless: true,
-      args: ['--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream']
+      args: ['--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream', '--allow-file-access-from-files']
     });
   }
 
@@ -346,7 +361,8 @@ class ViewerCanaryTest {
       if (text.includes('[VIEWER] Connection to peer successful!')) {
         this.peerConnectionEstablishedTime = Date.now();
         this.peerConnectionEstablished = true;
-        log('Peer connection established timestamp captured');
+        this.successfulConnections++;
+        log(`Peer connection established timestamp captured (successful connections: ${this.successfulConnections}/${this.connectionAttempts})`);
 
         // Push PeerConnectionAvailability = 1 (ICE candidate pair selected, connection established)
         log('Peer connection to media server succeeded — pushing PeerConnectionAvailability = 1');
@@ -399,15 +415,11 @@ class ViewerCanaryTest {
       // Track peer connection state explicitly transitioning to "failed" (ICE connectivity check failed)
       // This is mutually exclusive with the 30s timeout above — covers the case where ICE fails outright
       if (text.includes('[VIEWER] PeerConnection state: failed')) {
-        log('Peer connection state transitioned to FAILED — pushing PeerConnectionAvailability = 0');
-        await CloudWatchMetrics.publishCountMetric(
-          this.getMetricName('PeerConnectionAvailability'),
-          this.config.channelName,
-          0
-        );
-
-        // If peer connection was previously established, this is an unexpected disconnect
         if (this.peerConnectionEstablished) {
+          // Connection was previously established — this is an unexpected disconnect.
+          // The master's printPeerConnectionStateInfo only triggers onPeerConnectionFailed
+          // (and reconnect) on 'failed', not on 'disconnected'. So 'failed' after 'connected'
+          // is the only real unexpected disconnect we should track.
           this.unexpectedDisconnectCount++;
           log(`Unexpected disconnect detected (failed after connected)! Count: ${this.unexpectedDisconnectCount}`);
           await CloudWatchMetrics.publishCountMetric(
@@ -416,18 +428,27 @@ class ViewerCanaryTest {
             1
           );
         }
+
+        // Always push PeerConnectionAvailability = 0 for any 'failed' state
+        log('Peer connection state transitioned to FAILED — pushing PeerConnectionAvailability = 0');
+        await CloudWatchMetrics.publishCountMetric(
+          this.getMetricName('PeerConnectionAvailability'),
+          this.config.channelName,
+          0
+        );
       }
 
-      // Track peer connection state transitioning to "disconnected" after being connected
-      // This indicates ICE connectivity was lost (e.g., network issue, media server dropped)
-      if (text.includes('[VIEWER] PeerConnection state: disconnected') && this.peerConnectionEstablished) {
-        this.unexpectedDisconnectCount++;
-        log(`Unexpected disconnect detected (disconnected after connected)! Count: ${this.unexpectedDisconnectCount}`);
-        await CloudWatchMetrics.publishCountMetric(
-          this.getMetricName('UnexpectedDisconnect'),
-          this.config.channelName,
-          1
-        );
+      // Note: 'disconnected' state is intentionally NOT tracked as an unexpected disconnect.
+      // The viewer's printPeerConnectionStateInfo only handles 'connected' and 'failed' —
+      // 'disconnected' falls through without triggering onPeerConnectionFailed or any
+      // reconnect logic. It's a transient ICE state that often resolves on its own.
+
+      // Track viewer reconnect attempts — the master calls onPeerConnectionFailed which
+      // logs "[VIEWER] Reconnecting..." before calling connectToMediaServer again.
+      if (text.includes('[VIEWER] Reconnecting...')) {
+        this.viewerReconnectCount++;
+        this.connectionAttempts++;
+        log(`Viewer reconnect attempt detected! Count: ${this.viewerReconnectCount}, total attempts: ${this.connectionAttempts}`);
       }
       
       // Detect storage session join error (single failure or retry failure)
@@ -507,7 +528,9 @@ class ViewerCanaryTest {
       params.set('forceTURN', 'true');
     }
     
-    return `https://awslabs.github.io/amazon-kinesis-video-streams-webrtc-sdk-js/examples/index.html?${params}`;
+    const defaultUrl = 'https://awslabs.github.io/amazon-kinesis-video-streams-webrtc-sdk-js/examples/index.html';
+    const baseUrl = process.env.JS_PAGE_URL || defaultUrl;
+    return `${baseUrl}?${params}`;
   }
 
   async initializePage(page) {
@@ -529,12 +552,17 @@ class ViewerCanaryTest {
     const startTime = Date.now();
     
     while ((Date.now() - startTime) < startTimeout) {
-      const status = await page.evaluate(() => ({
-        viewerExists: !!(window.viewer),
-        connectionState: window.viewer?.pc?.iceConnectionState,
-        signalingState: window.viewer?.pc?.signalingState,
-        error: window.viewer?.error
-      }));
+      const status = await page.evaluate(() => {
+        const m = typeof master !== 'undefined' ? master : window.master;
+        return {
+          viewerExists: !!(m),
+          connectionState: m?.peerByClientId ? 
+            Object.values(m.peerByClientId)[0]?.getPeerConnection?.()?.iceConnectionState : undefined,
+          signalingState: m?.peerByClientId ?
+            Object.values(m.peerByClientId)[0]?.getPeerConnection?.()?.signalingState : undefined,
+          error: m?.error
+        };
+      });
       
       if (status.viewerExists && !status.error) {
         log('Viewer started successfully!');
@@ -585,7 +613,8 @@ class ViewerCanaryTest {
 
   async getFrameStats(page) {
     return await page.evaluate(() => {
-      const viewerExists = !!(window.viewer);
+      const m = typeof master !== 'undefined' ? master : window.master;
+      const masterExists = !!(m);
       const remoteViewElements = document.querySelectorAll('.remote-view');
       
       let hasActiveVideo = false;
@@ -605,15 +634,14 @@ class ViewerCanaryTest {
       let storageSessionActive = false;
       let signalingConnected = false;
       
-      if (window.viewer) {
-        signalingConnected = window.viewer.signalingClient?.readyState === 1;
-        storageSessionActive = !!(window.viewer.storageSessionJoined || 
-                                window.viewer.isStorageSessionActive ||
-                                (window.viewer.signalingClient && signalingConnected));
+      if (m) {
+        const sigClient = m.channelHelper?.getSignalingClient?.();
+        signalingConnected = sigClient?.readyState === 1;
+        storageSessionActive = !!(signalingConnected && Object.keys(m.peerByClientId || {}).length > 0);
       }
       
       return {
-        viewerExists,
+        viewerExists: masterExists,
         storageSessionActive,
         signalingConnected,
         connectionState: signalingConnected ? 'connected' : 'disconnected',
@@ -622,6 +650,54 @@ class ViewerCanaryTest {
         videoInfo,
         timestamp: Date.now()
       };
+    });
+  }
+
+  /**
+   * Collect inbound-rtp stats from the viewer's RTCPeerConnection via getStats().
+   * Returns { packetsReceived, packetsLost, framesDecoded, framesDropped, jitter }
+   * or null if the peer connection is not available.
+   */
+  async getRTCStats(page) {
+    return await page.evaluate(async () => {
+      // The KVS JS SDK example page stores peer connections in master.peerByClientId
+      // regardless of whether it's running as master or viewer role.
+      // master is declared with `let` so it may not be on `window`.
+      const m = typeof master !== 'undefined' ? master : window.master;
+      const peerMap = m?.peerByClientId;
+      if (!peerMap) return { debug: `no master.peerByClientId (master exists: ${!!m})` };
+
+      const clientIds = Object.keys(peerMap);
+      if (clientIds.length === 0) return { debug: 'peerByClientId is empty' };
+
+      const peer = peerMap[clientIds[0]];
+      const pc = typeof peer.getPeerConnection === 'function' ? peer.getPeerConnection() : peer;
+      if (!pc || typeof pc.getStats !== 'function') {
+        return { debug: `peer found but no getStats. peer keys: [${Object.keys(peer).slice(0, 20)}]` };
+      }
+
+      const report = await pc.getStats();
+      const result = { video: null, audio: null };
+      report.forEach(stat => {
+        if (stat.type !== 'inbound-rtp') return;
+        const entry = {
+          packetsReceived: stat.packetsReceived || 0,
+          packetsLost: stat.packetsLost || 0,
+          bytesReceived: stat.bytesReceived || 0,
+          jitter: stat.jitter || 0,
+          framesDecoded: stat.framesDecoded || 0,
+          framesDropped: stat.framesDropped || 0,
+          framesPerSecond: stat.framesPerSecond || 0,
+          nackCount: stat.nackCount || 0,
+          pliCount: stat.pliCount || 0,
+        };
+        if (stat.kind === 'video') result.video = entry;
+        else if (stat.kind === 'audio') result.audio = entry;
+      });
+      return result;
+    }).catch((err) => {
+      log(`getRTCStats error: ${err.message}`);
+      return null;
     });
   }
 
@@ -642,6 +718,185 @@ class ViewerCanaryTest {
       }
       return null;
     });
+  }
+
+  async startRecording(page) {
+    if (this.isRecording) return;
+
+    const recordingsDir = 'recordings';
+    if (!fs.existsSync(recordingsDir)) fs.mkdirSync(recordingsDir);
+
+    this.recordingFilePath = `${recordingsDir}/viewer-${Date.now()}.mp4`;
+    this.recordingWriteStream = fs.createWriteStream(this.recordingFilePath);
+    this.isRecording = true;
+
+    // Expose a Node function so the browser can stream video chunks to disk.
+    // Each chunk arrives as an array of byte values since Blobs can't cross the bridge.
+    await page.exposeFunction('_saveVideoChunk', (bytes) => {
+      if (this.recordingWriteStream) {
+        this.recordingWriteStream.write(Buffer.from(bytes));
+      }
+    });
+
+    const mimeType = await page.evaluate(() => {
+      const remoteVideo = document.querySelector('.remote-view');
+      if (!remoteVideo || !remoteVideo.srcObject) {
+        console.log('No remote video stream available for recording');
+        return null;
+      }
+
+      // Use MP4/H.264 as the primary format if supported, fall back to WebM/VP8.
+      // The ArrayBuffer-based data transfer ensures bytes are preserved correctly.
+      const candidates = [
+        'video/mp4; codecs=avc1',
+        'video/mp4',
+        'video/webm; codecs=vp8',
+        'video/webm'
+      ];
+      let selectedMime = null;
+      for (const mime of candidates) {
+        if (MediaRecorder.isTypeSupported(mime)) {
+          selectedMime = mime;
+          break;
+        }
+      }
+      if (!selectedMime) {
+        console.log('No supported MIME type found for MediaRecorder');
+        return null;
+      }
+
+      const stream = remoteVideo.srcObject;
+      const recorder = new MediaRecorder(stream, { mimeType: selectedMime });
+
+      recorder.ondataavailable = async (event) => {
+        if (event.data && event.data.size > 0) {
+          // Convert Blob to ArrayBuffer, then to an array of numbers to cross the Puppeteer bridge
+          const arrayBuffer = await event.data.arrayBuffer();
+          const bytes = Array.from(new Uint8Array(arrayBuffer));
+          window._saveVideoChunk(bytes);
+        }
+      };
+
+      recorder.onstop = () => {
+        console.log('MediaRecorder stopped');
+      };
+
+      // Store on window so we can stop it later
+      window._mediaRecorder = recorder;
+      // Record in 1-second chunks for incremental flushing
+      recorder.start(1000);
+      console.log(`MediaRecorder started with MIME type: ${selectedMime}`);
+      return selectedMime;
+    });
+
+    if (mimeType) {
+      // Fix file extension if the actual MIME type doesn't match the default .mp4
+      if (mimeType.startsWith('video/webm')) {
+        const newPath = this.recordingFilePath.replace(/\.mp4$/, '.webm');
+        this.recordingWriteStream.close();
+        fs.renameSync(this.recordingFilePath, newPath);
+        this.recordingFilePath = newPath;
+        this.recordingWriteStream = fs.createWriteStream(this.recordingFilePath, { flags: 'a' });
+      }
+      log(`Recording started: ${this.recordingFilePath} (${mimeType})`);
+    } else {
+      log('Failed to start recording — no supported MIME type or no stream');
+      this.isRecording = false;
+      this.recordingWriteStream.close();
+      this.recordingWriteStream = null;
+    }
+  }
+
+  async stopRecording(page) {
+    if (!this.isRecording) return;
+
+    try {
+      // Stop the MediaRecorder in the browser and wait for the final chunk
+      await page.evaluate(() => {
+        return new Promise((resolve) => {
+          if (window._mediaRecorder && window._mediaRecorder.state !== 'inactive') {
+            window._mediaRecorder.onstop = () => resolve();
+            window._mediaRecorder.stop();
+          } else {
+            resolve();
+          }
+        });
+      });
+
+      // Give a moment for the last chunk to flush through the bridge
+      await new Promise(resolve => setTimeout(resolve, 500));
+    } catch (error) {
+      log(`Error stopping MediaRecorder: ${error.message}`);
+    }
+
+    if (this.recordingWriteStream) {
+      this.recordingWriteStream.end();
+      this.recordingWriteStream = null;
+    }
+    this.isRecording = false;
+    log(`Recording saved: ${this.recordingFilePath}`);
+  }
+
+  async runVideoVerification() {
+    if (!this.recordingFilePath || !fs.existsSync(this.recordingFilePath)) {
+      log('No recording available for video verification, skipping');
+      return;
+    }
+
+    const scriptDir = path.dirname(process.argv[1] || __filename);
+    const verifyScript = path.join(scriptDir, 'video-verification', 'verify.py');
+    const sourceFrames = path.join(scriptDir, '..', 'assets', 'h264SampleFrames');
+
+    if (!fs.existsSync(verifyScript)) {
+      log('verify.py not found, skipping video verification');
+      return;
+    }
+
+    try {
+      log('Running video verification...');
+      // Prefer the venv Python if available (PEP 668 blocks system-wide pip on modern Ubuntu)
+      const venvPython = path.join(process.env.HOME || '', '.venv', 'video-verify', 'bin', 'python3');
+      if (!fs.existsSync(venvPython)) {
+        log(`Video verification venv not found at ${venvPython} — run setup-storage-viewer.sh first`);
+        return;
+      }
+      const cmd = `"${venvPython}" "${verifyScript}" --recording "${this.recordingFilePath}" --source-frames "${sourceFrames}" --json`;
+      const output = execSync(cmd, { encoding: 'utf-8', timeout: 600000 });
+      const results = JSON.parse(output.trim());
+
+      log(`Video verification results: availability=${results.storage_availability}, avg SSIM=${results.avg_ssim}, min SSIM=${results.min_ssim}, max SSIM=${results.max_ssim}, compared=${results.frames_compared}`);
+
+      await CloudWatchMetrics.publishCountMetric(
+        this.getMetricName('ViewerStorageAvailability'),
+        this.config.channelName,
+        results.storage_availability
+      );
+
+      if (results.avg_ssim !== undefined) {
+        await CloudWatchMetrics.publishPercentageMetric(
+          this.getMetricName('ViewerSSIMAvg'),
+          this.config.channelName,
+          results.avg_ssim * 100
+        );
+        await CloudWatchMetrics.publishPercentageMetric(
+          this.getMetricName('ViewerSSIMMin'),
+          this.config.channelName,
+          results.min_ssim * 100
+        );
+        await CloudWatchMetrics.publishPercentageMetric(
+          this.getMetricName('ViewerSSIMMax'),
+          this.config.channelName,
+          results.max_ssim * 100
+        );
+      }
+    } catch (error) {
+      log(`Video verification failed: ${error.message}`);
+    }
+
+    // Preserve recording for manual verification
+    if (this.recordingFilePath && fs.existsSync(this.recordingFilePath)) {
+      log(`Viewer recording preserved at: ${this.recordingFilePath}`);
+    }
   }
 
   async handleVideoDetection(page) {
@@ -667,6 +922,9 @@ class ViewerCanaryTest {
     );
     
     this.framesReceived = true;
+
+    // Start recording the viewer's video stream
+    await this.startRecording(page);
   }
 
   async monitorConnection(page) {
@@ -674,7 +932,7 @@ class ViewerCanaryTest {
     
     // Start timer immediately since we already joined the storage session
     this.timerStarted = true;
-    const monitorDurationMs = 180000; // 3 minutes
+    const monitorDurationMs = 156000; // 2 min 36 sec
     log(`Storage session joined, monitoring connection for ${monitorDurationMs / 1000} seconds...`);
     setTimeout(() => {
       this.testCompleted = true;
@@ -682,6 +940,10 @@ class ViewerCanaryTest {
     
     let lastStatusLog = 0;
     const statusLogInterval = 10000;
+    
+    // Track RTCStats snapshots for final packet loss calculation
+    this.firstRTCStats = null;
+    this.lastRTCStats = null;
     
     while (!this.testCompleted) {
       const frameStats = await this.getFrameStats(page);
@@ -696,10 +958,25 @@ class ViewerCanaryTest {
         break;
       }
       
+      // Collect RTCStats snapshot
+      const rtcStats = await this.getRTCStats(page);
+      if (rtcStats?.video) {
+        if (!this.firstRTCStats) this.firstRTCStats = rtcStats;
+        this.lastRTCStats = rtcStats;
+      } else if (rtcStats?.debug && !this.rtcStatsDebugLogged) {
+        log(`RTCStats debug: ${rtcStats.debug}`);
+        this.rtcStatsDebugLogged = true;
+      }
+      
       const now = Date.now();
       if (now - lastStatusLog >= statusLogInterval) {
         const elapsed = Math.floor((now - this.sessionStartTime) / 1000);
-        log(`[${elapsed}s]ActiveVideo: ${frameStats.hasActiveVideo}`);
+        let statusMsg = `[${elapsed}s]ActiveVideo: ${frameStats.hasActiveVideo}`;
+        if (rtcStats?.video) {
+          const v = rtcStats.video;
+          statusMsg += ` | pktsRecv:${v.packetsReceived} pktsLost:${v.packetsLost} fps:${v.framesPerSecond} jitter:${(v.jitter * 1000).toFixed(1)}ms`;
+        }
+        log(statusMsg);
         lastStatusLog = now;
       }
       
@@ -752,6 +1029,57 @@ class ViewerCanaryTest {
     );
     log(`Unexpected Disconnect Summary: Total disconnects after connection: ${this.unexpectedDisconnectCount}`);
     
+    // Publish viewer reconnect count (0 means no reconnects during the session)
+    await CloudWatchMetrics.publishCountMetric(
+      this.getMetricName('ViewerReconnectCount'),
+      this.config.channelName,
+      this.viewerReconnectCount
+    );
+    log(`Viewer Reconnect Summary: Total reconnects: ${this.viewerReconnectCount}`);
+    
+    // Publish packet loss rate from RTCStatsReport (inbound-rtp)
+    if (this.lastRTCStats?.video) {
+      const v = this.lastRTCStats.video;
+      const totalPackets = v.packetsReceived + v.packetsLost;
+      const packetLossRate = totalPackets > 0 ? (v.packetsLost / totalPackets) * 100 : 0;
+      
+      log(`RTCStats Video Summary: packetsReceived=${v.packetsReceived}, packetsLost=${v.packetsLost}, packetLossRate=${packetLossRate.toFixed(2)}%`);
+      log(`RTCStats Video Detail: framesDecoded=${v.framesDecoded}, framesDropped=${v.framesDropped}, nackCount=${v.nackCount}, pliCount=${v.pliCount}`);
+      
+      await CloudWatchMetrics.publishPercentageMetric(
+        this.getMetricName('ViewerPacketLossRate'),
+        this.config.channelName,
+        packetLossRate
+      );
+      
+      await CloudWatchMetrics.publishCountMetric(
+        this.getMetricName('ViewerFramesDropped'),
+        this.config.channelName,
+        v.framesDropped
+      );
+      
+      await CloudWatchMetrics.publishCountMetric(
+        this.getMetricName('ViewerNackCount'),
+        this.config.channelName,
+        v.nackCount
+      );
+      
+      await CloudWatchMetrics.publishCountMetric(
+        this.getMetricName('ViewerPliCount'),
+        this.config.channelName,
+        v.pliCount
+      );
+    } else {
+      log('No RTCStats video data available for packet loss calculation');
+    }
+    
+    // Publish connection attempt stats for ViewerJoinPercentage aggregation
+    const joinPct = this.connectionAttempts > 0
+      ? (this.successfulConnections * 100.0) / this.connectionAttempts
+      : 0;
+    log(`Connection Attempt Summary: ${this.successfulConnections}/${this.connectionAttempts} successful (${joinPct.toFixed(1)}%)`);
+    log(`VIEWER_STATS:${JSON.stringify({attempts: this.connectionAttempts, successes: this.successfulConnections})}`);
+    
     // Success is based on storage session joining, not frame reception
     const success = this.storageSessionJoined;
     log(success ? 'TEST PASSED: Storage session joined successfully' : 'TEST FAILED: Storage session not joined');
@@ -771,6 +1099,11 @@ async function runViewerCanary(config) {
     try {
       log(`Cleaning up viewer connection (${reason})...`);
       
+      // Stop recording before closing the viewer
+      if (test.isRecording && test.page) {
+        await test.stopRecording(test.page);
+      }
+
       if (test.page) {
         try {
           // Try to click stop viewer button for proper cleanup
@@ -789,9 +1122,11 @@ async function runViewerCanary(config) {
             log(`Stop viewer button not found, attempting manual cleanup`);
             // Manual cleanup if button doesn't exist
             await test.page.evaluate(() => {
-              if (window.viewer && window.viewer.signalingClient) {
+              const m = typeof master !== 'undefined' ? master : window.master;
+              if (m?.channelHelper) {
                 try {
-                  window.viewer.signalingClient.close();
+                  const sigClient = m.channelHelper.getSignalingClient?.();
+                  if (sigClient) sigClient.close();
                   console.log('Manually closed signaling client');
                 } catch (e) {
                   console.log('Error closing signaling client:', e);
@@ -807,7 +1142,9 @@ async function runViewerCanary(config) {
       // Wait a moment for cleanup
       await new Promise(resolve => setTimeout(resolve, 1000));
       
-      // Close browser
+      // Close browser BEFORE running video verification to prevent
+      // stale connection events (disconnects, reconnects) during the
+      // potentially long verification process.
       if (test.browser) {
         try {
           await test.browser.close();
@@ -816,6 +1153,9 @@ async function runViewerCanary(config) {
           log(`Error closing browser: ${error.message}`);
         }
       }
+
+      // Run video verification after browser is closed
+      await test.runVideoVerification();
       
     } catch (error) {
       log(`Error during cleanup: ${error.message}`);
@@ -922,7 +1262,7 @@ async function runViewerCanary(config) {
 runViewerCanary({
   channelName: process.env.CANARY_CHANNEL_NAME || 'ScaryTestStream',
   region: process.env.AWS_REGION || 'us-west-2',
-  duration: parseInt(process.env.TEST_DURATION) || 360,
+  duration: parseInt(process.env.TEST_DURATION) || 180,
   saveFrames: process.env.SAVE_FRAMES === 'true',
   clientId: process.env.CLIENT_ID || `test-viewer-${Date.now()}`,
   forceTURN: process.env.FORCE_TURN === 'true',

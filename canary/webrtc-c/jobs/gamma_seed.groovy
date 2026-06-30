@@ -62,6 +62,22 @@ pipelineJob("${NAMESPACE}-orchestrator") {
             <li>Click "Build"</li>
         </ol>
     """)
+    parameters {
+        stringParam('ENDPOINT', '', 'Custom endpoint URL (e.g., gamma endpoint). REQUIRED.')
+        stringParam('AWS_DEFAULT_REGION', 'us-east-1', 'AWS region for the tests')
+        stringParam('VIEWER_WAIT_MINUTES', '2', 'Minutes to wait for master to build before starting viewers')
+        stringParam('VIEWER_SESSION_DURATION_SECONDS', '600', 'Duration in seconds for each viewer session')
+        stringParam('GIT_HASH', 'master', 'Git branch/tag/commit to use')
+        booleanParam('RUN_STORAGE_WITH_VIEWER', true, 'Run StorageWithViewer test (1 viewer)')
+        booleanParam('RUN_STORAGE_TWO_VIEWERS', true, 'Run StorageTwoViewers test (2 viewers)')
+        booleanParam('RUN_STORAGE_THREE_VIEWERS', true, 'Run StorageThreeViewers test (3 viewers)')
+        booleanParam('RUN_STORAGE_PERIODIC', true, 'Run StoragePeriodic test (master + consumer, 156s)')
+        booleanParam('RUN_STORAGE_SUB_RECONNECT', true, 'Run StorageSubReconnect test (master + consumer, 45 min)')
+        booleanParam('RUN_STORAGE_SINGLE_RECONNECT', true, 'Run StorageSingleReconnect test (master + consumer, 65 min)')
+        booleanParam('KEEP_RECORDING', false, 'Keep viewer video recordings after verification')
+        booleanParam('RESCHEDULE', true, 'Enable continuous testing (reschedule after each run completes)')
+        stringParam('JS_BRANCH', 'master', 'JS SDK branch name to clone and serve locally (default: master)')
+    }
     throttleConcurrentBuilds {
         maxTotal(1)
     }
