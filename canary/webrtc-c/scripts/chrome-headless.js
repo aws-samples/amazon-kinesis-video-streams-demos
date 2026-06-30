@@ -1,20 +1,42 @@
 const puppeteer = require('puppeteer');
 const { CloudWatchClient } = require('@aws-sdk/client-cloudwatch');
-const { CloudWatchMetrics } = require('./cloudwatch');
+const { CloudWatchMetrics, CloudWatchLogger } = require('./cloudwatch');
 const fs = require('fs');
 
 function log(message) {
   const timestamp = new Date().toISOString();
-  console.log(`[${timestamp}] ${message}`);
+  const formatted = `[${timestamp}] ${message}`;
+  console.log(formatted);
+  CloudWatchLogger.log(formatted);
 }
+
+// Capture unhandled errors and flush logs before dying
+process.on('unhandledRejection', async (reason) => {
+  log(`FATAL: Unhandled rejection: ${reason}`);
+  await CloudWatchLogger.shutdown();
+  process.exit(1);
+});
+
+process.on('uncaughtException', async (err) => {
+  log(`FATAL: Uncaught exception: ${err.message}\n${err.stack}`);
+  await CloudWatchLogger.shutdown();
+  process.exit(1);
+});
+
+process.on('SIGTERM', async () => {
+  log('Received SIGTERM — flushing logs before exit');
+  await CloudWatchLogger.shutdown();
+  process.exit(143);
+});
 
 class ViewerCanaryTest {
   constructor(config) {
     this.config = config;
     this.viewerId = process.env.VIEWER_ID || 'Viewer1';
     this.clientId = process.env.CLIENT_ID || `viewer-${Date.now()}`;
+    this.metricSuffix = config.metricSuffix || '';
     
-    log(`Initializing test with ${this.viewerId} (${this.clientId})`);
+    log(`Initializing test with ${this.viewerId} (${this.clientId})${this.metricSuffix ? `, metric suffix: ${this.metricSuffix}` : ''}`);
     
     this.sessionStartTime = Date.now();
     this.storageSessionJoined = false;
@@ -22,8 +44,9 @@ class ViewerCanaryTest {
     this.framesReceived = false;
     this.testCompleted = false;
     this.timerStarted = false;
-    
+
     // Comprehensive timing tracking for WebRTC connection stages
+    this.joinSSCallTime = null;
     this.offerReceivedTime = null;
     this.answerSentTime = null;
     this.firstIceCandidateReceivedTime = null;
@@ -35,17 +58,74 @@ class ViewerCanaryTest {
     this.hasReceivedFirstIceCandidate = false;
     this.hasSentFirstIceCandidate = false;
     
+    // ICE candidate type tracking
+    this.firstHostCandidateTime = null;
+    this.firstSrflxCandidateTime = null;
+    this.firstRelayCandidateTime = null;
+    this.hasGeneratedHostCandidate = false;
+    this.hasGeneratedSrflxCandidate = false;
+    this.hasGeneratedRelayCandidate = false;
+    
     // WebRTC connection retry tracking (internal viewer retries)
     this.webrtcRetryCount = 0;
     this.hadWebRTCRetries = false;
+    
+    // JoinStorageSessionAsViewer retry tracking
+    this.joinSSRetryCount = 0;
+
+    // Unexpected disconnect tracking — after peer connection was successfully established
+    this.peerConnectionEstablished = false;
+    this.unexpectedDisconnectCount = 0;
+    
+    // Storage session join failure tracking - sequence detection
+    // Failure is confirmed when these 3 logs appear consecutively:
+    // 1. [VIEWER] Error joining storage session as viewer
+    // 2. [VIEWER] Stopping VIEWER connection
+    // 3. [VIEWER] Disconnected from signaling channel
+    this.storageSessionJoinFailed = false;
+    this.viewerDisconnected = false;
+    this.failureSequenceStep = 0; // Track which step of the failure sequence we're at
     
     this.browser = null;
     this.page = null;
   }
 
   async initializeCloudWatch() {
-    const cwClient = new CloudWatchClient({ region: this.config.region || 'us-west-2' });
+    const region = this.config.region || 'us-west-2';
+    const cwClient = new CloudWatchClient({ region });
     CloudWatchMetrics.init(cwClient);
+
+    // Initialize CloudWatch Logs — uses same log group as the C master canary
+    const logGroupName = process.env.CANARY_LOG_GROUP_NAME || '';
+    const logStreamName = process.env.CANARY_LOG_STREAM_NAME ||
+      `${process.env.RUNNER_LABEL || 'StorageViewer'}-${this.viewerId}-JSViewer-${Date.now()}`;
+    await CloudWatchLogger.init(region, logGroupName, logStreamName);
+  }
+
+  // Helper to generate metric name with optional suffix
+  getMetricName(baseName) {
+    return `${baseName}_${this.viewerId}${this.metricSuffix}`;
+  }
+
+  // Helper function to extract ICE candidate type from candidate string
+  extractIceCandidateType(text) {
+    // Look for DEBUG log containing ICE candidate details
+    if (!text.includes('[DEBUG] [VIEWER] ICE candidate:')) {
+      return null;
+    }
+    
+    // Extract candidate string from the log
+    // Example: candidate:2220892825 1 udp 2122260223 192.168.1.142 55262 typ host generation 0 ufrag mnD0
+    const candidateMatch = text.match(/candidate:.*?typ\s+(\w+)/);
+    if (candidateMatch && candidateMatch[1]) {
+      const candidateType = candidateMatch[1].toLowerCase();
+      // Return standardized candidate types
+      if (candidateType === 'host') return 'host';
+      if (candidateType === 'srflx') return 'srflx';  
+      if (candidateType === 'relay') return 'relay';
+    }
+    
+    return null;
   }
 
   async createBrowser() {
@@ -57,13 +137,90 @@ class ViewerCanaryTest {
 
   setupConsoleListener(page) {
     page.on('console', async (msg) => {
-      const text = msg.text();
+      // Serialize all arguments so objects show as JSON instead of [object Object]
+      let text;
+      try {
+        const args = msg.args();
+        const parts = await Promise.all(args.map(async (arg) => {
+          try {
+            const val = await arg.jsonValue();
+            return typeof val === 'object' ? JSON.stringify(val) : String(val);
+          } catch {
+            return arg.toString();
+          }
+        }));
+        text = parts.join(' ');
+      } catch {
+        text = msg.text();
+      }
       log(`PAGE: ${text}`);
       
-      // Track SDP offer received
+      // Track when JoinStorageSessionAsViewer API is called
+      if (text.includes('[VIEWER] Joining storage session as viewer')) {
+        this.joinSSCallTime = Date.now();
+        log('JoinStorageSessionAsViewer call timestamp captured');
+      }
+
+      // Track SDP offer received — this means JoinStorageSessionAsViewer succeeded
+      // (the media server sent an SDP offer back over the signaling channel)
       if (text.includes('[VIEWER] Received SDP offer from remote')) {
         this.offerReceivedTime = Date.now();
         log('SDP offer received timestamp captured');
+
+        // Calculate and publish JoinSSCallToOfferReceived metric
+        // Measures time from calling JoinStorageSessionAsViewer to receiving SDP offer
+        if (this.joinSSCallTime && this.offerReceivedTime) {
+          const joinSSToOfferTime = this.offerReceivedTime - this.joinSSCallTime;
+          log(`JoinSSCallToOfferReceived time: ${joinSSToOfferTime}ms`);
+          
+          await CloudWatchMetrics.publishMsMetric(
+            this.getMetricName('JoinSSCallToOfferReceived'),
+            this.config.channelName,
+            joinSSToOfferTime
+          );
+        }
+
+        // Push JoinSSAsViewerAvailability = 1 (this attempt succeeded)
+        log('JoinStorageSessionAsViewer attempt succeeded — pushing availability = 1');
+        await CloudWatchMetrics.publishCountMetric(
+          this.getMetricName('JoinSSAsViewerAvailability'),
+          this.config.channelName,
+          1
+        );
+
+        // Push JoinSSAsViewerTimeout = 0 (this attempt did NOT time out)
+        // This ensures CloudWatch has data points during healthy periods,
+        // not just when timeouts occur.
+        log('JoinStorageSessionAsViewer succeeded without timeout — pushing JoinSSAsViewerTimeout = 0');
+        await CloudWatchMetrics.publishCountMetric(
+          this.getMetricName('JoinSSAsViewerTimeout'),
+          this.config.channelName,
+          0
+        );
+      }
+
+      // Track JoinStorageSessionAsViewer retry failure — each retry is a failed attempt
+      // This log means the API call did not result in an SDP offer from the media server
+      if (text.includes('Did not receive SDP offer from Media Service. Retrying...')) {
+        this.joinSSRetryCount++;
+        log(`JoinStorageSessionAsViewer attempt failed (no SDP offer) — retry count: ${this.joinSSRetryCount}, pushing availability = 0`);
+        await CloudWatchMetrics.publishCountMetric(
+          this.getMetricName('JoinSSAsViewerAvailability'),
+          this.config.channelName,
+          0
+        );
+      }
+
+      // Track JoinStorageSession HTTP timeout — the API call did not complete within 6000ms
+      // Log: "TimeoutError: Request did not complete within 6000 ms"
+      // This fires once per timed-out API call attempt, before the retry log above
+      if (text.includes('TimeoutError: Request did not complete within')) {
+        log('JoinStorageSession API call timed out — pushing JoinSSAsViewerTimeout = 1');
+        await CloudWatchMetrics.publishCountMetric(
+          this.getMetricName('JoinSSAsViewerTimeout'),
+          this.config.channelName,
+          1
+        );
       }
       
       // Track SDP answer sent and calculate offer-to-answer metric
@@ -77,7 +234,7 @@ class ViewerCanaryTest {
           log(`Offer to Answer time: ${offerToAnswerTime}ms`);
           
           await CloudWatchMetrics.publishMsMetric(
-            `OfferReceivedToAnswerSentTime_${this.viewerId}`,
+            this.getMetricName('OfferReceivedToAnswerSentTime'),
             this.config.channelName,
             offerToAnswerTime
           );
@@ -96,7 +253,7 @@ class ViewerCanaryTest {
           log(`Answer Sent to First ICE Received time: ${answerToFirstIceTime}ms`);
           
           await CloudWatchMetrics.publishMsMetric(
-            `AnswerSentToFirstIceReceivedTime_${this.viewerId}`,
+            this.getMetricName('AnswerSentToFirstIceReceivedTime'),
             this.config.channelName,
             answerToFirstIceTime
           );
@@ -115,9 +272,54 @@ class ViewerCanaryTest {
           log(`First ICE Received to First ICE Sent time: ${firstIceReceivedToSentTime}ms`);
           
           await CloudWatchMetrics.publishMsMetric(
-            `FirstIceReceivedToFirstIceSentTime_${this.viewerId}`,
+            this.getMetricName('FirstIceReceivedToFirstIceSentTime'),
             this.config.channelName,
             firstIceReceivedToSentTime
+          );
+        }
+      }
+      
+      // Track specific ICE candidate types (host, srflx, relay)
+      const candidateType = this.extractIceCandidateType(text);
+      if (candidateType && this.answerSentTime) {
+        const currentTime = Date.now();
+        
+        if (candidateType === 'host' && !this.hasGeneratedHostCandidate) {
+          this.firstHostCandidateTime = currentTime;
+          this.hasGeneratedHostCandidate = true;
+          const timeToHostCandidate = currentTime - this.answerSentTime;
+          log(`First HOST candidate generated: ${timeToHostCandidate}ms after answer sent`);
+          
+          await CloudWatchMetrics.publishMsMetric(
+            this.getMetricName('TimeToFirstHostCandidate'),
+            this.config.channelName,
+            timeToHostCandidate
+          );
+        }
+        
+        if (candidateType === 'srflx' && !this.hasGeneratedSrflxCandidate) {
+          this.firstSrflxCandidateTime = currentTime;
+          this.hasGeneratedSrflxCandidate = true;
+          const timeToSrflxCandidate = currentTime - this.answerSentTime;
+          log(`First SRFLX candidate generated: ${timeToSrflxCandidate}ms after answer sent`);
+          
+          await CloudWatchMetrics.publishMsMetric(
+            this.getMetricName('TimeToFirstSrflxCandidate'),
+            this.config.channelName,
+            timeToSrflxCandidate
+          );
+        }
+        
+        if (candidateType === 'relay' && !this.hasGeneratedRelayCandidate) {
+          this.firstRelayCandidateTime = currentTime;
+          this.hasGeneratedRelayCandidate = true;
+          const timeToRelayCandidate = currentTime - this.answerSentTime;
+          log(`First RELAY candidate generated: ${timeToRelayCandidate}ms after answer sent`);
+          
+          await CloudWatchMetrics.publishMsMetric(
+            this.getMetricName('TimeToFirstRelayCandidate'),
+            this.config.channelName,
+            timeToRelayCandidate
           );
         }
       }
@@ -133,7 +335,7 @@ class ViewerCanaryTest {
           log(`First ICE Sent to All ICE Generated time: ${firstIceSentToAllGeneratedTime}ms`);
           
           await CloudWatchMetrics.publishMsMetric(
-            `FirstIceSentToAllIceGeneratedTime_${this.viewerId}`,
+            this.getMetricName('FirstIceSentToAllIceGeneratedTime'),
             this.config.channelName,
             firstIceSentToAllGeneratedTime
           );
@@ -143,7 +345,16 @@ class ViewerCanaryTest {
       // Track peer connection establishment
       if (text.includes('[VIEWER] Connection to peer successful!')) {
         this.peerConnectionEstablishedTime = Date.now();
+        this.peerConnectionEstablished = true;
         log('Peer connection established timestamp captured');
+
+        // Push PeerConnectionAvailability = 1 (ICE candidate pair selected, connection established)
+        log('Peer connection to media server succeeded — pushing PeerConnectionAvailability = 1');
+        await CloudWatchMetrics.publishCountMetric(
+          this.getMetricName('PeerConnectionAvailability'),
+          this.config.channelName,
+          1
+        );
         
         // Calculate all-ice-generated-to-connection-established metric
         if (this.allIceCandidatesGeneratedTime && this.peerConnectionEstablishedTime) {
@@ -151,7 +362,7 @@ class ViewerCanaryTest {
           log(`All ICE Generated to Connection Established time: ${allIceToConnectionTime}ms`);
           
           await CloudWatchMetrics.publishMsMetric(
-            `AllIceGeneratedToConnectionEstablishedTime_${this.viewerId}`,
+            this.getMetricName('AllIceGeneratedToConnectionEstablishedTime'),
             this.config.channelName,
             allIceToConnectionTime
           );
@@ -163,18 +374,81 @@ class ViewerCanaryTest {
           log(`Total Connection Establishment time (Offer to Peer Connection): ${totalConnectionTime}ms`);
           
           await CloudWatchMetrics.publishMsMetric(
-            `TotalConnectionEstablishmentTime_${this.viewerId}`,
+            this.getMetricName('TotalConnectionEstablishmentTime'),
             this.config.channelName,
             totalConnectionTime
           );
         }
       }
       
-      // Track WebRTC connection retries
-      if (text.includes('[ERROR] [VIEWER] Connection failed after 30 seconds, will enter retry.')) {
+      // Track WebRTC connection retries and peer connection failure (30s timeout)
+      if (text.includes('[VIEWER] Connection failed after 30 seconds, will enter retry.')) {
         this.webrtcRetryCount++;
         this.hadWebRTCRetries = true;
         log(`WebRTC connection retry detected! Total retries: ${this.webrtcRetryCount}`);
+
+        // Push PeerConnectionAvailability = 0 (peer connection stuck in "connecting", timed out)
+        log('Peer connection timed out after 30s — pushing PeerConnectionAvailability = 0');
+        await CloudWatchMetrics.publishCountMetric(
+          this.getMetricName('PeerConnectionAvailability'),
+          this.config.channelName,
+          0
+        );
+      }
+
+      // Track peer connection state explicitly transitioning to "failed" (ICE connectivity check failed)
+      // This is mutually exclusive with the 30s timeout above — covers the case where ICE fails outright
+      if (text.includes('[VIEWER] PeerConnection state: failed')) {
+        log('Peer connection state transitioned to FAILED — pushing PeerConnectionAvailability = 0');
+        await CloudWatchMetrics.publishCountMetric(
+          this.getMetricName('PeerConnectionAvailability'),
+          this.config.channelName,
+          0
+        );
+
+        // If peer connection was previously established, this is an unexpected disconnect
+        if (this.peerConnectionEstablished) {
+          this.unexpectedDisconnectCount++;
+          log(`Unexpected disconnect detected (failed after connected)! Count: ${this.unexpectedDisconnectCount}`);
+          await CloudWatchMetrics.publishCountMetric(
+            this.getMetricName('UnexpectedDisconnect'),
+            this.config.channelName,
+            1
+          );
+        }
+      }
+
+      // Track peer connection state transitioning to "disconnected" after being connected
+      // This indicates ICE connectivity was lost (e.g., network issue, media server dropped)
+      if (text.includes('[VIEWER] PeerConnection state: disconnected') && this.peerConnectionEstablished) {
+        this.unexpectedDisconnectCount++;
+        log(`Unexpected disconnect detected (disconnected after connected)! Count: ${this.unexpectedDisconnectCount}`);
+        await CloudWatchMetrics.publishCountMetric(
+          this.getMetricName('UnexpectedDisconnect'),
+          this.config.channelName,
+          1
+        );
+      }
+      
+      // Detect storage session join error (single failure or retry failure)
+      if (text.includes('[VIEWER] Error joining storage session as viewer')) {
+        log('Storage session join error detected!');
+        this.storageSessionJoinFailed = true;
+        this.storageSessionJoined = false;
+      }
+      
+      // Detect storage session join failure after all retries exhausted
+      if (text.includes('Stopping the application after 5 failed attempts to connect to the storage session')) {
+        log('Storage session join FAILED after 5 retry attempts!');
+        this.storageSessionJoinFailed = true;
+        this.storageSessionJoined = false;
+      }
+      
+      // Detect viewer disconnection (signals end of failed session)
+      if (text.includes('[VIEWER] Stopping VIEWER connection') || 
+          text.includes('[VIEWER] Disconnected from signaling channel')) {
+        log('Viewer disconnection detected!');
+        this.viewerDisconnected = true;
       }
       
       if (text.includes('Successfully joined the storage session')) {
@@ -189,10 +463,22 @@ class ViewerCanaryTest {
         
         const joinTime = Date.now() - this.sessionStartTime;
         await CloudWatchMetrics.publishMsMetric(
-          `JoinSSAsViewerTime_${this.viewerId}`,
+          this.getMetricName('JoinSSAsViewerTime'),
           this.config.channelName,
           joinTime
         );
+
+        // Publish JoinSSCallToSessionJoined metric — time from calling
+        // JoinStorageSessionAsViewer to successfully joining the storage session
+        if (this.joinSSCallTime) {
+          const joinSSCallToSessionJoined = Date.now() - this.joinSSCallTime;
+          log(`JoinSSCallToSessionJoined time: ${joinSSCallToSessionJoined}ms`);
+          await CloudWatchMetrics.publishMsMetric(
+            this.getMetricName('JoinSSCallToSessionJoined'),
+            this.config.channelName,
+            joinSSCallToSessionJoined
+          );
+        }
       }
     });
   }
@@ -213,6 +499,7 @@ class ViewerCanaryTest {
       sendVideo: this.config.sendVideo || 'false',
       sendAudio: this.config.sendAudio || 'false',
       useTrickleICE: 'true',
+      endpoint: this.config.endpoint || '',
     });
     
     // Add forceTURN parameter if configured
@@ -266,17 +553,34 @@ class ViewerCanaryTest {
     throw new Error('Viewer failed to start within 60 seconds');
   }
 
-  async waitForStorageSession() {
-    log('Waiting for storage session to be joined...');
-    const sessionTimeout = 180000;
+  async waitForStorageSessionOrFailure() {
+    log('Waiting for storage session to be joined or failure...');
     
-    while (!this.storageSessionJoined && (Date.now() - this.sessionStartTime) < sessionTimeout) {
+    // Wait until either:
+    // 1. Storage session is successfully joined
+    // 2. Storage session join failed AND viewer disconnected (failure complete)
+    // 3. Hard timeout reached
+    const hardTimeout = this.config.duration * 1000;
+    
+    while ((Date.now() - this.sessionStartTime) < hardTimeout) {
+      // Success case: storage session joined
+      if (this.storageSessionJoined) {
+        log('Storage session joined successfully!');
+        return { success: true };
+      }
+      
+      // Failure case: join failed and viewer disconnected
+      if (this.storageSessionJoinFailed && this.viewerDisconnected) {
+        log('Storage session join failed and viewer disconnected - failure complete');
+        return { success: false, reason: 'join_failed' };
+      }
+      
       await new Promise(resolve => setTimeout(resolve, 1000));
     }
     
-    if (!this.storageSessionJoined) {
-      throw new Error('Storage session not joined within 180 seconds');
-    }
+    // Timeout reached without success or complete failure
+    log('Timeout reached waiting for storage session');
+    return { success: false, reason: 'timeout' };
   }
 
   async getFrameStats(page) {
@@ -357,7 +661,7 @@ class ViewerCanaryTest {
     
     const frameDetectionTime = Date.now() - this.sessionStartTime;
     await CloudWatchMetrics.publishMsMetric(
-      `TimeToFirstFrame_${this.viewerId}`,
+      this.getMetricName('TimeToFirstFrame'),
       this.config.channelName,
       frameDetectionTime
     );
@@ -370,10 +674,11 @@ class ViewerCanaryTest {
     
     // Start timer immediately since we already joined the storage session
     this.timerStarted = true;
-    log('Storage session joined, running test for 45 seconds...');
+    const monitorDurationMs = 180000; // 3 minutes
+    log(`Storage session joined, monitoring connection for ${monitorDurationMs / 1000} seconds...`);
     setTimeout(() => {
       this.testCompleted = true;
-    }, 45000);
+    }, monitorDurationMs);
     
     let lastStatusLog = 0;
     const statusLogInterval = 10000;
@@ -417,19 +722,35 @@ class ViewerCanaryTest {
     // Publish success rate metric (100% for success, 0% for failure)
     const successRate = this.storageSessionJoined ? 100 : 0;
     await CloudWatchMetrics.publishPercentageMetric(
-      `StorageSessionSuccessRate_${this.viewerId}`,
+      this.getMetricName('StorageSessionSuccessRate'),
       this.config.channelName,
       successRate
     );
     
     // Publish WebRTC connection retry count metric
     await CloudWatchMetrics.publishCountMetric(
-      `WebRTCConnectionRetryCount_${this.viewerId}`,
+      this.getMetricName('WebRTCConnectionRetryCount'),
       this.config.channelName,
       this.webrtcRetryCount
     );
     
     log(`WebRTC Connection Retry Summary: Total retries: ${this.webrtcRetryCount}, Had retries: ${this.hadWebRTCRetries}`);
+    
+    // Publish JoinStorageSessionAsViewer retry count (no SDP offer received, had to retry)
+    await CloudWatchMetrics.publishCountMetric(
+      this.getMetricName('JoinSSAsViewerRetryCount'),
+      this.config.channelName,
+      this.joinSSRetryCount
+    );
+    log(`JoinSSAsViewer Retry Summary: Total retries: ${this.joinSSRetryCount}`);
+    
+    // Publish unexpected disconnect count (0 means stable connection throughout monitoring)
+    await CloudWatchMetrics.publishCountMetric(
+      this.getMetricName('UnexpectedDisconnectCount'),
+      this.config.channelName,
+      this.unexpectedDisconnectCount
+    );
+    log(`Unexpected Disconnect Summary: Total disconnects after connection: ${this.unexpectedDisconnectCount}`);
     
     // Success is based on storage session joining, not frame reception
     const success = this.storageSessionJoined;
@@ -562,10 +883,16 @@ async function runViewerCanary(config) {
         
         await test.waitForViewerStart(test.page);
         
-        await test.waitForStorageSession();
+        // Wait for storage session join or failure
+        const sessionResult = await test.waitForStorageSessionOrFailure();
         
-        // Monitor the viewer
-        await test.monitorConnection(test.page);
+        if (sessionResult.success) {
+          // Success: monitor connection briefly then complete
+          await test.monitorConnection(test.page);
+        } else {
+          // Failure: session result already captured, just log
+          log(`Storage session failed: ${sessionResult.reason}`);
+        }
         
         cleanupCompleted = true; // Mark cleanup as not needed (normal completion)
         return await test.getTestResults();
@@ -598,10 +925,14 @@ runViewerCanary({
   duration: parseInt(process.env.TEST_DURATION) || 360,
   saveFrames: process.env.SAVE_FRAMES === 'true',
   clientId: process.env.CLIENT_ID || `test-viewer-${Date.now()}`,
-  forceTURN: process.env.FORCE_TURN === 'true'
-}).then(result => {
+  forceTURN: process.env.FORCE_TURN === 'true',
+  endpoint: process.env.ENDPOINT || '',
+  metricSuffix: process.env.METRIC_SUFFIX || ''
+}).then(async (result) => {
+  await CloudWatchLogger.shutdown();
   process.exit(result.success ? 0 : 1);
-}).catch(error => {
+}).catch(async (error) => {
   log(`Test failed with error: ${error.message}`);
+  await CloudWatchLogger.shutdown();
   process.exit(1);
 });

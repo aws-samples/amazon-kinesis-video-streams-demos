@@ -3,6 +3,8 @@
 
 
 extern PSampleConfiguration gSampleConfiguration;
+extern UINT32 gJoinSSTimeoutCount;
+extern UINT32 gCMasterUnexpectedDisconnectionCount;
 
 INT32 main(INT32 argc, CHAR* argv[])
 {
@@ -10,6 +12,8 @@ INT32 main(INT32 argc, CHAR* argv[])
     UINT32 frameSize;
     PSampleConfiguration pSampleConfiguration = NULL;
     PCHAR pChannelName;
+    PCHAR pControlPlaneUri = NULL;
+    CHAR controlPlaneUrl[MAX_CONTROL_PLANE_URI_CHAR_LEN];
     SignalingClientMetrics signalingClientMetrics;
     signalingClientMetrics.version = SIGNALING_CLIENT_METRICS_CURRENT_VERSION;
 
@@ -52,6 +56,19 @@ INT32 main(INT32 argc, CHAR* argv[])
 
     // Set sample to use storage mode
     pSampleConfiguration->channelInfo.useMediaStorage = TRUE;
+
+    // Set custom control plane URL if CONTROL_PLANE_URI is provided (e.g., for gamma testing).
+    // This overrides the default control plane URL so that all control plane API calls
+    // (DescribeSignalingChannel, GetSignalingChannelEndpoint, etc.) go to the custom endpoint.
+    // JoinStorageSession will then use the data plane endpoint returned by GetSignalingChannelEndpoint.
+    pControlPlaneUri = GETENV(CONTROL_PLANE_URI_ENV_VAR);
+    if (pControlPlaneUri != NULL && pControlPlaneUri[0] != '\0') {
+        SNPRINTF(controlPlaneUrl, MAX_CONTROL_PLANE_URI_CHAR_LEN, "%s", pControlPlaneUri);
+        pSampleConfiguration->channelInfo.pControlPlaneUrl = controlPlaneUrl;
+        DLOGI("[KVS Master] Using custom control plane URL: %s", controlPlaneUrl);
+    } else {
+        DLOGI("[KVS Master] No custom control plane URL set, using default");
+    }
 
     // Initialize storage disconnected timestamp
     pSampleConfiguration->storageDisconnectedTime = 0;
@@ -96,7 +113,30 @@ CleanUp:
     DLOGI("Exiting with 0x%08x", retStatus);
     if (initialized) {
         Canary::Cloudwatch::getInstance().monitoring.pushExitStatus(retStatus);
+
+        // Push cumulative JoinStorageSession timeout count (0 if no timeouts occurred)
+        DLOGI("[KVS Master] Pushing JoinSSTimeout: %u", gJoinSSTimeoutCount);
+        Canary::Cloudwatch::getInstance().monitoring.pushJoinSSTimeout(gJoinSSTimeoutCount);
+
+        // Push cumulative unexpected disconnection count (0 if none occurred)
+        DLOGI("[KVS Master] Pushing CMasterUnexpectedDisconnection: %u", gCMasterUnexpectedDisconnectionCount);
+        Canary::Cloudwatch::getInstance().monitoring.pushCMasterUnexpectedDisconnection(gCMasterUnexpectedDisconnectionCount);
     }
+
+    // Fetch signaling client metrics before CloudWatch deinit so we can push CMasterRetryCount
+    if (pSampleConfiguration != NULL) {
+        STATUS metricsStatus = signalingClientGetMetrics(pSampleConfiguration->signalingClientHandle, &signalingClientMetrics);
+        if (metricsStatus == STATUS_SUCCESS) {
+            logSignalingClientStats(&signalingClientMetrics);
+            if (initialized) {
+                DLOGI("[KVS Master] Pushing CMasterRetryCount: %d", signalingClientMetrics.signalingClientStats.apiCallRetryCount);
+                Canary::Cloudwatch::getInstance().monitoring.pushCMasterRetryCount(signalingClientMetrics.signalingClientStats.apiCallRetryCount);
+            }
+        } else {
+            DLOGE("[KVS Master] signalingClientGetMetrics() operation returned status code: 0x%08x", metricsStatus);
+        }
+    }
+
     Canary::Cloudwatch::deinit();
 
     DLOGI("[KVS Master] Cleaning up....");
@@ -106,13 +146,6 @@ CleanUp:
 
         if (pSampleConfiguration->mediaSenderTid != INVALID_TID_VALUE) {
             THREAD_JOIN(pSampleConfiguration->mediaSenderTid, NULL);
-        }
-
-        retStatus = signalingClientGetMetrics(pSampleConfiguration->signalingClientHandle, &signalingClientMetrics);
-        if (retStatus == STATUS_SUCCESS) {
-            logSignalingClientStats(&signalingClientMetrics);
-        } else {
-            DLOGE("[KVS Master] signalingClientGetMetrics() operation returned status code: 0x%08x", retStatus);
         }
         retStatus = freeSignalingClient(&pSampleConfiguration->signalingClientHandle);
         if (retStatus != STATUS_SUCCESS) {

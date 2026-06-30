@@ -73,6 +73,7 @@
 #define IOT_CORE_PRIVATE_KEY_ENV_VAR                     "AWS_IOT_CORE_PRIVATE_KEY"
 #define IOT_CORE_ROLE_ALIAS_ENV_VAR                      "AWS_IOT_CORE_ROLE_ALIAS"
 #define IOT_CORE_THING_NAME_ENV_VAR                      "AWS_IOT_CORE_THING_NAME"
+#define CONTROL_PLANE_URI_ENV_VAR                        "CONTROL_PLANE_URI"
 #define STORAGE_CANARY_FIRST_FRAME_TS_FILE_ENV_VAR       "STORAGE_CANARY_FIRST_FRAME_TS_FILE"
 
 #define CANARY_DEFAULT_LABEL                       "ScaryTestLabel"
