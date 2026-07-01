@@ -1,12 +1,16 @@
 import jenkins.model.*
 
 RUNNER_JOB_NAME_PREFIX = "webrtc-canary-runner"
+// Dedicated runner for StorageExtended so it is not killed by the orchestrator's
+// teardown cycle.  This Jenkins job must use the same runner.groovy pipeline but
+// lives outside the webrtc-canary-runner-* naming convention.
+STORAGE_EXTENDED_RUNNER = "webrtc-canary-storage-extended"
 PERIODIC_DURATION_IN_SECONDS = 90
 PERIODIC_PROFILING_DURATION_IN_SECONDS = 90
 LONG_RUNNING_DURATION_IN_SECONDS = 0
 
-STORAGE_PERIODIC_DURATION_IN_SECONDS = 300 // 5 min
-STORAGE_WITH_VIEWER_DURATION_IN_SECONDS = 600 // 10 min
+STORAGE_PERIODIC_DURATION_IN_SECONDS = 156 // 2 min 36 sec
+STORAGE_WITH_VIEWER_DURATION_IN_SECONDS = 156 // 2 min 36 sec
 STORAGE_SUB_RECONNECT_DURATION_IN_SECONDS = 2700 // 45 min
 STORAGE_SINGLE_RECONNECT_DURATION_IN_SECONDS = 3900 // 65 min
 STORAGE_EXTENDED_DURATION_IN_SECONDS = 43200 // 12 hr
@@ -52,6 +56,11 @@ def findRunners() {
     return Jenkins.instance
                     .getAllItems(Job.class)
                     .findAll(filterClosure)
+}
+
+def isJobBuilding(jobName) {
+    def job = Jenkins.instance.getItemByFullName(jobName)
+    return job != null && job.isBuilding()
 }
 
 NEXT_AVAILABLE_RUNNER = null
@@ -322,6 +331,7 @@ pipeline {
                                 booleanParam(name: 'USE_TURN', value: true),
                                 booleanParam(name: 'TRICKLE_ICE', value: true),
                                 booleanParam(name: 'USE_IOT', value: false),
+                                booleanParam(name: 'VIDEO_VERIFY_ENABLED', value: true),
                                 string(name: 'DURATION_IN_SECONDS', value: STORAGE_PERIODIC_DURATION_IN_SECONDS.toString()),
                                 string(name: 'MASTER_NODE_LABEL', value: "webrtc-storage-master"),
                                 string(name: 'CONSUMER_NODE_LABEL', value: "webrtc-storage-consumer"),
@@ -341,6 +351,7 @@ pipeline {
                                 booleanParam(name: 'USE_TURN', value: true),
                                 booleanParam(name: 'TRICKLE_ICE', value: true),
                                 booleanParam(name: 'USE_IOT', value: false),
+                                booleanParam(name: 'VIDEO_VERIFY_ENABLED', value: true),
                                 string(name: 'DURATION_IN_SECONDS', value: STORAGE_SUB_RECONNECT_DURATION_IN_SECONDS.toString()),
                                 string(name: 'MASTER_NODE_LABEL', value: "webrtc-storage-master"),
                                 string(name: 'CONSUMER_NODE_LABEL', value: "webrtc-storage-consumer"),
@@ -360,6 +371,7 @@ pipeline {
                                 booleanParam(name: 'USE_TURN', value: true),
                                 booleanParam(name: 'TRICKLE_ICE', value: true),
                                 booleanParam(name: 'USE_IOT', value: false),
+                                booleanParam(name: 'VIDEO_VERIFY_ENABLED', value: true),
                                 string(name: 'DURATION_IN_SECONDS', value: STORAGE_SINGLE_RECONNECT_DURATION_IN_SECONDS.toString()),
                                 string(name: 'MASTER_NODE_LABEL', value: "webrtc-storage-master"),
                                 string(name: 'CONSUMER_NODE_LABEL', value: "webrtc-storage-consumer"),
@@ -370,24 +382,35 @@ pipeline {
                             wait: false
                         )
 
-                        // Storage Extended.
-                        build(
-                            job: NEXT_AVAILABLE_RUNNER,
-                            parameters: COMMON_PARAMS + [
-                                booleanParam(name: 'IS_SIGNALING', value: false),
-                                booleanParam(name: 'IS_STORAGE', value: true),
-                                booleanParam(name: 'USE_TURN', value: true),
-                                booleanParam(name: 'TRICKLE_ICE', value: true),
-                                booleanParam(name: 'USE_IOT', value: false),
-                                string(name: 'DURATION_IN_SECONDS', value: STORAGE_EXTENDED_DURATION_IN_SECONDS.toString()),
-                                string(name: 'MASTER_NODE_LABEL', value: "webrtc-storage-master"),
-                                string(name: 'CONSUMER_NODE_LABEL', value: "webrtc-storage-consumer"),
-                                string(name: 'RUNNER_LABEL', value: "StorageExtended"),
-                                string(name: 'SCENARIO_LABEL', value: "StorageExtended"),
-                                string(name: 'AWS_DEFAULT_REGION', value: "us-west-2"),
-                            ],
-                            wait: false
-                        )
+                        // Storage Extended — runs on a dedicated runner to avoid being
+                        // killed by the orchestrator teardown cycle.  Only spawn a new
+                        // run when the previous one has finished.
+                        // Uses a dedicated node label to ensure it lands on a large-disk
+                        // machine and avoids resource contention with short-lived jobs.
+                        script {
+                            if (isJobBuilding(STORAGE_EXTENDED_RUNNER)) {
+                                echo "StorageExtended is still running on ${STORAGE_EXTENDED_RUNNER}, skipping"
+                            } else {
+                                build(
+                                    job: STORAGE_EXTENDED_RUNNER,
+                                    parameters: COMMON_PARAMS + [
+                                        booleanParam(name: 'IS_SIGNALING', value: false),
+                                        booleanParam(name: 'IS_STORAGE', value: true),
+                                        booleanParam(name: 'USE_TURN', value: true),
+                                        booleanParam(name: 'TRICKLE_ICE', value: true),
+                                        booleanParam(name: 'USE_IOT', value: false),
+                                        booleanParam(name: 'VIDEO_VERIFY_ENABLED', value: true),
+                                        string(name: 'DURATION_IN_SECONDS', value: STORAGE_EXTENDED_DURATION_IN_SECONDS.toString()),
+                                        string(name: 'MASTER_NODE_LABEL', value: "webrtc-storage-extended-master"),
+                                        string(name: 'CONSUMER_NODE_LABEL', value: "webrtc-storage-consumer"),
+                                        string(name: 'RUNNER_LABEL', value: "StorageExtended"),
+                                        string(name: 'SCENARIO_LABEL', value: "StorageExtended"),
+                                        string(name: 'AWS_DEFAULT_REGION', value: "us-west-2"),
+                                    ],
+                                    wait: false
+                                )
+                            }
+                        }
 
 
                         //Storage with a viewer join
@@ -407,7 +430,7 @@ pipeline {
                                 string(name: 'RUNNER_LABEL', value: "StorageWithViewer"),
                                 string(name: 'SCENARIO_LABEL', value: "StorageWithViewer"),
                                 string(name: 'AWS_DEFAULT_REGION', value: "us-west-2"),
-                                string(name: 'VIEWER_WAIT_MINUTES', value: "55"),
+                                string(name: 'VIEWER_WAIT_MINUTES', value: "20"),
                             ],
                             wait: false
                         )
@@ -432,7 +455,7 @@ pipeline {
                                 string(name: 'RUNNER_LABEL', value: "StorageTwoViewers"),
                                 string(name: 'SCENARIO_LABEL', value: "StorageTwoViewers"),
                                 string(name: 'AWS_DEFAULT_REGION', value: "us-west-2"),
-                                string(name: 'VIEWER_WAIT_MINUTES', value: "55"),
+                                string(name: 'VIEWER_WAIT_MINUTES', value: "20"),
                             ],
                             wait: false
                         )
@@ -459,7 +482,7 @@ pipeline {
                                 string(name: 'RUNNER_LABEL', value: "StorageThreeViewers"),
                                 string(name: 'SCENARIO_LABEL', value: "StorageThreeViewers"),
                                 string(name: 'AWS_DEFAULT_REGION', value: "us-west-2"),
-                                string(name: 'VIEWER_WAIT_MINUTES', value: "55"),
+                                string(name: 'VIEWER_WAIT_MINUTES', value: "20"),
                             ],
                             wait: false
                         )
