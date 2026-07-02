@@ -1,17 +1,15 @@
 import org.jenkinsci.plugins.workflow.steps.FlowInterruptedException
+import jenkins.model.Jenkins
 
 /**
- * Gamma Test Runner
- * 
- * This is a dedicated runner for gamma tests. It runs the WebRTC storage master
- * and JS viewer tests against a custom endpoint.
- * 
- * Key differences from production runner:
- *   - No automatic rescheduling (runs once and stops)
- *   - Simplified configuration
- *   - Dedicated for gamma/testing purposes
- * 
- * Do not run this directly - use webrtc-gamma-orchestrator instead.
+ * Storage Runner
+ *
+ * Unified runner for all WebRTC storage canary tests (prod and gamma).
+ * Triggered by Jenkins cron — runs once per trigger, no self-rescheduling.
+ *
+ * Supports:
+ *   - Storage Master + Consumer (separate or same node)
+ *   - Single/Two/Three viewer sessions
  */
 
 START_TIMESTAMP = new Date().getTime()
@@ -19,6 +17,25 @@ RUNNING_NODES_IN_BUILDING = 0
 HAS_ERROR = false
 IS_ABORTED = false
 VIEWER_SESSION_RESULTS = [:]
+
+def pushKeepAlive(stageName) {
+    def region = params.AWS_DEFAULT_REGION ?: 'us-west-2'
+    def scenarioLabel = params.SCENARIO_LABEL ?: 'StoragePeriodic'
+    def runnerLabel = params.RUNNER_LABEL ?: 'StoragePeriodic'
+    def rc = sh(script: """
+        export PATH="/usr/local/bin:/usr/bin:\$PATH"
+        aws cloudwatch put-metric-data \
+            --namespace KinesisVideoSDKCanary \
+            --region ${region} \
+            --metric-data \
+                'MetricName=PipelineKeepAlive,Value=1.0,Unit=None,Dimensions=[{Name=Stage,Value=${stageName}},{Name=StorageWebRTCSDKCanaryLabel,Value=${scenarioLabel}},{Name=RunnerLabel,Value=${runnerLabel}}]'
+    """, returnStatus: true)
+    if (rc == 0) {
+        echo "KeepAlive: ${stageName}"
+    } else {
+        echo "KeepAlive: ${stageName} (emit failed, rc=${rc} — aws CLI may not be installed on this node)"
+    }
+}
 
 // Signal flag: set to true when the storage master build is complete and the binary
 // is about to start streaming. Viewers poll this instead of sleeping a fixed duration.
@@ -48,6 +65,8 @@ def buildWebRTCProject(thing_prefix) {
         fi
         cd '${repoDir}' && git fetch origin '+refs/heads/*:refs/remotes/origin/*' && git checkout -f '${params.GIT_HASH}'
         flock -u 9"""
+
+    pushKeepAlive('GitCheckoutComplete')
 
     // Sync cleanup cron script if it changed
     sh """
@@ -161,6 +180,7 @@ def runViewerSessions(viewerId = "", waitMinutes = 2, viewerCount = "1") {
                 export JS_PAGE_URL="${params.JS_BRANCH ?: 'master'}"
                 ./canary/webrtc-c/scripts/prepare-storage-viewer.sh
             """
+            pushKeepAlive('ViewerPrepareComplete')
 
             if (waitMinutes > 0) {
                 echo "Waiting for master to be ready (timeout: ${waitMinutes} minutes)..."
@@ -230,6 +250,7 @@ def runViewerSessions(viewerId = "", waitMinutes = 2, viewerCount = "1") {
                 unstable err.toString()
             }
 
+            pushKeepAlive('ViewerSessionComplete')
             echo "${viewerId ? viewerId + ' ' : ''}viewer session completed"
         } finally {
             sh "rm -f '${env.WORKSPACE}/.in_use'"
@@ -339,6 +360,7 @@ def buildStorageCanary(isConsumer, params) {
         MASTER_READY = true
         echo "Master build complete, signaling viewers (MASTER_READY=true)"
         def buildDir = "${env.HOME}/webrtc-c-storage-master/build"
+        pushKeepAlive('MasterStarted')
         withRunnerWrapper(envs) {
             // Timeout: duration + 5 min buffer. The C binary should exit on its own
             // after CANARY_DURATION_IN_SECONDS, but if it hangs (e.g., ICE agent
@@ -349,6 +371,7 @@ def buildStorageCanary(isConsumer, params) {
                     ./kvsWebrtcStorageSample"""
             }
         }
+        pushKeepAlive('MasterFinished')
     } else {
         def envs = (commonEnvs + consumerEnvs).collect{ k, v -> "${k}=${v}" }
         withRunnerWrapper(envs) {
@@ -427,6 +450,10 @@ pipeline {
         label params.MASTER_NODE_LABEL
     }
 
+    options {
+        skipDefaultCheckout()
+    }
+
     parameters {
         string(name: 'AWS_KVS_LOG_LEVEL', defaultValue: '2')
         string(name: 'LOG_GROUP_NAME', defaultValue: 'WebrtcSDK')
@@ -435,19 +462,18 @@ pipeline {
         string(name: 'STORAGE_VIEWER_ONE_NODE_LABEL', defaultValue: 'webrtc-storage-multi-viewer-1')
         string(name: 'STORAGE_VIEWER_TWO_NODE_LABEL', defaultValue: 'webrtc-storage-multi-viewer-2')
         string(name: 'STORAGE_VIEWER_THREE_NODE_LABEL', defaultValue: 'webrtc-storage-consumer')
-        string(name: 'RUNNER_LABEL', defaultValue: 'GammaTest')
-        string(name: 'SCENARIO_LABEL', defaultValue: 'GammaTest')
+        string(name: 'RUNNER_LABEL', defaultValue: 'StoragePeriodic')
+        string(name: 'SCENARIO_LABEL', defaultValue: 'StoragePeriodic')
         string(name: 'DURATION_IN_SECONDS', defaultValue: '156')
         string(name: 'GIT_URL', defaultValue: 'https://github.com/aws-samples/amazon-kinesis-video-streams-demos.git')
-        string(name: 'GIT_HASH', defaultValue: 'metric-implementation')
+        string(name: 'GIT_HASH', defaultValue: 'reschedule-logic')
         string(name: 'AWS_DEFAULT_REGION', defaultValue: 'us-west-2')
         string(name: 'ENDPOINT', defaultValue: '', description: 'Custom endpoint URL (e.g., gamma endpoint)')
-        string(name: 'METRIC_SUFFIX', defaultValue: '-gamma')
+        string(name: 'METRIC_SUFFIX', defaultValue: '')
         string(name: 'VIEWER_WAIT_MINUTES', defaultValue: '20', description: 'Minutes to wait for master to build')
         string(name: 'VIEWER_SESSION_DURATION_SECONDS', defaultValue: '900', description: 'Hard timeout in seconds for the viewer process (default 15 minutes, must be larger than monitoring duration)')
         booleanParam(name: 'KEEP_RECORDING', defaultValue: false, description: 'Keep viewer video recordings after verification')
         booleanParam(name: 'DEBUG_LOG_SDP', defaultValue: true)
-        booleanParam(name: 'FIRST_ITERATION', defaultValue: true)
         booleanParam(name: 'IS_STORAGE', defaultValue: false, description: 'Run storage master + consumer test')
         booleanParam(name: 'IS_STORAGE_SINGLE_NODE', defaultValue: false, description: 'Run master and consumer on same node')
         booleanParam(name: 'VIDEO_VERIFY_ENABLED', defaultValue: false, description: 'Enable consumer-side video verification via GetClip')
@@ -455,7 +481,6 @@ pipeline {
         booleanParam(name: 'JS_STORAGE_VIEWER_JOIN', defaultValue: false)
         booleanParam(name: 'JS_STORAGE_TWO_VIEWERS', defaultValue: false)
         booleanParam(name: 'JS_STORAGE_THREE_VIEWERS', defaultValue: false)
-        booleanParam(name: 'RESCHEDULE', defaultValue: false, description: 'Whether to reschedule after completion')
         booleanParam(name: 'USE_TURN', defaultValue: false)
         booleanParam(name: 'USE_IOT', defaultValue: false)
         booleanParam(name: 'TRICKLE_ICE', defaultValue: false)
@@ -465,15 +490,28 @@ pipeline {
         string(name: 'JS_BRANCH', defaultValue: 'master', description: 'JS SDK branch name to clone and serve locally (default: master)')
     }
     
-    options {
-        lock(resource: "${params.RUNNER_LABEL}")
-    }
-
     environment {
         AWS_KVS_STS_ROLE_ARN = credentials('CANARY_STS_ROLE_ARN')
     }
 
     stages {
+        stage('Skip if duplicate') {
+            steps {
+                script {
+                    def myLabel = params.RUNNER_LABEL
+                    def runningBuilds = Jenkins.instance.getItemByFullName(env.JOB_NAME).builds.findAll { b ->
+                        b.isBuilding() && b.number != currentBuild.number &&
+                        b.getAction(hudson.model.ParametersAction)?.getParameter('RUNNER_LABEL')?.value == myLabel
+                    }
+                    if (runningBuilds) {
+                        echo "Another ${myLabel} build is already running (#${runningBuilds[0].number}), skipping"
+                        currentBuild.result = 'NOT_BUILT'
+                        error("Duplicate skipped")
+                    }
+                }
+            }
+        }
+
         stage('Fetch STS credentials') {
             steps {
                 script {
@@ -504,12 +542,12 @@ pipeline {
             steps {
                 script {
                     echo "=========================================="
-                    echo "Gamma Runner Configuration"
+                    echo "Storage Runner Configuration"
                     echo "=========================================="
                     echo "Endpoint: ${params.ENDPOINT}"
                     echo "Region: ${params.AWS_DEFAULT_REGION}"
                     echo "Viewer Wait: ${params.VIEWER_WAIT_MINUTES} minutes"
-                    echo "Test Type: ${params.IS_STORAGE ? 'Storage Master+Consumer' : params.JS_STORAGE_VIEWER_JOIN ? '1 Viewer' : params.JS_STORAGE_TWO_VIEWERS ? '2 Viewers' : params.JS_STORAGE_THREE_VIEWERS ? '3 Viewers' : 'Unknown'}"
+                    echo "Test Type: ${params.IS_STORAGE ? (params.IS_STORAGE_SINGLE_NODE ? 'Storage Master+Consumer (same node)' : 'Storage Master+Consumer') : params.JS_STORAGE_VIEWER_JOIN ? '1 Viewer' : params.JS_STORAGE_TWO_VIEWERS ? '2 Viewers' : params.JS_STORAGE_THREE_VIEWERS ? '3 Viewers' : 'Unknown'}"
                     echo "=========================================="
                 }
             }
@@ -518,7 +556,10 @@ pipeline {
         stage('Build and Run Storage Master and Consumer') {
             failFast true
             when {
-                equals expected: true, actual: params.IS_STORAGE
+                allOf {
+                    equals expected: true, actual: params.IS_STORAGE
+                    equals expected: false, actual: params.IS_STORAGE_SINGLE_NODE
+                }
             }
             parallel {
                 stage('StorageMaster') {
@@ -540,6 +581,32 @@ pipeline {
                             } finally {
                                 sh "rm -f '${env.WORKSPACE}/.in_use'"
                             }
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Build and Run Storage Master and Consumer on Same Node') {
+            failFast true
+            when {
+                allOf {
+                    equals expected: true, actual: params.IS_STORAGE
+                    equals expected: true, actual: params.IS_STORAGE_SINGLE_NODE
+                }
+            }
+            parallel {
+                stage('StorageMaster') {
+                    steps {
+                        script {
+                            buildStorageCanary(false, params)
+                        }
+                    }
+                }
+                stage('StorageConsumer') {
+                    steps {
+                        script {
+                            buildStorageCanary(true, params)
                         }
                     }
                 }
@@ -720,9 +787,11 @@ pipeline {
             }
         }
 
-        stage('Unset credentials') {
+        stage('Cleanup') {
             steps {
                 script {
+                    sh "rm -f '${env.WORKSPACE}/.in_use'"
+                    pushKeepAlive('CleanupComplete')
                     env.AWS_ACCESS_KEY_ID = ''
                     env.AWS_SECRET_ACCESS_KEY = ''
                     env.AWS_SESSION_TOKEN = ''
@@ -735,68 +804,14 @@ pipeline {
     post {
         always {
             script {
-                // Remove workspace lock so cron can clean it up later
                 sh "rm -f '${env.WORKSPACE}/.in_use'"
 
                 echo "=========================================="
-                echo "Gamma Runner Summary"
+                echo "Storage Runner Summary"
                 echo "=========================================="
                 echo "Build result: ${currentBuild.result ?: 'SUCCESS'}"
                 echo "Has errors: ${HAS_ERROR}"
                 echo "=========================================="
-
-                if (currentBuild.result == 'ABORTED' || IS_ABORTED) {
-                    echo "Build was aborted, skipping reschedule"
-                } else if (params.RESCHEDULE) {
-                    def rescheduleParams = [
-                        string(name: 'AWS_KVS_LOG_LEVEL', value: params.AWS_KVS_LOG_LEVEL),
-                        string(name: 'LOG_GROUP_NAME', value: params.LOG_GROUP_NAME),
-                        string(name: 'MASTER_NODE_LABEL', value: params.MASTER_NODE_LABEL),
-                        string(name: 'STORAGE_VIEWER_NODE_LABEL', value: params.STORAGE_VIEWER_NODE_LABEL),
-                        string(name: 'STORAGE_VIEWER_ONE_NODE_LABEL', value: params.STORAGE_VIEWER_ONE_NODE_LABEL),
-                        string(name: 'STORAGE_VIEWER_TWO_NODE_LABEL', value: params.STORAGE_VIEWER_TWO_NODE_LABEL),
-                        string(name: 'STORAGE_VIEWER_THREE_NODE_LABEL', value: params.STORAGE_VIEWER_THREE_NODE_LABEL),
-                        string(name: 'RUNNER_LABEL', value: params.RUNNER_LABEL),
-                        string(name: 'SCENARIO_LABEL', value: params.SCENARIO_LABEL),
-                        string(name: 'DURATION_IN_SECONDS', value: params.DURATION_IN_SECONDS),
-                        string(name: 'GIT_URL', value: params.GIT_URL),
-                        string(name: 'GIT_HASH', value: params.GIT_HASH),
-                        string(name: 'AWS_DEFAULT_REGION', value: params.AWS_DEFAULT_REGION),
-                        string(name: 'ENDPOINT', value: params.ENDPOINT),
-                        string(name: 'METRIC_SUFFIX', value: params.METRIC_SUFFIX),
-                        string(name: 'VIEWER_WAIT_MINUTES', value: params.VIEWER_WAIT_MINUTES),
-                        string(name: 'VIEWER_SESSION_DURATION_SECONDS', value: params.VIEWER_SESSION_DURATION_SECONDS),
-                        booleanParam(name: 'DEBUG_LOG_SDP', value: params.DEBUG_LOG_SDP),
-                        booleanParam(name: 'FIRST_ITERATION', value: false),
-                        booleanParam(name: 'IS_STORAGE', value: params.IS_STORAGE),
-                        booleanParam(name: 'IS_STORAGE_SINGLE_NODE', value: params.IS_STORAGE_SINGLE_NODE),
-                        booleanParam(name: 'VIDEO_VERIFY_ENABLED', value: params.VIDEO_VERIFY_ENABLED),
-                        string(name: 'CONSUMER_NODE_LABEL', value: params.CONSUMER_NODE_LABEL),
-                        booleanParam(name: 'JS_STORAGE_VIEWER_JOIN', value: params.JS_STORAGE_VIEWER_JOIN),
-                        booleanParam(name: 'JS_STORAGE_TWO_VIEWERS', value: params.JS_STORAGE_TWO_VIEWERS),
-                        booleanParam(name: 'JS_STORAGE_THREE_VIEWERS', value: params.JS_STORAGE_THREE_VIEWERS),
-                        booleanParam(name: 'RESCHEDULE', value: params.RESCHEDULE),
-                        booleanParam(name: 'USE_TURN', value: params.USE_TURN),
-                        booleanParam(name: 'USE_IOT', value: params.USE_IOT),
-                        booleanParam(name: 'TRICKLE_ICE', value: params.TRICKLE_ICE),
-                        booleanParam(name: 'FORCE_TURN', value: params.FORCE_TURN),
-                        booleanParam(name: 'NO_LOOP_FRAMES', value: params.NO_LOOP_FRAMES),
-                        string(name: 'STORAGE_FPS', value: params.STORAGE_FPS),
-                        string(name: 'JS_BRANCH', value: params.JS_BRANCH),
-                    ]
-
-                    try {
-                        build(job: env.JOB_NAME, parameters: rescheduleParams, wait: false)
-                    } catch (err) {
-                        echo "WARNING: Reschedule failed: ${err.getMessage()}, retrying in 5s..."
-                        try {
-                            sleep 5
-                            build(job: env.JOB_NAME, parameters: rescheduleParams, wait: false)
-                        } catch (retryErr) {
-                            echo "ERROR: Reschedule retry also failed: ${retryErr.getMessage()}"
-                        }
-                    }
-                }
             }
         }
     }
