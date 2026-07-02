@@ -82,6 +82,7 @@ class ViewerCanaryTest {
 
     // Unexpected disconnect tracking — after peer connection was successfully established
     this.peerConnectionEstablished = false;
+    this.lastPeerConnectionState = 'new'; // Track state for transition detection
     this.unexpectedDisconnectCount = 0;
 
     // Viewer reconnect tracking — counts "[VIEWER] Reconnecting..." log lines
@@ -237,6 +238,25 @@ class ViewerCanaryTest {
           1
         );
       }
+
+      // Track HTTP errors from JoinStorageSessionAsViewer API (400s, 500s)
+      // These appear as JSON objects with $metadata.httpStatusCode in the console
+      if (text.includes('"httpStatusCode"') && text.includes('"$metadata"')) {
+        const statusMatch = text.match(/"httpStatusCode"\s*:\s*(\d+)/);
+        if (statusMatch) {
+          const httpStatus = parseInt(statusMatch[1]);
+          if (httpStatus >= 400) {
+            const nameMatch = text.match(/"name"\s*:\s*"([^"]+)"/);
+            const errorName = nameMatch ? nameMatch[1] : 'Unknown';
+            log(`ViewerHttpError detected: ${httpStatus} (${errorName})`);
+            await CloudWatchMetrics.publishCountMetric(
+              this.getMetricName('ViewerHttpError'),
+              this.config.channelName,
+              1
+            );
+          }
+        }
+      }
       
       // Track SDP answer sent and calculate offer-to-answer metric
       if (text.includes('[VIEWER] Sending SDP answer to remote')) {
@@ -273,6 +293,18 @@ class ViewerCanaryTest {
             answerToFirstIceTime
           );
         }
+
+        // Calculate Join API call to first ICE candidate received
+        if (this.joinSSCallTime && this.firstIceCandidateReceivedTime) {
+          const timeToReceiveIce = this.firstIceCandidateReceivedTime - this.joinSSCallTime;
+          log(`TimeToReceiveIce (Join API to first ICE received): ${timeToReceiveIce}ms`);
+          
+          await CloudWatchMetrics.publishMsMetric(
+            this.getMetricName('TimeToReceiveIce'),
+            this.config.channelName,
+            timeToReceiveIce
+          );
+        }
       }
       
       // Track first ICE candidate sent to remote
@@ -290,6 +322,18 @@ class ViewerCanaryTest {
             this.getMetricName('FirstIceReceivedToFirstIceSentTime'),
             this.config.channelName,
             firstIceReceivedToSentTime
+          );
+        }
+
+        // Calculate Join API call to first ICE candidate sent
+        if (this.joinSSCallTime && this.firstIceCandidateSentTime) {
+          const timeToSendIce = this.firstIceCandidateSentTime - this.joinSSCallTime;
+          log(`TimeToSendIce (Join API to first ICE sent): ${timeToSendIce}ms`);
+          
+          await CloudWatchMetrics.publishMsMetric(
+            this.getMetricName('TimeToSendIce'),
+            this.config.channelName,
+            timeToSendIce
           );
         }
       }
@@ -361,6 +405,7 @@ class ViewerCanaryTest {
       if (text.includes('[VIEWER] Connection to peer successful!')) {
         this.peerConnectionEstablishedTime = Date.now();
         this.peerConnectionEstablished = true;
+        this.lastPeerConnectionState = 'connected';
         this.successfulConnections++;
         log(`Peer connection established timestamp captured (successful connections: ${this.successfulConnections}/${this.connectionAttempts})`);
 
@@ -395,6 +440,18 @@ class ViewerCanaryTest {
             totalConnectionTime
           );
         }
+
+        // Calculate Join API call to peer connection established
+        if (this.joinSSCallTime && this.peerConnectionEstablishedTime) {
+          const timeToPeerConnection = this.peerConnectionEstablishedTime - this.joinSSCallTime;
+          log(`TimeToPeerConnection (Join API to peer connection): ${timeToPeerConnection}ms`);
+          
+          await CloudWatchMetrics.publishMsMetric(
+            this.getMetricName('TimeToPeerConnection'),
+            this.config.channelName,
+            timeToPeerConnection
+          );
+        }
       }
       
       // Track WebRTC connection retries and peer connection failure (30s timeout)
@@ -410,29 +467,44 @@ class ViewerCanaryTest {
           this.config.channelName,
           0
         );
+
+        // Also push ViewerStreamingAvailability = 0 on connection timeout
+        log('[Canary] Connection timed out — pushing ViewerStreamingAvailability = 0');
+        await CloudWatchMetrics.publishCountMetric(
+          this.getMetricName('ViewerStreamingAvailability'),
+          this.config.channelName,
+          0
+        );
       }
 
       // Track peer connection state explicitly transitioning to "failed" (ICE connectivity check failed)
       // This is mutually exclusive with the 30s timeout above — covers the case where ICE fails outright
       if (text.includes('[VIEWER] PeerConnection state: failed')) {
-        if (this.peerConnectionEstablished) {
-          // Connection was previously established — this is an unexpected disconnect.
-          // The master's printPeerConnectionStateInfo only triggers onPeerConnectionFailed
-          // (and reconnect) on 'failed', not on 'disconnected'. So 'failed' after 'connected'
-          // is the only real unexpected disconnect we should track.
+        // Unexpected disconnect = connected → failed (the only transition we care about)
+        if (this.lastPeerConnectionState === 'connected') {
           this.unexpectedDisconnectCount++;
-          log(`Unexpected disconnect detected (failed after connected)! Count: ${this.unexpectedDisconnectCount}`);
+          log(`Unexpected disconnect detected (connected → failed)! Count: ${this.unexpectedDisconnectCount}`);
           await CloudWatchMetrics.publishCountMetric(
             this.getMetricName('UnexpectedDisconnect'),
             this.config.channelName,
             1
           );
+        } else {
+          // connecting → failed (initial connection failure)
+          log('Peer connection state transitioned to FAILED (never connected) — pushing PeerConnectionAvailability = 0');
+          await CloudWatchMetrics.publishCountMetric(
+            this.getMetricName('PeerConnectionAvailability'),
+            this.config.channelName,
+            0
+          );
         }
 
-        // Always push PeerConnectionAvailability = 0 for any 'failed' state
-        log('Peer connection state transitioned to FAILED — pushing PeerConnectionAvailability = 0');
+        this.lastPeerConnectionState = 'failed';
+
+        // Also push ViewerStreamingAvailability = 0 immediately on failure
+        log('[Canary] Peer connection FAILED — pushing ViewerStreamingAvailability = 0');
         await CloudWatchMetrics.publishCountMetric(
-          this.getMetricName('PeerConnectionAvailability'),
+          this.getMetricName('ViewerStreamingAvailability'),
           this.config.channelName,
           0
         );
@@ -448,6 +520,7 @@ class ViewerCanaryTest {
       if (text.includes('[VIEWER] Reconnecting...')) {
         this.viewerReconnectCount++;
         this.connectionAttempts++;
+        this.lastPeerConnectionState = 'connecting';
         log(`Viewer reconnect attempt detected! Count: ${this.viewerReconnectCount}, total attempts: ${this.connectionAttempts}`);
       }
       
@@ -542,7 +615,14 @@ class ViewerCanaryTest {
       document.querySelector('#ingest-media-manual-on').setAttribute('data-selected', 'true');
     });
     
-    log('Page loaded, clicking viewer button...');
+    log('Page loaded, checking JS SDK version...');
+    const sdkVersion = await page.evaluate(() => {
+      try { return typeof KVSWebRTC !== 'undefined' ? KVSWebRTC.VERSION : 'unknown'; }
+      catch (e) { return 'error: ' + e.message; }
+    });
+    log(`JS SDK version: ${sdkVersion}`);
+
+    log('Clicking viewer button...');
     await page.click('#viewer-button');
   }
 
@@ -677,8 +757,28 @@ class ViewerCanaryTest {
       }
 
       const report = await pc.getStats();
-      const result = { video: null, audio: null };
+      const result = { video: null, audio: null, roundTripTime: null, selectedCandidatePair: null };
       report.forEach(stat => {
+        if (stat.type === 'candidate-pair' && stat.nominated) {
+          result.roundTripTime = stat.currentRoundTripTime || 0;
+          // Find the local and remote candidate details
+          const localCandidate = report.get(stat.localCandidateId);
+          const remoteCandidate = report.get(stat.remoteCandidateId);
+          result.selectedCandidatePair = {
+            local: localCandidate ? {
+              address: localCandidate.address || localCandidate.ip,
+              port: localCandidate.port,
+              protocol: localCandidate.protocol,
+              candidateType: localCandidate.candidateType,
+            } : null,
+            remote: remoteCandidate ? {
+              address: remoteCandidate.address || remoteCandidate.ip,
+              port: remoteCandidate.port,
+              protocol: remoteCandidate.protocol,
+              candidateType: remoteCandidate.candidateType,
+            } : null,
+          };
+        }
         if (stat.type !== 'inbound-rtp') return;
         const entry = {
           packetsReceived: stat.packetsReceived || 0,
@@ -690,6 +790,9 @@ class ViewerCanaryTest {
           framesPerSecond: stat.framesPerSecond || 0,
           nackCount: stat.nackCount || 0,
           pliCount: stat.pliCount || 0,
+          jitterBufferDelay: stat.jitterBufferDelay || 0,
+          jitterBufferEmittedCount: stat.jitterBufferEmittedCount || 0,
+          totalDecodeTime: stat.totalDecodeTime || 0,
         };
         if (stat.kind === 'video') result.video = entry;
         else if (stat.kind === 'audio') result.audio = entry;
@@ -920,6 +1023,18 @@ class ViewerCanaryTest {
       this.config.channelName,
       frameDetectionTime
     );
+
+    // Calculate Join API call to first frame received
+    if (this.joinSSCallTime) {
+      const joinToFirstFrame = Date.now() - this.joinSSCallTime;
+      log(`TimeToFirstFrame from Join API: ${joinToFirstFrame}ms`);
+      
+      await CloudWatchMetrics.publishMsMetric(
+        this.getMetricName('JoinSSToFirstFrame'),
+        this.config.channelName,
+        joinToFirstFrame
+      );
+    }
     
     this.framesReceived = true;
 
@@ -941,6 +1056,16 @@ class ViewerCanaryTest {
     let lastStatusLog = 0;
     const statusLogInterval = 10000;
     
+    // ViewerStreamingAvailability heartbeat — push every 20 seconds
+    let lastAvailabilityPush = Date.now();
+    const availabilityInterval = 20000;
+    
+    // Periodic RTP metrics — push every 60 seconds
+    let lastPeriodicMetricsPush = Date.now();
+    const periodicMetricsInterval = 60000;
+    let prevRTCStats = null;
+    let prevRTCStatsTime = null;
+
     // Track RTCStats snapshots for final packet loss calculation
     this.firstRTCStats = null;
     this.lastRTCStats = null;
@@ -954,6 +1079,12 @@ class ViewerCanaryTest {
       
       if (!frameStats.viewerExists) {
         log('Viewer object lost!');
+        log('[Canary] Viewer object lost — pushing ViewerStreamingAvailability = 0');
+        await CloudWatchMetrics.publishCountMetric(
+          this.getMetricName('ViewerStreamingAvailability'),
+          this.config.channelName,
+          0
+        );
         this.testCompleted = true;
         break;
       }
@@ -961,7 +1092,14 @@ class ViewerCanaryTest {
       // Collect RTCStats snapshot
       const rtcStats = await this.getRTCStats(page);
       if (rtcStats?.video) {
-        if (!this.firstRTCStats) this.firstRTCStats = rtcStats;
+        if (!this.firstRTCStats) {
+          this.firstRTCStats = rtcStats;
+          // Log selected candidate pair on first successful stats collection
+          if (rtcStats.selectedCandidatePair) {
+            const pair = rtcStats.selectedCandidatePair;
+            log(`Selected ICE candidate pair — Local: ${pair.local?.candidateType} ${pair.local?.address}:${pair.local?.port} ${pair.local?.protocol} | Remote: ${pair.remote?.candidateType} ${pair.remote?.address}:${pair.remote?.port} ${pair.remote?.protocol}`);
+          }
+        }
         this.lastRTCStats = rtcStats;
       } else if (rtcStats?.debug && !this.rtcStatsDebugLogged) {
         log(`RTCStats debug: ${rtcStats.debug}`);
@@ -969,6 +1107,53 @@ class ViewerCanaryTest {
       }
       
       const now = Date.now();
+
+      // Push ViewerStreamingAvailability heartbeat every 20 seconds
+      if (now - lastAvailabilityPush >= availabilityInterval) {
+        const availability = frameStats.storageSessionActive ? 1.0 : 0.0;
+        await CloudWatchMetrics.publishCountMetric(
+          this.getMetricName('ViewerStreamingAvailability'),
+          this.config.channelName,
+          availability
+        );
+        lastAvailabilityPush = now;
+      }
+
+      // Push periodic RTP metrics every 60 seconds
+      if (now - lastPeriodicMetricsPush >= periodicMetricsInterval && rtcStats?.video && prevRTCStats?.video) {
+        const v = rtcStats.video;
+        const pv = prevRTCStats.video;
+        const durationSec = (now - prevRTCStatsTime) / 1000;
+
+        if (durationSec > 0) {
+          const nackPerSec = (v.nackCount - pv.nackCount) / durationSec;
+          const pliPerSec = (v.pliCount - pv.pliCount) / durationSec;
+          const framesDecodedPerSec = (v.framesDecoded - pv.framesDecoded) / durationSec;
+          const framesDroppedPerSec = (v.framesDropped - pv.framesDropped) / durationSec;
+          const incomingBitrateKbps = ((v.bytesReceived - pv.bytesReceived) * 8) / durationSec / 1000;
+          const packetsReceivedPerSec = (v.packetsReceived - pv.packetsReceived) / durationSec;
+          const packetsLostPerSec = (v.packetsLost - pv.packetsLost) / durationSec;
+
+          await CloudWatchMetrics.publishCountMetric(this.getMetricName('NackCountPerSecond'), this.config.channelName, nackPerSec);
+          await CloudWatchMetrics.publishCountMetric(this.getMetricName('PliCountPerSecond'), this.config.channelName, pliPerSec);
+          await CloudWatchMetrics.publishCountMetric(this.getMetricName('FramesDecodedPerSecond'), this.config.channelName, framesDecodedPerSec);
+          await CloudWatchMetrics.publishCountMetric(this.getMetricName('FramesDroppedPerSecond'), this.config.channelName, framesDroppedPerSec);
+          await CloudWatchMetrics.publishCountMetric(this.getMetricName('IncomingBitrateKbps'), this.config.channelName, incomingBitrateKbps);
+          await CloudWatchMetrics.publishCountMetric(this.getMetricName('PacketsReceivedPerSecond'), this.config.channelName, packetsReceivedPerSec);
+          await CloudWatchMetrics.publishCountMetric(this.getMetricName('PacketsLostPerSecond'), this.config.channelName, packetsLostPerSec);
+
+          log(`[Canary] Periodic RTP: nack/s=${nackPerSec.toFixed(2)} pli/s=${pliPerSec.toFixed(2)} decoded/s=${framesDecodedPerSec.toFixed(1)} dropped/s=${framesDroppedPerSec.toFixed(2)} bitrate=${incomingBitrateKbps.toFixed(1)}kbps pktsRecv/s=${packetsReceivedPerSec.toFixed(1)} pktsLost/s=${packetsLostPerSec.toFixed(2)}`);
+        }
+
+        lastPeriodicMetricsPush = now;
+      }
+
+      // Update prev snapshot for next periodic calculation
+      if (rtcStats?.video) {
+        prevRTCStats = rtcStats;
+        prevRTCStatsTime = now;
+      }
+
       if (now - lastStatusLog >= statusLogInterval) {
         const elapsed = Math.floor((now - this.sessionStartTime) / 1000);
         let statusMsg = `[${elapsed}s]ActiveVideo: ${frameStats.hasActiveVideo}`;
@@ -981,6 +1166,16 @@ class ViewerCanaryTest {
       }
       
       await new Promise(resolve => setTimeout(resolve, 2000));
+    }
+
+    // If monitoring loop completed normally (timeout, not failure), push final 1.0
+    if (this.storageSessionJoined) {
+      log('[Canary] Viewer monitoring completed normally — pushing ViewerStreamingAvailability = 1 (clean exit)');
+      await CloudWatchMetrics.publishCountMetric(
+        this.getMetricName('ViewerStreamingAvailability'),
+        this.config.channelName,
+        1
+      );
     }
   }
 
@@ -1069,6 +1264,65 @@ class ViewerCanaryTest {
         this.config.channelName,
         v.pliCount
       );
+
+      // Jitter Buffer Delay — average time frames spend in the jitter buffer (ms)
+      if (v.jitterBufferEmittedCount > 0) {
+        const avgJitterBufferDelay = (v.jitterBufferDelay / v.jitterBufferEmittedCount) * 1000;
+        log(`Jitter Buffer Delay: ${avgJitterBufferDelay.toFixed(2)}ms (total=${v.jitterBufferDelay}s, emitted=${v.jitterBufferEmittedCount})`);
+        await CloudWatchMetrics.publishMsMetric(
+          this.getMetricName('JitterBufferDelay'),
+          this.config.channelName,
+          avgJitterBufferDelay
+        );
+      }
+
+      // Decode Time — average time spent decoding each frame (ms)
+      if (v.framesDecoded > 0) {
+        const avgDecodeTime = (v.totalDecodeTime / v.framesDecoded) * 1000;
+        log(`Decode Time: ${avgDecodeTime.toFixed(2)}ms (total=${v.totalDecodeTime}s, frames=${v.framesDecoded})`);
+        await CloudWatchMetrics.publishMsMetric(
+          this.getMetricName('DecodeTime'),
+          this.config.channelName,
+          avgDecodeTime
+        );
+      }
+
+      // Round Trip Time — from nominated ICE candidate pair (ms)
+      if (this.lastRTCStats.roundTripTime !== null) {
+        const rttMs = this.lastRTCStats.roundTripTime * 1000;
+        log(`Round Trip Time: ${rttMs.toFixed(2)}ms`);
+        await CloudWatchMetrics.publishMsMetric(
+          this.getMetricName('RoundTripTime'),
+          this.config.channelName,
+          rttMs
+        );
+      }
+
+      // Total Packets Received
+      await CloudWatchMetrics.publishCountMetric(
+        this.getMetricName('TotalPacketsReceived'),
+        this.config.channelName,
+        v.packetsReceived
+      );
+
+      // Total Frames Decoded
+      await CloudWatchMetrics.publishCountMetric(
+        this.getMetricName('TotalFramesDecoded'),
+        this.config.channelName,
+        v.framesDecoded
+      );
+
+      // Total Frames Dropped Percentage
+      const totalFramesProcessed = v.framesDecoded + v.framesDropped;
+      if (totalFramesProcessed > 0) {
+        const framesDroppedPct = (v.framesDropped / totalFramesProcessed) * 100;
+        log(`Total Frames Dropped: ${framesDroppedPct.toFixed(2)}% (${v.framesDropped}/${totalFramesProcessed})`);
+        await CloudWatchMetrics.publishPercentageMetric(
+          this.getMetricName('TotalFramesDroppedPercentage'),
+          this.config.channelName,
+          framesDroppedPct
+        );
+      }
     } else {
       log('No RTCStats video data available for packet loss calculation');
     }

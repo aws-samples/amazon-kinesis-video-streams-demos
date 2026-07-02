@@ -282,7 +282,9 @@ public class WebrtcStorageCanaryConsumer {
 
         switch (mCanaryLabel) {
             case CanaryConstants.PERIODIC_LABEL:
-            case CanaryConstants.GAMMA_PERIODIC_LABEL: {
+            case CanaryConstants.GAMMA_PERIODIC_LABEL:
+            case CanaryConstants.LOW_FPS_LABEL:
+            case CanaryConstants.GAMMA_LOW_FPS_LABEL: {
                 logger.info("Periodic case: canaryRunTime=" + canaryRunTime
                         + "s, mCanaryStartTime=" + mCanaryStartTime
                         + ", now=" + new Date()
@@ -299,6 +301,18 @@ public class WebrtcStorageCanaryConsumer {
                     }
                 });
 
+                // Also run fragment continuity checks for periodic runs
+                final CanaryFragmentList periodicFragmentList = new CanaryFragmentList();
+                Timer periodicFragmentTimer = new Timer("PeriodicFragmentContinuityTimer");
+                TimerTask periodicFragmentTask = new TimerTask() {
+                    @Override
+                    public void run() {
+                        calculateFragmentContinuityMetric(periodicFragmentList);
+                    }
+                };
+                periodicFragmentTimer.scheduleAtFixedRate(periodicFragmentTask,
+                        CanaryConstants.LIST_FRAGMENTS_INITIAL_DELAY, CanaryConstants.LIST_FRAGMENTS_INTERVAL);
+
                 // Wait for the canary duration
                 long remainingMs = (canaryRunTime * CanaryConstants.MILLISECONDS_IN_A_SECOND)
                         - (System.currentTimeMillis() - mCanaryStartTime.getTime());
@@ -308,6 +322,7 @@ public class WebrtcStorageCanaryConsumer {
                 }
                 logger.info("Periodic duration elapsed, shutting down GetMedia worker");
                 periodicExecutor.shutdownNow();
+                periodicFragmentTimer.cancel();
 
                 // Download clip for video verification if enabled
                 String videoVerifyEnabled = System.getenv(CanaryConstants.VIDEO_VERIFY_ENABLED_ENV_VAR);

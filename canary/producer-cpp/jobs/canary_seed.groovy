@@ -5,8 +5,8 @@ import org.jenkinsci.plugins.scriptsecurity.sandbox.whitelists.*;
 
 WORKSPACE="."
 GROOVY_SCRIPT_DIR="$WORKSPACE/canary/producer-cpp/jobs"
-DAYS_TO_KEEP_LOGS=2
-NUMBER_OF_LOGS=1
+DAYS_TO_KEEP_LOGS=7
+NUMBER_OF_LOGS=20
 MAX_EXECUTION_PER_NODE=1
 NAMESPACE="producercpp"
 

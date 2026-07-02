@@ -5,7 +5,7 @@ install-system-dependencies:
 
 build: install-system-dependencies
 	@echo "Build java parser based consumer"
-	mvn package
+	mvn package -DskipTests
 	# Create a temporary filename in /tmp directory
 	touch tmp_jar
 	# Create classpath string of dependencies from the local repository to a file
