@@ -83,6 +83,7 @@ def buildWebRTCProject(thing_prefix) {
         export CANARY_ASSET_SET='${params.STORAGE_ASSET_SET ?: ''}'
         export CANARY_ASSET_BUCKET='${params.CANARY_ASSET_BUCKET ?: ''}'
         export CANARY_ASSET_PREFIX='${params.CANARY_ASSET_PREFIX ?: ''}'
+        export CANARY_ASSET_REGION='${params.CANARY_ASSET_REGION ?: ''}'
         export AWS_DEFAULT_REGION='${params.AWS_DEFAULT_REGION ?: 'us-west-2'}'
         chmod a+x '${repoDir}/canary/webrtc-c/scripts/build-storage-master.sh' &&
         '${repoDir}/canary/webrtc-c/scripts/build-storage-master.sh' '${params.GIT_URL}' '${params.GIT_HASH}'"""
@@ -154,6 +155,7 @@ def buildConsumerProject() {
         export CANARY_ASSET_SET='${params.STORAGE_ASSET_SET ?: ''}'
         export CANARY_ASSET_BUCKET='${params.CANARY_ASSET_BUCKET ?: ''}'
         export CANARY_ASSET_PREFIX='${params.CANARY_ASSET_PREFIX ?: ''}'
+        export CANARY_ASSET_REGION='${params.CANARY_ASSET_REGION ?: ''}'
         export AWS_DEFAULT_REGION='${params.AWS_DEFAULT_REGION ?: 'us-west-2'}'
         if [ -n "\$CANARY_ASSET_SET" ]; then
             chmod +x '${repoDir}/canary/webrtc-c/scripts/fetch-asset-set.sh' 2>/dev/null || true
@@ -545,6 +547,7 @@ pipeline {
         string(name: 'STORAGE_ASSET_SET', defaultValue: '', description: 'Frame asset set: empty=default h264SampleFrames, or e.g. h264SampleFrames-500kbps / -1mbps / -5mbps')
         string(name: 'CANARY_ASSET_BUCKET', defaultValue: '', description: 'S3 bucket hosting the frame-set tarballs (required when STORAGE_ASSET_SET is set)')
         string(name: 'CANARY_ASSET_PREFIX', defaultValue: '', description: 'S3 key prefix for frame-set tarballs, e.g. webrtc-canary/frame-sets/v1 (required when STORAGE_ASSET_SET is set)')
+        string(name: 'CANARY_ASSET_REGION', defaultValue: '', description: 'Region of the S3 asset bucket. May differ from AWS_DEFAULT_REGION. Empty falls back to AWS_DEFAULT_REGION.')
         string(name: 'JS_BRANCH', defaultValue: 'master', description: 'JS SDK branch name to clone and serve locally (default: master)')
     }
     
@@ -941,6 +944,7 @@ pipeline {
                         string(name: 'STORAGE_ASSET_SET', value: params.STORAGE_ASSET_SET),
                         string(name: 'CANARY_ASSET_BUCKET', value: params.CANARY_ASSET_BUCKET),
                         string(name: 'CANARY_ASSET_PREFIX', value: params.CANARY_ASSET_PREFIX),
+                        string(name: 'CANARY_ASSET_REGION', value: params.CANARY_ASSET_REGION),
                         string(name: 'JS_BRANCH', value: params.JS_BRANCH),
                     ]
 

@@ -13,7 +13,11 @@
 #   CANARY_ASSET_BUCKET  - required unless set-name is default or empty
 #   CANARY_ASSET_PREFIX  - required unless set-name is default or empty
 #                          S3 key prefix, e.g. "webrtc-canary/frame-sets/v1"
-#   AWS_DEFAULT_REGION   - optional; uses aws-cli default if unset
+#   CANARY_ASSET_REGION  - optional; region of the S3 bucket (may differ
+#                          from the canary run's AWS_DEFAULT_REGION).
+#                          Falls back to AWS_DEFAULT_REGION if unset.
+#                          If both are unset, the aws CLI auto-detects.
+#   AWS_DEFAULT_REGION   - optional fallback for CANARY_ASSET_REGION
 #
 # Exit codes:
 #   0  success (or no-op for default set)
@@ -78,9 +82,13 @@ S3_KEY="${CANARY_ASSET_PREFIX}/${SET_NAME}.tar.gz"
 
 mkdir -p "$ASSET_DIR"
 
+# Prefer bucket-specific region, fall back to the canary's operational region.
+# If neither is set, drop --region and let the aws CLI auto-detect via
+# S3's PermanentRedirect handling.
+ASSET_REGION="${CANARY_ASSET_REGION:-${AWS_DEFAULT_REGION:-}}"
 REGION_FLAG=""
-if [ -n "${AWS_DEFAULT_REGION:-}" ]; then
-    REGION_FLAG="--region ${AWS_DEFAULT_REGION}"
+if [ -n "$ASSET_REGION" ]; then
+    REGION_FLAG="--region ${ASSET_REGION}"
 fi
 
 # --- Diagnostics: log the identity and preflight the object so failures
@@ -88,7 +96,8 @@ fi
 echo "fetch-asset-set: --- diagnostics ---"
 echo "fetch-asset-set: bucket=${CANARY_ASSET_BUCKET}"
 echo "fetch-asset-set: key=${S3_KEY}"
-echo "fetch-asset-set: region=${AWS_DEFAULT_REGION:-<unset, default>}"
+echo "fetch-asset-set: asset-region=${ASSET_REGION:-<unset, CLI auto-detects>}"
+echo "fetch-asset-set: (CANARY_ASSET_REGION=${CANARY_ASSET_REGION:-<unset>}, AWS_DEFAULT_REGION=${AWS_DEFAULT_REGION:-<unset>})"
 echo "fetch-asset-set: caller identity:"
 aws sts get-caller-identity 2>&1 | sed 's/^/    /' || true
 echo "fetch-asset-set: head-object preflight:"
