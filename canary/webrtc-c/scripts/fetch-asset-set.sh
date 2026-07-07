@@ -112,12 +112,16 @@ else
 fi
 
 # --- Download and extract (streamed; no intermediate file on disk) ---
+# Capture PIPESTATUS into a local array *before* any other command runs,
+# otherwise the very next assignment resets PIPESTATUS and ${PIPESTATUS[1]}
+# becomes unbound (which trips `set -u`).
 echo "fetch-asset-set: downloading $S3_URI"
 set +e
 aws s3 cp $REGION_FLAG "$S3_URI" - | tar -xzf - -C "$ASSET_DIR"
-aws_rc=${PIPESTATUS[0]}
-tar_rc=${PIPESTATUS[1]}
+pipe_status=("${PIPESTATUS[@]}")
 set -e
+aws_rc="${pipe_status[0]}"
+tar_rc="${pipe_status[1]}"
 if [ "$aws_rc" -ne 0 ] || [ "$tar_rc" -ne 0 ]; then
     echo "ERROR: fetch/extract failed for $S3_URI (aws rc=$aws_rc, tar rc=$tar_rc)" >&2
     rm -rf "$TARGET_DIR"
