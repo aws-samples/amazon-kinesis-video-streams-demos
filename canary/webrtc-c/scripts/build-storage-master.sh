@@ -117,53 +117,75 @@ elif [ "$CURRENT_WEBRTC_VERSION" != "$CACHED_WEBRTC_VERSION" ]; then
     NEED_REBUILD=true
 else
     echo "No changes detected, skipping build"
-    echo "Binary ready at: $BINARY_PATH"
-    # Release lock
-    flock -u 9
-    echo "$BINARY_PATH"
-    exit 0
 fi
 
 # ---------------------------------------------------------------------------
 # 4. Build (clean rebuild to avoid stale CMake cache / FetchContent artifacts)
+#    Only runs when NEED_REBUILD=true; otherwise fall through to asset fetch.
 # ---------------------------------------------------------------------------
-BUILD_LOG="${LOGS_DIR}/build-$(date +%s).log"
-echo "Building... (log: $BUILD_LOG)"
+if [ "$NEED_REBUILD" = "true" ]; then
+    BUILD_LOG="${LOGS_DIR}/build-$(date +%s).log"
+    echo "Building... (log: $BUILD_LOG)"
 
-CMAKE_FLAGS="-DCMAKE_BUILD_TYPE=Debug -DCMAKE_INSTALL_PREFIX=${BUILD_DIR}"
-if [ "$TLS_BACKEND" = "mbedtls" ]; then
-    CMAKE_FLAGS="$CMAKE_FLAGS -DCANARY_USE_OPENSSL=OFF -DCANARY_USE_MBEDTLS=ON"
+    CMAKE_FLAGS="-DCMAKE_BUILD_TYPE=Debug -DCMAKE_INSTALL_PREFIX=${BUILD_DIR}"
+    if [ "$TLS_BACKEND" = "mbedtls" ]; then
+        CMAKE_FLAGS="$CMAKE_FLAGS -DCANARY_USE_OPENSSL=OFF -DCANARY_USE_MBEDTLS=ON"
+    fi
+
+    rm -rf "$BUILD_DIR"
+    mkdir -p "$BUILD_DIR"
+
+    (
+        cd "$BUILD_DIR"
+        cmake "$REPO_DIR/canary/webrtc-c" $CMAKE_FLAGS
+        make -j"$(nproc)"
+    ) > "$BUILD_LOG" 2>&1
+
+    BUILD_EXIT=$?
+
+    if [ $BUILD_EXIT -ne 0 ]; then
+        echo "ERROR: Build failed (exit code $BUILD_EXIT). See log: $BUILD_LOG"
+        tail -50 "$BUILD_LOG"
+        # Release lock
+        flock -u 9
+        exit 1
+    fi
+
+    # -----------------------------------------------------------------------
+    # 5. Update stamps
+    # -----------------------------------------------------------------------
+    echo "$CURRENT_COMMIT" > "$COMMIT_FILE"
+    echo "$CURRENT_WEBRTC_VERSION" > "$WEBRTC_VERSION_FILE"
+
+    # Clean up old logs (keep last 10)
+    ls -1t "$LOGS_DIR"/build-*.log 2>/dev/null | tail -n +11 | xargs rm -f 2>/dev/null || true
+
+    echo "Build successful"
 fi
 
-rm -rf "$BUILD_DIR"
-mkdir -p "$BUILD_DIR"
-
-(
-    cd "$BUILD_DIR"
-    cmake "$REPO_DIR/canary/webrtc-c" $CMAKE_FLAGS
-    make -j"$(nproc)"
-) > "$BUILD_LOG" 2>&1
-
-BUILD_EXIT=$?
-
-if [ $BUILD_EXIT -ne 0 ]; then
-    echo "ERROR: Build failed (exit code $BUILD_EXIT). See log: $BUILD_LOG"
-    tail -50 "$BUILD_LOG"
-    # Release lock
-    flock -u 9
-    exit 1
+# ---------------------------------------------------------------------------
+# 6. Fetch optional bitrate-variant asset set (idempotent, runs every invocation)
+#    - Default set ("h264SampleFrames") ships in the git checkout; the fetch
+#      script no-ops for it.
+#    - A CMake rebuild wipes ${BUILD_DIR}, so previously fetched sets need
+#      re-fetching; that's why this runs unconditionally, not only on rebuild.
+# ---------------------------------------------------------------------------
+FETCH_SCRIPT="${REPO_DIR}/canary/webrtc-c/scripts/fetch-asset-set.sh"
+REQUESTED_ASSET_SET="${CANARY_ASSET_SET:-}"
+if [ -n "$REQUESTED_ASSET_SET" ]; then
+    if [ ! -x "$FETCH_SCRIPT" ]; then
+        chmod +x "$FETCH_SCRIPT" 2>/dev/null || true
+    fi
+    if ! "$FETCH_SCRIPT" "$REQUESTED_ASSET_SET" "${BUILD_DIR}/assets"; then
+        echo "ERROR: fetch-asset-set.sh failed for '$REQUESTED_ASSET_SET'"
+        # Release lock
+        flock -u 9
+        exit 1
+    fi
+else
+    echo "No CANARY_ASSET_SET requested, using default asset set from git checkout"
 fi
 
-# ---------------------------------------------------------------------------
-# 5. Update stamps
-# ---------------------------------------------------------------------------
-echo "$CURRENT_COMMIT" > "$COMMIT_FILE"
-echo "$CURRENT_WEBRTC_VERSION" > "$WEBRTC_VERSION_FILE"
-
-# Clean up old logs (keep last 10)
-ls -1t "$LOGS_DIR"/build-*.log 2>/dev/null | tail -n +11 | xargs rm -f 2>/dev/null || true
-
-echo "Build successful"
 echo "Binary ready at: $BINARY_PATH"
 
 # Release lock
