@@ -13,7 +13,9 @@ INT32 main(INT32 argc, CHAR* argv[])
     PSampleConfiguration pSampleConfiguration = NULL;
     PCHAR pChannelName;
     PCHAR pControlPlaneUri = NULL;
+    PCHAR pAssetSet;
     CHAR controlPlaneUrl[MAX_CONTROL_PLANE_URI_CHAR_LEN];
+    CHAR videoProbePath[MAX_PATH_LEN + 1];
     SignalingClientMetrics signalingClientMetrics;
     signalingClientMetrics.version = SIGNALING_CLIENT_METRICS_CURRENT_VERSION;
 
@@ -83,7 +85,9 @@ INT32 main(INT32 argc, CHAR* argv[])
     // Resolve asset set: CANARY_ASSET_SET env var (optional) selects a non-default frame
     // directory such as "h264SampleFrames-500kbps" for bitrate variants. Empty/unset uses
     // the default set so existing runs are unaffected.
-    PCHAR pAssetSet = GETENV(CANARY_ASSET_SET_ENV_VAR);
+    // NOTE: declaration is at top of main(); plain assignment here avoids the C++ rule
+    // against `goto CleanUp` crossing a variable initialization.
+    pAssetSet = GETENV(CANARY_ASSET_SET_ENV_VAR);
     if (pAssetSet == NULL || pAssetSet[0] == '\0') {
         pAssetSet = CANARY_DEFAULT_ASSET_SET;
         DLOGI("[KVS Master] No %s set, using default asset set '%s'", CANARY_ASSET_SET_ENV_VAR, pAssetSet);
@@ -92,7 +96,6 @@ INT32 main(INT32 argc, CHAR* argv[])
     }
 
     // Check if the samples are present
-    CHAR videoProbePath[MAX_PATH_LEN + 1];
     SNPRINTF(videoProbePath, MAX_PATH_LEN, "./assets/%s/frame-0001.h264", pAssetSet);
     DLOGI("[KVS Master] Checking sample video frame availability at %s ....", videoProbePath);
     CHK_STATUS(readFrameFromDisk(NULL, &frameSize, videoProbePath));
