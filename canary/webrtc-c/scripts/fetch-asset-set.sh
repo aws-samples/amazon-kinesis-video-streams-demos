@@ -74,22 +74,44 @@ if [ -z "${CANARY_ASSET_PREFIX:-}" ]; then
 fi
 
 S3_URI="s3://${CANARY_ASSET_BUCKET}/${CANARY_ASSET_PREFIX}/${SET_NAME}.tar.gz"
+S3_KEY="${CANARY_ASSET_PREFIX}/${SET_NAME}.tar.gz"
 
 mkdir -p "$ASSET_DIR"
 
-# --- Download and extract (streamed; no intermediate file on disk) ---
-echo "fetch-asset-set: downloading $S3_URI"
 REGION_FLAG=""
 if [ -n "${AWS_DEFAULT_REGION:-}" ]; then
     REGION_FLAG="--region ${AWS_DEFAULT_REGION}"
 fi
 
-# Use pipefail so a failed download aborts the extract too
-if ! aws s3 cp $REGION_FLAG "$S3_URI" - | tar -xzf - -C "$ASSET_DIR"; then
-    rc=$?
-    echo "ERROR: fetch/extract failed for $S3_URI (rc=$rc)" >&2
+# --- Diagnostics: log the identity and preflight the object so failures
+#     are self-explanatory in the build log ---
+echo "fetch-asset-set: --- diagnostics ---"
+echo "fetch-asset-set: bucket=${CANARY_ASSET_BUCKET}"
+echo "fetch-asset-set: key=${S3_KEY}"
+echo "fetch-asset-set: region=${AWS_DEFAULT_REGION:-<unset, default>}"
+echo "fetch-asset-set: caller identity:"
+aws sts get-caller-identity 2>&1 | sed 's/^/    /' || true
+echo "fetch-asset-set: head-object preflight:"
+if head_out=$(aws s3api head-object $REGION_FLAG --bucket "$CANARY_ASSET_BUCKET" --key "$S3_KEY" 2>&1); then
+    echo "$head_out" | sed 's/^/    /'
+    echo "fetch-asset-set: head-object OK, proceeding with download"
+else
+    echo "$head_out" | sed 's/^/    /' >&2
+    echo "ERROR: head-object failed for s3://${CANARY_ASSET_BUCKET}/${S3_KEY}" >&2
+    echo "       — check IAM permissions on the caller identity above, region, or object existence" >&2
+    exit 5
+fi
+
+# --- Download and extract (streamed; no intermediate file on disk) ---
+echo "fetch-asset-set: downloading $S3_URI"
+set +e
+aws s3 cp $REGION_FLAG "$S3_URI" - | tar -xzf - -C "$ASSET_DIR"
+aws_rc=${PIPESTATUS[0]}
+tar_rc=${PIPESTATUS[1]}
+set -e
+if [ "$aws_rc" -ne 0 ] || [ "$tar_rc" -ne 0 ]; then
+    echo "ERROR: fetch/extract failed for $S3_URI (aws rc=$aws_rc, tar rc=$tar_rc)" >&2
     rm -rf "$TARGET_DIR"
-    # Distinguish network vs unpack failures poorly here; return generic 5
     exit 5
 fi
 
