@@ -80,9 +80,22 @@ INT32 main(INT32 argc, CHAR* argv[])
     pSampleConfiguration->mediaType = SAMPLE_STREAMING_AUDIO_VIDEO;
     DLOGI("[KVS Master] Finished setting handlers");
 
+    // Resolve asset set: CANARY_ASSET_SET env var (optional) selects a non-default frame
+    // directory such as "h264SampleFrames-500kbps" for bitrate variants. Empty/unset uses
+    // the default set so existing runs are unaffected.
+    PCHAR pAssetSet = GETENV(CANARY_ASSET_SET_ENV_VAR);
+    if (pAssetSet == NULL || pAssetSet[0] == '\0') {
+        pAssetSet = CANARY_DEFAULT_ASSET_SET;
+        DLOGI("[KVS Master] No %s set, using default asset set '%s'", CANARY_ASSET_SET_ENV_VAR, pAssetSet);
+    } else {
+        DLOGI("[KVS Master] Using asset set '%s' (from %s)", pAssetSet, CANARY_ASSET_SET_ENV_VAR);
+    }
+
     // Check if the samples are present
-    DLOGI("[KVS Master] Checking sample video frame availability....");
-    CHK_STATUS(readFrameFromDisk(NULL, &frameSize, "./assets/h264SampleFrames/frame-0001.h264"));
+    CHAR videoProbePath[MAX_PATH_LEN + 1];
+    SNPRINTF(videoProbePath, MAX_PATH_LEN, "./assets/%s/frame-0001.h264", pAssetSet);
+    DLOGI("[KVS Master] Checking sample video frame availability at %s ....", videoProbePath);
+    CHK_STATUS(readFrameFromDisk(NULL, &frameSize, videoProbePath));
     DLOGI("[KVS Master] Checked sample video frame availability....available");
 
     CHK_STATUS(readFrameFromDisk(NULL, &frameSize, "./assets/opusSampleFrames/sample-0001.opus"));
@@ -224,9 +237,17 @@ PVOID sendVideoPackets(PVOID args)
     UINT64 videoFrameDuration;
     PCHAR pFrameRate;
     PCHAR pNoLoopFrames;
+    PCHAR pAssetSet;
     BOOL noLoopFrames;
     MEMSET(&encoderStats, 0x00, SIZEOF(RtcEncoderStats));
     CHK_ERR(pSampleConfiguration != NULL, STATUS_NULL_ARG, "[KVS Master] Streaming session is NULL");
+
+    // Resolve asset set (same env var / default as main's availability probe).
+    pAssetSet = GETENV(CANARY_ASSET_SET_ENV_VAR);
+    if (pAssetSet == NULL || pAssetSet[0] == '\0') {
+        pAssetSet = CANARY_DEFAULT_ASSET_SET;
+    }
+    DLOGI("[KVS Master] sendVideoPackets using asset set '%s'", pAssetSet);
 
     // Determine FPS from environment variable, defaulting to DEFAULT_FPS_VALUE (30)
     pFrameRate = GETENV("CANARY_FRAME_RATE");
@@ -262,7 +283,7 @@ PVOID sendVideoPackets(PVOID args)
             break;
         }
 
-        SNPRINTF(filePath, MAX_PATH_LEN, "./assets/h264SampleFrames/frame-%04d.h264", fileIndex);
+        SNPRINTF(filePath, MAX_PATH_LEN, "./assets/%s/frame-%04d.h264", pAssetSet, fileIndex);
 
         CHK_STATUS(readFrameFromDisk(NULL, &frameSize, filePath));
 

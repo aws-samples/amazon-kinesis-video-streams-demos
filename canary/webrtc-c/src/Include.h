@@ -106,6 +106,12 @@
 #define CANARY_VIDEO_FRAMES_PATH (PCHAR) "./assets/h264SampleFrames/frame-%04d.h264"
 #define CANARY_AUDIO_FRAMES_PATH (PCHAR) "./assets/opusSampleFrames/sample-%04d.opus"
 
+// Asset-set selection. Env var picks a non-default frame directory (e.g. bitrate variants
+// like "h264SampleFrames-500kbps"). Unset/empty falls back to CANARY_DEFAULT_ASSET_SET,
+// preserving existing behavior.
+#define CANARY_ASSET_SET_ENV_VAR (PCHAR) "CANARY_ASSET_SET"
+#define CANARY_DEFAULT_ASSET_SET (PCHAR) "h264SampleFrames"
+
 #define METRICS_INVOCATION_PERIOD            (60 * HUNDREDS_OF_NANOS_IN_A_SECOND)
 #define END_TO_END_METRICS_INVOCATION_PERIOD (30 * HUNDREDS_OF_NANOS_IN_A_SECOND)
 #define KVS_METRICS_INVOCATION_PERIOD        (5 * HUNDREDS_OF_NANOS_IN_A_SECOND)
