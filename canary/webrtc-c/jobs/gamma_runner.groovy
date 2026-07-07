@@ -77,8 +77,13 @@ def buildWebRTCProject(thing_prefix) {
         cmp -s '${repoDir}/canary/webrtc-c/scripts/cron/cleanup-master.sh' '${env.HOME}/webrtc-c-storage-master/cleanup-master.sh' \
             || cp '${repoDir}/canary/webrtc-c/scripts/cron/cleanup-master.sh' '${env.HOME}/webrtc-c-storage-master/cleanup-master.sh'"""
 
-    // Build the binary (handles git fetch, skip-rebuild, and flock internally)
+    // Build the binary (handles git fetch, skip-rebuild, and flock internally).
+    // Export asset-set env so build-storage-master.sh can fetch the requested set from S3.
     sh """
+        export CANARY_ASSET_SET='${params.STORAGE_ASSET_SET ?: ''}'
+        export CANARY_ASSET_BUCKET='${params.CANARY_ASSET_BUCKET ?: ''}'
+        export CANARY_ASSET_PREFIX='${params.CANARY_ASSET_PREFIX ?: ''}'
+        export AWS_DEFAULT_REGION='${params.AWS_DEFAULT_REGION ?: 'us-west-2'}'
         chmod a+x '${repoDir}/canary/webrtc-c/scripts/build-storage-master.sh' &&
         '${repoDir}/canary/webrtc-c/scripts/build-storage-master.sh' '${params.GIT_URL}' '${params.GIT_HASH}'"""
 
@@ -141,6 +146,21 @@ def buildConsumerProject() {
     sh """
         cmp -s '${repoDir}/canary/webrtc-c/scripts/cron/cleanup-consumer.sh' '${env.HOME}/webrtc-c-storage-master/cleanup-consumer.sh' \
             || cp '${repoDir}/canary/webrtc-c/scripts/cron/cleanup-consumer.sh' '${env.HOME}/webrtc-c-storage-master/cleanup-consumer.sh'"""
+
+    // Fetch bitrate-variant asset set into the repo's assets dir so verify.py can use it
+    // as the SSIM reference (Option A: like-for-like comparison). Default set is a no-op
+    // because it's already in the git checkout.
+    sh """
+        export CANARY_ASSET_SET='${params.STORAGE_ASSET_SET ?: ''}'
+        export CANARY_ASSET_BUCKET='${params.CANARY_ASSET_BUCKET ?: ''}'
+        export CANARY_ASSET_PREFIX='${params.CANARY_ASSET_PREFIX ?: ''}'
+        export AWS_DEFAULT_REGION='${params.AWS_DEFAULT_REGION ?: 'us-west-2'}'
+        if [ -n "\$CANARY_ASSET_SET" ]; then
+            chmod +x '${repoDir}/canary/webrtc-c/scripts/fetch-asset-set.sh' 2>/dev/null || true
+            '${repoDir}/canary/webrtc-c/scripts/fetch-asset-set.sh' \"\$CANARY_ASSET_SET\" '${repoDir}/canary/webrtc-c/assets'
+        else
+            echo "No CANARY_ASSET_SET requested, using default assets from git checkout"
+        fi"""
 }
 
 def withRunnerWrapper(envs, fn) {
@@ -340,6 +360,7 @@ def buildStorageCanary(isConsumer, params) {
         'CONTROL_PLANE_URI': params.ENDPOINT ?: '',
         'CANARY_NO_LOOP_FRAMES': params.NO_LOOP_FRAMES ?: false,
         'CANARY_FRAME_RATE': params.STORAGE_FPS ?: '',
+        'CANARY_ASSET_SET': params.STORAGE_ASSET_SET ?: '',
         'CANARY_MEDIA_TYPE': env.CANARY_MEDIA_TYPE ?: ''
     ]
 
@@ -413,10 +434,13 @@ def buildStorageCanary(isConsumer, params) {
             """
         }
 
-        // Run video verification on the GetClip MP4
+        // Run video verification on the GetClip MP4. sourceFrames points at the same
+        // asset set the master streamed, so SSIM measures transport degradation only
+        // (Option A). Empty STORAGE_ASSET_SET falls back to the default set.
+        def assetSet = params.STORAGE_ASSET_SET ?: 'h264SampleFrames'
         def clipPath = "${repoDir}/canary/consumer-java/clip-${START_TIMESTAMP}.mp4"
         def verifyScript = "${repoDir}/canary/webrtc-c/scripts/video-verification/verify.py"
-        def sourceFrames = "${repoDir}/canary/webrtc-c/assets/h264SampleFrames"
+        def sourceFrames = "${repoDir}/canary/webrtc-c/assets/${assetSet}"
         def streamName = "${env.JOB_NAME}-${params.RUNNER_LABEL}"
         def scenarioLabel = params.SCENARIO_LABEL
 
@@ -518,6 +542,9 @@ pipeline {
         booleanParam(name: 'FORCE_TURN', defaultValue: false)
         booleanParam(name: 'NO_LOOP_FRAMES', defaultValue: false, description: 'Stop after sending all frames once instead of looping')
         string(name: 'STORAGE_FPS', defaultValue: '', description: 'Override storage master frame rate (e.g., 10 for low FPS test). Empty uses default 30 fps.')
+        string(name: 'STORAGE_ASSET_SET', defaultValue: '', description: 'Frame asset set: empty=default h264SampleFrames, or e.g. h264SampleFrames-500kbps / -1mbps / -5mbps')
+        string(name: 'CANARY_ASSET_BUCKET', defaultValue: '', description: 'S3 bucket hosting the frame-set tarballs (required when STORAGE_ASSET_SET is set)')
+        string(name: 'CANARY_ASSET_PREFIX', defaultValue: '', description: 'S3 key prefix for frame-set tarballs, e.g. webrtc-canary/frame-sets/v1 (required when STORAGE_ASSET_SET is set)')
         string(name: 'JS_BRANCH', defaultValue: 'master', description: 'JS SDK branch name to clone and serve locally (default: master)')
     }
     
@@ -911,6 +938,9 @@ pipeline {
                         booleanParam(name: 'FORCE_TURN', value: params.FORCE_TURN),
                         booleanParam(name: 'NO_LOOP_FRAMES', value: params.NO_LOOP_FRAMES),
                         string(name: 'STORAGE_FPS', value: params.STORAGE_FPS),
+                        string(name: 'STORAGE_ASSET_SET', value: params.STORAGE_ASSET_SET),
+                        string(name: 'CANARY_ASSET_BUCKET', value: params.CANARY_ASSET_BUCKET),
+                        string(name: 'CANARY_ASSET_PREFIX', value: params.CANARY_ASSET_PREFIX),
                         string(name: 'JS_BRANCH', value: params.JS_BRANCH),
                     ]
 
