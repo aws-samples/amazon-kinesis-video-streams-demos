@@ -32,6 +32,15 @@ public final class CanaryConstants {
     public static final String LOW_FPS_LABEL = "StorageLowFps";
     public static final String GAMMA_LOW_FPS_LABEL = "GammaStorageLowFps";
 
+    // Bitrate-tuned periodic variants (asset set selects encoded bitrate).
+    // All three follow the same short-duration periodic pattern as PERIODIC_LABEL.
+    public static final String PERIODIC_500KBPS_LABEL = "StoragePeriodic-500kbps";
+    public static final String PERIODIC_1MBPS_LABEL = "StoragePeriodic-1mbps";
+    public static final String PERIODIC_5MBPS_LABEL = "StoragePeriodic-5mbps";
+    public static final String GAMMA_PERIODIC_500KBPS_LABEL = "GammaStoragePeriodic-500kbps";
+    public static final String GAMMA_PERIODIC_1MBPS_LABEL = "GammaStoragePeriodic-1mbps";
+    public static final String GAMMA_PERIODIC_5MBPS_LABEL = "GammaStoragePeriodic-5mbps";
+
     public static final String CW_DIMENSION_INDIVIDUAL = "StorageWebRTCSDKCanaryStreamName";
     public static final String CW_DIMENSION_AGGREGATE = "StorageWebRTCSDKCanaryLabel";
 
