@@ -24,6 +24,8 @@ GIT_URL="${1:?Usage: build-storage-master.sh <git_url> <git_hash> [openssl|mbedt
 GIT_HASH="${2:?Usage: build-storage-master.sh <git_url> <git_hash> [openssl|mbedtls]}"
 TLS_BACKEND="${3:-openssl}"
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
 BUILD_HOME="${HOME}/webrtc-c-storage-master"
 REPO_DIR="${BUILD_HOME}/repo"
 BUILD_DIR="${BUILD_HOME}/build"
@@ -104,6 +106,16 @@ BINARY_PATH="${BUILD_DIR}/kvsWebrtcStorageSample"
 
 echo "Comparing: current commit=${CURRENT_COMMIT:0:12} vs cached commit=${CACHED_COMMIT:0:12}"
 echo "Comparing: current webrtc-c=${CURRENT_WEBRTC_VERSION} vs cached webrtc-c=${CACHED_WEBRTC_VERSION}"
+
+# Emit code-update marker metrics for tracked repos. Only fire on a real
+# transition (a cached value already exists) so a fresh node's first build
+# does not produce a spurious spike. Best-effort — never breaks the build.
+if [ -n "$CACHED_COMMIT" ] && [ "$CURRENT_COMMIT" != "$CACHED_COMMIT" ]; then
+    bash "$SCRIPT_DIR/push-code-update-metric.sh" Canary "$CACHED_COMMIT" "$CURRENT_COMMIT" || true
+fi
+if [ -n "$CACHED_WEBRTC_VERSION" ] && [ "$CURRENT_WEBRTC_VERSION" != "$CACHED_WEBRTC_VERSION" ]; then
+    bash "$SCRIPT_DIR/push-code-update-metric.sh" C "$CACHED_WEBRTC_VERSION" "$CURRENT_WEBRTC_VERSION" || true
+fi
 
 NEED_REBUILD=false
 if [ ! -f "$BINARY_PATH" ]; then

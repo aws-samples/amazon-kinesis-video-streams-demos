@@ -231,6 +231,9 @@ ensure_js_sdk() {
             return 0
         fi
         echo "JS SDK has new commits ($cached_commit -> $remote_head), updating..."
+        # Best-effort code-update marker metric. Fires only on a real transition
+        # (we already had a cached commit), so no spurious spike on first setup.
+        bash "$(dirname "${BASH_SOURCE[0]}")/push-code-update-metric.sh" JS "$cached_commit" "$remote_head" || true
         (cd "$repo_dir" && git fetch origin "$branch" && git reset --hard FETCH_HEAD) \
             || { echo "ERROR: git update failed"; flock -u 8; exit 1; }
         (cd "$repo_dir" && npm install) \

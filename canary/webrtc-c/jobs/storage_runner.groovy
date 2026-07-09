@@ -73,8 +73,12 @@ def buildWebRTCProject(thing_prefix) {
         cmp -s '${repoDir}/canary/webrtc-c/scripts/cron/cleanup-master.sh' '${env.HOME}/webrtc-c-storage-master/cleanup-master.sh' \
             || cp '${repoDir}/canary/webrtc-c/scripts/cron/cleanup-master.sh' '${env.HOME}/webrtc-c-storage-master/cleanup-master.sh'"""
 
-    // Build the binary (handles git fetch, skip-rebuild, and flock internally)
+    // Build the binary (handles git fetch, skip-rebuild, and flock internally).
+    // Region + metric suffix are exported so the build script's code-update
+    // marker metric lands in the right region/namespace (this runs before withEnv).
     sh """
+        export AWS_DEFAULT_REGION='${params.AWS_DEFAULT_REGION ?: 'us-east-1'}'
+        export METRIC_SUFFIX='${params.METRIC_SUFFIX ?: ''}'
         chmod a+x '${repoDir}/canary/webrtc-c/scripts/build-storage-master.sh' &&
         '${repoDir}/canary/webrtc-c/scripts/build-storage-master.sh' '${params.GIT_URL}' '${params.GIT_HASH}'"""
 
@@ -178,6 +182,8 @@ def runViewerSessions(viewerId = "", waitMinutes = 2, viewerCount = "1") {
             echo "Preparing viewer dependencies (parallel with master build)..."
             sh """
                 export JS_PAGE_URL="${params.JS_BRANCH ?: 'master'}"
+                export AWS_DEFAULT_REGION="${params.AWS_DEFAULT_REGION ?: 'us-east-1'}"
+                export METRIC_SUFFIX="${params.METRIC_SUFFIX ?: ''}"
                 ./canary/webrtc-c/scripts/prepare-storage-viewer.sh
             """
             pushKeepAlive('ViewerPrepareComplete')
