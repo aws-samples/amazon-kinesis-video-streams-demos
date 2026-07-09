@@ -1093,6 +1093,13 @@ class ViewerCanaryTest {
     let prevRTCStats = null;
     let prevRTCStatsTime = null;
 
+    // Active-viewers-per-session heartbeat — push every 60 seconds.
+    // Emitted to a SHARED metric name (no per-viewer suffix) under the channel dimension, so a
+    // CloudWatch SUM over a 1-minute period across all viewers of the session yields the count of
+    // viewers still active that minute. Each active viewer contributes exactly 1 per minute.
+    let lastActiveViewerPush = Date.now();
+    const activeViewerInterval = 60000;
+
     // Track RTCStats snapshots for final packet loss calculation
     this.firstRTCStats = null;
     this.lastRTCStats = null;
@@ -1144,6 +1151,21 @@ class ViewerCanaryTest {
           availability
         );
         lastAvailabilityPush = now;
+      }
+
+      // Push ActiveViewersPerSession heartbeat every 60 seconds.
+      // Shared metric name (NOT getMetricName — no per-viewer suffix) so that summing across all
+      // viewers on this channel per minute gives the active viewer count. Contributes 1 while the
+      // storage session is active, 0 otherwise (so a stalled viewer stops counting).
+      if (now - lastActiveViewerPush >= activeViewerInterval) {
+        const activeContribution = frameStats.storageSessionActive ? 1.0 : 0.0;
+        await CloudWatchMetrics.publishCountMetric(
+          `ActiveViewersPerSession${this.metricSuffix}`,
+          this.config.channelName,
+          activeContribution
+        );
+        log(`[Canary] ActiveViewersPerSession heartbeat: ${activeContribution} (channel=${this.config.channelName})`);
+        lastActiveViewerPush = now;
       }
 
       // Push periodic RTP metrics every 60 seconds
