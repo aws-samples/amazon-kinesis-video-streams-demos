@@ -39,6 +39,10 @@ class CloudwatchMonitoring {
     VOID pushTimeToReceiveIce(UINT64, Aws::CloudWatch::Model::StandardUnit);
     VOID pushJoinSSCallToFirstFrame(UINT64, Aws::CloudWatch::Model::StandardUnit);
     VOID pushRoundTripTime(DOUBLE, Aws::CloudWatch::Model::StandardUnit);
+    // Inbound-media receiver metrics (only emitted when the master actually receives media,
+    // e.g. VOMasterMixedViewer where the audio transceiver is RECVONLY and viewer audio is mixed in).
+    VOID pushJitterBufferDelay(DOUBLE, Aws::CloudWatch::Model::StandardUnit);
+    VOID pushDecodeTime(DOUBLE, Aws::CloudWatch::Model::StandardUnit);
 
     // Periodic during-session metrics
     VOID pushPacketsSentPerSecond(DOUBLE);

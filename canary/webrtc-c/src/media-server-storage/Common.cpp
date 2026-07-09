@@ -203,6 +203,43 @@ STATUS canaryRtpOutboundStats(UINT32 timerId, UINT64 currentTime, UINT64 customD
                 }
             }
         }
+
+        // Inbound-media receiver metrics on the audio transceiver.
+        // Only populated when the master actually receives media — e.g. VOMasterMixedViewer,
+        // where the audio transceiver is RECVONLY and the media server mixes the AO viewers'
+        // audio down to the master. In the plain single-master case no audio is delivered, so
+        // jitterBufferEmittedCount stays 0 and nothing is pushed.
+        if (pSampleStreamingSession->pAudioRtcRtpTransceiver != NULL) {
+            RtcStats rtcInboundRtpMetrics;
+            rtcInboundRtpMetrics.requestedTypeOfStats = RTC_STATS_TYPE_INBOUND_RTP;
+            if (STATUS_SUCCEEDED(rtcPeerConnectionGetMetrics(pSampleStreamingSession->pPeerConnection,
+                                                             pSampleStreamingSession->pAudioRtcRtpTransceiver,
+                                                             &rtcInboundRtpMetrics))) {
+                PRtcInboundRtpStreamStats pInbound = &rtcInboundRtpMetrics.rtcStatsObject.inboundRtpStreamStats;
+
+                // Jitter Buffer Delay — average time (ms) each received sample/frame spent in the
+                // jitter buffer before being emitted. jitterBufferDelay is a cumulative sum in seconds.
+                if (pInbound->jitterBufferEmittedCount > 0) {
+                    DOUBLE avgJitterBufferDelayMs =
+                        (pInbound->jitterBufferDelay / (DOUBLE) pInbound->jitterBufferEmittedCount) * 1000.0;
+                    DLOGD("[Canary] JitterBufferDelay: %lf ms (total=%lf s, emitted=%" PRIu64 ")", avgJitterBufferDelayMs,
+                          pInbound->jitterBufferDelay, pInbound->jitterBufferEmittedCount);
+                    Canary::Cloudwatch::getInstance().monitoring.pushJitterBufferDelay(
+                        avgJitterBufferDelayMs, Aws::CloudWatch::Model::StandardUnit::Milliseconds);
+                }
+
+                // Decode Time — average time (ms) to decode a frame. The SDK only populates this for
+                // video, so it stays 0 for the master's audio-only inbound and is gated out here.
+                // Kept for parity/future-proofing if the master ever receives video.
+                if (pInbound->framesDecoded > 0) {
+                    DOUBLE avgDecodeTimeMs = (pInbound->totalDecodeTime / (DOUBLE) pInbound->framesDecoded) * 1000.0;
+                    DLOGD("[Canary] DecodeTime: %lf ms (total=%lf s, frames=%u)", avgDecodeTimeMs, pInbound->totalDecodeTime,
+                          pInbound->framesDecoded);
+                    Canary::Cloudwatch::getInstance().monitoring.pushDecodeTime(
+                        avgDecodeTimeMs, Aws::CloudWatch::Model::StandardUnit::Milliseconds);
+                }
+            }
+        }
     } else {
         retStatus = STATUS_TIMER_QUEUE_STOP_SCHEDULING;
     }

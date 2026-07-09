@@ -608,6 +608,28 @@ VOID CloudwatchMonitoring::pushRoundTripTime(DOUBLE rttMs, Aws::CloudWatch::Mode
     this->push(datum);
 }
 
+VOID CloudwatchMonitoring::pushJitterBufferDelay(DOUBLE delayMs, Aws::CloudWatch::Model::StandardUnit unit)
+{
+    MetricDatum datum;
+
+    datum.SetMetricName("JitterBufferDelay");
+    datum.SetValue(delayMs);
+    datum.SetUnit(unit);
+
+    this->push(datum);
+}
+
+VOID CloudwatchMonitoring::pushDecodeTime(DOUBLE decodeMs, Aws::CloudWatch::Model::StandardUnit unit)
+{
+    MetricDatum datum;
+
+    datum.SetMetricName("DecodeTime");
+    datum.SetValue(decodeMs);
+    datum.SetUnit(unit);
+
+    this->push(datum);
+}
+
 VOID CloudwatchMonitoring::pushPacketsSentPerSecond(DOUBLE rate)
 {
     MetricDatum datum;
