@@ -204,6 +204,54 @@ STATUS canaryRtpOutboundStats(UINT32 timerId, UINT64 currentTime, UINT64 customD
             }
         }
 
+        // RTP media-level packets/bytes sent per second, per track (video + audio).
+        // Distinct from the transport-level PacketsSentPerSecond above (ICE candidate pair, which
+        // muxes RTP+RTCP+STUN across all tracks): these come from per-transceiver outbound-RTP
+        // stats (outboundRtpStreamStats.sent.*) — the same counters the RTCP Sender Report carries,
+        // split by media type. canaryMetrics already holds the video transceiver's OUTBOUND_RTP
+        // (fetched above); audio is fetched separately.
+        {
+            UINT64 rtpNowTs = pSampleStreamingSession->canaryMetrics.timestamp;
+            DOUBLE rtpDuration =
+                (DOUBLE)(rtpNowTs - pSampleStreamingSession->canaryOutgoingRTPMetricsContext.prevRtpStatsTs) / HUNDREDS_OF_NANOS_IN_A_SECOND;
+
+            if (rtpDuration > 0) {
+                if (pSampleStreamingSession->pVideoRtcRtpTransceiver != NULL) {
+                    UINT64 vPkts = pSampleStreamingSession->canaryMetrics.rtcStatsObject.outboundRtpStreamStats.sent.packetsSent;
+                    UINT64 vBytes = pSampleStreamingSession->canaryMetrics.rtcStatsObject.outboundRtpStreamStats.sent.bytesSent;
+                    DOUBLE vPktsPerSec =
+                        (DOUBLE)(vPkts - pSampleStreamingSession->canaryOutgoingRTPMetricsContext.prevRtpVideoPacketsSent) / rtpDuration;
+                    DOUBLE vBytesPerSec =
+                        (DOUBLE)(vBytes - pSampleStreamingSession->canaryOutgoingRTPMetricsContext.prevRtpVideoBytesSent) / rtpDuration;
+                    Canary::Cloudwatch::getInstance().monitoring.pushRtpVideoPacketsSentPerSecond(vPktsPerSec);
+                    Canary::Cloudwatch::getInstance().monitoring.pushRtpVideoBytesSentPerSecond(vBytesPerSec);
+                    pSampleStreamingSession->canaryOutgoingRTPMetricsContext.prevRtpVideoPacketsSent = vPkts;
+                    pSampleStreamingSession->canaryOutgoingRTPMetricsContext.prevRtpVideoBytesSent = vBytes;
+                }
+
+                if (pSampleStreamingSession->pAudioRtcRtpTransceiver != NULL) {
+                    RtcStats rtcAudioOutboundMetrics;
+                    rtcAudioOutboundMetrics.requestedTypeOfStats = RTC_STATS_TYPE_OUTBOUND_RTP;
+                    if (STATUS_SUCCEEDED(rtcPeerConnectionGetMetrics(pSampleStreamingSession->pPeerConnection,
+                                                                     pSampleStreamingSession->pAudioRtcRtpTransceiver,
+                                                                     &rtcAudioOutboundMetrics))) {
+                        UINT64 aPkts = rtcAudioOutboundMetrics.rtcStatsObject.outboundRtpStreamStats.sent.packetsSent;
+                        UINT64 aBytes = rtcAudioOutboundMetrics.rtcStatsObject.outboundRtpStreamStats.sent.bytesSent;
+                        DOUBLE aPktsPerSec =
+                            (DOUBLE)(aPkts - pSampleStreamingSession->canaryOutgoingRTPMetricsContext.prevRtpAudioPacketsSent) / rtpDuration;
+                        DOUBLE aBytesPerSec =
+                            (DOUBLE)(aBytes - pSampleStreamingSession->canaryOutgoingRTPMetricsContext.prevRtpAudioBytesSent) / rtpDuration;
+                        Canary::Cloudwatch::getInstance().monitoring.pushRtpAudioPacketsSentPerSecond(aPktsPerSec);
+                        Canary::Cloudwatch::getInstance().monitoring.pushRtpAudioBytesSentPerSecond(aBytesPerSec);
+                        pSampleStreamingSession->canaryOutgoingRTPMetricsContext.prevRtpAudioPacketsSent = aPkts;
+                        pSampleStreamingSession->canaryOutgoingRTPMetricsContext.prevRtpAudioBytesSent = aBytes;
+                    }
+                }
+
+                pSampleStreamingSession->canaryOutgoingRTPMetricsContext.prevRtpStatsTs = rtpNowTs;
+            }
+        }
+
         // Inbound-media receiver metrics on the audio transceiver.
         // Only populated when the master actually receives media — e.g. VOMasterMixedViewer,
         // where the audio transceiver is RECVONLY and the media server mixes the AO viewers'
@@ -429,6 +477,11 @@ VOID onConnectionStateChange(UINT64 customData, RTC_PEER_CONNECTION_STATE newSta
             pSampleStreamingSession->canaryOutgoingRTPMetricsContext.prevRetxBytesSent = 0;
             pSampleStreamingSession->canaryOutgoingRTPMetricsContext.prevPliCount = 0;
             pSampleStreamingSession->canaryOutgoingRTPMetricsContext.prevFramesSent = 0;
+            pSampleStreamingSession->canaryOutgoingRTPMetricsContext.prevRtpVideoPacketsSent = 0;
+            pSampleStreamingSession->canaryOutgoingRTPMetricsContext.prevRtpVideoBytesSent = 0;
+            pSampleStreamingSession->canaryOutgoingRTPMetricsContext.prevRtpAudioPacketsSent = 0;
+            pSampleStreamingSession->canaryOutgoingRTPMetricsContext.prevRtpAudioBytesSent = 0;
+            pSampleStreamingSession->canaryOutgoingRTPMetricsContext.prevRtpStatsTs = GETTIME();
             CHK_STATUS(initMetricsTimers(pSampleStreamingSession));
             break;
         case RTC_PEER_CONNECTION_STATE_FAILED:

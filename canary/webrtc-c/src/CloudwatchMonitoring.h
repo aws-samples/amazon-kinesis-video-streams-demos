@@ -43,6 +43,12 @@ class CloudwatchMonitoring {
     // e.g. VOMasterMixedViewer where the audio transceiver is RECVONLY and viewer audio is mixed in).
     VOID pushJitterBufferDelay(DOUBLE, Aws::CloudWatch::Model::StandardUnit);
     VOID pushDecodeTime(DOUBLE, Aws::CloudWatch::Model::StandardUnit);
+    // RTP media-level (per-track) packets/bytes sent rates, distinct from the transport-level
+    // PacketsSentPerSecond (ICE candidate pair). Sourced from outboundRtpStreamStats.sent.*.
+    VOID pushRtpVideoPacketsSentPerSecond(DOUBLE);
+    VOID pushRtpVideoBytesSentPerSecond(DOUBLE);
+    VOID pushRtpAudioPacketsSentPerSecond(DOUBLE);
+    VOID pushRtpAudioBytesSentPerSecond(DOUBLE);
 
     // Periodic during-session metrics
     VOID pushPacketsSentPerSecond(DOUBLE);
