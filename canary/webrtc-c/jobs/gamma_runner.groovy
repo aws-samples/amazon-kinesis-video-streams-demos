@@ -34,6 +34,29 @@ def extractViewerStats(String output) {
     return m.find() ? m.group(1) : null
 }
 
+// Emit a per-run "build info" heartbeat carrying the resolved commit SHA as a dimension.
+// Because it fires every run, graphing CanaryBuildInfo grouped by the GitHash dimension gives
+// contiguous "this period = this commit" bands over time — letting you attribute any window of
+// other metrics to the exact commit that produced it (independent of sparse detection metrics).
+def pushBuildInfo(repoDir) {
+    def region = params.AWS_DEFAULT_REGION ?: 'us-west-2'
+    def scenarioLabel = params.SCENARIO_LABEL ?: 'StoragePeriodic'
+    def runnerLabel = params.RUNNER_LABEL ?: 'StoragePeriodic'
+    def rc = sh(script: """
+        export PATH="/usr/local/bin:/usr/bin:\$PATH"
+        COMMIT=\$(cd '${repoDir}' && git rev-parse --short=12 HEAD 2>/dev/null || echo unknown)
+        aws cloudwatch put-metric-data \
+            --namespace KinesisVideoSDKCanary \
+            --region ${region} \
+            --metric-data \
+                "MetricName=CanaryBuildInfo,Value=1.0,Unit=None,Dimensions=[{Name=GitHash,Value=\${COMMIT}},{Name=StorageWebRTCSDKCanaryLabel,Value=${scenarioLabel}},{Name=RunnerLabel,Value=${runnerLabel}}]"
+        echo "BuildInfo: commit=\${COMMIT}"
+    """, returnStatus: true)
+    if (rc != 0) {
+        echo "BuildInfo emit failed (rc=${rc} — aws CLI may not be installed on this node)"
+    }
+}
+
 def buildWebRTCProject(thing_prefix) {
     def repoDir = "${env.HOME}/webrtc-c-storage-master/repo"
     def certsDir = "${env.HOME}/webrtc-c-storage-master/certs/${thing_prefix}"
@@ -48,6 +71,9 @@ def buildWebRTCProject(thing_prefix) {
         fi
         cd '${repoDir}' && git fetch origin '+refs/heads/*:refs/remotes/origin/*' && git checkout -f '${params.GIT_HASH}'
         flock -u 9"""
+
+    // Record which commit this run is executing so dashboards can attribute time windows to commits.
+    pushBuildInfo(repoDir)
 
     // Sync cleanup cron script if it changed
     sh """
