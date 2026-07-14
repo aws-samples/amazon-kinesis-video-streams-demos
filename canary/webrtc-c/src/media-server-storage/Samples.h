@@ -107,6 +107,7 @@ typedef struct {
     TID mediaSenderTid;
     TID audioSenderTid;
     TID videoSenderTid;
+    UINT64 mediaStartTime; // shared media epoch so audio & video timestamp from the same origin
     TIMER_QUEUE_HANDLE timerQueueHandle;
     UINT32 iceCandidatePairStatsTimerId;
     SampleStreamingMediaType mediaType;
