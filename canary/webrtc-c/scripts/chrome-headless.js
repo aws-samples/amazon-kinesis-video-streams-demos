@@ -288,6 +288,20 @@ class ViewerCanaryTest {
             offerToAnswerTime
           );
         }
+
+        // Calculate and publish JoinSSCallToAnswerSentTime — time from the
+        // JoinStorageSessionAsViewer API call to the SDP answer being sent.
+        // Viewer analog of the master's TimeToSendAnswer.
+        if (this.joinSSCallTime && this.answerSentTime) {
+          const joinSSToAnswerTime = this.answerSentTime - this.joinSSCallTime;
+          log(`JoinSSCallToAnswerSentTime: ${joinSSToAnswerTime}ms`);
+
+          await CloudWatchMetrics.publishMsMetric(
+            this.getMetricName('JoinSSCallToAnswerSentTime'),
+            this.config.channelName,
+            joinSSToAnswerTime
+          );
+        }
       }
       
       // Track first ICE candidate received from remote
