@@ -969,7 +969,12 @@ class ViewerCanaryTest {
 
   async runVideoVerification() {
     if (!this.recordingFilePath || !fs.existsSync(this.recordingFilePath)) {
-      log('No recording available for video verification, skipping');
+      log('No recording available for video verification, pushing ViewerStorageAvailability=0');
+      await CloudWatchMetrics.publishCountMetric(
+        this.getMetricName('ViewerStorageAvailability'),
+        this.config.channelName,
+        0
+      );
       return;
     }
 
