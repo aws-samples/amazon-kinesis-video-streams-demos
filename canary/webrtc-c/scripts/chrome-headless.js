@@ -786,8 +786,19 @@ class ViewerCanaryTest {
       }
 
       const report = await pc.getStats();
-      const result = { video: null, audio: null, roundTripTime: null, selectedCandidatePair: null, outboundAudio: null, outboundVideo: null };
+      const result = { video: null, audio: null, roundTripTime: null, remoteInboundRtt: null, selectedCandidatePair: null, outboundAudio: null, outboundVideo: null };
       report.forEach(stat => {
+        // remote-inbound-rtp carries the RTCP Receiver Report the remote sends about the stream
+        // the viewer is SENDING (e.g. AO/mixed-viewer audio). roundTripTime is the RR-based RTT.
+        // Empty for video-only viewers (nothing sent), hence gated on roundTripTimeMeasurements.
+        if (stat.type === 'remote-inbound-rtp') {
+          result.remoteInboundRtt = {
+            roundTripTime: (typeof stat.roundTripTime === 'number') ? stat.roundTripTime : null,
+            roundTripTimeMeasurements: stat.roundTripTimeMeasurements || 0,
+            kind: stat.kind,
+          };
+          return;
+        }
         if (stat.type === 'candidate-pair' && stat.nominated) {
           result.roundTripTime = stat.currentRoundTripTime || 0;
           // Find the local and remote candidate details
@@ -1379,6 +1390,22 @@ class ViewerCanaryTest {
           this.getMetricName('RoundTripTime'),
           this.config.channelName,
           rttMs
+        );
+      }
+
+      // RR-based Round Trip Time (RTCP Receiver Report) — from remote-inbound-rtp. This reflects the
+      // RTT the remote reports about the stream the VIEWER sends, so it only populates for AO/mixed
+      // viewers that send audio; video-only viewers send nothing, so it's gated on having at least
+      // one RTT measurement to avoid emitting a misleading 0.
+      if (this.lastRTCStats.remoteInboundRtt &&
+          this.lastRTCStats.remoteInboundRtt.roundTripTimeMeasurements > 0 &&
+          this.lastRTCStats.remoteInboundRtt.roundTripTime !== null) {
+        const rtcpRttMs = this.lastRTCStats.remoteInboundRtt.roundTripTime * 1000;
+        log(`Rtcp Round Trip Time (RR-based): ${rtcpRttMs.toFixed(2)}ms`);
+        await CloudWatchMetrics.publishMsMetric(
+          this.getMetricName('RtcpRoundTripTime'),
+          this.config.channelName,
+          rtcpRttMs
         );
       }
 
