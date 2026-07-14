@@ -50,6 +50,14 @@ class CloudwatchMonitoring {
     VOID pushRtpAudioPacketsSentPerSecond(DOUBLE);
     VOID pushRtpAudioBytesSentPerSecond(DOUBLE);
 
+    // Remote-inbound RTP metrics, derived from the RTCP Receiver Reports the remote sends back
+    // about the stream the master sent. FractionLost is the only packet-loss signal available on
+    // the master; RtcpRoundTripTime is RR-based RTT; RtcpReportsReceived indicates whether RRs are
+    // arriving at all (distinguishes "0% loss" from "no reports").
+    VOID pushFractionLost(DOUBLE, Aws::CloudWatch::Model::StandardUnit);
+    VOID pushRtcpRoundTripTime(DOUBLE, Aws::CloudWatch::Model::StandardUnit);
+    VOID pushRtcpReportsReceived(DOUBLE, Aws::CloudWatch::Model::StandardUnit);
+
     // Periodic during-session metrics
     VOID pushPacketsSentPerSecond(DOUBLE);
     VOID pushPacketsReceivedPerSecond(DOUBLE);

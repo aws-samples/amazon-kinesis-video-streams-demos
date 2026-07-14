@@ -666,6 +666,33 @@ VOID CloudwatchMonitoring::pushRtpAudioBytesSentPerSecond(DOUBLE rate)
     this->push(datum);
 }
 
+VOID CloudwatchMonitoring::pushFractionLost(DOUBLE fractionLostPct, Aws::CloudWatch::Model::StandardUnit unit)
+{
+    MetricDatum datum;
+    datum.SetMetricName("FractionLost");
+    datum.SetValue(fractionLostPct);
+    datum.SetUnit(unit);
+    this->push(datum);
+}
+
+VOID CloudwatchMonitoring::pushRtcpRoundTripTime(DOUBLE rttMs, Aws::CloudWatch::Model::StandardUnit unit)
+{
+    MetricDatum datum;
+    datum.SetMetricName("RtcpRoundTripTime");
+    datum.SetValue(rttMs);
+    datum.SetUnit(unit);
+    this->push(datum);
+}
+
+VOID CloudwatchMonitoring::pushRtcpReportsReceived(DOUBLE reportsReceived, Aws::CloudWatch::Model::StandardUnit unit)
+{
+    MetricDatum datum;
+    datum.SetMetricName("RtcpReportsReceived");
+    datum.SetValue(reportsReceived);
+    datum.SetUnit(unit);
+    this->push(datum);
+}
+
 VOID CloudwatchMonitoring::pushPacketsSentPerSecond(DOUBLE rate)
 {
     MetricDatum datum;

@@ -288,6 +288,37 @@ STATUS canaryRtpOutboundStats(UINT32 timerId, UINT64 currentTime, UINT64 customD
                 }
             }
         }
+
+        // Remote-inbound RTP stats — parsed from the RTCP Receiver Reports the media server sends
+        // back about the stream the master is sending. This is the only packet-loss signal
+        // available on the master: fractionLost is the loss fraction reported by the remote, and
+        // roundTripTime is RR-based RTT. We query the video transceiver (the master's primary sent
+        // media). fractionLost/RTT are gated on reportsReceived > 0 so we don't emit a misleading
+        // constant 0 before any RR has arrived; reportsReceived itself is always emitted so a flat
+        // 0 (no reports at all) is visible on the graph.
+        if (pSampleStreamingSession->pVideoRtcRtpTransceiver != NULL) {
+            RtcStats rtcRemoteInboundMetrics;
+            rtcRemoteInboundMetrics.requestedTypeOfStats = RTC_STATS_TYPE_REMOTE_INBOUND_RTP;
+            if (STATUS_SUCCEEDED(rtcPeerConnectionGetMetrics(pSampleStreamingSession->pPeerConnection,
+                                                             pSampleStreamingSession->pVideoRtcRtpTransceiver,
+                                                             &rtcRemoteInboundMetrics))) {
+                PRtcRemoteInboundRtpStreamStats pRemoteInbound = &rtcRemoteInboundMetrics.rtcStatsObject.remoteInboundRtpStreamStats;
+
+                Canary::Cloudwatch::getInstance().monitoring.pushRtcpReportsReceived(
+                    (DOUBLE) pRemoteInbound->reportsReceived, Aws::CloudWatch::Model::StandardUnit::Count);
+
+                if (pRemoteInbound->reportsReceived > 0) {
+                    // fractionLost is 0..1; report as a percentage for readability.
+                    DOUBLE fractionLostPct = pRemoteInbound->fractionLost * 100.0;
+                    DLOGD("[Canary] Remote fractionLost: %lf %% (reportsReceived=%" PRIu64 ", rtcpRtt=%" PRIu64 " ms)", fractionLostPct,
+                          pRemoteInbound->reportsReceived, pRemoteInbound->roundTripTime);
+                    Canary::Cloudwatch::getInstance().monitoring.pushFractionLost(
+                        fractionLostPct, Aws::CloudWatch::Model::StandardUnit::Percent);
+                    Canary::Cloudwatch::getInstance().monitoring.pushRtcpRoundTripTime(
+                        (DOUBLE) pRemoteInbound->roundTripTime, Aws::CloudWatch::Model::StandardUnit::Milliseconds);
+                }
+            }
+        }
     } else {
         retStatus = STATUS_TIMER_QUEUE_STOP_SCHEDULING;
     }
