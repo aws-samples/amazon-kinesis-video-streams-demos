@@ -203,6 +203,122 @@ STATUS canaryRtpOutboundStats(UINT32 timerId, UINT64 currentTime, UINT64 customD
                 }
             }
         }
+
+        // RTP media-level packets/bytes sent per second, per track (video + audio).
+        // Distinct from the transport-level PacketsSentPerSecond above (ICE candidate pair, which
+        // muxes RTP+RTCP+STUN across all tracks): these come from per-transceiver outbound-RTP
+        // stats (outboundRtpStreamStats.sent.*) — the same counters the RTCP Sender Report carries,
+        // split by media type. canaryMetrics already holds the video transceiver's OUTBOUND_RTP
+        // (fetched above); audio is fetched separately.
+        {
+            UINT64 rtpNowTs = pSampleStreamingSession->canaryMetrics.timestamp;
+            DOUBLE rtpDuration =
+                (DOUBLE)(rtpNowTs - pSampleStreamingSession->canaryOutgoingRTPMetricsContext.prevRtpStatsTs) / HUNDREDS_OF_NANOS_IN_A_SECOND;
+
+            if (rtpDuration > 0) {
+                if (pSampleStreamingSession->pVideoRtcRtpTransceiver != NULL) {
+                    UINT64 vPkts = pSampleStreamingSession->canaryMetrics.rtcStatsObject.outboundRtpStreamStats.sent.packetsSent;
+                    UINT64 vBytes = pSampleStreamingSession->canaryMetrics.rtcStatsObject.outboundRtpStreamStats.sent.bytesSent;
+                    DOUBLE vPktsPerSec =
+                        (DOUBLE)(vPkts - pSampleStreamingSession->canaryOutgoingRTPMetricsContext.prevRtpVideoPacketsSent) / rtpDuration;
+                    DOUBLE vBytesPerSec =
+                        (DOUBLE)(vBytes - pSampleStreamingSession->canaryOutgoingRTPMetricsContext.prevRtpVideoBytesSent) / rtpDuration;
+                    Canary::Cloudwatch::getInstance().monitoring.pushRtpVideoPacketsSentPerSecond(vPktsPerSec);
+                    Canary::Cloudwatch::getInstance().monitoring.pushRtpVideoBytesSentPerSecond(vBytesPerSec);
+                    pSampleStreamingSession->canaryOutgoingRTPMetricsContext.prevRtpVideoPacketsSent = vPkts;
+                    pSampleStreamingSession->canaryOutgoingRTPMetricsContext.prevRtpVideoBytesSent = vBytes;
+                }
+
+                if (pSampleStreamingSession->pAudioRtcRtpTransceiver != NULL) {
+                    RtcStats rtcAudioOutboundMetrics;
+                    rtcAudioOutboundMetrics.requestedTypeOfStats = RTC_STATS_TYPE_OUTBOUND_RTP;
+                    if (STATUS_SUCCEEDED(rtcPeerConnectionGetMetrics(pSampleStreamingSession->pPeerConnection,
+                                                                     pSampleStreamingSession->pAudioRtcRtpTransceiver,
+                                                                     &rtcAudioOutboundMetrics))) {
+                        UINT64 aPkts = rtcAudioOutboundMetrics.rtcStatsObject.outboundRtpStreamStats.sent.packetsSent;
+                        UINT64 aBytes = rtcAudioOutboundMetrics.rtcStatsObject.outboundRtpStreamStats.sent.bytesSent;
+                        DOUBLE aPktsPerSec =
+                            (DOUBLE)(aPkts - pSampleStreamingSession->canaryOutgoingRTPMetricsContext.prevRtpAudioPacketsSent) / rtpDuration;
+                        DOUBLE aBytesPerSec =
+                            (DOUBLE)(aBytes - pSampleStreamingSession->canaryOutgoingRTPMetricsContext.prevRtpAudioBytesSent) / rtpDuration;
+                        Canary::Cloudwatch::getInstance().monitoring.pushRtpAudioPacketsSentPerSecond(aPktsPerSec);
+                        Canary::Cloudwatch::getInstance().monitoring.pushRtpAudioBytesSentPerSecond(aBytesPerSec);
+                        pSampleStreamingSession->canaryOutgoingRTPMetricsContext.prevRtpAudioPacketsSent = aPkts;
+                        pSampleStreamingSession->canaryOutgoingRTPMetricsContext.prevRtpAudioBytesSent = aBytes;
+                    }
+                }
+
+                pSampleStreamingSession->canaryOutgoingRTPMetricsContext.prevRtpStatsTs = rtpNowTs;
+            }
+        }
+
+        // Inbound-media receiver metrics on the audio transceiver.
+        // Only populated when the master actually receives media — e.g. VOMasterMixedViewer,
+        // where the audio transceiver is RECVONLY and the media server mixes the AO viewers'
+        // audio down to the master. In the plain single-master case no audio is delivered, so
+        // jitterBufferEmittedCount stays 0 and nothing is pushed.
+        if (pSampleStreamingSession->pAudioRtcRtpTransceiver != NULL) {
+            RtcStats rtcInboundRtpMetrics;
+            rtcInboundRtpMetrics.requestedTypeOfStats = RTC_STATS_TYPE_INBOUND_RTP;
+            if (STATUS_SUCCEEDED(rtcPeerConnectionGetMetrics(pSampleStreamingSession->pPeerConnection,
+                                                             pSampleStreamingSession->pAudioRtcRtpTransceiver,
+                                                             &rtcInboundRtpMetrics))) {
+                PRtcInboundRtpStreamStats pInbound = &rtcInboundRtpMetrics.rtcStatsObject.inboundRtpStreamStats;
+
+                // Jitter Buffer Delay — average time (ms) each received sample/frame spent in the
+                // jitter buffer before being emitted. jitterBufferDelay is a cumulative sum in seconds.
+                if (pInbound->jitterBufferEmittedCount > 0) {
+                    DOUBLE avgJitterBufferDelayMs =
+                        (pInbound->jitterBufferDelay / (DOUBLE) pInbound->jitterBufferEmittedCount) * 1000.0;
+                    DLOGD("[Canary] JitterBufferDelay: %lf ms (total=%lf s, emitted=%" PRIu64 ")", avgJitterBufferDelayMs,
+                          pInbound->jitterBufferDelay, pInbound->jitterBufferEmittedCount);
+                    Canary::Cloudwatch::getInstance().monitoring.pushJitterBufferDelay(
+                        avgJitterBufferDelayMs, Aws::CloudWatch::Model::StandardUnit::Milliseconds);
+                }
+
+                // Decode Time — average time (ms) to decode a frame. The SDK only populates this for
+                // video, so it stays 0 for the master's audio-only inbound and is gated out here.
+                // Kept for parity/future-proofing if the master ever receives video.
+                if (pInbound->framesDecoded > 0) {
+                    DOUBLE avgDecodeTimeMs = (pInbound->totalDecodeTime / (DOUBLE) pInbound->framesDecoded) * 1000.0;
+                    DLOGD("[Canary] DecodeTime: %lf ms (total=%lf s, frames=%u)", avgDecodeTimeMs, pInbound->totalDecodeTime,
+                          pInbound->framesDecoded);
+                    Canary::Cloudwatch::getInstance().monitoring.pushDecodeTime(
+                        avgDecodeTimeMs, Aws::CloudWatch::Model::StandardUnit::Milliseconds);
+                }
+            }
+        }
+
+        // Remote-inbound RTP stats — parsed from the RTCP Receiver Reports the media server sends
+        // back about the stream the master is sending. This is the only packet-loss signal
+        // available on the master: fractionLost is the loss fraction reported by the remote, and
+        // roundTripTime is RR-based RTT. We query the video transceiver (the master's primary sent
+        // media). fractionLost/RTT are gated on reportsReceived > 0 so we don't emit a misleading
+        // constant 0 before any RR has arrived; reportsReceived itself is always emitted so a flat
+        // 0 (no reports at all) is visible on the graph.
+        if (pSampleStreamingSession->pVideoRtcRtpTransceiver != NULL) {
+            RtcStats rtcRemoteInboundMetrics;
+            rtcRemoteInboundMetrics.requestedTypeOfStats = RTC_STATS_TYPE_REMOTE_INBOUND_RTP;
+            if (STATUS_SUCCEEDED(rtcPeerConnectionGetMetrics(pSampleStreamingSession->pPeerConnection,
+                                                             pSampleStreamingSession->pVideoRtcRtpTransceiver,
+                                                             &rtcRemoteInboundMetrics))) {
+                PRtcRemoteInboundRtpStreamStats pRemoteInbound = &rtcRemoteInboundMetrics.rtcStatsObject.remoteInboundRtpStreamStats;
+
+                Canary::Cloudwatch::getInstance().monitoring.pushRtcpReportsReceived(
+                    (DOUBLE) pRemoteInbound->reportsReceived, Aws::CloudWatch::Model::StandardUnit::Count);
+
+                if (pRemoteInbound->reportsReceived > 0) {
+                    // fractionLost is 0..1; report as a percentage for readability.
+                    DOUBLE fractionLostPct = pRemoteInbound->fractionLost * 100.0;
+                    DLOGD("[Canary] Remote fractionLost: %lf %% (reportsReceived=%" PRIu64 ", rtcpRtt=%" PRIu64 " ms)", fractionLostPct,
+                          pRemoteInbound->reportsReceived, pRemoteInbound->roundTripTime);
+                    Canary::Cloudwatch::getInstance().monitoring.pushFractionLost(
+                        fractionLostPct, Aws::CloudWatch::Model::StandardUnit::Percent);
+                    Canary::Cloudwatch::getInstance().monitoring.pushRtcpRoundTripTime(
+                        (DOUBLE) pRemoteInbound->roundTripTime, Aws::CloudWatch::Model::StandardUnit::Milliseconds);
+                }
+            }
+        }
     } else {
         retStatus = STATUS_TIMER_QUEUE_STOP_SCHEDULING;
     }
@@ -381,6 +497,9 @@ VOID onConnectionStateChange(UINT64 customData, RTC_PEER_CONNECTION_STATE newSta
                 UINT64 joinSSCallToSessionJoined = (GETTIME() - pSampleConfiguration->joinSSCallStartTime) / HUNDREDS_OF_NANOS_IN_A_MILLISECOND;
                 DLOGI("[Canary] JoinSSCallToSessionJoined: %" PRIu64 " ms", joinSSCallToSessionJoined);
                 Canary::Cloudwatch::getInstance().monitoring.pushJoinSSCallToSessionJoined(joinSSCallToSessionJoined, Aws::CloudWatch::Model::StandardUnit::Milliseconds);
+
+                DLOGI("[Canary] TimeToPeerConnection: %" PRIu64 " ms", joinSSCallToSessionJoined);
+                Canary::Cloudwatch::getInstance().monitoring.pushTimeToPeerConnection(joinSSCallToSessionJoined, Aws::CloudWatch::Model::StandardUnit::Milliseconds);
             }
             
             pSampleStreamingSession->canaryOutgoingRTPMetricsContext.prevTs = GETTIME();
@@ -389,6 +508,11 @@ VOID onConnectionStateChange(UINT64 customData, RTC_PEER_CONNECTION_STATE newSta
             pSampleStreamingSession->canaryOutgoingRTPMetricsContext.prevRetxBytesSent = 0;
             pSampleStreamingSession->canaryOutgoingRTPMetricsContext.prevPliCount = 0;
             pSampleStreamingSession->canaryOutgoingRTPMetricsContext.prevFramesSent = 0;
+            pSampleStreamingSession->canaryOutgoingRTPMetricsContext.prevRtpVideoPacketsSent = 0;
+            pSampleStreamingSession->canaryOutgoingRTPMetricsContext.prevRtpVideoBytesSent = 0;
+            pSampleStreamingSession->canaryOutgoingRTPMetricsContext.prevRtpAudioPacketsSent = 0;
+            pSampleStreamingSession->canaryOutgoingRTPMetricsContext.prevRtpAudioBytesSent = 0;
+            pSampleStreamingSession->canaryOutgoingRTPMetricsContext.prevRtpStatsTs = GETTIME();
             CHK_STATUS(initMetricsTimers(pSampleStreamingSession));
             break;
         case RTC_PEER_CONNECTION_STATE_FAILED:
@@ -567,6 +691,10 @@ PVOID mediaSenderRoutine(PVOID customData)
 
     CHK(!ATOMIC_LOAD_BOOL(&pSampleConfiguration->appTerminateFlag), retStatus);
 
+    // Capture a single media epoch shared by both the audio and video sender threads. Both threads use this as the
+    // base for their drift-compensated pacing so their presentation timelines start from the same origin and stay aligned.
+    pSampleConfiguration->mediaStartTime = GETTIME();
+
     if (pSampleConfiguration->videoSource != NULL) {
         THREAD_CREATE(&pSampleConfiguration->videoSenderTid, pSampleConfiguration->videoSource, (PVOID) pSampleConfiguration);
     }
@@ -656,6 +784,13 @@ STATUS sendSignalingMessage(PSampleStreamingSession pSampleStreamingSession, PSi
         CHK_STATUS(signalingClientGetMetrics(pSampleConfiguration->signalingClientHandle, &pSampleConfiguration->signalingClientMetrics));
         DLOGP("[Signaling offer received to answer sent time] %" PRIu64 " ms",
               pSampleConfiguration->signalingClientMetrics.signalingClientStats.offerToAnswerTime);
+
+        // Push TimeToSendAnswer — time from JoinStorageSession call to answer sent
+        if (pSampleConfiguration->joinSSCallStartTime != 0) {
+            UINT64 timeToSendAnswer = (GETTIME() - pSampleConfiguration->joinSSCallStartTime) / HUNDREDS_OF_NANOS_IN_A_MILLISECOND;
+            DLOGI("[Canary] TimeToSendAnswer: %" PRIu64 " ms", timeToSendAnswer);
+            Canary::Cloudwatch::getInstance().monitoring.pushTimeToSendAnswer(timeToSendAnswer, Aws::CloudWatch::Model::StandardUnit::Milliseconds);
+        }
     }
 
 CleanUp:
@@ -899,6 +1034,7 @@ STATUS createSampleStreamingSession(PSampleConfiguration pSampleConfiguration, P
 
     ATOMIC_STORE_BOOL(&pSampleStreamingSession->firstIceSent, FALSE);
     ATOMIC_STORE_BOOL(&pSampleStreamingSession->firstIceReceived, FALSE);
+    ATOMIC_STORE_BOOL(&pSampleStreamingSession->firstInboundFrameReceived, FALSE);
 
     // if we're the viewer, we control the trickle ice mode
     pSampleStreamingSession->remoteCanTrickleIce = !isMaster && pSampleConfiguration->trickleIce;
@@ -934,7 +1070,13 @@ STATUS createSampleStreamingSession(PSampleConfiguration pSampleConfiguration, P
     // Add a SendRecv Transceiver of type audio
     audioTrack.kind = MEDIA_STREAM_TRACK_KIND_AUDIO;
     audioTrack.codec = RTC_CODEC_OPUS;
-    audioRtpTransceiverInit.direction = RTC_RTP_TRANSCEIVER_DIRECTION_SENDRECV;
+    if (pSampleConfiguration->mediaType == SAMPLE_STREAMING_VIDEO_ONLY) {
+        // Video-only mode: still add audio transceiver but set direction to recvonly
+        // The media server requires an audio m-line with a valid direction (not inactive)
+        audioRtpTransceiverInit.direction = RTC_RTP_TRANSCEIVER_DIRECTION_RECVONLY;
+    } else {
+        audioRtpTransceiverInit.direction = RTC_RTP_TRANSCEIVER_DIRECTION_SENDRECV;
+    }
     STRCPY(audioTrack.streamId, "myKvsVideoStream");
     STRCPY(audioTrack.trackId, "myAudioTrack");
     CHK_STATUS(addTransceiver(pSampleStreamingSession->pPeerConnection, &audioTrack, &audioRtpTransceiverInit,
@@ -1044,14 +1186,32 @@ CleanUp:
 
 VOID sampleVideoFrameHandler(UINT64 customData, PFrame pFrame)
 {
-    UNUSED_PARAM(customData);
+    PSampleStreamingSession pSampleStreamingSession = (PSampleStreamingSession) customData;
     DLOGV("Video Frame received. TrackId: %" PRIu64 ", Size: %u, Flags %u", pFrame->trackId, pFrame->size, pFrame->flags);
+
+    if (pSampleStreamingSession != NULL && !ATOMIC_EXCHANGE_BOOL(&pSampleStreamingSession->firstInboundFrameReceived, TRUE)) {
+        PSampleConfiguration pConfig = pSampleStreamingSession->pSampleConfiguration;
+        if (pConfig != NULL && pConfig->joinSSCallStartTime != 0) {
+            UINT64 timeToReceiveInbound = (GETTIME() - pConfig->joinSSCallStartTime) / HUNDREDS_OF_NANOS_IN_A_MILLISECOND;
+            DLOGI("[Canary] TimeToReceiveInboundMedia: %" PRIu64 " ms", timeToReceiveInbound);
+            Canary::Cloudwatch::getInstance().monitoring.pushTimeToReceiveInboundMedia(timeToReceiveInbound, Aws::CloudWatch::Model::StandardUnit::Milliseconds);
+        }
+    }
 }
 
 VOID sampleAudioFrameHandler(UINT64 customData, PFrame pFrame)
 {
-    UNUSED_PARAM(customData);
+    PSampleStreamingSession pSampleStreamingSession = (PSampleStreamingSession) customData;
     DLOGV("Audio Frame received. TrackId: %" PRIu64 ", Size: %u, Flags %u", pFrame->trackId, pFrame->size, pFrame->flags);
+
+    if (pSampleStreamingSession != NULL && !ATOMIC_EXCHANGE_BOOL(&pSampleStreamingSession->firstInboundFrameReceived, TRUE)) {
+        PSampleConfiguration pConfig = pSampleStreamingSession->pSampleConfiguration;
+        if (pConfig != NULL && pConfig->joinSSCallStartTime != 0) {
+            UINT64 timeToReceiveInbound = (GETTIME() - pConfig->joinSSCallStartTime) / HUNDREDS_OF_NANOS_IN_A_MILLISECOND;
+            DLOGI("[Canary] TimeToReceiveInboundMedia: %" PRIu64 " ms (audio)", timeToReceiveInbound);
+            Canary::Cloudwatch::getInstance().monitoring.pushTimeToReceiveInboundMedia(timeToReceiveInbound, Aws::CloudWatch::Model::StandardUnit::Milliseconds);
+        }
+    }
 }
 
 VOID sampleFrameHandler(UINT64 customData, PFrame pFrame)
@@ -1213,6 +1373,7 @@ STATUS createSampleConfiguration(PCHAR channelName, SIGNALING_CHANNEL_ROLE_TYPE 
     pSampleConfiguration->mediaSenderTid = INVALID_TID_VALUE;
     pSampleConfiguration->audioSenderTid = INVALID_TID_VALUE;
     pSampleConfiguration->videoSenderTid = INVALID_TID_VALUE;
+    pSampleConfiguration->mediaStartTime = 0;
     pSampleConfiguration->signalingClientHandle = INVALID_SIGNALING_CLIENT_HANDLE_VALUE;
     pSampleConfiguration->sampleConfigurationObjLock = MUTEX_CREATE(TRUE);
     pSampleConfiguration->cvar = CVAR_CREATE();

@@ -85,7 +85,7 @@ INT32 main(INT32 argc, CHAR* argv[])
     CHK_STATUS(readFrameFromDisk(NULL, &frameSize, "./assets/h264SampleFrames/frame-0001.h264"));
     DLOGI("[KVS Master] Checked sample video frame availability....available");
 
-    CHK_STATUS(readFrameFromDisk(NULL, &frameSize, "./assets/opusSampleFrames/sample-001.opus"));
+    CHK_STATUS(readFrameFromDisk(NULL, &frameSize, "./assets/opusSampleFrames/sample-0001.opus"));
     DLOGI("[KVS Master] Checked sample audio frame availability....available");
 
     // Initialize KVS WebRTC. This must be done before anything else, and must only be done once.
@@ -245,7 +245,8 @@ PVOID sendVideoPackets(PVOID args)
     }
 
     frame.presentationTs = 0;
-    startTime = GETTIME();
+    // Use the shared media epoch (set once before both sender threads spawn) so audio & video pace from the same origin.
+    startTime = (pSampleConfiguration->mediaStartTime != 0) ? pSampleConfiguration->mediaStartTime : GETTIME();
     lastFrameTime = startTime;
 
     // Check if we should stop after one pass through all frames (no looping)
@@ -348,13 +349,17 @@ PVOID sendAudioPackets(PVOID args)
     CHAR filePath[MAX_PATH_LEN + 1];
     UINT32 i;
     STATUS status;
+    UINT64 startTime, lastFrameTime, elapsed;
 
     CHK_ERR(pSampleConfiguration != NULL, STATUS_NULL_ARG, "[KVS Master] Streaming session is NULL");
     frame.presentationTs = 0;
+    // Use the shared media epoch (set once before both sender threads spawn) so audio & video pace from the same origin.
+    startTime = (pSampleConfiguration->mediaStartTime != 0) ? pSampleConfiguration->mediaStartTime : GETTIME();
+    lastFrameTime = startTime;
 
     while (!ATOMIC_LOAD_BOOL(&pSampleConfiguration->appTerminateFlag)) {
         fileIndex = fileIndex % NUMBER_OF_OPUS_FRAME_FILES + 1;
-        SNPRINTF(filePath, MAX_PATH_LEN, "./assets/opusSampleFrames/sample-%03d.opus", fileIndex);
+        SNPRINTF(filePath, MAX_PATH_LEN, "./assets/opusSampleFrames/sample-%04d.opus", fileIndex);
 
         CHK_STATUS(readFrameFromDisk(NULL, &frameSize, filePath));
 
@@ -404,7 +409,12 @@ PVOID sendAudioPackets(PVOID args)
             }
         }
         MUTEX_UNLOCK(pSampleConfiguration->streamingSessionListReadLock);
-        THREAD_SLEEP(SAMPLE_AUDIO_FRAME_DURATION);
+
+        // Drift-compensated pacing (mirrors sendVideoPackets): account for the time spent in readFrameFromDisk/writeFrame
+        // and the previous sleep so the audio thread paces off the shared media epoch instead of accumulating drift.
+        elapsed = lastFrameTime - startTime;
+        THREAD_SLEEP(SAMPLE_AUDIO_FRAME_DURATION - elapsed % SAMPLE_AUDIO_FRAME_DURATION);
+        lastFrameTime = GETTIME();
     }
 
 CleanUp:

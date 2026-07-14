@@ -53,7 +53,7 @@ if [ ! -d "$REPO_DIR/.git" ]; then
         || { echo "ERROR: git checkout failed"; exit 1; }
 else
     echo "Updating canary repo..."
-    (cd "$REPO_DIR" && git fetch origin '+refs/heads/*:refs/remotes/origin/*' && git checkout -f "$GIT_HASH") \
+    (cd "$REPO_DIR" && git fetch origin '+refs/heads/*:refs/remotes/origin/*' && git checkout -f "$GIT_HASH" && git reset --hard "origin/$GIT_HASH" 2>/dev/null || true) \
         || { echo "ERROR: git fetch/checkout failed"; exit 1; }
 fi
 
