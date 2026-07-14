@@ -570,6 +570,10 @@ PVOID mediaSenderRoutine(PVOID customData)
 
     CHK(!ATOMIC_LOAD_BOOL(&pSampleConfiguration->appTerminateFlag), retStatus);
 
+    // Capture a single media epoch shared by both the audio and video sender threads. Both threads use this as the
+    // base for their drift-compensated pacing so their presentation timelines start from the same origin and stay aligned.
+    pSampleConfiguration->mediaStartTime = GETTIME();
+
     if (pSampleConfiguration->videoSource != NULL) {
         THREAD_CREATE(&pSampleConfiguration->videoSenderTid, pSampleConfiguration->videoSource, (PVOID) pSampleConfiguration);
     }
@@ -1248,6 +1252,7 @@ STATUS createSampleConfiguration(PCHAR channelName, SIGNALING_CHANNEL_ROLE_TYPE 
     pSampleConfiguration->mediaSenderTid = INVALID_TID_VALUE;
     pSampleConfiguration->audioSenderTid = INVALID_TID_VALUE;
     pSampleConfiguration->videoSenderTid = INVALID_TID_VALUE;
+    pSampleConfiguration->mediaStartTime = 0;
     pSampleConfiguration->signalingClientHandle = INVALID_SIGNALING_CLIENT_HANDLE_VALUE;
     pSampleConfiguration->sampleConfigurationObjLock = MUTEX_CREATE(TRUE);
     pSampleConfiguration->cvar = CVAR_CREATE();
