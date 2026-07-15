@@ -11,7 +11,7 @@ option(CANARY_USE_MBEDTLS "MBedtls" OFF)
 FetchContent_Declare(
   webrtc
   GIT_REPOSITORY https://github.com/awslabs/amazon-kinesis-video-streams-webrtc-sdk-c
-  GIT_TAG        main
+  GIT_TAG        develop
 )
 
 FetchContent_Declare(
@@ -68,6 +68,7 @@ add_library(
   src/media-server-storage/Common.cpp)
 target_link_libraries(
   kvsWebrtcCanary
+  PUBLIC
   kvsWebrtcClient
   kvsWebrtcSignalingClient
   kvspicUtils

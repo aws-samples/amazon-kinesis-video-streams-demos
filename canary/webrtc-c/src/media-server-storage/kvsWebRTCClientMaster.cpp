@@ -221,15 +221,47 @@ PVOID sendVideoPackets(PVOID args)
     STATUS status;
     UINT32 i;
     UINT64 startTime, lastFrameTime, elapsed;
+    UINT64 videoFrameDuration;
+    PCHAR pFrameRate;
+    PCHAR pNoLoopFrames;
+    BOOL noLoopFrames;
     MEMSET(&encoderStats, 0x00, SIZEOF(RtcEncoderStats));
     CHK_ERR(pSampleConfiguration != NULL, STATUS_NULL_ARG, "[KVS Master] Streaming session is NULL");
+
+    // Determine FPS from environment variable, defaulting to DEFAULT_FPS_VALUE (30)
+    pFrameRate = GETENV("CANARY_FRAME_RATE");
+    if (pFrameRate != NULL && pFrameRate[0] != '\0') {
+        UINT64 fps = (UINT64) strtoull(pFrameRate, NULL, 10);
+        if (fps > 0 && fps <= 120) {
+            videoFrameDuration = HUNDREDS_OF_NANOS_IN_A_SECOND / fps;
+            DLOGI("[KVS Master] Using configured frame rate: %llu fps (frame duration: %llu)", fps, videoFrameDuration);
+        } else {
+            videoFrameDuration = SAMPLE_VIDEO_FRAME_DURATION;
+            DLOGW("[KVS Master] Invalid CANARY_FRAME_RATE '%s', using default %u fps", pFrameRate, DEFAULT_FPS_VALUE);
+        }
+    } else {
+        videoFrameDuration = SAMPLE_VIDEO_FRAME_DURATION;
+        DLOGI("[KVS Master] No CANARY_FRAME_RATE set, using default %u fps", DEFAULT_FPS_VALUE);
+    }
 
     frame.presentationTs = 0;
     startTime = GETTIME();
     lastFrameTime = startTime;
 
+    // Check if we should stop after one pass through all frames (no looping)
+    pNoLoopFrames = GETENV("CANARY_NO_LOOP_FRAMES");
+    noLoopFrames = (pNoLoopFrames != NULL && pNoLoopFrames[0] != '\0' &&
+                    (TOLOWER(pNoLoopFrames[0]) == 't' || pNoLoopFrames[0] == '1'));
+
     while (!ATOMIC_LOAD_BOOL(&pSampleConfiguration->appTerminateFlag)) {
         fileIndex = fileIndex % NUMBER_OF_H264_FRAME_FILES + 1;
+
+        // If no-loop mode is enabled, stop after sending all frames once
+        if (noLoopFrames && fileIndex == 1 && frame.presentationTs > 0) {
+            DLOGI("[KVS Master] All %u frames sent (no-loop mode), stopping video thread", NUMBER_OF_H264_FRAME_FILES);
+            break;
+        }
+
         SNPRINTF(filePath, MAX_PATH_LEN, "./assets/h264SampleFrames/frame-%04d.h264", fileIndex);
 
         CHK_STATUS(readFrameFromDisk(NULL, &frameSize, filePath));
@@ -250,7 +282,7 @@ PVOID sendVideoPackets(PVOID args)
         encoderStats.width = 640;
         encoderStats.height = 480;
         encoderStats.targetBitrate = 262000;
-        frame.presentationTs += SAMPLE_VIDEO_FRAME_DURATION;
+        frame.presentationTs += videoFrameDuration;
         MUTEX_LOCK(pSampleConfiguration->streamingSessionListReadLock);
 
         for (i = 0; i < pSampleConfiguration->streamingSessionCount; ++i) {
@@ -266,6 +298,14 @@ PVOID sendVideoPackets(PVOID args)
                 DLOGD("[Canary] Start up latency from offer received to first frame sent (timeToFirstFrame): %lf ms", timeToFirstFrame);
                 Canary::Cloudwatch::getInstance().monitoring.pushTimeToFirstFrame(timeToFirstFrame,
                                                                                 Aws::CloudWatch::Model::StandardUnit::Milliseconds);
+
+                // Push JoinSSCallToFirstFrame — time from JoinStorageSession call to first frame sent
+                if (pSampleConfiguration->joinSSCallStartTime != 0) {
+                    UINT64 joinSSToFirstFrame = (GETTIME() - pSampleConfiguration->joinSSCallStartTime) / HUNDREDS_OF_NANOS_IN_A_MILLISECOND;
+                    DLOGI("[Canary] JoinSSCallToFirstFrame: %" PRIu64 " ms", joinSSToFirstFrame);
+                    Canary::Cloudwatch::getInstance().monitoring.pushJoinSSCallToFirstFrame(joinSSToFirstFrame, Aws::CloudWatch::Model::StandardUnit::Milliseconds);
+                }
+
                 calculateDisconnectToFrameSentTime(pSampleConfiguration);
 
                 pSampleConfiguration->sampleStreamingSessionList[i]->firstFrame = FALSE;
@@ -285,10 +325,10 @@ PVOID sendVideoPackets(PVOID args)
 
         // Adjust sleep in the case the sleep itself and writeFrame take longer than expected. Since sleep makes sure that the thread
         // will be paused at least until the given amount, we can assume that there's no too early frame scenario.
-        // Also, it's very unlikely to have a delay greater than SAMPLE_VIDEO_FRAME_DURATION, so the logic assumes that this is always
+        // Also, it's very unlikely to have a delay greater than videoFrameDuration, so the logic assumes that this is always
         // true for simplicity.
         elapsed = lastFrameTime - startTime;
-        THREAD_SLEEP(SAMPLE_VIDEO_FRAME_DURATION - elapsed % SAMPLE_VIDEO_FRAME_DURATION);
+        THREAD_SLEEP(videoFrameDuration - elapsed % videoFrameDuration);
         lastFrameTime = GETTIME();
     }
 
@@ -346,6 +386,13 @@ PVOID sendAudioPackets(PVOID args)
                 DLOGD("[Canary] Start up latency from offer received to first frame sent (timeToFirstFrame): %lf ms", timeToFirstFrame);
                     Canary::Cloudwatch::getInstance().monitoring.pushTimeToFirstFrame(timeToFirstFrame,
                                                                                 Aws::CloudWatch::Model::StandardUnit::Milliseconds);
+
+                    // Push JoinSSCallToFirstFrame — time from JoinStorageSession call to first frame sent
+                    if (pSampleConfiguration->joinSSCallStartTime != 0) {
+                        UINT64 joinSSToFirstFrame = (GETTIME() - pSampleConfiguration->joinSSCallStartTime) / HUNDREDS_OF_NANOS_IN_A_MILLISECOND;
+                        DLOGI("[Canary] JoinSSCallToFirstFrame (audio): %" PRIu64 " ms", joinSSToFirstFrame);
+                        Canary::Cloudwatch::getInstance().monitoring.pushJoinSSCallToFirstFrame(joinSSToFirstFrame, Aws::CloudWatch::Model::StandardUnit::Milliseconds);
+                    }
 
                     calculateDisconnectToFrameSentTime(pSampleConfiguration);
 

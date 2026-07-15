@@ -110,6 +110,7 @@ STATUS populateOutgoingRtpMetricsContext(PSampleStreamingSession pSampleStreamin
     pSampleStreamingSession->canaryOutgoingRTPMetricsContext.prevFramesDiscardedOnSend = pSampleStreamingSession->canaryMetrics.rtcStatsObject.outboundRtpStreamStats.framesDiscardedOnSend;
     pSampleStreamingSession->canaryOutgoingRTPMetricsContext.prevNackCount = pSampleStreamingSession->canaryMetrics.rtcStatsObject.outboundRtpStreamStats.nackCount;
     pSampleStreamingSession->canaryOutgoingRTPMetricsContext.prevRetxBytesSent = pSampleStreamingSession->canaryMetrics.rtcStatsObject.outboundRtpStreamStats.retransmittedBytesSent;
+    pSampleStreamingSession->canaryOutgoingRTPMetricsContext.prevPliCount = pSampleStreamingSession->canaryMetrics.rtcStatsObject.outboundRtpStreamStats.pliCount;
 
     return STATUS_SUCCESS;
 }
@@ -153,10 +154,55 @@ STATUS canaryRtpOutboundStats(UINT32 timerId, UINT64 currentTime, UINT64 customD
         if (pSampleStreamingSession->pVideoRtcRtpTransceiver) {
                 pSampleStreamingSession->canaryMetrics.requestedTypeOfStats = RTC_STATS_TYPE_OUTBOUND_RTP;
                 CHK_LOG_ERR(rtcPeerConnectionGetMetrics(pSampleStreamingSession->pPeerConnection, pSampleStreamingSession->pVideoRtcRtpTransceiver, &(pSampleStreamingSession->canaryMetrics)));
+
+                // Compute PLI rate before populateOutgoingRtpMetricsContext updates prev values
+                DOUBLE pliDuration = (DOUBLE)(pSampleStreamingSession->canaryMetrics.timestamp - pSampleStreamingSession->canaryOutgoingRTPMetricsContext.prevTs) / HUNDREDS_OF_NANOS_IN_A_SECOND;
+                if (pliDuration > 0) {
+                    DOUBLE pliPerSecond = ((DOUBLE) pSampleStreamingSession->canaryMetrics.rtcStatsObject.outboundRtpStreamStats.pliCount -
+                                           pSampleStreamingSession->canaryOutgoingRTPMetricsContext.prevPliCount) / pliDuration;
+                    Canary::Cloudwatch::getInstance().monitoring.pushPliCountPerSecond(pliPerSecond);
+                }
+
                 populateOutgoingRtpMetricsContext(pSampleStreamingSession);
                 Canary::POutgoingRTPMetricsContext pCanaryOutgoingRTPMetricsContext = reinterpret_cast<Canary::POutgoingRTPMetricsContext>(&(pSampleStreamingSession->canaryOutgoingRTPMetricsContext));
                 Canary::Cloudwatch::getInstance().monitoring.pushOutboundRtpStats(pCanaryOutgoingRTPMetricsContext);
             }
+
+        // Extract RTT, packets sent/received rate, and bitrate from ICE candidate pair stats
+        {
+            RtcStats rtcCandidatePairMetrics;
+            rtcCandidatePairMetrics.requestedTypeOfStats = RTC_STATS_TYPE_CANDIDATE_PAIR;
+            if (STATUS_SUCCEEDED(rtcPeerConnectionGetMetrics(pSampleStreamingSession->pPeerConnection, NULL, &rtcCandidatePairMetrics))) {
+                DOUBLE rttMs = rtcCandidatePairMetrics.rtcStatsObject.iceCandidatePairStats.currentRoundTripTime * 1000.0;
+                DLOGD("[Canary] RoundTripTime: %lf ms", rttMs);
+                Canary::Cloudwatch::getInstance().monitoring.pushRoundTripTime(rttMs, Aws::CloudWatch::Model::StandardUnit::Milliseconds);
+
+                DOUBLE duration = (DOUBLE)(rtcCandidatePairMetrics.timestamp - pSampleStreamingSession->rtcMetricsHistory.prevTs) / HUNDREDS_OF_NANOS_IN_A_SECOND;
+                if (duration > 0) {
+                    DOUBLE pktsSentPerSec = (DOUBLE)(rtcCandidatePairMetrics.rtcStatsObject.iceCandidatePairStats.packetsSent -
+                                                     pSampleStreamingSession->rtcMetricsHistory.prevNumberOfPacketsSent) / duration;
+                    DOUBLE pktsRecvPerSec = (DOUBLE)(rtcCandidatePairMetrics.rtcStatsObject.iceCandidatePairStats.packetsReceived -
+                                                     pSampleStreamingSession->rtcMetricsHistory.prevNumberOfPacketsReceived) / duration;
+                    DOUBLE outBitrateKbps = ((DOUBLE)(rtcCandidatePairMetrics.rtcStatsObject.iceCandidatePairStats.bytesSent -
+                                                      pSampleStreamingSession->rtcMetricsHistory.prevNumberOfBytesSent) * 8.0) / duration / 1000.0;
+
+                    Canary::Cloudwatch::getInstance().monitoring.pushPacketsSentPerSecond(pktsSentPerSec);
+                    Canary::Cloudwatch::getInstance().monitoring.pushPacketsReceivedPerSecond(pktsRecvPerSec);
+                    Canary::Cloudwatch::getInstance().monitoring.pushOutgoingBitrate(outBitrateKbps);
+
+                    // Update prev values for next interval
+                    pSampleStreamingSession->rtcMetricsHistory.prevTs = rtcCandidatePairMetrics.timestamp;
+                    pSampleStreamingSession->rtcMetricsHistory.prevNumberOfPacketsSent =
+                        rtcCandidatePairMetrics.rtcStatsObject.iceCandidatePairStats.packetsSent;
+                    pSampleStreamingSession->rtcMetricsHistory.prevNumberOfPacketsReceived =
+                        rtcCandidatePairMetrics.rtcStatsObject.iceCandidatePairStats.packetsReceived;
+                    pSampleStreamingSession->rtcMetricsHistory.prevNumberOfBytesSent =
+                        rtcCandidatePairMetrics.rtcStatsObject.iceCandidatePairStats.bytesSent;
+                    pSampleStreamingSession->rtcMetricsHistory.prevNumberOfBytesReceived =
+                        rtcCandidatePairMetrics.rtcStatsObject.iceCandidatePairStats.bytesReceived;
+                }
+            }
+        }
     } else {
         retStatus = STATUS_TIMER_QUEUE_STOP_SCHEDULING;
     }
@@ -252,6 +298,30 @@ CleanUp:
     return retStatus;
 }
 
+STATUS canaryMasterStreamingAvailability(UINT32 timerId, UINT64 currentTime, UINT64 customData)
+{
+    UNUSED_PARAM(timerId);
+    UNUSED_PARAM(currentTime);
+    STATUS retStatus = STATUS_SUCCESS;
+
+    PSampleStreamingSession pSampleStreamingSession = (PSampleStreamingSession) customData;
+    PSampleConfiguration pSampleConfiguration;
+
+    CHK(pSampleStreamingSession != NULL, STATUS_NULL_ARG);
+    CHK(!ATOMIC_LOAD_BOOL(&pSampleStreamingSession->terminateFlag), STATUS_TIMER_QUEUE_STOP_SCHEDULING);
+
+    pSampleConfiguration = pSampleStreamingSession->pSampleConfiguration;
+    CHK(pSampleConfiguration != NULL, STATUS_NULL_ARG);
+    CHK(!ATOMIC_LOAD_BOOL(&pSampleConfiguration->appTerminateFlag), STATUS_TIMER_QUEUE_STOP_SCHEDULING);
+
+    if (ATOMIC_LOAD_BOOL(&pSampleConfiguration->connected)) {
+        Canary::Cloudwatch::getInstance().monitoring.pushMasterStreamingAvailability(1.0);
+    }
+
+CleanUp:
+    return retStatus;
+}
+
 STATUS initMetricsTimers(PSampleStreamingSession pSampleStreamingSession)
 {
     STATUS retStatus = STATUS_SUCCESS;
@@ -267,6 +337,11 @@ STATUS initMetricsTimers(PSampleStreamingSession pSampleStreamingSession)
     CHK_STATUS(timerQueueAddTimer(pSampleConfiguration->timerQueueHandle, METRICS_INVOCATION_PERIOD, METRICS_INVOCATION_PERIOD, canaryRtpOutboundStats, (UINT64) pSampleStreamingSession,
                                       &pSampleStreamingSession->metricsTimerId));
     DLOGD("[Canary] Added metricsTimer");
+
+    CHK_STATUS(timerQueueAddTimer(pSampleConfiguration->timerQueueHandle, STREAMING_AVAILABILITY_PERIOD, STREAMING_AVAILABILITY_PERIOD,
+                                      canaryMasterStreamingAvailability, (UINT64) pSampleStreamingSession,
+                                      &pSampleStreamingSession->streamingAvailabilityTimerId));
+    DLOGD("[Canary] Added MasterStreamingAvailability timer");
 
 CleanUp:
     return retStatus;
@@ -312,12 +387,15 @@ VOID onConnectionStateChange(UINT64 customData, RTC_PEER_CONNECTION_STATE newSta
             pSampleStreamingSession->canaryOutgoingRTPMetricsContext.prevFramesDiscardedOnSend = 0;
             pSampleStreamingSession->canaryOutgoingRTPMetricsContext.prevNackCount = 0;
             pSampleStreamingSession->canaryOutgoingRTPMetricsContext.prevRetxBytesSent = 0;
+            pSampleStreamingSession->canaryOutgoingRTPMetricsContext.prevPliCount = 0;
             pSampleStreamingSession->canaryOutgoingRTPMetricsContext.prevFramesSent = 0;
             CHK_STATUS(initMetricsTimers(pSampleStreamingSession));
             break;
         case RTC_PEER_CONNECTION_STATE_FAILED:
             DLOGE("[Canary] Peer connection FAILED — pushing PeerConnectionAvailability = 0");
             Canary::Cloudwatch::getInstance().monitoring.pushPeerConnectionAvailability(0.0);
+            DLOGE("[Canary] Peer connection FAILED — pushing MasterStreamingAvailability = 0");
+            Canary::Cloudwatch::getInstance().monitoring.pushMasterStreamingAvailability(0.0);
             // explicit fallthrough
         case RTC_PEER_CONNECTION_STATE_CLOSED:
             // explicit fallthrough
@@ -332,7 +410,53 @@ VOID onConnectionStateChange(UINT64 customData, RTC_PEER_CONNECTION_STATE newSta
                 gCMasterUnexpectedDisconnectionCount++;
                 DLOGE("[Canary] Unexpected disconnection detected (was CONNECTED, now state %u). Count: %u",
                       newState, gCMasterUnexpectedDisconnectionCount);
+                if (newState == RTC_PEER_CONNECTION_STATE_DISCONNECTED) {
+                    DLOGE("[Canary] Peer connection DISCONNECTED unexpectedly — pushing MasterStreamingAvailability = 0");
+                    Canary::Cloudwatch::getInstance().monitoring.pushMasterStreamingAvailability(0.0);
+                }
             }
+            // CLOSED is expected (clean bye from backend after ~1hr) — push 1.0
+            if (newState == RTC_PEER_CONNECTION_STATE_CLOSED && ATOMIC_LOAD_BOOL(&pSampleConfiguration->connected)) {
+                DLOGI("[Canary] Peer connection CLOSED (clean bye) — pushing MasterStreamingAvailability = 1");
+                Canary::Cloudwatch::getInstance().monitoring.pushMasterStreamingAvailability(1.0);
+            }
+
+            // Push end-of-session totals before the session terminates
+            if (ATOMIC_LOAD_BOOL(&pSampleConfiguration->connected)) {
+                // Get final candidate pair stats for total packets
+                RtcStats finalCandidatePairStats;
+                finalCandidatePairStats.requestedTypeOfStats = RTC_STATS_TYPE_CANDIDATE_PAIR;
+                if (STATUS_SUCCEEDED(rtcPeerConnectionGetMetrics(pSampleStreamingSession->pPeerConnection, NULL, &finalCandidatePairStats))) {
+                    UINT64 totalPktsSent = finalCandidatePairStats.rtcStatsObject.iceCandidatePairStats.packetsSent;
+                    UINT64 totalPktsRecv = finalCandidatePairStats.rtcStatsObject.iceCandidatePairStats.packetsReceived;
+                    DLOGI("[Canary] End-of-session TotalPacketsSent: %" PRIu64 ", TotalPacketsReceived: %" PRIu64, totalPktsSent, totalPktsRecv);
+                    Canary::Cloudwatch::getInstance().monitoring.pushTotalPacketsSent(totalPktsSent);
+                    Canary::Cloudwatch::getInstance().monitoring.pushTotalPacketsReceived(totalPktsRecv);
+                }
+
+                // Get final outbound RTP stats for total NACK, PLI, frames discarded
+                if (pSampleStreamingSession->pVideoRtcRtpTransceiver != NULL) {
+                    RtcStats finalOutboundStats;
+                    finalOutboundStats.requestedTypeOfStats = RTC_STATS_TYPE_OUTBOUND_RTP;
+                    if (STATUS_SUCCEEDED(rtcPeerConnectionGetMetrics(pSampleStreamingSession->pPeerConnection,
+                                                                      pSampleStreamingSession->pVideoRtcRtpTransceiver, &finalOutboundStats))) {
+                        UINT64 totalNack = finalOutboundStats.rtcStatsObject.outboundRtpStreamStats.nackCount;
+                        UINT64 totalPli = finalOutboundStats.rtcStatsObject.outboundRtpStreamStats.pliCount;
+                        UINT64 totalFramesSent = finalOutboundStats.rtcStatsObject.outboundRtpStreamStats.framesSent;
+                        UINT64 totalFramesDiscarded = finalOutboundStats.rtcStatsObject.outboundRtpStreamStats.framesDiscardedOnSend;
+                        DOUBLE framesDiscardedPct = (totalFramesSent + totalFramesDiscarded) > 0
+                            ? ((DOUBLE) totalFramesDiscarded / (DOUBLE)(totalFramesSent + totalFramesDiscarded)) * 100.0
+                            : 0.0;
+
+                        DLOGI("[Canary] End-of-session TotalNackCount: %" PRIu64 ", TotalPliCount: %" PRIu64 ", TotalFramesDiscardedPct: %lf%%",
+                              totalNack, totalPli, framesDiscardedPct);
+                        Canary::Cloudwatch::getInstance().monitoring.pushTotalNackCount(totalNack);
+                        Canary::Cloudwatch::getInstance().monitoring.pushTotalPliCount(totalPli);
+                        Canary::Cloudwatch::getInstance().monitoring.pushTotalFramesDiscardedPercentage(framesDiscardedPct);
+                    }
+                }
+            }
+
             DLOGD("p2p connection disconnected");
             ATOMIC_STORE_BOOL(&pSampleStreamingSession->terminateFlag, TRUE);
             CVAR_BROADCAST(pSampleConfiguration->cvar);
@@ -608,6 +732,16 @@ VOID onIceCandidateHandler(UINT64 customData, PCHAR candidateJson)
         STRNCPY(message.payload, candidateJson, message.payloadLen);
         message.correlationId[0] = '\0';
         CHK_STATUS(sendSignalingMessage(pSampleStreamingSession, &message));
+
+        // Push TimeToSendIce on the first ICE candidate sent
+        if (!ATOMIC_EXCHANGE_BOOL(&pSampleStreamingSession->firstIceSent, TRUE)) {
+            PSampleConfiguration pConfig = pSampleStreamingSession->pSampleConfiguration;
+            if (pConfig != NULL && pConfig->joinSSCallStartTime != 0) {
+                UINT64 timeToSendIce = (GETTIME() - pConfig->joinSSCallStartTime) / HUNDREDS_OF_NANOS_IN_A_MILLISECOND;
+                DLOGI("[Canary] TimeToSendIce: %" PRIu64 " ms", timeToSendIce);
+                Canary::Cloudwatch::getInstance().monitoring.pushTimeToSendIce(timeToSendIce, Aws::CloudWatch::Model::StandardUnit::Milliseconds);
+            }
+        }
     }
 
 CleanUp:
@@ -761,6 +895,10 @@ STATUS createSampleStreamingSession(PSampleConfiguration pSampleConfiguration, P
     pSampleStreamingSession->iceMetrics.version = ICE_AGENT_METRICS_CURRENT_VERSION;
 
     pSampleStreamingSession->metricsTimerId = MAX_UINT32;
+    pSampleStreamingSession->streamingAvailabilityTimerId = MAX_UINT32;
+
+    ATOMIC_STORE_BOOL(&pSampleStreamingSession->firstIceSent, FALSE);
+    ATOMIC_STORE_BOOL(&pSampleStreamingSession->firstIceReceived, FALSE);
 
     // if we're the viewer, we control the trickle ice mode
     pSampleStreamingSession->remoteCanTrickleIce = !isMaster && pSampleConfiguration->trickleIce;
@@ -867,6 +1005,12 @@ STATUS freeSampleStreamingSession(PSampleStreamingSession* ppSampleStreamingSess
                                           (UINT64) pSampleStreamingSession));
     }
 
+    // Free the streaming availability timer
+    if (pSampleStreamingSession->streamingAvailabilityTimerId != MAX_UINT32 && IS_VALID_TIMER_QUEUE_HANDLE(pSampleConfiguration->timerQueueHandle)) {
+        CHK_LOG_ERR(timerQueueCancelTimer(pSampleConfiguration->timerQueueHandle, pSampleStreamingSession->streamingAvailabilityTimerId,
+                                          (UINT64) pSampleStreamingSession));
+    }
+
     MUTEX_UNLOCK(pSampleConfiguration->sampleConfigurationObjLock);
 
     CHK_LOG_ERR(closePeerConnection(pSampleStreamingSession->pPeerConnection));
@@ -953,6 +1097,16 @@ STATUS handleRemoteCandidate(PSampleStreamingSession pSampleStreamingSession, PS
 
     CHK_STATUS(deserializeRtcIceCandidateInit(pSignalingMessage->payload, pSignalingMessage->payloadLen, &iceCandidate));
     CHK_STATUS(addIceCandidate(pSampleStreamingSession->pPeerConnection, iceCandidate.candidate));
+
+    // Push TimeToReceiveIce on the first ICE candidate received
+    if (!ATOMIC_EXCHANGE_BOOL(&pSampleStreamingSession->firstIceReceived, TRUE)) {
+        PSampleConfiguration pConfig = pSampleStreamingSession->pSampleConfiguration;
+        if (pConfig != NULL && pConfig->joinSSCallStartTime != 0) {
+            UINT64 timeToReceiveIce = (GETTIME() - pConfig->joinSSCallStartTime) / HUNDREDS_OF_NANOS_IN_A_MILLISECOND;
+            DLOGI("[Canary] TimeToReceiveIce: %" PRIu64 " ms", timeToReceiveIce);
+            Canary::Cloudwatch::getInstance().monitoring.pushTimeToReceiveIce(timeToReceiveIce, Aws::CloudWatch::Model::StandardUnit::Milliseconds);
+        }
+    }
 
 CleanUp:
 

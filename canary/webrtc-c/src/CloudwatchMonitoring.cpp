@@ -520,4 +520,140 @@ VOID CloudwatchMonitoring::pushCMasterUnexpectedDisconnection(UINT32 disconnecti
     this->push(datum);
 }
 
+VOID CloudwatchMonitoring::pushMasterStreamingAvailability(DOUBLE availability)
+{
+    MetricDatum datum;
+
+    datum.SetMetricName("MasterStreamingAvailability");
+    datum.SetValue(availability);
+    datum.SetUnit(Aws::CloudWatch::Model::StandardUnit::None);
+
+    this->push(datum);
+}
+
+VOID CloudwatchMonitoring::pushTimeToSendIce(UINT64 duration, Aws::CloudWatch::Model::StandardUnit unit)
+{
+    MetricDatum datum;
+
+    datum.SetMetricName("TimeToSendIce");
+    datum.SetValue(duration);
+    datum.SetUnit(unit);
+
+    this->push(datum);
+}
+
+VOID CloudwatchMonitoring::pushTimeToReceiveIce(UINT64 duration, Aws::CloudWatch::Model::StandardUnit unit)
+{
+    MetricDatum datum;
+
+    datum.SetMetricName("TimeToReceiveIce");
+    datum.SetValue(duration);
+    datum.SetUnit(unit);
+
+    this->push(datum);
+}
+
+VOID CloudwatchMonitoring::pushJoinSSCallToFirstFrame(UINT64 duration, Aws::CloudWatch::Model::StandardUnit unit)
+{
+    MetricDatum datum;
+
+    datum.SetMetricName("JoinSSCallToFirstFrame");
+    datum.SetValue(duration);
+    datum.SetUnit(unit);
+
+    this->push(datum);
+}
+
+VOID CloudwatchMonitoring::pushRoundTripTime(DOUBLE rttMs, Aws::CloudWatch::Model::StandardUnit unit)
+{
+    MetricDatum datum;
+
+    datum.SetMetricName("RoundTripTime");
+    datum.SetValue(rttMs);
+    datum.SetUnit(unit);
+
+    this->push(datum);
+}
+
+VOID CloudwatchMonitoring::pushPacketsSentPerSecond(DOUBLE rate)
+{
+    MetricDatum datum;
+    datum.SetMetricName("PacketsSentPerSecond");
+    datum.SetValue(rate);
+    datum.SetUnit(Aws::CloudWatch::Model::StandardUnit::Count_Second);
+    this->push(datum);
+}
+
+VOID CloudwatchMonitoring::pushPacketsReceivedPerSecond(DOUBLE rate)
+{
+    MetricDatum datum;
+    datum.SetMetricName("PacketsReceivedPerSecond");
+    datum.SetValue(rate);
+    datum.SetUnit(Aws::CloudWatch::Model::StandardUnit::Count_Second);
+    this->push(datum);
+}
+
+VOID CloudwatchMonitoring::pushOutgoingBitrate(DOUBLE bitrate)
+{
+    MetricDatum datum;
+    datum.SetMetricName("OutgoingBitrate");
+    datum.SetValue(bitrate);
+    datum.SetUnit(Aws::CloudWatch::Model::StandardUnit::Kilobits_Second);
+    this->push(datum);
+}
+
+VOID CloudwatchMonitoring::pushPliCountPerSecond(DOUBLE rate)
+{
+    MetricDatum datum;
+    datum.SetMetricName("PliCountPerSecond");
+    datum.SetValue(rate);
+    datum.SetUnit(Aws::CloudWatch::Model::StandardUnit::Count_Second);
+    this->push(datum);
+}
+
+VOID CloudwatchMonitoring::pushTotalPacketsSent(UINT64 count)
+{
+    MetricDatum datum;
+    datum.SetMetricName("TotalPacketsSent");
+    datum.SetValue(count);
+    datum.SetUnit(Aws::CloudWatch::Model::StandardUnit::Count);
+    this->push(datum);
+}
+
+VOID CloudwatchMonitoring::pushTotalPacketsReceived(UINT64 count)
+{
+    MetricDatum datum;
+    datum.SetMetricName("TotalPacketsReceived");
+    datum.SetValue(count);
+    datum.SetUnit(Aws::CloudWatch::Model::StandardUnit::Count);
+    this->push(datum);
+}
+
+VOID CloudwatchMonitoring::pushTotalNackCount(UINT64 count)
+{
+    MetricDatum datum;
+    datum.SetMetricName("TotalNackCount");
+    datum.SetValue(count);
+    datum.SetUnit(Aws::CloudWatch::Model::StandardUnit::Count);
+    this->push(datum);
+}
+
+VOID CloudwatchMonitoring::pushTotalPliCount(UINT64 count)
+{
+    MetricDatum datum;
+    datum.SetMetricName("TotalPliCount");
+    datum.SetValue(count);
+    datum.SetUnit(Aws::CloudWatch::Model::StandardUnit::Count);
+    this->push(datum);
+}
+
+VOID CloudwatchMonitoring::pushTotalFramesDiscardedPercentage(DOUBLE percentage)
+{
+    MetricDatum datum;
+    datum.SetMetricName("TotalFramesDiscardedPercentage");
+    datum.SetValue(percentage);
+    datum.SetUnit(Aws::CloudWatch::Model::StandardUnit::Percent);
+    this->push(datum);
+}
+
 } // namespace Canary
