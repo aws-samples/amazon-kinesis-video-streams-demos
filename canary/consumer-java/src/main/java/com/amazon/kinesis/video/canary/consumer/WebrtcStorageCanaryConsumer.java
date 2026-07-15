@@ -73,6 +73,7 @@ public class WebrtcStorageCanaryConsumer {
     private static EnvironmentVariableCredentialsProvider mCredentialsProvider;
     private static AmazonKinesisVideo mAmazonKinesisVideo;
     private static AmazonCloudWatch mCwClient;
+    private static Timer mConnectionHeartbeatTimer;
 
     private static void calculateFragmentContinuityMetric(CanaryFragmentList fragmentList) {
         try {
@@ -115,6 +116,47 @@ public class WebrtcStorageCanaryConsumer {
         } catch (Exception e) {
             logger.error("Failed while fetching attributes for CanaryListFragmentWorker, " + e);
         }
+    }
+
+    /**
+     * Per-minute persistence streaming availability heartbeat. Emits
+     * PERSISTENCE_STREAMING_AVAILABILITY_METRIC_NAME = 1 when the consumer can reach KVS and
+     * retrieve persisted media for the stream, and 0 when that fails (connection closed abruptly /
+     * stream unreachable). This consumer is fragment/GetMedia based, so there is no long-lived
+     * connection object to observe directly — a successful getDataEndpoint + ListFragments
+     * round-trip is the most faithful "persistence streaming is available" signal.
+     */
+    private static void emitPersistenceStreamingAvailability() {
+        boolean connectionActive = false;
+        try {
+            final GetDataEndpointRequest dataEndpointRequest = new GetDataEndpointRequest()
+                    .withAPIName(APIName.LIST_FRAGMENTS).withStreamName(mStreamName);
+            final String listFragmentsEndpoint = mAmazonKinesisVideo.getDataEndpoint(dataEndpointRequest)
+                    .getDataEndpoint();
+
+            TimestampRange timestampRange = new TimestampRange();
+            timestampRange.setStartTimestamp(mCanaryStartTime);
+            timestampRange.setEndTimestamp(new Date());
+
+            FragmentSelector fragmentSelector = new FragmentSelector();
+            fragmentSelector.setFragmentSelectorType(FragmentSelectorType.SERVER_TIMESTAMP.toString());
+            fragmentSelector.setTimestampRange(timestampRange);
+
+            try (CanaryListFragmentWorker listFragmentWorker = new CanaryListFragmentWorker(mStreamName,
+                    mCredentialsProvider, listFragmentsEndpoint, Regions.fromName(mRegion), fragmentSelector)) {
+                final FutureTask<List<Fragment>> futureTask = new FutureTask<>(listFragmentWorker);
+                Thread thread = new Thread(futureTask);
+                thread.start();
+                // A successful response means the consumer reached KVS and the stream is
+                // retrievable — the consumer connection is active for this interval.
+                futureTask.get();
+                connectionActive = true;
+            }
+        } catch (Exception e) {
+            logger.error("Consumer connection heartbeat probe failed (connection closed/failed), " + e);
+        }
+        publishMetricToCW(CanaryConstants.PERSISTENCE_STREAMING_AVAILABILITY_METRIC_NAME,
+                connectionActive ? 1.0 : 0.0, StandardUnit.None);
     }
 
     private static void calculateTimeToFirstFragment() {
@@ -177,6 +219,9 @@ public class WebrtcStorageCanaryConsumer {
     }
 
     protected static void shutdownCanaryResources() {
+        if (mConnectionHeartbeatTimer != null) {
+            mConnectionHeartbeatTimer.cancel();
+        }
         mCwClient.shutdown();
         mAmazonKinesisVideo.shutdown();
     }
@@ -279,6 +324,18 @@ public class WebrtcStorageCanaryConsumer {
                 .withRegion(mRegion)
                 .withCredentials(mCredentialsProvider)
                 .build();
+
+        // Per-minute persistence streaming availability heartbeat, covering both periodic and
+        // reconnect run modes. Started here (before the run-mode switch) and cancelled in
+        // shutdownCanaryResources(). Uses the same initial delay as the fragment continuity check so
+        // we don't record a spurious 0 before the stream has been created by the master.
+        mConnectionHeartbeatTimer = new Timer("PersistenceStreamingAvailabilityTimer");
+        mConnectionHeartbeatTimer.scheduleAtFixedRate(new TimerTask() {
+            @Override
+            public void run() {
+                emitPersistenceStreamingAvailability();
+            }
+        }, CanaryConstants.LIST_FRAGMENTS_INITIAL_DELAY, CanaryConstants.CONNECTION_HEARTBEAT_INTERVAL);
 
         switch (mCanaryLabel) {
             case CanaryConstants.PERIODIC_LABEL:

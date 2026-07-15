@@ -107,6 +107,7 @@ typedef struct {
     TID mediaSenderTid;
     TID audioSenderTid;
     TID videoSenderTid;
+    UINT64 mediaStartTime; // shared media epoch so audio & video timestamp from the same origin
     TIMER_QUEUE_HANDLE timerQueueHandle;
     UINT32 iceCandidatePairStatsTimerId;
     SampleStreamingMediaType mediaType;
@@ -171,6 +172,12 @@ typedef struct {
     UINT64 prevNackCount;
     UINT64 prevRetxBytesSent;
     UINT64 prevPliCount;
+    // Per-track RTP-level (outboundRtpStreamStats.sent.*) prev counters for packets/bytes-sent rates
+    UINT64 prevRtpVideoPacketsSent;
+    UINT64 prevRtpVideoBytesSent;
+    UINT64 prevRtpAudioPacketsSent;
+    UINT64 prevRtpAudioBytesSent;
+    UINT64 prevRtpStatsTs;
     std::atomic<UINT64> videoFramesGenerated;
     UINT64 videoBytesGenerated;
     DOUBLE framesPercentageDiscarded;

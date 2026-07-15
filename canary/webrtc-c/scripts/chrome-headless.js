@@ -288,6 +288,20 @@ class ViewerCanaryTest {
             offerToAnswerTime
           );
         }
+
+        // Calculate and publish JoinSSCallToAnswerSentTime — time from the
+        // JoinStorageSessionAsViewer API call to the SDP answer being sent.
+        // Viewer analog of the master's TimeToSendAnswer.
+        if (this.joinSSCallTime && this.answerSentTime) {
+          const joinSSToAnswerTime = this.answerSentTime - this.joinSSCallTime;
+          log(`JoinSSCallToAnswerSentTime: ${joinSSToAnswerTime}ms`);
+
+          await CloudWatchMetrics.publishMsMetric(
+            this.getMetricName('JoinSSCallToAnswerSentTime'),
+            this.config.channelName,
+            joinSSToAnswerTime
+          );
+        }
       }
       
       // Track first ICE candidate received from remote
@@ -772,8 +786,19 @@ class ViewerCanaryTest {
       }
 
       const report = await pc.getStats();
-      const result = { video: null, audio: null, roundTripTime: null, selectedCandidatePair: null, outboundAudio: null, outboundVideo: null };
+      const result = { video: null, audio: null, roundTripTime: null, remoteInboundRtt: null, selectedCandidatePair: null, outboundAudio: null, outboundVideo: null };
       report.forEach(stat => {
+        // remote-inbound-rtp carries the RTCP Receiver Report the remote sends about the stream
+        // the viewer is SENDING (e.g. AO/mixed-viewer audio). roundTripTime is the RR-based RTT.
+        // Empty for video-only viewers (nothing sent), hence gated on roundTripTimeMeasurements.
+        if (stat.type === 'remote-inbound-rtp') {
+          result.remoteInboundRtt = {
+            roundTripTime: (typeof stat.roundTripTime === 'number') ? stat.roundTripTime : null,
+            roundTripTimeMeasurements: stat.roundTripTimeMeasurements || 0,
+            kind: stat.kind,
+          };
+          return;
+        }
         if (stat.type === 'candidate-pair' && stat.nominated) {
           result.roundTripTime = stat.currentRoundTripTime || 0;
           // Find the local and remote candidate details
@@ -969,7 +994,12 @@ class ViewerCanaryTest {
 
   async runVideoVerification() {
     if (!this.recordingFilePath || !fs.existsSync(this.recordingFilePath)) {
-      log('No recording available for video verification, skipping');
+      log('No recording available for video verification, pushing ViewerStorageAvailability=0');
+      await CloudWatchMetrics.publishCountMetric(
+        this.getMetricName('ViewerStorageAvailability'),
+        this.config.channelName,
+        0
+      );
       return;
     }
 
@@ -1093,6 +1123,13 @@ class ViewerCanaryTest {
     let prevRTCStats = null;
     let prevRTCStatsTime = null;
 
+    // Active-viewers-per-session heartbeat — push every 60 seconds.
+    // Emitted to a SHARED metric name (no per-viewer suffix) under the channel dimension, so a
+    // CloudWatch SUM over a 1-minute period across all viewers of the session yields the count of
+    // viewers still active that minute. Each active viewer contributes exactly 1 per minute.
+    let lastActiveViewerPush = Date.now();
+    const activeViewerInterval = 60000;
+
     // Track RTCStats snapshots for final packet loss calculation
     this.firstRTCStats = null;
     this.lastRTCStats = null;
@@ -1144,6 +1181,21 @@ class ViewerCanaryTest {
           availability
         );
         lastAvailabilityPush = now;
+      }
+
+      // Push ActiveViewersPerSession heartbeat every 60 seconds.
+      // Shared metric name (NOT getMetricName — no per-viewer suffix) so that summing across all
+      // viewers on this channel per minute gives the active viewer count. Contributes 1 while the
+      // storage session is active, 0 otherwise (so a stalled viewer stops counting).
+      if (now - lastActiveViewerPush >= activeViewerInterval) {
+        const activeContribution = frameStats.storageSessionActive ? 1.0 : 0.0;
+        await CloudWatchMetrics.publishCountMetric(
+          `ActiveViewersPerSession${this.metricSuffix}`,
+          this.config.channelName,
+          activeContribution
+        );
+        log(`[Canary] ActiveViewersPerSession heartbeat: ${activeContribution} (channel=${this.config.channelName})`);
+        lastActiveViewerPush = now;
       }
 
       // Push periodic RTP metrics every 60 seconds
@@ -1338,6 +1390,22 @@ class ViewerCanaryTest {
           this.getMetricName('RoundTripTime'),
           this.config.channelName,
           rttMs
+        );
+      }
+
+      // RR-based Round Trip Time (RTCP Receiver Report) — from remote-inbound-rtp. This reflects the
+      // RTT the remote reports about the stream the VIEWER sends, so it only populates for AO/mixed
+      // viewers that send audio; video-only viewers send nothing, so it's gated on having at least
+      // one RTT measurement to avoid emitting a misleading 0.
+      if (this.lastRTCStats.remoteInboundRtt &&
+          this.lastRTCStats.remoteInboundRtt.roundTripTimeMeasurements > 0 &&
+          this.lastRTCStats.remoteInboundRtt.roundTripTime !== null) {
+        const rtcpRttMs = this.lastRTCStats.remoteInboundRtt.roundTripTime * 1000;
+        log(`Rtcp Round Trip Time (RR-based): ${rtcpRttMs.toFixed(2)}ms`);
+        await CloudWatchMetrics.publishMsMetric(
+          this.getMetricName('RtcpRoundTripTime'),
+          this.config.channelName,
+          rtcpRttMs
         );
       }
 

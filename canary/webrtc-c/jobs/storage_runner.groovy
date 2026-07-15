@@ -498,7 +498,15 @@ def buildStorageCanary(isConsumer, params) {
                 echo "Consumer video verification failed: ${err.getMessage()}"
             }
         } else {
-            echo "No GetClip MP4 found at ${clipPath}, skipping consumer video verification"
+            echo "No GetClip MP4 found at ${clipPath}, pushing ConsumerStorageAvailability=0"
+            sh """
+                aws cloudwatch put-metric-data \
+                    --namespace KinesisVideoSDKCanary \
+                    --region ${params.AWS_DEFAULT_REGION} \
+                    --metric-data \
+                        MetricName=ConsumerStorageAvailability,Value=0,Unit=Count,Dimensions="[{Name=StorageWebRTCSDKCanaryStreamName,Value=${streamName}},{Name=StorageWebRTCSDKCanaryLabel,Value=${scenarioLabel}}]"
+            """
+            echo "Pushed ConsumerStorageAvailability=0"
         }
     }
 }

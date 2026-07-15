@@ -608,6 +608,91 @@ VOID CloudwatchMonitoring::pushRoundTripTime(DOUBLE rttMs, Aws::CloudWatch::Mode
     this->push(datum);
 }
 
+VOID CloudwatchMonitoring::pushJitterBufferDelay(DOUBLE delayMs, Aws::CloudWatch::Model::StandardUnit unit)
+{
+    MetricDatum datum;
+
+    datum.SetMetricName("JitterBufferDelay");
+    datum.SetValue(delayMs);
+    datum.SetUnit(unit);
+
+    this->push(datum);
+}
+
+VOID CloudwatchMonitoring::pushDecodeTime(DOUBLE decodeMs, Aws::CloudWatch::Model::StandardUnit unit)
+{
+    MetricDatum datum;
+
+    datum.SetMetricName("DecodeTime");
+    datum.SetValue(decodeMs);
+    datum.SetUnit(unit);
+
+    this->push(datum);
+}
+
+VOID CloudwatchMonitoring::pushRtpVideoPacketsSentPerSecond(DOUBLE rate)
+{
+    MetricDatum datum;
+    datum.SetMetricName("RtpVideoPacketsSentPerSecond");
+    datum.SetValue(rate);
+    datum.SetUnit(Aws::CloudWatch::Model::StandardUnit::Count_Second);
+    this->push(datum);
+}
+
+VOID CloudwatchMonitoring::pushRtpVideoBytesSentPerSecond(DOUBLE rate)
+{
+    MetricDatum datum;
+    datum.SetMetricName("RtpVideoBytesSentPerSecond");
+    datum.SetValue(rate);
+    datum.SetUnit(Aws::CloudWatch::Model::StandardUnit::Bytes_Second);
+    this->push(datum);
+}
+
+VOID CloudwatchMonitoring::pushRtpAudioPacketsSentPerSecond(DOUBLE rate)
+{
+    MetricDatum datum;
+    datum.SetMetricName("RtpAudioPacketsSentPerSecond");
+    datum.SetValue(rate);
+    datum.SetUnit(Aws::CloudWatch::Model::StandardUnit::Count_Second);
+    this->push(datum);
+}
+
+VOID CloudwatchMonitoring::pushRtpAudioBytesSentPerSecond(DOUBLE rate)
+{
+    MetricDatum datum;
+    datum.SetMetricName("RtpAudioBytesSentPerSecond");
+    datum.SetValue(rate);
+    datum.SetUnit(Aws::CloudWatch::Model::StandardUnit::Bytes_Second);
+    this->push(datum);
+}
+
+VOID CloudwatchMonitoring::pushFractionLost(DOUBLE fractionLostPct, Aws::CloudWatch::Model::StandardUnit unit)
+{
+    MetricDatum datum;
+    datum.SetMetricName("FractionLost");
+    datum.SetValue(fractionLostPct);
+    datum.SetUnit(unit);
+    this->push(datum);
+}
+
+VOID CloudwatchMonitoring::pushRtcpRoundTripTime(DOUBLE rttMs, Aws::CloudWatch::Model::StandardUnit unit)
+{
+    MetricDatum datum;
+    datum.SetMetricName("RtcpRoundTripTime");
+    datum.SetValue(rttMs);
+    datum.SetUnit(unit);
+    this->push(datum);
+}
+
+VOID CloudwatchMonitoring::pushRtcpReportsReceived(DOUBLE reportsReceived, Aws::CloudWatch::Model::StandardUnit unit)
+{
+    MetricDatum datum;
+    datum.SetMetricName("RtcpReportsReceived");
+    datum.SetValue(reportsReceived);
+    datum.SetUnit(unit);
+    this->push(datum);
+}
+
 VOID CloudwatchMonitoring::pushPacketsSentPerSecond(DOUBLE rate)
 {
     MetricDatum datum;
