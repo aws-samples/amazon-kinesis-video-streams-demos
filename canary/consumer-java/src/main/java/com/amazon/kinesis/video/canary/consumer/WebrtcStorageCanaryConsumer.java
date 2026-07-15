@@ -100,11 +100,35 @@ public class WebrtcStorageCanaryConsumer {
                 Thread thread = new Thread(futureTask);
                 thread.start();
 
+                final int prevFragmentCount = fragmentList.getFragmentList().size();
                 List<Fragment> newFragmentList = futureTask.get();
                 // NOTE: The below newFragmentReceived logic assumes that fragments are not
                 // expiring, so stream retention must be greater than canary run duration.
-                if (newFragmentList.size() > fragmentList.getFragmentList().size()) {
+                if (newFragmentList.size() > prevFragmentCount) {
                     newFragmentReceived = true;
+                }
+
+                // IngestionIncomingBitrateKbps: bitrate of the fragments persisted to storage during
+                // this interval, computed from the fragments newly returned by ListFragments (delta
+                // over the previous count): sum(bytes)*8 / sum(seconds) / 1000. This is the storage
+                // (ingestion) side counterpart to the master's OutgoingBitrate and the viewer's
+                // IncomingBitrateKbps. Only emitted when new fragments with positive duration arrived.
+                if (newFragmentList.size() > prevFragmentCount) {
+                    long deltaBytes = 0;
+                    long deltaMillis = 0;
+                    for (int i = prevFragmentCount; i < newFragmentList.size(); i++) {
+                        Fragment f = newFragmentList.get(i);
+                        if (f.getFragmentSizeInBytes() != null) {
+                            deltaBytes += f.getFragmentSizeInBytes();
+                        }
+                        if (f.getFragmentLengthInMilliseconds() != null) {
+                            deltaMillis += f.getFragmentLengthInMilliseconds();
+                        }
+                    }
+                    if (deltaMillis > 0) {
+                        double ingestionBitrateKbps = (deltaBytes * 8.0) / (deltaMillis / 1000.0) / 1000.0;
+                        publishMetricToCW("IngestionIncomingBitrateKbps", ingestionBitrateKbps, StandardUnit.None);
+                    }
                 }
 
                 fragmentList.setFragmentList(newFragmentList);
