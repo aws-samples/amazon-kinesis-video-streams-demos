@@ -48,6 +48,16 @@ public final class CanaryConstants {
     public static final String GAMMA_PERIODIC_1MBPS_LABEL = "GammaStoragePeriodic-1mbps";
     public static final String GAMMA_PERIODIC_5MBPS_LABEL = "GammaStoragePeriodic-5mbps";
 
+    // Short-running Video+Audio master + Read-Only viewer (+ co-resident consumer), per bitrate
+    // asset set. Same short-duration periodic verification path as PERIODIC_LABEL; bitrate is
+    // kept in the label so the three variants stay distinguishable in metrics.
+    public static final String SHORT_VA_MASTER_RO_VIEWER_500KBPS_LABEL = "ShortVAMasterROViewer-500kbps";
+    public static final String SHORT_VA_MASTER_RO_VIEWER_1MBPS_LABEL = "ShortVAMasterROViewer-1mbps";
+    public static final String SHORT_VA_MASTER_RO_VIEWER_5MBPS_LABEL = "ShortVAMasterROViewer-5mbps";
+    public static final String GAMMA_SHORT_VA_MASTER_RO_VIEWER_500KBPS_LABEL = "GammaShortVAMasterROViewer-500kbps";
+    public static final String GAMMA_SHORT_VA_MASTER_RO_VIEWER_1MBPS_LABEL = "GammaShortVAMasterROViewer-1mbps";
+    public static final String GAMMA_SHORT_VA_MASTER_RO_VIEWER_5MBPS_LABEL = "GammaShortVAMasterROViewer-5mbps";
+
     public static final String CW_DIMENSION_INDIVIDUAL = "StorageWebRTCSDKCanaryStreamName";
     public static final String CW_DIMENSION_AGGREGATE = "StorageWebRTCSDKCanaryLabel";
 
