@@ -697,6 +697,30 @@ pipeline {
                         }
                     }
                 }
+                // Co-resident consumer: verifies storage from the SAME continuous master the viewer
+                // is watching, so master + consumer + viewer all exercise one session. Gated on
+                // VIDEO_VERIFY_ENABLED so plain viewer runs (no storage verification) are unaffected.
+                // Uses the same 156s window as the continuous master above.
+                stage('StorageConsumer') {
+                    when {
+                        equals expected: true, actual: params.VIDEO_VERIFY_ENABLED
+                    }
+                    agent {
+                        label params.CONSUMER_NODE_LABEL
+                    }
+                    steps {
+                        script {
+                            sh "touch '${env.WORKSPACE}/.in_use'"
+                            try {
+                                def mutableParams = [:] + params
+                                mutableParams.DURATION_IN_SECONDS = "156"
+                                buildStorageCanary(true, mutableParams)
+                            } finally {
+                                sh "rm -f '${env.WORKSPACE}/.in_use'"
+                            }
+                        }
+                    }
+                }
             }
         }
 
