@@ -798,6 +798,28 @@ pipeline {
                         }
                     }
                 }
+                // Co-resident consumer (see single-viewer stage). Gated on VIDEO_VERIFY_ENABLED so
+                // master + 2 viewers + consumer all exercise the same continuous master session.
+                stage('StorageConsumer') {
+                    when {
+                        equals expected: true, actual: params.VIDEO_VERIFY_ENABLED
+                    }
+                    agent {
+                        label params.CONSUMER_NODE_LABEL
+                    }
+                    steps {
+                        script {
+                            sh "touch '${env.WORKSPACE}/.in_use'"
+                            try {
+                                def mutableParams = [:] + params
+                                mutableParams.DURATION_IN_SECONDS = "156"
+                                buildStorageCanary(true, mutableParams)
+                            } finally {
+                                sh "rm -f '${env.WORKSPACE}/.in_use'"
+                            }
+                        }
+                    }
+                }
             }
         }
 
@@ -861,6 +883,28 @@ pipeline {
                                 ? params.VIEWER_WAIT_MINUTES.toInteger() 
                                 : 20
                             runViewerSessions("Viewer3", waitMins, "3")
+                        }
+                    }
+                }
+                // Co-resident consumer (see single-viewer stage). Gated on VIDEO_VERIFY_ENABLED so
+                // master + 3 viewers + consumer all exercise the same continuous master session.
+                stage('StorageConsumer') {
+                    when {
+                        equals expected: true, actual: params.VIDEO_VERIFY_ENABLED
+                    }
+                    agent {
+                        label params.CONSUMER_NODE_LABEL
+                    }
+                    steps {
+                        script {
+                            sh "touch '${env.WORKSPACE}/.in_use'"
+                            try {
+                                def mutableParams = [:] + params
+                                mutableParams.DURATION_IN_SECONDS = "156"
+                                buildStorageCanary(true, mutableParams)
+                            } finally {
+                                sh "rm -f '${env.WORKSPACE}/.in_use'"
+                            }
                         }
                     }
                 }
