@@ -12,6 +12,7 @@ import java.util.concurrent.Future;
 import java.lang.Exception;
 import java.text.MessageFormat;
 
+import com.amazonaws.ClientConfiguration;
 import com.amazonaws.auth.EnvironmentVariableCredentialsProvider;
 import com.amazonaws.regions.Regions;
 import com.amazonaws.services.cloudwatch.AmazonCloudWatch;
@@ -269,8 +270,23 @@ public class WebrtcStorageCanaryConsumer {
             final String clipEndpoint = mAmazonKinesisVideo.getDataEndpoint(endpointRequest).getDataEndpoint();
             logger.info("downloadClip: clipEndpoint=" + clipEndpoint);
 
+            // Bound the GetClip call so a stalled request can't hang the consumer
+            // indefinitely (root cause of the 2026-07 gamma queue pile-up, see
+            // canary/webrtc-c/docs/gamma-queue-pileup-investigation.md). A hung
+            // GetClip now surfaces as an exception caught below -> no clip file ->
+            // the runner reports ConsumerStorageAvailability=0 instead of wedging.
+            // The payload download itself is additionally bounded by the socket
+            // timeout (fires only after 60s of complete silence, so it never
+            // interrupts an active large-clip download).
+            ClientConfiguration clipClientConfig = new ClientConfiguration()
+                    .withConnectionTimeout(10 * 1000)
+                    .withSocketTimeout(60 * 1000)
+                    .withRequestTimeout(2 * 60 * 1000)
+                    .withClientExecutionTimeout(10 * 60 * 1000);
+
             AmazonKinesisVideoArchivedMedia archivedMediaClient = AmazonKinesisVideoArchivedMediaClient
                     .builder()
+                    .withClientConfiguration(clipClientConfig)
                     .withCredentials(mCredentialsProvider)
                     .withEndpointConfiguration(
                             new com.amazonaws.client.builder.AwsClientBuilder.EndpointConfiguration(

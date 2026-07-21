@@ -560,7 +560,18 @@ pipeline {
     }
     
     options {
-        lock(resource: "${params.RUNNER_LABEL}")
+        // Whole-pipeline hard timeout: scenario duration + 35 min buffer (incremental
+        // build ~2-5 min, viewer wait, consumer runs DURATION+120s, GetClip + verify).
+        // Guarantees the executor is always released even if any step hangs
+        // (GetClip, git, flock, viewer waits, ...).
+        //
+        // NOTE: the previous lock(resource: RUNNER_LABEL) was removed deliberately.
+        // Lock waiters block INSIDE an executor (agent is allocated before the lock),
+        // so one hung build turned every cron tick into a leaked executor and wedged
+        // the whole node (see docs/gamma-queue-pileup-investigation.md). Same-scenario
+        // concurrency is already prevented by the 'Skip if duplicate' stage, which
+        // exits in seconds instead of holding an executor.
+        timeout(time: params.DURATION_IN_SECONDS.toInteger() + 2100, unit: 'SECONDS')
     }
 
     environment {
