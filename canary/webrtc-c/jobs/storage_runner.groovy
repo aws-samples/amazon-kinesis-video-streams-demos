@@ -667,14 +667,14 @@ pipeline {
                 }
             }
             parallel {
-                stage('StorageMaster') {
+                stage('SingleNodeStorageMaster') {
                     steps {
                         script {
                             buildStorageCanary(false, params)
                         }
                     }
                 }
-                stage('StorageConsumer') {
+                stage('SingleNodeStorageConsumer') {
                     steps {
                         script {
                             buildStorageCanary(true, params)
@@ -689,7 +689,7 @@ pipeline {
                 equals expected: true, actual: params.JS_STORAGE_VIEWER_JOIN
             }
             parallel {
-                stage('Continuous StorageMaster') {
+                stage('ViewerContinuousMaster') {
                     agent {
                         label params.MASTER_NODE_LABEL
                     }
@@ -725,7 +725,9 @@ pipeline {
                 // is watching, so master + consumer + viewer all exercise one session. Gated on
                 // VIDEO_VERIFY_ENABLED so plain viewer runs (no storage verification) are unaffected.
                 // Uses the same 156s window as the continuous master above.
-                stage('StorageConsumer') {
+                // NOTE: stage name must be unique across the whole pipeline — duplicate stage names
+                // break Jenkins' per-stage log attribution (logs show up under the wrong stage).
+                stage('ViewerStorageConsumer') {
                     when {
                         equals expected: true, actual: params.VIDEO_VERIFY_ENABLED
                     }
@@ -753,7 +755,7 @@ pipeline {
                 equals expected: true, actual: params.JS_STORAGE_TWO_VIEWERS
             }
             parallel {
-                stage('Continuous StorageMaster') {
+                stage('TwoViewersContinuousMaster') {
                     agent {
                         label params.MASTER_NODE_LABEL
                     }
@@ -772,7 +774,7 @@ pipeline {
                         }
                     }
                 }
-                stage('StorageViewer1') {
+                stage('TwoViewersViewer1') {
                     agent {
                         label params.STORAGE_VIEWER_ONE_NODE_LABEL
                     }
@@ -785,7 +787,7 @@ pipeline {
                         }
                     }
                 }
-                stage('StorageViewer2') {
+                stage('TwoViewersViewer2') {
                     agent {
                         label params.STORAGE_VIEWER_TWO_NODE_LABEL
                     }
@@ -800,7 +802,7 @@ pipeline {
                 }
                 // Co-resident consumer (see single-viewer stage). Gated on VIDEO_VERIFY_ENABLED so
                 // master + 2 viewers + consumer all exercise the same continuous master session.
-                stage('StorageConsumer') {
+                stage('TwoViewersStorageConsumer') {
                     when {
                         equals expected: true, actual: params.VIDEO_VERIFY_ENABLED
                     }
@@ -828,7 +830,7 @@ pipeline {
                 equals expected: true, actual: params.JS_STORAGE_THREE_VIEWERS
             }
             parallel {
-                stage('Continuous StorageMaster') {
+                stage('ThreeViewersContinuousMaster') {
                     agent {
                         label params.MASTER_NODE_LABEL
                     }
@@ -847,7 +849,7 @@ pipeline {
                         }
                     }
                 }
-                stage('StorageViewer1') {
+                stage('ThreeViewersViewer1') {
                     agent {
                         label params.STORAGE_VIEWER_ONE_NODE_LABEL
                     }
@@ -860,7 +862,7 @@ pipeline {
                         }
                     }
                 }
-                stage('StorageViewer2') {
+                stage('ThreeViewersViewer2') {
                     agent {
                         label params.STORAGE_VIEWER_TWO_NODE_LABEL
                     }
@@ -888,7 +890,7 @@ pipeline {
                 }
                 // Co-resident consumer (see single-viewer stage). Gated on VIDEO_VERIFY_ENABLED so
                 // master + 3 viewers + consumer all exercise the same continuous master session.
-                stage('StorageConsumer') {
+                stage('ThreeViewersStorageConsumer') {
                     when {
                         equals expected: true, actual: params.VIDEO_VERIFY_ENABLED
                     }
