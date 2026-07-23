@@ -465,10 +465,6 @@ pipeline {
         string(name: 'JS_BRANCH', defaultValue: 'master', description: 'JS SDK branch name to clone and serve locally (default: master)')
     }
     
-    options {
-        lock(resource: "${params.RUNNER_LABEL}")
-    }
-
     environment {
         AWS_KVS_STS_ROLE_ARN = credentials('CANARY_STS_ROLE_ARN')
     }
