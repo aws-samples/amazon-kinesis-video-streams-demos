@@ -561,6 +561,7 @@ pipeline {
         string(name: 'CANARY_ASSET_PREFIX', defaultValue: '', description: 'S3 key prefix for frame-set tarballs, e.g. webrtc-canary/frame-sets/v1 (required when STORAGE_ASSET_SET is set)')
         string(name: 'CANARY_ASSET_REGION', defaultValue: '', description: 'Region of the S3 asset bucket. May differ from AWS_DEFAULT_REGION. Empty falls back to AWS_DEFAULT_REGION.')
         string(name: 'JS_BRANCH', defaultValue: 'master', description: 'JS SDK branch name to clone and serve locally (default: master)')
+        string(name: 'STS_DURATION_SECONDS', defaultValue: '43200', description: 'STS session duration. Use 3600 for nodes with role-chained credentials (e.g. rpi5-master, whose IoT-certificate base credentials cap chained sessions at 1 hour).')
     }
     
     options {
@@ -615,7 +616,11 @@ pipeline {
                     // Mark workspace as in-use to prevent cron cleanup
                     sh "touch '${env.WORKSPACE}/.in_use'"
 
-                    def assumeRoleOutput = sh(script: 'aws sts assume-role --role-arn $AWS_KVS_STS_ROLE_ARN --role-session-name roleSessionName --duration-seconds 43200 --output json',
+                    // Role-chained credentials (e.g. the Raspberry Pi node's IoT-certificate
+                    // base credentials) are hard-capped at 3600s by STS; EC2 instance-profile
+                    // nodes can use the full 43200s.
+                    def stsDuration = params.STS_DURATION_SECONDS ?: '43200'
+                    def assumeRoleOutput = sh(script: "aws sts assume-role --role-arn \$AWS_KVS_STS_ROLE_ARN --role-session-name roleSessionName --duration-seconds ${stsDuration} --output json",
                                                 returnStdout: true).trim()
                     def assumeRoleJson = readJSON text: assumeRoleOutput
 
