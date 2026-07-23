@@ -474,6 +474,26 @@ pipeline {
     }
 
     stages {
+        stage('Skip if duplicate') {
+            steps {
+                script {
+                    // Dedup on the scenario identifier so distinct scenarios don't skip each other.
+                    // Fall back to RUNNER_LABEL if SCENARIO_LABEL is unset.
+                    def myLabel = params.SCENARIO_LABEL ?: params.RUNNER_LABEL
+                    def runningBuilds = Jenkins.instance.getItemByFullName(env.JOB_NAME).builds.findAll { b ->
+                        b.isBuilding() && b.number != currentBuild.number &&
+                        (b.getAction(hudson.model.ParametersAction)?.getParameter('SCENARIO_LABEL')?.value ?:
+                         b.getAction(hudson.model.ParametersAction)?.getParameter('RUNNER_LABEL')?.value) == myLabel
+                    }
+                    if (runningBuilds) {
+                        echo "Another ${myLabel} build is already running (#${runningBuilds[0].number}), skipping"
+                        currentBuild.result = 'NOT_BUILT'
+                        error("Duplicate skipped")
+                    }
+                }
+            }
+        }
+
         stage('Fetch STS credentials') {
             steps {
                 script {
@@ -747,6 +767,8 @@ pipeline {
 
                 if (currentBuild.result == 'ABORTED' || IS_ABORTED) {
                     echo "Build was aborted, skipping reschedule"
+                } else if (currentBuild.result == 'NOT_BUILT') {
+                    echo "Build was skipped as a duplicate, skipping reschedule"
                 } else if (params.RESCHEDULE) {
                     def rescheduleParams = [
                         string(name: 'AWS_KVS_LOG_LEVEL', value: params.AWS_KVS_LOG_LEVEL),
