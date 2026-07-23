@@ -488,6 +488,7 @@ pipeline {
         booleanParam(name: 'NO_LOOP_FRAMES', defaultValue: false, description: 'Stop after sending all frames once instead of looping')
         string(name: 'STORAGE_FPS', defaultValue: '', description: 'Override storage master frame rate (e.g., 10 for low FPS test). Empty uses default 30 fps.')
         string(name: 'JS_BRANCH', defaultValue: 'master', description: 'JS SDK branch name to clone and serve locally (default: master)')
+        string(name: 'STS_DURATION_SECONDS', defaultValue: '43200', description: 'STS session duration. Use 3600 for nodes with role-chained credentials (e.g. rpi5-master, whose IoT-certificate base credentials cap chained sessions at 1 hour).')
     }
     
     environment {
@@ -518,7 +519,11 @@ pipeline {
                     // Mark workspace as in-use to prevent cron cleanup
                     sh "touch '${env.WORKSPACE}/.in_use'"
 
-                    def assumeRoleOutput = sh(script: 'aws sts assume-role --role-arn $AWS_KVS_STS_ROLE_ARN --role-session-name roleSessionName --duration-seconds 43200 --output json',
+                    // Role-chained credentials (e.g. the Raspberry Pi node's IoT-certificate
+                    // base credentials) are hard-capped at 3600s by STS; EC2 instance-profile
+                    // nodes can use the full 43200s.
+                    def stsDuration = params.STS_DURATION_SECONDS ?: '43200'
+                    def assumeRoleOutput = sh(script: "aws sts assume-role --role-arn \$AWS_KVS_STS_ROLE_ARN --role-session-name roleSessionName --duration-seconds ${stsDuration} --output json",
                                                 returnStdout: true).trim()
                     def assumeRoleJson = readJSON text: assumeRoleOutput
 
