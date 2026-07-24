@@ -572,6 +572,12 @@ pipeline {
         // concurrency is already prevented by the 'Skip if duplicate' stage, which
         // exits in seconds instead of holding an executor.
         timeout(time: params.DURATION_IN_SECONDS.toInteger() + 2100, unit: 'SECONDS')
+        // Skip the declarative per-stage automatic SCM checkout (matches storage_runner).
+        // Without this, every stage with an agent does a 'git checkout' into the node's
+        // DEFAULT workspace; with all viewer stages sharing one viewer node, an aborted
+        // checkout leaves a stale .git/index.lock that fails every subsequent build.
+        // Stages fetch what they need themselves (repo under $HOME, ws() workspaces).
+        skipDefaultCheckout()
     }
 
     environment {
