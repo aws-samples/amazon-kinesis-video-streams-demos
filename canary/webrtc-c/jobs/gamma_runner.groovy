@@ -519,11 +519,15 @@ pipeline {
     parameters {
         string(name: 'AWS_KVS_LOG_LEVEL', defaultValue: '2')
         string(name: 'LOG_GROUP_NAME', defaultValue: 'WebrtcSDK')
-        string(name: 'MASTER_NODE_LABEL', defaultValue: 'webrtc-storage-master')
-        string(name: 'STORAGE_VIEWER_NODE_LABEL', defaultValue: 'webrtc-storage-viewer')
-        string(name: 'STORAGE_VIEWER_ONE_NODE_LABEL', defaultValue: 'webrtc-storage-multi-viewer-1')
-        string(name: 'STORAGE_VIEWER_TWO_NODE_LABEL', defaultValue: 'webrtc-storage-multi-viewer-2')
-        string(name: 'STORAGE_VIEWER_THREE_NODE_LABEL', defaultValue: 'webrtc-storage-consumer')
+        // Node label defaults MUST point at gamma nodes. These used to default to the
+        // prod labels (webrtc-storage-*), so any cron entry or manual run that forgot
+        // to override them silently landed gamma work on prod hosts (shared build-dir
+        // wipes, executor contention).
+        string(name: 'MASTER_NODE_LABEL', defaultValue: 'gamma-webrtc-storage-master')
+        string(name: 'STORAGE_VIEWER_NODE_LABEL', defaultValue: 'gamma-webrtc-storage-viewer')
+        string(name: 'STORAGE_VIEWER_ONE_NODE_LABEL', defaultValue: 'gamma-webrtc-storage-viewer')
+        string(name: 'STORAGE_VIEWER_TWO_NODE_LABEL', defaultValue: 'gamma-webrtc-storage-viewer')
+        string(name: 'STORAGE_VIEWER_THREE_NODE_LABEL', defaultValue: 'gamma-webrtc-storage-viewer')
         string(name: 'RUNNER_LABEL', defaultValue: 'GammaTest')
         string(name: 'SCENARIO_LABEL', defaultValue: 'GammaTest')
         string(name: 'DURATION_IN_SECONDS', defaultValue: '156')
@@ -540,7 +544,7 @@ pipeline {
         booleanParam(name: 'IS_STORAGE', defaultValue: false, description: 'Run storage master + consumer test')
         booleanParam(name: 'IS_STORAGE_SINGLE_NODE', defaultValue: false, description: 'Run master and consumer on same node')
         booleanParam(name: 'VIDEO_VERIFY_ENABLED', defaultValue: false, description: 'Enable consumer-side video verification via GetClip')
-        string(name: 'CONSUMER_NODE_LABEL', defaultValue: 'webrtc-storage-consumer')
+        string(name: 'CONSUMER_NODE_LABEL', defaultValue: 'gamma-webrtc-storage-consumer')
         booleanParam(name: 'JS_STORAGE_VIEWER_JOIN', defaultValue: false)
         booleanParam(name: 'JS_STORAGE_TWO_VIEWERS', defaultValue: false)
         booleanParam(name: 'JS_STORAGE_THREE_VIEWERS', defaultValue: false)
@@ -722,6 +726,10 @@ pipeline {
                 // break Jenkins' per-stage log attribution (logs show up under the wrong stage).
                 stage('ViewerStorageConsumer') {
                     when {
+                        // beforeAgent: evaluate the gate BEFORE allocating the consumer node.
+                        // Without it, declarative allocates the agent first, so a disabled
+                        // consumer still consumed an executor on CONSUMER_NODE_LABEL every run.
+                        beforeAgent true
                         equals expected: true, actual: params.VIDEO_VERIFY_ENABLED
                     }
                     agent {
@@ -797,6 +805,7 @@ pipeline {
                 // master + 2 viewers + consumer all exercise the same continuous master session.
                 stage('TwoViewersStorageConsumer') {
                     when {
+                        beforeAgent true
                         equals expected: true, actual: params.VIDEO_VERIFY_ENABLED
                     }
                     agent {
@@ -885,6 +894,7 @@ pipeline {
                 // master + 3 viewers + consumer all exercise the same continuous master session.
                 stage('ThreeViewersStorageConsumer') {
                     when {
+                        beforeAgent true
                         equals expected: true, actual: params.VIDEO_VERIFY_ENABLED
                     }
                     agent {
