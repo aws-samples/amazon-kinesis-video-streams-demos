@@ -129,9 +129,10 @@ if [ "$NEED_REBUILD" = "true" ]; then
 
     CMAKE_FLAGS="-DCMAKE_BUILD_TYPE=Debug -DCMAKE_INSTALL_PREFIX=${BUILD_DIR}"
     # GStreamer media source (physical camera / RTSP / test source) for the
-    # storage canary. Defaults ON; export ENABLE_GST_MEDIA_SOURCE=OFF to build
-    # without it (e.g. on a host missing libgstreamer1.0-dev).
-    CMAKE_FLAGS="$CMAKE_FLAGS -DENABLE_GST_MEDIA_SOURCE=${ENABLE_GST_MEDIA_SOURCE:-ON}"
+    # storage canary. Defaults OFF so hosts without libgstreamer1.0-dev build as
+    # before; jobs that need the camera path (e.g. RPi) set
+    # ENABLE_GST_MEDIA_SOURCE=ON in their environment.
+    CMAKE_FLAGS="$CMAKE_FLAGS -DENABLE_GST_MEDIA_SOURCE=${ENABLE_GST_MEDIA_SOURCE:-OFF}"
     if [ "$TLS_BACKEND" = "mbedtls" ]; then
         CMAKE_FLAGS="$CMAKE_FLAGS -DCANARY_USE_OPENSSL=OFF -DCANARY_USE_MBEDTLS=ON"
     fi
