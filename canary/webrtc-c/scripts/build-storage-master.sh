@@ -98,6 +98,23 @@ echo "webrtc-c dependency version: $CURRENT_WEBRTC_VERSION"
 # ---------------------------------------------------------------------------
 # 3. Check if rebuild is needed
 # ---------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
+# Derive GStreamer support from the job's runtime media source: any non-disk
+# CANARY_MEDIA_SOURCE (devicesrc / testsrc / rtspsrc) requires the GStreamer
+# build. ENABLE_GST_MEDIA_SOURCE, if set explicitly, overrides the derivation.
+# ---------------------------------------------------------------------------
+if [ -z "${ENABLE_GST_MEDIA_SOURCE:-}" ]; then
+    MEDIA_SOURCE="${CANARY_MEDIA_SOURCE:-disk}"
+    if [ "$MEDIA_SOURCE" != "disk" ]; then
+        ENABLE_GST_MEDIA_SOURCE=ON
+    else
+        ENABLE_GST_MEDIA_SOURCE=OFF
+    fi
+fi
+echo "GStreamer media source: ${ENABLE_GST_MEDIA_SOURCE} (CANARY_MEDIA_SOURCE='${CANARY_MEDIA_SOURCE:-}')"
+CURRENT_BUILD_FLAGS="gst=${ENABLE_GST_MEDIA_SOURCE}"
+BUILD_FLAGS_FILE="${BUILD_HOME}/.build-flags"
+
 CACHED_COMMIT=$(cat "$COMMIT_FILE" 2>/dev/null || echo "")
 CACHED_WEBRTC_VERSION=$(cat "$WEBRTC_VERSION_FILE" 2>/dev/null || echo "")
 BINARY_PATH="${BUILD_DIR}/kvsWebrtcStorageSample"
@@ -115,6 +132,9 @@ elif [ "$CURRENT_COMMIT" != "$CACHED_COMMIT" ]; then
 elif [ "$CURRENT_WEBRTC_VERSION" != "$CACHED_WEBRTC_VERSION" ]; then
     echo "webrtc-c version changed ($CACHED_WEBRTC_VERSION -> $CURRENT_WEBRTC_VERSION), rebuild needed"
     NEED_REBUILD=true
+elif [ "$CURRENT_BUILD_FLAGS" != "$(cat "$BUILD_FLAGS_FILE" 2>/dev/null || echo "")" ]; then
+    echo "Build flags changed ($(cat "$BUILD_FLAGS_FILE" 2>/dev/null || echo "<none>") -> $CURRENT_BUILD_FLAGS), rebuild needed"
+    NEED_REBUILD=true
 else
     echo "No changes detected, skipping build"
 fi
@@ -128,11 +148,8 @@ if [ "$NEED_REBUILD" = "true" ]; then
     echo "Building... (log: $BUILD_LOG)"
 
     CMAKE_FLAGS="-DCMAKE_BUILD_TYPE=Debug -DCMAKE_INSTALL_PREFIX=${BUILD_DIR}"
-    # GStreamer media source (physical camera / RTSP / test source) for the
-    # storage canary. Defaults OFF so hosts without libgstreamer1.0-dev build as
-    # before; jobs that need the camera path (e.g. RPi) set
-    # ENABLE_GST_MEDIA_SOURCE=ON in their environment.
-    CMAKE_FLAGS="$CMAKE_FLAGS -DENABLE_GST_MEDIA_SOURCE=${ENABLE_GST_MEDIA_SOURCE:-OFF}"
+    # GStreamer media source, derived above from CANARY_MEDIA_SOURCE
+    CMAKE_FLAGS="$CMAKE_FLAGS -DENABLE_GST_MEDIA_SOURCE=${ENABLE_GST_MEDIA_SOURCE}"
     if [ "$TLS_BACKEND" = "mbedtls" ]; then
         CMAKE_FLAGS="$CMAKE_FLAGS -DCANARY_USE_OPENSSL=OFF -DCANARY_USE_MBEDTLS=ON"
     fi
@@ -161,6 +178,7 @@ if [ "$NEED_REBUILD" = "true" ]; then
     # -----------------------------------------------------------------------
     echo "$CURRENT_COMMIT" > "$COMMIT_FILE"
     echo "$CURRENT_WEBRTC_VERSION" > "$WEBRTC_VERSION_FILE"
+    echo "$CURRENT_BUILD_FLAGS" > "$BUILD_FLAGS_FILE"
 
     # Clean up old logs (keep last 10)
     ls -1t "$LOGS_DIR"/build-*.log 2>/dev/null | tail -n +11 | xargs rm -f 2>/dev/null || true
