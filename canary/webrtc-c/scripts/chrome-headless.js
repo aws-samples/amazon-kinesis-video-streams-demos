@@ -100,7 +100,15 @@ class ViewerCanaryTest {
     this.browser = null;
     this.page = null;
 
-    // Video recording state
+    // Video recording state. A MediaRecorder is bound to one MediaStream, so every
+    // reconnect (new remote stream) needs a fresh recorder writing to a fresh segment
+    // file — finished segments are collected here for verification at the end.
+    this.recordingSegments = [];
+    this._chunkSinkExposed = false;
+    // framesReceived is re-armed (set false) on reconnect to restart recording;
+    // these two track run-wide one-shot state independently of that re-arming.
+    this.everReceivedFrames = false;
+    this.firstFrameMetricsPushed = false;
     this.isRecording = false;
     this.recordingFilePath = null;
     this.recordingWriteStream = null;
@@ -550,6 +558,21 @@ class ViewerCanaryTest {
         this.connectionAttempts++;
         this.lastPeerConnectionState = 'connecting';
         log(`Viewer reconnect attempt detected! Count: ${this.viewerReconnectCount}, total attempts: ${this.connectionAttempts}`);
+
+        // The old MediaStream's tracks are dead, so the MediaRecorder bound to it has
+        // stopped (or is about to). Finalize the current segment and re-arm first-frame
+        // detection so the monitor loop restarts recording on the NEW stream — otherwise
+        // everything streamed after the reconnect goes unrecorded and verification
+        // falsely reports low availability.
+        if (this.isRecording) {
+          try {
+            await this.stopRecording(page);
+            log(`Recording segment finalized on reconnect (${this.recordingSegments.length} segment(s) so far)`);
+          } catch (err) {
+            log(`Failed to finalize recording segment on reconnect: ${err.message}`);
+          }
+        }
+        this.framesReceived = false;
       }
       
       // Detect storage session join error (single failure or retry failure)
@@ -887,11 +910,16 @@ class ViewerCanaryTest {
 
     // Expose a Node function so the browser can stream video chunks to disk.
     // Each chunk arrives as an array of byte values since Blobs can't cross the bridge.
-    await page.exposeFunction('_saveVideoChunk', (bytes) => {
-      if (this.recordingWriteStream) {
-        this.recordingWriteStream.write(Buffer.from(bytes));
-      }
-    });
+    // exposeFunction can only be called once per page, so guard for re-recording after
+    // a reconnect; the callback writes to whatever the CURRENT segment's stream is.
+    if (!this._chunkSinkExposed) {
+      await page.exposeFunction('_saveVideoChunk', (bytes) => {
+        if (this.recordingWriteStream) {
+          this.recordingWriteStream.write(Buffer.from(bytes));
+        }
+      });
+      this._chunkSinkExposed = true;
+    }
 
     const mimeType = await page.evaluate(() => {
       const remoteVideo = document.querySelector('.remote-view');
@@ -964,6 +992,9 @@ class ViewerCanaryTest {
 
   async stopRecording(page) {
     if (!this.isRecording) return;
+    // Flip the flag at entry so concurrent callers (e.g. a reconnect console event
+    // racing final cleanup) can't double-finalize the same segment.
+    this.isRecording = false;
 
     try {
       // Stop the MediaRecorder in the browser and wait for the final chunk
@@ -988,12 +1019,24 @@ class ViewerCanaryTest {
       this.recordingWriteStream.end();
       this.recordingWriteStream = null;
     }
-    this.isRecording = false;
+    if (this.recordingFilePath && !this.recordingSegments.includes(this.recordingFilePath)) {
+      this.recordingSegments.push(this.recordingFilePath);
+    }
     log(`Recording saved: ${this.recordingFilePath}`);
   }
 
   async runVideoVerification() {
-    if (!this.recordingFilePath || !fs.existsSync(this.recordingFilePath)) {
+    // A session with reconnects produces one recording segment per connection.
+    // All segments are handed to verify.py together and judged as one logical
+    // recording (verify.py sums durations/frame counts before applying the
+    // session-wide thresholds — a single segment alone would fail the
+    // duration/frame-count gates even if its content is perfect).
+    const candidates = [...this.recordingSegments];
+    if (this.recordingFilePath && !candidates.includes(this.recordingFilePath)) {
+      candidates.push(this.recordingFilePath);
+    }
+    const existing = candidates.filter(p => p && fs.existsSync(p));
+    if (existing.length === 0) {
       log('No recording available for video verification, pushing ViewerStorageAvailability=0');
       await CloudWatchMetrics.publishCountMetric(
         this.getMetricName('ViewerStorageAvailability'),
@@ -1001,6 +1044,9 @@ class ViewerCanaryTest {
         0
       );
       return;
+    }
+    if (existing.length > 1) {
+      log(`Verifying ${existing.length} recording segments as one logical session: ${existing.join(', ')}`);
     }
 
     const scriptDir = path.dirname(process.argv[1] || __filename);
@@ -1020,11 +1066,12 @@ class ViewerCanaryTest {
         log(`Video verification venv not found at ${venvPython} — run setup-storage-viewer.sh first`);
         return;
       }
-      const cmd = `"${venvPython}" "${verifyScript}" --recording "${this.recordingFilePath}" --source-frames "${sourceFrames}" --json`;
+      const recordingArgs = existing.map(p => `"${p}"`).join(' ');
+      const cmd = `"${venvPython}" "${verifyScript}" --recording ${recordingArgs} --source-frames "${sourceFrames}" --json`;
       const output = execSync(cmd, { encoding: 'utf-8', timeout: 600000 });
       const results = JSON.parse(output.trim());
 
-      log(`Video verification results: availability=${results.storage_availability}, avg SSIM=${results.avg_ssim}, min SSIM=${results.min_ssim}, max SSIM=${results.max_ssim}, compared=${results.frames_compared}`);
+      log(`Video verification results: availability=${results.storage_availability}, avg SSIM=${results.avg_ssim}, min SSIM=${results.min_ssim}, max SSIM=${results.max_ssim}, compared=${results.frames_compared}, segments=${results.segments}`);
 
       await CloudWatchMetrics.publishCountMetric(
         this.getMetricName('ViewerStorageAvailability'),
@@ -1053,9 +1100,9 @@ class ViewerCanaryTest {
       log(`Video verification failed: ${error.message}`);
     }
 
-    // Preserve recording for manual verification
-    if (this.recordingFilePath && fs.existsSync(this.recordingFilePath)) {
-      log(`Viewer recording preserved at: ${this.recordingFilePath}`);
+    // Preserve recordings for manual verification
+    for (const segment of existing) {
+      log(`Viewer recording preserved at: ${segment}`);
     }
   }
 
@@ -1074,26 +1121,36 @@ class ViewerCanaryTest {
       }
     }
     
-    const frameDetectionTime = Date.now() - this.sessionStartTime;
-    await CloudWatchMetrics.publishMsMetric(
-      this.getMetricName('TimeToFirstFrame'),
-      this.config.channelName,
-      frameDetectionTime
-    );
+    // This handler re-fires after a reconnect (framesReceived is re-armed) so that
+    // recording restarts on the new stream. The first-frame latency metrics must only
+    // be pushed once per run: TimeToFirstFrame is measured from sessionStartTime,
+    // which is never reset, so a re-push after a reconnect would inject an inflated
+    // datapoint into the metric.
+    if (!this.firstFrameMetricsPushed) {
+      this.firstFrameMetricsPushed = true;
 
-    // Calculate Join API call to first frame received
-    if (this.joinSSCallTime) {
-      const joinToFirstFrame = Date.now() - this.joinSSCallTime;
-      log(`TimeToFirstFrame from Join API: ${joinToFirstFrame}ms`);
-      
+      const frameDetectionTime = Date.now() - this.sessionStartTime;
       await CloudWatchMetrics.publishMsMetric(
-        this.getMetricName('JoinSSToFirstFrame'),
+        this.getMetricName('TimeToFirstFrame'),
         this.config.channelName,
-        joinToFirstFrame
+        frameDetectionTime
       );
+
+      // Calculate Join API call to first frame received
+      if (this.joinSSCallTime) {
+        const joinToFirstFrame = Date.now() - this.joinSSCallTime;
+        log(`TimeToFirstFrame from Join API: ${joinToFirstFrame}ms`);
+        
+        await CloudWatchMetrics.publishMsMetric(
+          this.getMetricName('JoinSSToFirstFrame'),
+          this.config.channelName,
+          joinToFirstFrame
+        );
+      }
     }
     
     this.framesReceived = true;
+    this.everReceivedFrames = true;
 
     // Start recording the viewer's video stream
     await this.startRecording(page);
@@ -1278,7 +1335,7 @@ class ViewerCanaryTest {
     const metrics = {
       success: this.storageSessionJoined,
       storageSessionJoined: this.storageSessionJoined,
-      framesReceived: this.framesReceived,
+      framesReceived: this.everReceivedFrames,
       timestamp: Date.now()
     };
     

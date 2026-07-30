@@ -184,7 +184,11 @@ def compute_ssim(img_path_a, img_path_b):
 def main():
     parser = argparse.ArgumentParser(
         description='Verify received video against source frames for StorageAvailability')
-    parser.add_argument('--recording', required=True, help='Path to received video')
+    parser.add_argument('--recording', required=True, nargs='+',
+                        help='Path(s) to received video. A viewer session that reconnects '
+                             'produces one recording segment per connection; pass all of '
+                             'them and they are verified as one logical recording '
+                             '(durations and frame counts are summed before thresholds).')
     parser.add_argument('--source-frames', required=True, help='Path to H.264 source frames directory')
     parser.add_argument('--expected-duration', type=float, default=EXPECTED_DURATION,
                         help=f'Expected duration in seconds (default: {EXPECTED_DURATION})')
@@ -198,8 +202,14 @@ def main():
         import builtins, functools
         builtins.print = functools.partial(builtins.print, file=sys.stderr)
 
-    if not os.path.exists(args.recording):
-        print(f"Recording not found: {args.recording}", file=sys.stderr)
+    recordings = []
+    for rec in args.recording:
+        if os.path.exists(rec):
+            recordings.append(rec)
+        else:
+            print(f"Recording not found (skipping): {rec}", file=sys.stderr)
+    if not recordings:
+        print("No recordings found", file=sys.stderr)
         sys.exit(1)
     if not os.path.isdir(args.source_frames):
         print(f"Source frames directory not found: {args.source_frames}", file=sys.stderr)
@@ -215,30 +225,44 @@ def main():
             print("Failed to build reference video", file=sys.stderr)
             sys.exit(1)
 
-        # Phase 2: Duration and frame count check
+        # Phase 2: Duration and frame count check — summed across all segments so a
+        # reconnected session (multiple files) is judged against the same session-wide
+        # thresholds as a single uninterrupted recording.
         print("\n--- Phase 2: Duration and frame count ---")
-        clip_duration = get_video_duration(args.recording)
         expected = args.expected_duration
+        clip_duration = None
+        clip_total_frames = 0
+        for rec in recordings:
+            seg_duration = get_video_duration(rec)
+            if seg_duration is not None:
+                clip_duration = (clip_duration or 0.0) + seg_duration
 
-        # Get total frame count of the clip
-        fc_cmd = [
-            'ffprobe', '-v', 'error', '-select_streams', 'v:0',
-            '-count_frames', '-show_entries', 'stream=nb_read_frames',
-            '-of', 'default=noprint_wrappers=1:nokey=1', args.recording
-        ]
-        fc_result = subprocess.run(fc_cmd, capture_output=True, text=True)
-        try:
-            clip_total_frames = int(fc_result.stdout.strip())
-        except ValueError:
-            clip_total_frames = 0
+            fc_cmd = [
+                'ffprobe', '-v', 'error', '-select_streams', 'v:0',
+                '-count_frames', '-show_entries', 'stream=nb_read_frames',
+                '-of', 'default=noprint_wrappers=1:nokey=1', rec
+            ]
+            fc_result = subprocess.run(fc_cmd, capture_output=True, text=True)
+            try:
+                seg_frames = int(fc_result.stdout.strip())
+            except ValueError:
+                seg_frames = 0
+            clip_total_frames += seg_frames
+            print(f"  segment {rec}: duration={seg_duration if seg_duration is not None else 'N/A'}s frames={seg_frames}")
 
-        print(f"Clip duration:      {clip_duration:.2f}s")
+        print(f"Segments:           {len(recordings)}")
+        print(f"Clip duration:      {clip_duration:.2f}s" if clip_duration is not None else "Clip duration:      N/A")
         print(f"Clip total frames:  {clip_total_frames}")
         print(f"Expected duration:  {expected:.2f}s")
 
-        # Phase 3: Extract 1fps from clip
+        # Phase 3: Extract 1fps from every segment into a combined frame list. Order
+        # across segments doesn't matter — OCR maps each frame back to its source
+        # frame number independently.
         print("\n--- Phase 3: Extracting clip frames at 1 FPS ---")
-        clip_frames = extract_frames_1fps(args.recording, os.path.join(work_dir, 'clip'))
+        clip_frames = []
+        for idx, rec in enumerate(recordings):
+            clip_frames.extend(
+                extract_frames_1fps(rec, os.path.join(work_dir, f'clip-{idx}')))
         if not clip_frames:
             print("Failed to extract clip frames", file=sys.stderr)
             sys.exit(1)
@@ -284,7 +308,8 @@ def main():
         if not scores:
             print("No frames compared!", file=sys.stderr)
             result = {'storage_availability': 0, 'clip_duration': clip_duration,
-                      'frames_compared': 0, 'ocr_failures': ocr_failures}
+                      'frames_compared': 0, 'ocr_failures': ocr_failures,
+                      'segments': len(recordings)}
         else:
             avg_ssim = sum(scores) / len(scores)
             max_ssim = max(scores)
@@ -315,6 +340,7 @@ def main():
                 'ocr_failures': ocr_failures,
                 'clip_duration': round(clip_duration, 2) if clip_duration else None,
                 'expected_duration': round(expected, 2),
+                'segments': len(recordings),
             }
 
         if args.json_output:
