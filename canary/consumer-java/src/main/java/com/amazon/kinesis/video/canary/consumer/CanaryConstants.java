@@ -48,6 +48,16 @@ public final class CanaryConstants {
     public static final String GAMMA_PERIODIC_1MBPS_LABEL = "GammaStoragePeriodic-1mbps";
     public static final String GAMMA_PERIODIC_5MBPS_LABEL = "GammaStoragePeriodic-5mbps";
 
+    // Viewer scenarios with a co-resident consumer (VIDEO_VERIFY_ENABLED). The consumer runs
+    // the same short-duration periodic verification path as PERIODIC_LABEL; the label carries
+    // the scenario name so metrics and dedup stay per-scenario.
+    public static final String WITH_VIEWER_LABEL = "StorageWithViewer";
+    public static final String TWO_VIEWERS_LABEL = "StorageTwoViewers";
+    public static final String THREE_VIEWERS_LABEL = "StorageThreeViewers";
+    public static final String GAMMA_WITH_VIEWER_LABEL = "GammaStorageWithViewer";
+    public static final String GAMMA_TWO_VIEWERS_LABEL = "GammaStorageTwoViewers";
+    public static final String GAMMA_THREE_VIEWERS_LABEL = "GammaStorageThreeViewers";
+
     // Short-running Video+Audio master + Read-Only viewer (+ co-resident consumer), per bitrate
     // asset set. Same short-duration periodic verification path as PERIODIC_LABEL; bitrate is
     // kept in the label so the three variants stay distinguishable in metrics.

@@ -393,7 +393,15 @@ public class WebrtcStorageCanaryConsumer {
             case CanaryConstants.SHORT_VA_MASTER_RO_VIEWER_5MBPS_LABEL:
             case CanaryConstants.GAMMA_SHORT_VA_MASTER_RO_VIEWER_500KBPS_LABEL:
             case CanaryConstants.GAMMA_SHORT_VA_MASTER_RO_VIEWER_1MBPS_LABEL:
-            case CanaryConstants.GAMMA_SHORT_VA_MASTER_RO_VIEWER_5MBPS_LABEL: {
+            case CanaryConstants.GAMMA_SHORT_VA_MASTER_RO_VIEWER_5MBPS_LABEL:
+            // Viewer scenarios with a co-resident consumer (VIDEO_VERIFY_ENABLED): same
+            // short-duration verification path (GetMedia TTFF + fragment continuity + GetClip).
+            case CanaryConstants.WITH_VIEWER_LABEL:
+            case CanaryConstants.TWO_VIEWERS_LABEL:
+            case CanaryConstants.THREE_VIEWERS_LABEL:
+            case CanaryConstants.GAMMA_WITH_VIEWER_LABEL:
+            case CanaryConstants.GAMMA_TWO_VIEWERS_LABEL:
+            case CanaryConstants.GAMMA_THREE_VIEWERS_LABEL: {
                 logger.info("Periodic case: canaryRunTime=" + canaryRunTime
                         + "s, mCanaryStartTime=" + mCanaryStartTime
                         + ", now=" + new Date()
