@@ -518,6 +518,13 @@ pipeline {
 
     options {
         skipDefaultCheckout()
+        // Whole-pipeline hard timeout: scenario duration + 35 min buffer (incremental
+        // build ~2-5 min, viewer wait, consumer runs DURATION+120s, GetClip + verify).
+        // Guarantees the executor is always released even if any step hangs
+        // (GetClip, git, flock, viewer waits, ...) — the backstop that would have
+        // capped the 2.5-day gamma queue pile-up at ~40 min
+        // (see docs/gamma-queue-pileup-investigation.md).
+        timeout(time: params.DURATION_IN_SECONDS.toInteger() + 2100, unit: 'SECONDS')
     }
 
     parameters {
@@ -569,10 +576,13 @@ pipeline {
         stage('Skip if duplicate') {
             steps {
                 script {
-                    def myLabel = params.RUNNER_LABEL
+                    // Dedup on the scenario identifier so distinct scenarios don't skip each other.
+                    // Fall back to RUNNER_LABEL if SCENARIO_LABEL is unset (matches gamma_runner).
+                    def myLabel = params.SCENARIO_LABEL ?: params.RUNNER_LABEL
                     def runningBuilds = Jenkins.instance.getItemByFullName(env.JOB_NAME).builds.findAll { b ->
                         b.isBuilding() && b.number != currentBuild.number &&
-                        b.getAction(hudson.model.ParametersAction)?.getParameter('RUNNER_LABEL')?.value == myLabel
+                        (b.getAction(hudson.model.ParametersAction)?.getParameter('SCENARIO_LABEL')?.value ?:
+                         b.getAction(hudson.model.ParametersAction)?.getParameter('RUNNER_LABEL')?.value) == myLabel
                     }
                     if (runningBuilds) {
                         echo "Another ${myLabel} build is already running (#${runningBuilds[0].number}), skipping"
@@ -729,6 +739,10 @@ pipeline {
                 // break Jenkins' per-stage log attribution (logs show up under the wrong stage).
                 stage('ViewerStorageConsumer') {
                     when {
+                        // beforeAgent: evaluate the gate BEFORE allocating the consumer node.
+                        // Without it, declarative allocates the agent first, so a disabled
+                        // consumer still consumed an executor on CONSUMER_NODE_LABEL every run.
+                        beforeAgent true
                         equals expected: true, actual: params.VIDEO_VERIFY_ENABLED
                     }
                     agent {
@@ -804,6 +818,7 @@ pipeline {
                 // master + 2 viewers + consumer all exercise the same continuous master session.
                 stage('TwoViewersStorageConsumer') {
                     when {
+                        beforeAgent true
                         equals expected: true, actual: params.VIDEO_VERIFY_ENABLED
                     }
                     agent {
@@ -892,6 +907,7 @@ pipeline {
                 // master + 3 viewers + consumer all exercise the same continuous master session.
                 stage('ThreeViewersStorageConsumer') {
                     when {
+                        beforeAgent true
                         equals expected: true, actual: params.VIDEO_VERIFY_ENABLED
                     }
                     agent {
