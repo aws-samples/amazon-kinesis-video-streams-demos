@@ -157,10 +157,17 @@ if [ "$NEED_REBUILD" = "true" ]; then
     rm -rf "$BUILD_DIR"
     mkdir -p "$BUILD_DIR"
 
+    # Build only the storage master target. The canary signaling/webrtc
+    # executables are not used by the storage scenario, and building them
+    # pulls in symbols (writeFirstFrameSentTimeToFile,
+    # calculateDisconnectToFrameSentTime) that are only defined in the storage
+    # sample source — so a full `make` fails at link time on those two targets
+    # even though kvsWebrtcStorageSample links fine. Restrict the build to the
+    # one target we run.
     (
         cd "$BUILD_DIR"
         cmake "$REPO_DIR/canary/webrtc-c" $CMAKE_FLAGS
-        make -j"$(nproc)"
+        make -j"$(nproc)" kvsWebrtcStorageSample
     ) > "$BUILD_LOG" 2>&1
 
     BUILD_EXIT=$?
