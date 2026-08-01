@@ -338,6 +338,16 @@ public class WebrtcStorageCanaryConsumer {
     public static void main(final String[] args) throws Exception {
         BasicConfigurator.configure();
 
+        // Fail fast if anything escapes main(). Non-daemon timers (e.g. the persistence
+        // heartbeat, scheduled before the run-mode switch) otherwise keep the JVM alive
+        // as a zombie after main dies: it emits misleading heartbeat metrics every
+        // minute until the pipeline hard timeout kills the build ~35+ minutes later
+        // (seen with unrecognized CANARY_LABEL values on gamma and rpi runs).
+        Thread.currentThread().setUncaughtExceptionHandler((thread, throwable) -> {
+            logger.error("Fatal error in main, exiting: " + throwable.getMessage(), throwable);
+            System.exit(1);
+        });
+
         final Integer canaryRunTime = Integer.parseInt(System.getenv("CANARY_DURATION_IN_SECONDS"));
 
         logger.info("Stream name: " + mStreamName);
