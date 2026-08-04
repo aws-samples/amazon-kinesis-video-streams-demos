@@ -12,7 +12,7 @@ option(ENABLE_GST_MEDIA_SOURCE "Enable GStreamer media source (physical camera /
 FetchContent_Declare(
   webrtc
   GIT_REPOSITORY https://github.com/awslabs/amazon-kinesis-video-streams-webrtc-sdk-c
-  GIT_TAG        develop
+  GIT_TAG        rr-extension
 )
 
 FetchContent_Declare(
