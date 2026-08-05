@@ -7,6 +7,8 @@ Cloudwatch::Cloudwatch(Canary::PConfig pConfig, ClientConfiguration* pClientConf
 {
 }
 
+std::atomic<BOOL> Cloudwatch::initialized{FALSE};
+
 STATUS Cloudwatch::init(Canary::PConfig pConfig)
 {
     ENTERS();
@@ -16,8 +18,13 @@ STATUS Cloudwatch::init(Canary::PConfig pConfig)
     Aws::CloudWatchLogs::Model::CreateLogStreamOutcome createLogStreamOutcome;
     CreateLogStreamRequest createLogStreamRequest;
 
+    CHK(pConfig != NULL, STATUS_NULL_ARG);
+
     clientConfig.region = pConfig->region.value;
     auto& instance = getInstanceImpl(pConfig, &clientConfig);
+    // The singleton now exists (constructed with real arguments above), so
+    // deinit()/logger() are safe from here on even if the steps below fail.
+    initialized = TRUE;
 
     if (STATUS_FAILED(instance.logs.init())) {
         DLOGW("Failed to create Cloudwatch logger, fallback to file logger");
@@ -49,6 +56,14 @@ Cloudwatch& Cloudwatch::getInstanceImpl(Canary::PConfig pConfig, ClientConfigura
 
 VOID Cloudwatch::deinit()
 {
+    // If init() never constructed the singleton (e.g. it bailed on missing
+    // credentials), there is nothing to tear down — and calling getInstance()
+    // here would lazily construct it with NULL config and segfault inside the
+    // AWS client constructors.
+    if (!initialized) {
+        return;
+    }
+
     auto& instance = getInstance();
     if (instance.useFileLogger) {
         freeFileLogger();
@@ -78,9 +93,13 @@ VOID Cloudwatch::logger(UINT32 level, PCHAR tag, PCHAR fmt, ...)
         vprintf(logFmtString, valist);
         va_end(valist);
 
-        auto& instance = getInstance();
-        if (!instance.terminated) {
-            instance.logs.push(cwLogFmtString);
+        // Same guard as deinit(): never lazily construct the singleton with
+        // NULL config from a log call that races/precedes init().
+        if (initialized) {
+            auto& instance = getInstance();
+            if (!instance.terminated) {
+                instance.logs.push(cwLogFmtString);
+            }
         }
     }
 }
