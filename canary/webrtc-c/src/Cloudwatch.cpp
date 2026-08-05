@@ -18,8 +18,6 @@ STATUS Cloudwatch::init(Canary::PConfig pConfig)
     Aws::CloudWatchLogs::Model::CreateLogStreamOutcome createLogStreamOutcome;
     CreateLogStreamRequest createLogStreamRequest;
 
-    CHK(pConfig != NULL, STATUS_NULL_ARG);
-
     clientConfig.region = pConfig->region.value;
     auto& instance = getInstanceImpl(pConfig, &clientConfig);
     // The singleton now exists (constructed with real arguments above), so
