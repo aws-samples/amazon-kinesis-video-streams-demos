@@ -423,9 +423,14 @@ def buildStorageCanary(isConsumer, params) {
             // after CANARY_DURATION_IN_SECONDS, but if it hangs (e.g., ICE agent
             // threads not cleaned up after connection failure), Jenkins kills it.
             timeout(time: params.DURATION_IN_SECONDS.toInteger() + 900, unit: 'SECONDS') {
+                // stdbuf -oL: line-buffer stdout. Through a Jenkins pipe stdout is
+                // fully buffered, so if the binary segfaults (e.g. the SDK's ARM64
+                // signaling-teardown crash) every unflushed log line dies with the
+                // process and the console shows only garbage. Line buffering makes
+                // the pre-crash log lines reach the console.
                 sh """
                     cd ${buildDir} &&
-                    ./kvsWebrtcStorageSample"""
+                    stdbuf -oL ./kvsWebrtcStorageSample"""
             }
         }
         pushKeepAlive('MasterFinished')
