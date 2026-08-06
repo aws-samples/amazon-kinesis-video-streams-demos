@@ -181,11 +181,50 @@ if [ "$NEED_REBUILD" = "true" ]; then
     fi
 
     # -----------------------------------------------------------------------
+    # 4b. Post-build smoke test — a build can "succeed" yet produce corrupt
+    #     artifacts (observed once: garbage pages inside libusrsctp.a made
+    #     initKvsWebRtc die with SIGILL, and the stamp cache then reused the
+    #     poisoned binary on every run). Launch the binary with dummy creds:
+    #     it must survive WebRTC/SCTP init. Signaling failures afterwards are
+    #     expected (creds are fake) and exit with a normal status; death by
+    #     signal (exit >= 128, e.g. 132=SIGILL, 139=SIGSEGV) means the
+    #     artifacts are corrupt. In that case we do NOT write the stamps, so
+    #     the next invocation rebuilds from scratch instead of caching junk.
+    # -----------------------------------------------------------------------
+    SMOKE_LOG="${LOGS_DIR}/smoke-$(date +%s).log"
+    echo "Running post-build smoke test... (log: $SMOKE_LOG)"
+    SMOKE_RC=0
+    (
+        cd "$BUILD_DIR"
+        env AWS_ACCESS_KEY_ID=smoke-test AWS_SECRET_ACCESS_KEY=smoke-test \
+            AWS_SESSION_TOKEN=smoke-test AWS_DEFAULT_REGION=us-east-1 \
+            CANARY_CHANNEL_NAME=smoke-test CANARY_LABEL=StorageWithViewer \
+            CANARY_LOG_GROUP_NAME=WebrtcSDK CANARY_DURATION_IN_SECONDS=5 \
+            CANARY_IS_MASTER=TRUE \
+            timeout 30 ./kvsWebrtcStorageSample
+    ) > "$SMOKE_LOG" 2>&1 || SMOKE_RC=$?
+    if [ "$SMOKE_RC" -ge 128 ]; then
+        echo "ERROR: smoke test died with signal $((SMOKE_RC - 128)) (exit $SMOKE_RC) — build artifacts look corrupt"
+        echo "Refusing to cache this build; next invocation will rebuild from scratch."
+        tail -20 "$SMOKE_LOG"
+        # Release lock
+        flock -u 9
+        exit 1
+    fi
+    echo "Smoke test passed (exit $SMOKE_RC)"
+
+    # -----------------------------------------------------------------------
     # 5. Update stamps
     # -----------------------------------------------------------------------
     echo "$CURRENT_COMMIT" > "$COMMIT_FILE"
     echo "$CURRENT_WEBRTC_VERSION" > "$WEBRTC_VERSION_FILE"
     echo "$CURRENT_BUILD_FLAGS" > "$BUILD_FLAGS_FILE"
+
+    # Pin the fresh artifacts and stamps to disk immediately. Without this, a
+    # power loss during the kernel writeback window leaves "valid" stamps
+    # pointing at a binary with holes in it (metadata is journaled, file data
+    # is not).
+    sync
 
     # Clean up old logs (keep last 10)
     ls -1t "$LOGS_DIR"/build-*.log 2>/dev/null | tail -n +11 | xargs rm -f 2>/dev/null || true
