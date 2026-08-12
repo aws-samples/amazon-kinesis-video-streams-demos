@@ -715,25 +715,37 @@ STATUS createWebRtcStreamingSession(PGstKvsPlugin pGstKvsPlugin, PCHAR peerId, B
     CHK_STATUS(
         transceiverOnBandwidthEstimation(pStreamingSession->pVideoRtcRtpTransceiver, (UINT64) pStreamingSession, sampleBandwidthEstimationHandler));
 
-    // Set up audio transceiver codec id according to type of encoding used
-    if (STRNCMP(pGstKvsPlugin->gstParams.audioContentType, AUDIO_MULAW_CONTENT_TYPE, MAX_GSTREAMER_MEDIA_TYPE_LEN) == 0) {
-        audioTrack.codec = RTC_CODEC_MULAW;
-    } else if (STRNCMP(pGstKvsPlugin->gstParams.audioContentType, AUDIO_ALAW_CONTENT_TYPE, MAX_GSTREAMER_MEDIA_TYPE_LEN) == 0) {
-        audioTrack.codec = RTC_CODEC_ALAW;
-    } else if (STRNCMP(pGstKvsPlugin->gstParams.audioContentType, AUDIO_OPUS_CONTENT_TYPE, MAX_GSTREAMER_MEDIA_TYPE_LEN) == 0) {
-        audioTrack.codec = RTC_CODEC_OPUS;
-    } else {
-        DLOGE("Error, audio content type %s not accepted by plugin", pGstKvsPlugin->gstParams.audioContentType);
-        CHK(FALSE, STATUS_INVALID_ARG);
-    }
-    // Add a SendRecv Transceiver of type video
-    audioTrack.kind = MEDIA_STREAM_TRACK_KIND_AUDIO;
-    STRCPY(audioTrack.streamId, "myKvsVideoStream");
-    STRCPY(audioTrack.trackId, "myAudioTrack");
-    CHK_STATUS(addTransceiver(pStreamingSession->pPeerConnection, &audioTrack, NULL, &pStreamingSession->pAudioRtcRtpTransceiver));
+    // [KVS-DUAL-STREAM-TEST] Skip audio transceiver if no audio content type (video-only pipeline)
+    if (pGstKvsPlugin->gstParams.audioContentType != NULL) {
+        // Set up audio transceiver codec id according to type of encoding used
+        if (STRNCMP(pGstKvsPlugin->gstParams.audioContentType, AUDIO_MULAW_CONTENT_TYPE, MAX_GSTREAMER_MEDIA_TYPE_LEN) == 0) {
+            audioTrack.codec = RTC_CODEC_MULAW;
+        } else if (STRNCMP(pGstKvsPlugin->gstParams.audioContentType, AUDIO_ALAW_CONTENT_TYPE, MAX_GSTREAMER_MEDIA_TYPE_LEN) == 0) {
+            audioTrack.codec = RTC_CODEC_ALAW;
+        } else if (STRNCMP(pGstKvsPlugin->gstParams.audioContentType, AUDIO_OPUS_CONTENT_TYPE, MAX_GSTREAMER_MEDIA_TYPE_LEN) == 0) {
+            audioTrack.codec = RTC_CODEC_OPUS;
+        } else {
+            DLOGE("Error, audio content type %s not accepted by plugin", pGstKvsPlugin->gstParams.audioContentType);
+            CHK(FALSE, STATUS_INVALID_ARG);
+        }
+        // Add a SendRecv Transceiver of type audio
+        audioTrack.kind = MEDIA_STREAM_TRACK_KIND_AUDIO;
+        STRCPY(audioTrack.streamId, "myKvsVideoStream");
+        STRCPY(audioTrack.trackId, "myAudioTrack");
+        CHK_STATUS(addTransceiver(pStreamingSession->pPeerConnection, &audioTrack, NULL, &pStreamingSession->pAudioRtcRtpTransceiver));
 
-    CHK_STATUS(
-        transceiverOnBandwidthEstimation(pStreamingSession->pAudioRtcRtpTransceiver, (UINT64) pStreamingSession, sampleBandwidthEstimationHandler));
+        CHK_STATUS(
+            transceiverOnBandwidthEstimation(pStreamingSession->pAudioRtcRtpTransceiver, (UINT64) pStreamingSession, sampleBandwidthEstimationHandler));
+    } else {
+        // [KVS-DUAL-STREAM-TEST] Video-only: add inactive audio transceiver to match m-line order in SDP offer
+        audioTrack.kind = MEDIA_STREAM_TRACK_KIND_AUDIO;
+        audioTrack.codec = RTC_CODEC_OPUS;
+        STRCPY(audioTrack.streamId, "myKvsVideoStream");
+        STRCPY(audioTrack.trackId, "myAudioTrack");
+        RtcRtpTransceiverInit transceiverInit;
+        transceiverInit.direction = RTC_RTP_TRANSCEIVER_DIRECTION_INACTIVE;
+        CHK_STATUS(addTransceiver(pStreamingSession->pPeerConnection, &audioTrack, &transceiverInit, &pStreamingSession->pAudioRtcRtpTransceiver));
+    }
     pStreamingSession->firstFrame = TRUE;
     pStreamingSession->startUpLatency = 0;
 
@@ -1043,7 +1055,10 @@ STATUS handleOffer(PGstKvsPlugin pGstKvsPlugin, PWebRtcStreamingSession pStreami
     }
 
     // The audio video receive routine should be per streaming session
-    THREAD_CREATE(&pStreamingSession->receiveAudioVideoSenderTid, receiveGstreamerAudioVideo, (PVOID) pStreamingSession);
+    // [KVS-DUAL-STREAM-TEST] Only start audio/video receive thread if audio transceiver exists
+    if (pStreamingSession->pAudioRtcRtpTransceiver != NULL) {
+        THREAD_CREATE(&pStreamingSession->receiveAudioVideoSenderTid, receiveGstreamerAudioVideo, (PVOID) pStreamingSession);
+    }
 
 CleanUp:
 
