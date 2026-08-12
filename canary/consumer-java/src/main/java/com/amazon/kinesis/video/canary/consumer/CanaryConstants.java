@@ -16,6 +16,13 @@ public final class CanaryConstants {
     // optimal.
     public static final long LIST_FRAGMENTS_INTERVAL = 20000;
 
+    // Period at which to emit the consumer connection heartbeat. [ms]
+    public static final long CONNECTION_HEARTBEAT_INTERVAL = 60000; // 1 minute
+
+    // Metric emitted each interval the consumer can reach KVS and retrieve media
+    // (1), or 0 when the connection fails / is closed abruptly.
+    public static final String PERSISTENCE_STREAMING_AVAILABILITY_METRIC_NAME = "PersistenceStreamingAvailability";
+
     public static final String INTERVAL_METRICS_TIMER_NAME = "IntervalMetricsTimer";
 
     public static final String PERIODIC_LABEL = "StoragePeriodic"; // Short period, used for time to first frame consumed metrics.

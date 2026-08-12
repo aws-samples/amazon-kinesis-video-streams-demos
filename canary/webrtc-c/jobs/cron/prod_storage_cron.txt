@@ -1,0 +1,23 @@
+# StoragePeriodic (duration 156s ~3min, run every 12 min)
+H/12 * * * * %RUNNER_LABEL=StoragePeriodic;SCENARIO_LABEL=StoragePeriodic;IS_STORAGE=true;IS_STORAGE_SINGLE_NODE=true;VIDEO_VERIFY_ENABLED=true;DURATION_IN_SECONDS=156;MASTER_NODE_LABEL=webrtc-storage-master;CONSUMER_NODE_LABEL=webrtc-storage-consumer;AWS_DEFAULT_REGION=us-east-2;USE_TURN=true;TRICKLE_ICE=true;NO_LOOP_FRAMES=true;GIT_HASH=new-latency-metric
+
+# StorageLowFps (duration 156s ~3min, run every 12 min)
+H/12 * * * * %RUNNER_LABEL=StorageLowFps;SCENARIO_LABEL=StorageLowFps;IS_STORAGE=true;IS_STORAGE_SINGLE_NODE=true;VIDEO_VERIFY_ENABLED=true;DURATION_IN_SECONDS=156;STORAGE_FPS=10;MASTER_NODE_LABEL=webrtc-storage-master;CONSUMER_NODE_LABEL=webrtc-storage-consumer;AWS_DEFAULT_REGION=us-east-2;USE_TURN=true;TRICKLE_ICE=true;NO_LOOP_FRAMES=true;GIT_HASH=new-latency-metric
+
+# StorageSubReconnect (duration 2700s ~45min, run every 1 hour)
+H * * * * %RUNNER_LABEL=StorageSubReconnect;SCENARIO_LABEL=StorageSubReconnect;IS_STORAGE=true;VIDEO_VERIFY_ENABLED=true;DURATION_IN_SECONDS=2700;MASTER_NODE_LABEL=webrtc-storage-master;CONSUMER_NODE_LABEL=webrtc-storage-consumer;AWS_DEFAULT_REGION=us-east-2;USE_TURN=true;TRICKLE_ICE=true;GIT_HASH=new-latency-metric
+
+# StorageSingleReconnect (duration 3900s ~65min, run every 2 hours)
+H H/2 * * * %RUNNER_LABEL=StorageSingleReconnect;SCENARIO_LABEL=StorageSingleReconnect;IS_STORAGE=true;VIDEO_VERIFY_ENABLED=true;DURATION_IN_SECONDS=3900;MASTER_NODE_LABEL=webrtc-storage-master;CONSUMER_NODE_LABEL=webrtc-storage-consumer;AWS_DEFAULT_REGION=us-east-2;USE_TURN=true;TRICKLE_ICE=true;GIT_HASH=new-latency-metric
+
+# StorageWithViewer (duration 156s ~3min, run every 12 min)
+H/12 * * * * %RUNNER_LABEL=StorageWithViewer;SCENARIO_LABEL=StorageWithViewer;JS_STORAGE_VIEWER_JOIN=true;DURATION_IN_SECONDS=156;MASTER_NODE_LABEL=webrtc-storage-master;STORAGE_VIEWER_NODE_LABEL=webrtc-storage-viewer;AWS_DEFAULT_REGION=us-east-2;VIEWER_WAIT_MINUTES=20;NO_LOOP_FRAMES=true;GIT_HASH=new-latency-metric
+
+# StorageTwoViewers (duration 156s ~3min, run every 12 min)
+H/12 * * * * %RUNNER_LABEL=StorageTwoViewers;SCENARIO_LABEL=StorageTwoViewers;JS_STORAGE_TWO_VIEWERS=true;DURATION_IN_SECONDS=156;MASTER_NODE_LABEL=webrtc-storage-master;STORAGE_VIEWER_ONE_NODE_LABEL=webrtc-storage-multi-viewer-1;STORAGE_VIEWER_TWO_NODE_LABEL=webrtc-storage-multi-viewer-2;AWS_DEFAULT_REGION=us-east-2;VIEWER_WAIT_MINUTES=20;NO_LOOP_FRAMES=true;GIT_HASH=new-latency-metric
+
+# StorageThreeViewers (duration 156s ~3min, run every 12 min)
+H/12 * * * * %RUNNER_LABEL=StorageThreeViewers;SCENARIO_LABEL=StorageThreeViewers;JS_STORAGE_THREE_VIEWERS=true;DURATION_IN_SECONDS=156;MASTER_NODE_LABEL=webrtc-storage-master;STORAGE_VIEWER_ONE_NODE_LABEL=webrtc-storage-multi-viewer-1;STORAGE_VIEWER_TWO_NODE_LABEL=webrtc-storage-multi-viewer-2;STORAGE_VIEWER_THREE_NODE_LABEL=webrtc-storage-consumer;AWS_DEFAULT_REGION=us-east-2;VIEWER_WAIT_MINUTES=20;NO_LOOP_FRAMES=true;GIT_HASH=new-latency-metric
+
+# VOMasterMixedViewer (duration 156s ~3min, run every 12 min)
+H/12 * * * * %RUNNER_LABEL=VOMasterMixedViewer;SCENARIO_LABEL=VOMasterMixedViewer;JS_STORAGE_VO_MIXED_VIEWERS=true;DURATION_IN_SECONDS=156;MASTER_NODE_LABEL=webrtc-storage-master;STORAGE_VIEWER_ONE_NODE_LABEL=webrtc-storage-multi-viewer-1;STORAGE_VIEWER_TWO_NODE_LABEL=webrtc-storage-multi-viewer-2;STORAGE_VIEWER_THREE_NODE_LABEL=webrtc-storage-consumer;AWS_DEFAULT_REGION=us-east-2;VIEWER_WAIT_MINUTES=20;NO_LOOP_FRAMES=true;GIT_HASH=new-latency-metric
