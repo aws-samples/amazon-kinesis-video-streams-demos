@@ -63,6 +63,10 @@ class CloudwatchMonitoring {
     VOID pushPacketsReceivedPerSecond(DOUBLE);
     VOID pushOutgoingBitrate(DOUBLE);
     VOID pushPliCountPerSecond(DOUBLE);
+    // TWCC congestion-control metrics: EstimatedBitrate is the live video encoder target
+    // driven by TWCC feedback; DelayTrend is the smoothed one-way delay slope (ms).
+    VOID pushEstimatedBitrate(DOUBLE);
+    VOID pushDelayTrend(DOUBLE);
 
     // End-of-session totals
     VOID pushTotalPacketsSent(UINT64);

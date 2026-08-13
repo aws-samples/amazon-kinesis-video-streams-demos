@@ -77,6 +77,7 @@ add_library(
   src/Cloudwatch.cpp
   src/Peer.cpp
   src/media-server-storage/Common.cpp
+  src/media-server-storage/TwccBitrateController.cpp
   ${CANARY_GST_SOURCES})
 target_link_libraries(
   kvsWebrtcCanary

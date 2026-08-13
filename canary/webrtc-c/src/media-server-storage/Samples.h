@@ -32,6 +32,14 @@ Shared include file for the samples
 #define SAMPLE_PRE_GENERATE_CERT        TRUE
 #define SAMPLE_PRE_GENERATE_CERT_PERIOD (1000 * HUNDREDS_OF_NANOS_IN_A_MILLISECOND)
 
+// ---- TWCC bitrate adaptation (mirrors SDK samples/common/Samples.h) ----
+// Interval is in hundreds-of-nanos to match GETTIME(); the 250 is milliseconds.
+#define TWCC_BITRATE_ADJUSTMENT_INTERVAL_MS (250 * HUNDREDS_OF_NANOS_IN_A_MILLISECOND)
+#define MIN_VIDEO_BITRATE_KBPS              384    // kilobits/sec; override via CANARY_MIN_VIDEO_BITRATE_KBPS
+#define MAX_VIDEO_BITRATE_KBPS              2500   // kilobits/sec
+#define MIN_AUDIO_BITRATE_BPS               4000   // bits/sec
+#define MAX_AUDIO_BITRATE_BPS               128000 // bits/sec
+
 #define SAMPLE_SESSION_CLEANUP_WAIT_PERIOD (5 * HUNDREDS_OF_NANOS_IN_A_SECOND)
 
 #define SAMPLE_PENDING_MESSAGE_CLEANUP_DURATION (20 * HUNDREDS_OF_NANOS_IN_A_SECOND)
@@ -149,6 +157,11 @@ typedef struct {
 
     PCHAR rtspUri;
     UINT32 logLevel;
+
+    // TWCC congestion-control driven bitrate adaptation (effective only on the
+    // GStreamer media path, where a live encoder exists to re-target).
+    BOOL enableTwcc;
+    UINT32 twccMinVideoBitrateKbps; // MIN_VIDEO_BITRATE_KBPS, or CANARY_MIN_VIDEO_BITRATE_KBPS override
 } SampleConfiguration, *PSampleConfiguration;
 
 typedef struct {
@@ -187,6 +200,20 @@ typedef struct {
 } OutgoingRTPMetricsContext;
 typedef OutgoingRTPMetricsContext* POutgoingRTPMetricsContext;
 
+// Lock-guarded hand-off between the TWCC congestion callback (producer of
+// new*Bitrate, consumer of current*Bitrate) and the GStreamer media thread
+// (producer of current*Bitrate, consumer of new*Bitrate). 0 = no pending update.
+typedef struct {
+    MUTEX updateLock;
+    UINT64 lastAdjustmentTimeMs;
+    UINT64 currentVideoBitrate; // kbps; published by the media thread (live encoder value)
+    UINT64 currentAudioBitrate; // bps
+    UINT64 newVideoBitrate;     // kbps; produced by the callback, consumed+cleared by the media thread
+    UINT64 newAudioBitrate;     // bps
+    DOUBLE averagePacketLoss;   // EMA-smoothed percent
+    DOUBLE lastDelayTrendMs;    // cached for CloudWatch emission (canary addition)
+} TwccMetadata, *PTwccMetadata;
+
 struct __SampleStreamingSession {
     volatile ATOMIC_BOOL terminateFlag;
     volatile ATOMIC_BOOL candidateGatheringDone;
@@ -224,6 +251,7 @@ struct __SampleStreamingSession {
     UINT64 offerReceiveTime;
     PeerConnectionMetrics peerConnectionMetrics;
     KvsIceAgentMetrics iceMetrics;
+    TwccMetadata twccMetadata;
 };
 
 VOID sigintHandler(INT32);
@@ -254,7 +282,7 @@ VOID sampleVideoFrameHandler(UINT64, PFrame);
 VOID sampleAudioFrameHandler(UINT64, PFrame);
 VOID sampleFrameHandler(UINT64, PFrame);
 VOID sampleBandwidthEstimationHandler(UINT64, DOUBLE);
-VOID sampleSenderBandwidthEstimationHandler(UINT64, UINT32, UINT32, UINT32, UINT32, UINT64);
+STATUS sampleOnPeerCongestionFeedback(UINT64, PCongestionCtx);
 VOID onDataChannel(UINT64, PRtcDataChannel);
 VOID onConnectionStateChange(UINT64, RTC_PEER_CONNECTION_STATE);
 STATUS sessionCleanupWait(PSampleConfiguration);

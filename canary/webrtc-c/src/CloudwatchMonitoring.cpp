@@ -720,6 +720,24 @@ VOID CloudwatchMonitoring::pushOutgoingBitrate(DOUBLE bitrate)
     this->push(datum);
 }
 
+VOID CloudwatchMonitoring::pushEstimatedBitrate(DOUBLE bitrate)
+{
+    MetricDatum datum;
+    datum.SetMetricName("EstimatedBitrate");
+    datum.SetValue(bitrate);
+    datum.SetUnit(Aws::CloudWatch::Model::StandardUnit::Kilobits_Second);
+    this->push(datum);
+}
+
+VOID CloudwatchMonitoring::pushDelayTrend(DOUBLE delayTrendMs)
+{
+    MetricDatum datum;
+    datum.SetMetricName("DelayTrend");
+    datum.SetValue(delayTrendMs);
+    datum.SetUnit(Aws::CloudWatch::Model::StandardUnit::Milliseconds);
+    this->push(datum);
+}
+
 VOID CloudwatchMonitoring::pushPliCountPerSecond(DOUBLE rate)
 {
     MetricDatum datum;

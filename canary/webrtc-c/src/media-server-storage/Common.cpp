@@ -1,6 +1,7 @@
 #define LOG_CLASS "WebRtcSamples"
 #include "Samples.h"
 #include "../Include.h"
+#include "TwccBitrateController.h"
 
 PSampleConfiguration gSampleConfiguration = NULL;
 
@@ -189,6 +190,20 @@ STATUS canaryRtpOutboundStats(UINT32 timerId, UINT64 currentTime, UINT64 customD
                     Canary::Cloudwatch::getInstance().monitoring.pushPacketsSentPerSecond(pktsSentPerSec);
                     Canary::Cloudwatch::getInstance().monitoring.pushPacketsReceivedPerSecond(pktsRecvPerSec);
                     Canary::Cloudwatch::getInstance().monitoring.pushOutgoingBitrate(outBitrateKbps);
+
+                    // TWCC metrics (Module 3): DelayTrend is meaningful whenever TWCC feedback
+                    // arrives; EstimatedBitrate reflects the live encoder target and is only
+                    // non-zero on the GStreamer path where adaptation actuates.
+                    if (pSampleConfiguration->enableTwcc && IS_VALID_MUTEX_VALUE(pSampleStreamingSession->twccMetadata.updateLock)) {
+                        MUTEX_LOCK(pSampleStreamingSession->twccMetadata.updateLock);
+                        DOUBLE delayTrendMs = pSampleStreamingSession->twccMetadata.lastDelayTrendMs;
+                        UINT64 estVideoKbps = pSampleStreamingSession->twccMetadata.currentVideoBitrate;
+                        MUTEX_UNLOCK(pSampleStreamingSession->twccMetadata.updateLock);
+                        Canary::Cloudwatch::getInstance().monitoring.pushDelayTrend(delayTrendMs);
+                        if (estVideoKbps > 0) {
+                            Canary::Cloudwatch::getInstance().monitoring.pushEstimatedBitrate((DOUBLE) estVideoKbps);
+                        }
+                    }
 
                     // Update prev values for next interval
                     pSampleStreamingSession->rtcMetricsHistory.prevTs = rtcCandidatePairMetrics.timestamp;
@@ -1084,9 +1099,14 @@ STATUS createSampleStreamingSession(PSampleConfiguration pSampleConfiguration, P
 
     CHK_STATUS(transceiverOnBandwidthEstimation(pSampleStreamingSession->pAudioRtcRtpTransceiver, (UINT64) pSampleStreamingSession,
                                                 sampleBandwidthEstimationHandler));
-    // twcc bandwidth estimation
-    CHK_STATUS(peerConnectionOnSenderBandwidthEstimation(pSampleStreamingSession->pPeerConnection, (UINT64) pSampleStreamingSession,
-                                                         sampleSenderBandwidthEstimationHandler));
+    // TWCC congestion-feedback driven bitrate adaptation. The callback (Module 1)
+    // computes new encoder targets; the GStreamer media thread (Module 2) applies
+    // them. They coordinate through twccMetadata, guarded by updateLock.
+    if (pSampleConfiguration->enableTwcc) {
+        pSampleStreamingSession->twccMetadata.updateLock = MUTEX_CREATE(TRUE);
+        CHK_STATUS(setOnPeerCongestionFeedbackFn(pSampleStreamingSession->pPeerConnection, (UINT64) pSampleStreamingSession,
+                                                 sampleOnPeerCongestionFeedback));
+    }
     pSampleStreamingSession->startUpLatency = 0;
 
 CleanUp:
@@ -1157,6 +1177,10 @@ STATUS freeSampleStreamingSession(PSampleStreamingSession* ppSampleStreamingSess
 
     CHK_LOG_ERR(closePeerConnection(pSampleStreamingSession->pPeerConnection));
     CHK_LOG_ERR(freePeerConnection(&pSampleStreamingSession->pPeerConnection));
+    if (IS_VALID_MUTEX_VALUE(pSampleStreamingSession->twccMetadata.updateLock)) {
+        MUTEX_FREE(pSampleStreamingSession->twccMetadata.updateLock);
+        pSampleStreamingSession->twccMetadata.updateLock = INVALID_MUTEX_VALUE;
+    }
     SAFE_MEMFREE(pSampleStreamingSession);
 
 CleanUp:
@@ -1226,27 +1250,57 @@ VOID sampleBandwidthEstimationHandler(UINT64 customData, DOUBLE maximumBitrate)
     DLOGV("received bitrate suggestion: %f", maximumBitrate);
 }
 
-VOID sampleSenderBandwidthEstimationHandler(UINT64 customData, UINT32 txBytes, UINT32 rxBytes, UINT32 txPacketsCnt, UINT32 rxPacketsCnt,
-                                            UINT64 duration)
+// TWCC congestion feedback (Module 1): the SDK invokes this when transport-wide
+// feedback arrives. It stays I/O-free — it only updates the loss EMA, gates on
+// the adjustment interval, computes new targets via computeAdaptedBitrate, and
+// hands them to the media thread through twccMetadata. Metrics are emitted
+// separately from the periodic canaryRtpOutboundStats loop (Module 3).
+STATUS sampleOnPeerCongestionFeedback(UINT64 customData, PCongestionCtx pCongestionCtx)
 {
-    UNUSED_PARAM(customData);
-    UNUSED_PARAM(duration);
-    UNUSED_PARAM(rxBytes);
-    UNUSED_PARAM(txBytes);
-    UINT32 lostPacketsCnt = txPacketsCnt - rxPacketsCnt;
-    UINT32 percentLost = lostPacketsCnt * 100 / txPacketsCnt;
-    UINT32 bitrate = 1024;
-    if (percentLost < 2) {
-        // increase encoder bitrate by 2 percent
-        bitrate *= 1.02f;
-    } else if (percentLost > 5) {
-        // decrease encoder bitrate by packet loss percent
-        bitrate *= (1.0f - percentLost / 100.0f);
+    PSampleStreamingSession pSampleStreamingSession = (PSampleStreamingSession) customData;
+    if (pSampleStreamingSession == NULL || pCongestionCtx == NULL) {
+        return STATUS_NULL_ARG;
     }
-    // otherwise keep bitrate the same
 
-    DLOGS("received sender bitrate estimation: suggested bitrate %u sent: %u bytes %u packets received: %u bytes %u packets in %lu msec, ", bitrate,
-          txBytes, txPacketsCnt, rxBytes, rxPacketsCnt, duration / 10000ULL);
+    UINT32 txPacketsCnt = pCongestionCtx->txPackets;
+    UINT32 rxPacketsCnt = pCongestionCtx->rxPackets;
+    UINT32 lostPacketsCnt = txPacketsCnt > rxPacketsCnt ? txPacketsCnt - rxPacketsCnt : 0;
+    DOUBLE percentLost = (DOUBLE) ((txPacketsCnt > 0) ? (lostPacketsCnt * 100 / txPacketsCnt) : 0);
+    DOUBLE delayTrendMs = pCongestionCtx->congestionState.delayTrend;
+
+    // EMA-smooth packet loss with the PIC macro (same as the SDK sample). It's reachable via
+    // Samples.h -> webrtcclient/Include.h -> common/Include.h, the identical include chain the
+    // SDK sample uses. EMA_ACCUMULATOR_GET_NEXT(a, v) = EMA_ALPHA_VALUE*v + (1-EMA_ALPHA_VALUE)*a.
+    pSampleStreamingSession->twccMetadata.averagePacketLoss =
+        EMA_ACCUMULATOR_GET_NEXT(pSampleStreamingSession->twccMetadata.averagePacketLoss, percentLost);
+    pSampleStreamingSession->twccMetadata.lastDelayTrendMs = delayTrendMs;
+
+    UINT64 currentTimeMs = GETTIME();
+    if (currentTimeMs - pSampleStreamingSession->twccMetadata.lastAdjustmentTimeMs < TWCC_BITRATE_ADJUSTMENT_INTERVAL_MS) {
+        return STATUS_SUCCESS;
+    }
+
+    PSampleConfiguration pSampleConfiguration = pSampleStreamingSession->pSampleConfiguration;
+    UINT32 minVideoKbps = (pSampleConfiguration != NULL && pSampleConfiguration->twccMinVideoBitrateKbps > 0)
+        ? pSampleConfiguration->twccMinVideoBitrateKbps
+        : MIN_VIDEO_BITRATE_KBPS;
+
+    MUTEX_LOCK(pSampleStreamingSession->twccMetadata.updateLock);
+    AdaptedBitrate adapted = computeAdaptedBitrate(
+        pSampleStreamingSession->twccMetadata.currentVideoBitrate, pSampleStreamingSession->twccMetadata.currentAudioBitrate,
+        pSampleStreamingSession->twccMetadata.averagePacketLoss, delayTrendMs, minVideoKbps, MAX_VIDEO_BITRATE_KBPS, MIN_AUDIO_BITRATE_BPS,
+        MAX_AUDIO_BITRATE_BPS);
+    pSampleStreamingSession->twccMetadata.newVideoBitrate = adapted.newVideoBitrateKbps;
+    pSampleStreamingSession->twccMetadata.newAudioBitrate = adapted.newAudioBitrateBps;
+    MUTEX_UNLOCK(pSampleStreamingSession->twccMetadata.updateLock);
+
+    pSampleStreamingSession->twccMetadata.lastAdjustmentTimeMs = currentTimeMs;
+
+    DLOGD("BWE: pktLoss=%.2f%% delayTrend=%.4f ms | video=%llu kbps audio=%llu bps",
+          pSampleStreamingSession->twccMetadata.averagePacketLoss, delayTrendMs, (unsigned long long) adapted.newVideoBitrateKbps,
+          (unsigned long long) adapted.newAudioBitrateBps);
+
+    return STATUS_SUCCESS;
 }
 
 STATUS handleRemoteCandidate(PSampleStreamingSession pSampleStreamingSession, PSignalingMessage pSignalingMessage)
@@ -1383,6 +1437,15 @@ STATUS createSampleConfiguration(PCHAR channelName, SIGNALING_CHANNEL_ROLE_TYPE 
      * not ahead of time. */
     pSampleConfiguration->trickleIce = trickleIce;
     pSampleConfiguration->useTurn = useTurn;
+
+    // TWCC on by default (only actuates on the GStreamer path). Floor is
+    // MIN_VIDEO_BITRATE_KBPS unless CANARY_MIN_VIDEO_BITRATE_KBPS overrides it
+    // (e.g. 100 so the encoder can reach the 250 kbps "BAD" throttle profile).
+    pSampleConfiguration->enableTwcc = TRUE;
+    {
+        PCHAR pMinVideoKbps = GETENV((PCHAR) "CANARY_MIN_VIDEO_BITRATE_KBPS");
+        pSampleConfiguration->twccMinVideoBitrateKbps = (pMinVideoKbps != NULL) ? (UINT32) strtoul(pMinVideoKbps, NULL, 10) : MIN_VIDEO_BITRATE_KBPS;
+    }
 
     pSampleConfiguration->channelInfo.version = CHANNEL_INFO_CURRENT_VERSION;
     pSampleConfiguration->channelInfo.pChannelName = channelName;

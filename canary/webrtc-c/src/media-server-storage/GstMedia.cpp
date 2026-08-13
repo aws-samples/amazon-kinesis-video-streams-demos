@@ -98,12 +98,47 @@ static GstFlowReturn on_new_sample(GstElement* sink, gpointer data, UINT64 track
             frame.index = (UINT32) ATOMIC_INCREMENT(&pSampleStreamingSession->frameIndex);
 
             if (trackid == DEFAULT_AUDIO_TRACK_ID) {
+                // TWCC actuator (Module 2): publish the live audio encoder bitrate for the
+                // congestion callback, and apply any pending target it produced. bps.
+                if (pSampleStreamingSession->pSampleConfiguration->enableTwcc && senderPipeline != NULL) {
+                    GstElement* encoder = gst_bin_get_by_name(GST_BIN(senderPipeline), "sampleAudioEncoder");
+                    if (encoder != NULL) {
+                        guint bitrate = 0;
+                        g_object_get(G_OBJECT(encoder), "bitrate", &bitrate, NULL);
+                        MUTEX_LOCK(pSampleStreamingSession->twccMetadata.updateLock);
+                        pSampleStreamingSession->twccMetadata.currentAudioBitrate = (UINT64) bitrate;
+                        if (pSampleStreamingSession->twccMetadata.newAudioBitrate != 0) {
+                            bitrate = (guint) pSampleStreamingSession->twccMetadata.newAudioBitrate;
+                            pSampleStreamingSession->twccMetadata.newAudioBitrate = 0;
+                            g_object_set(G_OBJECT(encoder), "bitrate", bitrate, NULL);
+                        }
+                        MUTEX_UNLOCK(pSampleStreamingSession->twccMetadata.updateLock);
+                        gst_object_unref(encoder);
+                    }
+                }
                 pRtcRtpTransceiver = pSampleStreamingSession->pAudioRtcRtpTransceiver;
                 frame.presentationTs = pSampleStreamingSession->audioTimestamp;
                 frame.decodingTs = frame.presentationTs;
                 pSampleStreamingSession->audioTimestamp +=
                     SAMPLE_AUDIO_FRAME_DURATION; // assume audio frame size is 20ms, which is default in opusenc
             } else {
+                // TWCC actuator (Module 2): same hand-off for video. x264enc "bitrate" is kbps.
+                if (pSampleStreamingSession->pSampleConfiguration->enableTwcc && senderPipeline != NULL) {
+                    GstElement* encoder = gst_bin_get_by_name(GST_BIN(senderPipeline), "sampleVideoEncoder");
+                    if (encoder != NULL) {
+                        guint bitrate = 0;
+                        g_object_get(G_OBJECT(encoder), "bitrate", &bitrate, NULL);
+                        MUTEX_LOCK(pSampleStreamingSession->twccMetadata.updateLock);
+                        pSampleStreamingSession->twccMetadata.currentVideoBitrate = (UINT64) bitrate;
+                        if (pSampleStreamingSession->twccMetadata.newVideoBitrate != 0) {
+                            bitrate = (guint) pSampleStreamingSession->twccMetadata.newVideoBitrate;
+                            pSampleStreamingSession->twccMetadata.newVideoBitrate = 0;
+                            g_object_set(G_OBJECT(encoder), "bitrate", bitrate, NULL);
+                        }
+                        MUTEX_UNLOCK(pSampleStreamingSession->twccMetadata.updateLock);
+                        gst_object_unref(encoder);
+                    }
+                }
                 pRtcRtpTransceiver = pSampleStreamingSession->pVideoRtcRtpTransceiver;
                 frame.presentationTs = pSampleStreamingSession->videoTimestamp;
                 frame.decodingTs = frame.presentationTs;
