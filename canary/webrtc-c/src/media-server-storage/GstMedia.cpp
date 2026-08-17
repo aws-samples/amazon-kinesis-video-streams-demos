@@ -262,15 +262,18 @@ PVOID sendGstreamerAudioVideo(PVOID args)
                 // Reuse the repo's pre-encoded frame sequence (same CANARY_ASSET_SET
                 // selector as the disk path), but decode + re-encode LIVE so TWCC drives
                 // the x264enc bitrate. multifilesrc reads frame-0001.h264, 0002, ... as
-                // one byte-stream and loops at EOS (no run-duration limit). avdec_h264
-                // needs gstreamer1.0-libav (installed by rpi-onboard.sh).
+                // one byte-stream. No loop=true: the sequence plays once (~4676 frames /
+                // 30fps ~= 156s) then EOSes, which lets the duration-terminate path work
+                // (appsink returns GST_FLOW_EOS -> bus EOS -> clean stop). A run configured
+                // longer than the content ends when the frames run out. avdec_h264 needs
+                // gstreamer1.0-libav (installed by rpi-onboard.sh).
                 PCHAR pAssetSet = GETENV((PCHAR) "CANARY_ASSET_SET");
                 if (pAssetSet == NULL || pAssetSet[0] == '\0') {
                     pAssetSet = (PCHAR) "h264SampleFrames";
                 }
                 UINT32 stringOutcome =
                     (UINT32) SNPRINTF(pipelineBuffer, GST_PIPELINE_MAX_CHAR_COUNT,
-                                      "multifilesrc location=./assets/%s/frame-%%04d.h264 index=1 loop=true "
+                                      "multifilesrc location=./assets/%s/frame-%%04d.h264 index=1 "
                                       "caps=video/x-h264,stream-format=byte-stream,alignment=au,framerate=30/1 ! "
                                       "h264parse ! avdec_h264 ! videoconvert ! "
                                       "x264enc name=sampleVideoEncoder bframes=0 key-int-max=30 speed-preset=veryfast bitrate=512 "
