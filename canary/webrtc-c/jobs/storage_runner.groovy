@@ -368,6 +368,15 @@ def buildStorageCanary(isConsumer, params) {
         'CANARY_MEDIA_SOURCE': params.CANARY_MEDIA_SOURCE ?: ''
     ]
 
+    // TWCC shaping needs a live encoder to adapt: force the GStreamer path and set
+    // the encoder floor the ported master reads (CANARY_MIN_VIDEO_BITRATE_KBPS).
+    if (params.CANARY_TWCC_SHAPING?.toString() == 'true') {
+        masterEnvs['CANARY_MIN_VIDEO_BITRATE_KBPS'] = params.TWCC_MIN_VIDEO_BITRATE_KBPS ?: '100'
+        if (!masterEnvs['CANARY_MEDIA_SOURCE']) {
+            masterEnvs['CANARY_MEDIA_SOURCE'] = 'testsrc'
+        }
+    }
+
     def repoDir = "${env.HOME}/webrtc-c-storage-master/repo"
 
     def consumerEnvs = [
@@ -417,15 +426,39 @@ def buildStorageCanary(isConsumer, params) {
         }
 
         def buildDir = "${env.HOME}/webrtc-c-storage-master/build"
+        def twccShaping = params.CANARY_TWCC_SHAPING?.toString() == 'true'
         pushKeepAlive('MasterStarted')
         withRunnerWrapper(envs) {
             // Timeout: duration + 5 min buffer. The C binary should exit on its own
             // after CANARY_DURATION_IN_SECONDS, but if it hangs (e.g., ICE agent
             // threads not cleaned up after connection failure), Jenkins kills it.
             timeout(time: params.DURATION_IN_SECONDS.toInteger() + 900, unit: 'SECONDS') {
-                sh """
-                    cd ${buildDir} &&
-                    ./kvsWebrtcStorageSample"""
+                if (twccShaping) {
+                    // TWCC scenario: bring up the netns mid-path router, dump this
+                    // shell's creds/CANARY_* env to a 600-perm file (so the root
+                    // wrapper injects them into the namespace without exposing them
+                    // on argv), start the throttle sidecar, and run the (TWCC-aware)
+                    // master INSIDE the namespace as jenkins. Teardown always runs.
+                    def envFile = "${buildDir}/.twcc-master.env"
+                    def stageSecs = params.TWCC_STAGE_SECONDS ?: '20'
+                    def loss = params.TWCC_THROTTLE_LOSS ?: '0'
+                    try {
+                        sh """
+                            sudo /usr/local/bin/twcc-net up
+                            ( umask 077 && env | grep -E '^(AWS_|CANARY_|CONTROL_PLANE_URI=)' > '${envFile}' )
+                            sudo /usr/local/bin/twcc-net throttle-start ${stageSecs} ${loss}
+                            sudo /usr/local/bin/twcc-net run --cwd '${buildDir}' --env-file '${envFile}' -- ./kvsWebrtcStorageSample"""
+                    } finally {
+                        sh """
+                            sudo /usr/local/bin/twcc-net throttle-stop || true
+                            sudo /usr/local/bin/twcc-net down || true
+                            rm -f '${envFile}' || true"""
+                    }
+                } else {
+                    sh """
+                        cd ${buildDir} &&
+                        ./kvsWebrtcStorageSample"""
+                }
             }
         }
         pushKeepAlive('MasterFinished')
@@ -570,6 +603,10 @@ pipeline {
         string(name: 'CANARY_ASSET_REGION', defaultValue: '', description: 'Region of the S3 asset bucket. May differ from AWS_DEFAULT_REGION. Empty falls back to AWS_DEFAULT_REGION.')
         string(name: 'JS_BRANCH', defaultValue: 'master', description: 'JS SDK branch name to clone and serve locally (default: master)')
         string(name: 'STS_DURATION_SECONDS', defaultValue: '43200', description: 'STS session duration. Use 3600 for nodes with role-chained credentials (e.g. rpi5-master, whose IoT-certificate base credentials cap chained sessions at 1 hour).')
+        booleanParam(name: 'CANARY_TWCC_SHAPING', defaultValue: false, description: 'Shape the master uplink with a netns mid-path router + tc/netem so TWCC bitrate adaptation is exercised. Requires CANARY_MEDIA_SOURCE=testsrc (live encoder), a dedicated rpi5 node, and the /usr/local/bin/twcc-net wrapper + sudoers grant provisioned on that node.')
+        string(name: 'TWCC_MIN_VIDEO_BITRATE_KBPS', defaultValue: '100', description: 'Encoder video floor (kbps) when TWCC shaping is on, so the encoder can reach the 250 kbps BAD profile. Read by the master via CANARY_MIN_VIDEO_BITRATE_KBPS.')
+        string(name: 'TWCC_STAGE_SECONDS', defaultValue: '20', description: 'Seconds held per throttle profile (GOOD/MEDIUM/CONGESTING/BAD/RECOVERING).')
+        string(name: 'TWCC_THROTTLE_LOSS', defaultValue: '0', description: 'Packet-loss %% override for every throttle profile (0 = no injected loss; loss is decode damage, not congestion).')
     }
     
     environment {
