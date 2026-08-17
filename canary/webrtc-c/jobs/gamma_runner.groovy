@@ -447,11 +447,15 @@ def buildStorageCanary(isConsumer, params) {
                     def envFile = "${buildDir}/.twcc-master.env"
                     def stageSecs = params.TWCC_STAGE_SECONDS ?: '20'
                     def loss = params.TWCC_THROTTLE_LOSS ?: '0'
+                    def profile = params.TWCC_PROFILE ?: ''
+                    // TWCC_PROFILE set -> hold one steady condition (per-condition canary);
+                    // empty -> cycle GOOD..RECOVERING (transition/adaptation test).
+                    def throttleCmd = profile ? "throttle-hold ${profile} ${loss}" : "throttle-start ${stageSecs} ${loss}"
                     try {
                         sh """
                             sudo /usr/local/bin/twcc-net up
                             ( umask 077 && env | grep -E '^(AWS_|CANARY_|CONTROL_PLANE_URI=)' > '${envFile}' )
-                            sudo /usr/local/bin/twcc-net throttle-start ${stageSecs} ${loss}
+                            sudo /usr/local/bin/twcc-net ${throttleCmd}
                             sudo /usr/local/bin/twcc-net run --cwd '${buildDir}' --env-file '${envFile}' -- stdbuf -oL ./kvsWebrtcStorageSample"""
                     } finally {
                         sh """
@@ -605,8 +609,9 @@ pipeline {
         string(name: 'STS_DURATION_SECONDS', defaultValue: '43200', description: 'STS session duration. Use 3600 for nodes with role-chained credentials (e.g. rpi5-master, whose IoT-certificate base credentials cap chained sessions at 1 hour).')
         booleanParam(name: 'CANARY_TWCC_SHAPING', defaultValue: false, description: 'Shape the master uplink with a netns mid-path router + tc/netem so TWCC bitrate adaptation is exercised. Requires CANARY_MEDIA_SOURCE=testsrc (live encoder), a dedicated rpi5 node, and the /usr/local/bin/twcc-net wrapper + sudoers grant provisioned on that node.')
         string(name: 'TWCC_MIN_VIDEO_BITRATE_KBPS', defaultValue: '100', description: 'Encoder video floor (kbps) when TWCC shaping is on, so the encoder can reach the 250 kbps BAD profile. Read by the master via CANARY_MIN_VIDEO_BITRATE_KBPS.')
-        string(name: 'TWCC_STAGE_SECONDS', defaultValue: '20', description: 'Seconds held per throttle profile (GOOD/MEDIUM/CONGESTING/BAD/RECOVERING).')
+        string(name: 'TWCC_STAGE_SECONDS', defaultValue: '20', description: 'Seconds held per throttle profile when cycling (TWCC_PROFILE empty).')
         string(name: 'TWCC_THROTTLE_LOSS', defaultValue: '0', description: 'Packet-loss %% override for every throttle profile (0 = no injected loss; loss is decode damage, not congestion).')
+        string(name: 'TWCC_PROFILE', defaultValue: '', description: 'Hold ONE steady network condition for the whole run: GOOD|MEDIUM|CONGESTING|BAD|RECOVERING (per-condition canary). Empty = cycle all profiles (transition/adaptation test).')
     }
     
     options {

@@ -15,7 +15,8 @@
 #   up                              create kvsns netns + veth + NAT (mid-path router)
 #   down                            tear everything down (idempotent; also stops throttle)
 #   throttle-start [stageSecs] [loss]   background the GOOD..RECOVERING netem cycler
-#   throttle-stop                   stop the cycler + remove shaping
+#   throttle-hold PROFILE [loss]    apply ONE steady profile (per-condition canary)
+#   throttle-stop                   stop the cycler/shaping + remove IFB
 #   run --cwd DIR --env-file F -- CMD [ARGS...]   run CMD as jenkins inside kvsns
 #   status                          show current state
 #
@@ -135,6 +136,28 @@ throttle_stop() {
   echo "twcc-net throttle stopped"
 }
 
+# throttle-hold <PROFILE> [loss] — apply ONE profile steady (no cycling), for
+# per-condition canaries (RpiTwccGood/Bad/Congesting/Recovering).
+throttle_hold() {
+  local want lossov="${2:-}"
+  want=$(printf '%s' "${1:-}" | tr '[:lower:]' '[:upper:]')
+  [ -n "$want" ] || { echo "twcc-net throttle-hold: profile required (GOOD|MEDIUM|CONGESTING|BAD|RECOVERING)" >&2; exit 2; }
+  plumb_ifb
+  local found=""
+  for p in "${PROFILES[@]}"; do
+    read -r L BW LOSS D J <<< "$p"
+    if [ "$L" = "$want" ]; then
+      [ -n "$lossov" ] && LOSS="$lossov"
+      tc qdisc change dev "$IFB" root handle 1: netem \
+         delay "${D}ms" "${J}ms" "$CORR" distribution normal \
+         loss "${LOSS}%" rate "$BW" limit "$LIMIT"
+      echo "twcc-net hold $L -> bw=$BW loss=${LOSS}% delay=${D}ms jitter=${J}ms"
+      found=1; break
+    fi
+  done
+  [ -n "$found" ] || { echo "twcc-net throttle-hold: unknown profile '$want'" >&2; exit 2; }
+}
+
 # run --cwd DIR --env-file F -- CMD [ARGS...]
 # Executes CMD as $RUNUSER inside the namespace, with env from the file.
 run() {
@@ -170,9 +193,10 @@ case "$cmd" in
   up)             up ;;
   down)           down ;;
   throttle-start) throttle_start "$@" ;;
+  throttle-hold)  throttle_hold "$@" ;;
   throttle-stop)  throttle_stop ;;
   run)            run "$@" ;;
   status)         status ;;
   __throttle_loop) __throttle_loop "$@" ;;   # internal: backgrounded cycler
-  *) echo "usage: twcc-net {up|down|throttle-start [stageSecs] [loss]|throttle-stop|run --cwd DIR --env-file F -- CMD...|status}" >&2; exit 2 ;;
+  *) echo "usage: twcc-net {up|down|throttle-start [stageSecs] [loss]|throttle-hold PROFILE [loss]|throttle-stop|run --cwd DIR --env-file F -- CMD...|status}" >&2; exit 2 ;;
 esac

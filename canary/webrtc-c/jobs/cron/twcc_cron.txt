@@ -1,30 +1,46 @@
-# TWCC network-shaped storage canary cron entry (RPi5).
+# TWCC network-shaped storage canary cron entries (RPi5).
 #
-# Exercises the media service's TWCC (bitrate adaptation) on the ingest path:
-# the master's uplink is shaped by a netns mid-path router + tc/netem (cycling
-# GOOD -> MEDIUM -> CONGESTING -> BAD -> RECOVERING), so the TWCC-aware master's
-# encoder must track the available bandwidth. Verified via CloudWatch metrics
-# (OutgoingBitrate / EstimatedBitrate / DelayTrend) under RUNNER_LABEL=TwccShaped.
+# Exercises the media service's TWCC (bitrate adaptation) on the ingest path: the
+# master's uplink is shaped with a netns mid-path router + tc/netem so the
+# TWCC-aware master's encoder must track the available bandwidth. Verified via
+# CloudWatch metrics (OutgoingBitrate / EstimatedBitrate / DelayTrend), sliced by
+# RUNNER_LABEL.
+#
+# STEADY-STATE, ONE CONDITION PER JOB (TWCC_PROFILE): each job HOLDS a single
+# network condition for the whole run, so RUNNER_LABEL maps 1:1 to the condition
+# and its metrics have a clear expected value you can alarm on:
+#     RpiTwccGood        -> ~2 Mbps (encoder near MAX)
+#     RpiTwccCongesting  -> well under 500 kbit
+#     RpiTwccBad         -> near the 100 kbps floor
+#     RpiTwccRecovering  -> ~1.5 Mbps range
+# (A cycling variant that sweeps all profiles — for transition/ramp dynamics —
+#  is at the bottom, commented out; leave TWCC_PROFILE empty to cycle.)
 #
 # Prerequisites (see docs/rpi5-setup-sop.md "Phase 10"):
-#   - Runner seeded from storage_runner.groovy / gamma_runner.groovy WITH the
-#     CANARY_TWCC_SHAPING param (added alongside this entry).
-#   - A DEDICATED RPi5 node labeled rpi5-twcc, onboarded via rpi-onboard.sh (which
-#     installs /usr/local/bin/twcc-net + /etc/sudoers.d/twcc-canary + iptables +
-#     gstreamer1.0-plugins-ugly). Dedicated because CANARY_MEDIA_SOURCE=testsrc is a
-#     gst=ON build; sharing a node with a disk-path (gst=OFF) scenario forces a full
-#     rebuild every run (the .build-flags stamp flips).
-#   - The channel-owner account (232283333863) is on the media-service
-#     twcc-shadow-mode allowlist for the target stage/region, else TWCC won't
-#     negotiate (offer omits the transport-wide-cc extmap).
-#   - ENDPOINT + AWS_DEFAULT_REGION point at the allowlisted stack. Leave ENDPOINT
-#     empty for the default (prod) control plane in AWS_DEFAULT_REGION.
+#   - Node onboarded via rpi-onboard.sh (installs /usr/local/bin/twcc-net +
+#     /etc/sudoers.d/twcc-canary + iptables + gstreamer1.0-plugins-ugly).
+#   - Channel-owner account (232283333863) on the media-service twcc-shadow-mode
+#     allowlist for AWS_DEFAULT_REGION (else TWCC won't negotiate).
+#   - A dedicated node label (rpi5-twcc) — all 4 jobs share one gst=ON build
+#     (same CANARY_MEDIA_SOURCE=testsrc -> same .build-flags -> cached), so they
+#     don't thrash each other, but DO keep them off a disk-path node.
+#   - A webrtc-storage-viewer node exists (or drop JS_STORAGE_VIEWER_JOIN).
 #
-# Pi defaults baked in: STS_DURATION_SECONDS=3600 (role-chaining cap),
-# VIEWER_WAIT_MINUTES=120 (from-scratch gst build far exceeds the 20-min default).
-# Isolate TWCC metrics via RUNNER_LABEL; keep SCENARIO_LABEL a consumer-recognized
-# value (StorageWithViewer). Until the TWCC port is merged to the canary's mainline,
-# GIT_HASH=twcc-canary.
+# For the initial single-Pi test on 002, set MASTER_NODE_LABEL=rpi5-002 (or add
+# the rpi5-twcc label to that node). Schedules are staggered 5 min apart so the
+# 4 jobs don't collide on the node's single executor.
 
-# TwccShaped (duration 156s ~3min, every 12 min) — shaped master + JS viewer
-H/12 * * * * %RUNNER_LABEL=TwccShaped;SCENARIO_LABEL=StorageWithViewer;JS_STORAGE_VIEWER_JOIN=true;CANARY_TWCC_SHAPING=true;CANARY_MEDIA_SOURCE=testsrc;TWCC_MIN_VIDEO_BITRATE_KBPS=100;TWCC_STAGE_SECONDS=20;TWCC_THROTTLE_LOSS=0;DURATION_IN_SECONDS=156;MASTER_NODE_LABEL=rpi5-twcc;STORAGE_VIEWER_NODE_LABEL=webrtc-storage-viewer;AWS_DEFAULT_REGION=us-east-1;ENDPOINT=;VIEWER_WAIT_MINUTES=120;STS_DURATION_SECONDS=3600;GIT_HASH=twcc-canary
+# RpiTwccGood
+0,20,40 * * * * %RUNNER_LABEL=RpiTwccGood;SCENARIO_LABEL=StorageWithViewer;JS_STORAGE_VIEWER_JOIN=true;CANARY_TWCC_SHAPING=true;TWCC_PROFILE=GOOD;CANARY_MEDIA_SOURCE=testsrc;TWCC_MIN_VIDEO_BITRATE_KBPS=100;DURATION_IN_SECONDS=156;MASTER_NODE_LABEL=rpi5-twcc;STORAGE_VIEWER_NODE_LABEL=webrtc-storage-viewer;AWS_DEFAULT_REGION=us-east-1;VIEWER_WAIT_MINUTES=120;STS_DURATION_SECONDS=3600;GIT_HASH=twcc-canary
+
+# RpiTwccBad
+5,25,45 * * * * %RUNNER_LABEL=RpiTwccBad;SCENARIO_LABEL=StorageWithViewer;JS_STORAGE_VIEWER_JOIN=true;CANARY_TWCC_SHAPING=true;TWCC_PROFILE=BAD;CANARY_MEDIA_SOURCE=testsrc;TWCC_MIN_VIDEO_BITRATE_KBPS=100;DURATION_IN_SECONDS=156;MASTER_NODE_LABEL=rpi5-twcc;STORAGE_VIEWER_NODE_LABEL=webrtc-storage-viewer;AWS_DEFAULT_REGION=us-east-1;VIEWER_WAIT_MINUTES=120;STS_DURATION_SECONDS=3600;GIT_HASH=twcc-canary
+
+# RpiTwccCongesting
+10,30,50 * * * * %RUNNER_LABEL=RpiTwccCongesting;SCENARIO_LABEL=StorageWithViewer;JS_STORAGE_VIEWER_JOIN=true;CANARY_TWCC_SHAPING=true;TWCC_PROFILE=CONGESTING;CANARY_MEDIA_SOURCE=testsrc;TWCC_MIN_VIDEO_BITRATE_KBPS=100;DURATION_IN_SECONDS=156;MASTER_NODE_LABEL=rpi5-twcc;STORAGE_VIEWER_NODE_LABEL=webrtc-storage-viewer;AWS_DEFAULT_REGION=us-east-1;VIEWER_WAIT_MINUTES=120;STS_DURATION_SECONDS=3600;GIT_HASH=twcc-canary
+
+# RpiTwccRecovering
+15,35,55 * * * * %RUNNER_LABEL=RpiTwccRecovering;SCENARIO_LABEL=StorageWithViewer;JS_STORAGE_VIEWER_JOIN=true;CANARY_TWCC_SHAPING=true;TWCC_PROFILE=RECOVERING;CANARY_MEDIA_SOURCE=testsrc;TWCC_MIN_VIDEO_BITRATE_KBPS=100;DURATION_IN_SECONDS=156;MASTER_NODE_LABEL=rpi5-twcc;STORAGE_VIEWER_NODE_LABEL=webrtc-storage-viewer;AWS_DEFAULT_REGION=us-east-1;VIEWER_WAIT_MINUTES=120;STS_DURATION_SECONDS=3600;GIT_HASH=twcc-canary
+
+# (optional) cycling variant for transition/ramp dynamics — TWCC_PROFILE omitted so it sweeps GOOD..RECOVERING
+# H/12 * * * * %RUNNER_LABEL=RpiTwccCycle;SCENARIO_LABEL=StorageWithViewer;JS_STORAGE_VIEWER_JOIN=true;CANARY_TWCC_SHAPING=true;CANARY_MEDIA_SOURCE=testsrc;TWCC_MIN_VIDEO_BITRATE_KBPS=100;TWCC_STAGE_SECONDS=20;DURATION_IN_SECONDS=600;MASTER_NODE_LABEL=rpi5-twcc;STORAGE_VIEWER_NODE_LABEL=webrtc-storage-viewer;AWS_DEFAULT_REGION=us-east-1;VIEWER_WAIT_MINUTES=120;STS_DURATION_SECONDS=3600;GIT_HASH=twcc-canary
