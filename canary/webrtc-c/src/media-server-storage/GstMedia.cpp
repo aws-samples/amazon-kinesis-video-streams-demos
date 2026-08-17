@@ -280,9 +280,13 @@ PVOID sendGstreamerAudioVideo(PVOID args)
                                       "byte-stream=TRUE tune=zerolatency ! "
                                       "video/x-h264,stream-format=byte-stream,alignment=au,profile=baseline ! "
                                       "appsink sync=TRUE emit-signals=TRUE name=appsink-video "
-                                      "audiotestsrc wave=ticks is-live=TRUE ! queue leaky=2 max-size-buffers=400 ! audioconvert ! "
+                                      // Real audio companion to the frames (assets/audio-source.wav:
+                                      // PCM s16le 48kHz mono, ~156s). audioconvert upmixes mono->stereo
+                                      // for the channels=2 Opus caps. Plays once and EOSes ~= the video
+                                      // length, so both branches EOS together for a clean duration stop.
+                                      "filesrc location=./assets/audio-source.wav ! wavparse ! audioconvert ! "
                                       "audioresample ! opusenc name=sampleAudioEncoder ! audio/x-opus,rate=48000,channels=2 ! "
-                                      "appsink sync=TRUE emit-signals=TRUE name=appsink-audio",
+                                      "queue ! appsink sync=TRUE emit-signals=TRUE name=appsink-audio",
                                       pAssetSet);
                 CHK_ERR(stringOutcome < GST_PIPELINE_MAX_CHAR_COUNT, STATUS_INVALID_OPERATION,
                         "[KVS GStreamer Master] frame-source pipeline exceeds maximum allowed length");
