@@ -365,7 +365,8 @@ def buildStorageCanary(isConsumer, params) {
         'CANARY_FRAME_RATE': params.STORAGE_FPS ?: '',
         'CANARY_ASSET_SET': params.STORAGE_ASSET_SET ?: '',
         'CANARY_MEDIA_TYPE': env.CANARY_MEDIA_TYPE ?: '',
-        'CANARY_MEDIA_SOURCE': params.CANARY_MEDIA_SOURCE ?: ''
+        'CANARY_MEDIA_SOURCE': params.CANARY_MEDIA_SOURCE ?: '',
+        'CANARY_GST_FILE': params.CANARY_GST_FILE ?: ''
     ]
 
     // TWCC shaping needs a live encoder to adapt: force the GStreamer path and set
@@ -601,7 +602,8 @@ pipeline {
         booleanParam(name: 'NO_LOOP_FRAMES', defaultValue: false, description: 'Stop after sending all frames once instead of looping')
         string(name: 'STORAGE_FPS', defaultValue: '', description: 'Override storage master frame rate (e.g., 10 for low FPS test). Empty uses default 30 fps.')
         string(name: 'STORAGE_ASSET_SET', defaultValue: '', description: 'Frame asset set: empty=default h264SampleFrames, or e.g. h264SampleFrames-500kbps / -1mbps / -5mbps')
-        string(name: 'CANARY_MEDIA_SOURCE', defaultValue: '', description: 'Master media source: empty/disk=pre-encoded frames, devicesrc=physical camera, testsrc=GStreamer test pattern, rtspsrc=RTSP. Non-disk values trigger a GStreamer-enabled build (requires libgstreamer1.0-dev on the master node).')
+        string(name: 'CANARY_MEDIA_SOURCE', defaultValue: '', description: 'Master media source: empty/disk=pre-encoded frames, devicesrc=physical camera, testsrc=GStreamer test pattern, rtspsrc=RTSP, filesrc=local video file. Non-disk values trigger a GStreamer-enabled build (requires libgstreamer1.0-dev on the master node).')
+        string(name: 'CANARY_GST_FILE', defaultValue: '', description: 'Absolute path on the master node to a video file, required when CANARY_MEDIA_SOURCE=filesrc (e.g. /home/jenkins/media/big_buck_bunny.mp4). Decoded and re-encoded via x264enc so TWCC drives bitrate; must be longer than the run (no looping).')
         string(name: 'CANARY_ASSET_BUCKET', defaultValue: '', description: 'S3 bucket hosting the frame-set tarballs (required when STORAGE_ASSET_SET is set)')
         string(name: 'CANARY_ASSET_PREFIX', defaultValue: '', description: 'S3 key prefix for frame-set tarballs, e.g. webrtc-canary/frame-sets/v1 (required when STORAGE_ASSET_SET is set)')
         string(name: 'CANARY_ASSET_REGION', defaultValue: '', description: 'Region of the S3 asset bucket. May differ from AWS_DEFAULT_REGION. Empty falls back to AWS_DEFAULT_REGION.')

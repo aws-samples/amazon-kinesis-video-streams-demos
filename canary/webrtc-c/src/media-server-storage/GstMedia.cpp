@@ -240,6 +240,7 @@ PVOID sendGstreamerAudioVideo(PVOID args)
                     &gError);
                 break;
             }
+            case FILE_SOURCE: // file:// URI built in gstParseSrcTypeFromEnv; same uridecodebin pipeline as RTSP
             case RTSP_SOURCE: {
                 UINT32 stringOutcome =
                     (UINT32) SNPRINTF(pipelineBuffer, GST_PIPELINE_MAX_CHAR_COUNT,
@@ -254,6 +255,34 @@ PVOID sendGstreamerAudioVideo(PVOID args)
                                       pSampleConfiguration->rtspUri);
                 CHK_ERR(stringOutcome < GST_PIPELINE_MAX_CHAR_COUNT, STATUS_INVALID_OPERATION,
                         "[KVS GStreamer Master] RTSP uri entered exceeds maximum allowed length");
+                senderPipeline = gst_parse_launch(pipelineBuffer, &gError);
+                break;
+            }
+            case FRAME_SOURCE: {
+                // Reuse the repo's pre-encoded frame sequence (same CANARY_ASSET_SET
+                // selector as the disk path), but decode + re-encode LIVE so TWCC drives
+                // the x264enc bitrate. multifilesrc reads frame-0001.h264, 0002, ... as
+                // one byte-stream and loops at EOS (no run-duration limit). avdec_h264
+                // needs gstreamer1.0-libav (installed by rpi-onboard.sh).
+                PCHAR pAssetSet = GETENV((PCHAR) "CANARY_ASSET_SET");
+                if (pAssetSet == NULL || pAssetSet[0] == '\0') {
+                    pAssetSet = (PCHAR) "h264SampleFrames";
+                }
+                UINT32 stringOutcome =
+                    (UINT32) SNPRINTF(pipelineBuffer, GST_PIPELINE_MAX_CHAR_COUNT,
+                                      "multifilesrc location=./assets/%s/frame-%%04d.h264 index=1 loop=true "
+                                      "caps=video/x-h264,stream-format=byte-stream,alignment=au,framerate=30/1 ! "
+                                      "h264parse ! avdec_h264 ! videoconvert ! "
+                                      "x264enc name=sampleVideoEncoder bframes=0 key-int-max=30 speed-preset=veryfast bitrate=512 "
+                                      "byte-stream=TRUE tune=zerolatency ! "
+                                      "video/x-h264,stream-format=byte-stream,alignment=au,profile=baseline ! "
+                                      "appsink sync=TRUE emit-signals=TRUE name=appsink-video "
+                                      "audiotestsrc wave=ticks is-live=TRUE ! queue leaky=2 max-size-buffers=400 ! audioconvert ! "
+                                      "audioresample ! opusenc name=sampleAudioEncoder ! audio/x-opus,rate=48000,channels=2 ! "
+                                      "appsink sync=TRUE emit-signals=TRUE name=appsink-audio",
+                                      pAssetSet);
+                CHK_ERR(stringOutcome < GST_PIPELINE_MAX_CHAR_COUNT, STATUS_INVALID_OPERATION,
+                        "[KVS GStreamer Master] frame-source pipeline exceeds maximum allowed length");
                 senderPipeline = gst_parse_launch(pipelineBuffer, &gError);
                 break;
             }
@@ -354,7 +383,7 @@ STATUS gstParseSrcTypeFromEnv(PSampleConfiguration pSampleConfiguration)
 {
     ENTERS();
     STATUS retStatus = STATUS_SUCCESS;
-    PCHAR pMediaSource, pRtspUri;
+    PCHAR pMediaSource, pRtspUri, pFile;
 
     CHK(pSampleConfiguration != NULL, STATUS_NULL_ARG);
 
@@ -375,6 +404,23 @@ STATUS gstParseSrcTypeFromEnv(PSampleConfiguration pSampleConfiguration)
         DLOGI("[KVS GStreamer Master] Using RTSP source in GStreamer: %s", pRtspUri);
         pSampleConfiguration->srcType = RTSP_SOURCE;
         pSampleConfiguration->rtspUri = pRtspUri;
+    } else if (STRCMP(pMediaSource, "filesrc") == 0) {
+        // A local file is just a file:// URI into uridecodebin, so FILE_SOURCE reuses
+        // the RTSP pipeline (decode -> re-encode via x264enc, so TWCC drives bitrate).
+        static CHAR fileUri[GST_PIPELINE_MAX_CHAR_COUNT];
+        pFile = GETENV(CANARY_GST_FILE_ENV_VAR);
+        CHK_ERR(pFile != NULL && pFile[0] != '\0', STATUS_INVALID_OPERATION,
+                "[KVS GStreamer Master] %s must be set (absolute path) when %s=filesrc", CANARY_GST_FILE_ENV_VAR, CANARY_MEDIA_SOURCE_ENV_VAR);
+        SNPRINTF(fileUri, GST_PIPELINE_MAX_CHAR_COUNT, "file://%s", pFile);
+        DLOGI("[KVS GStreamer Master] Using file source in GStreamer: %s", fileUri);
+        pSampleConfiguration->srcType = FILE_SOURCE;
+        pSampleConfiguration->rtspUri = fileUri;
+    } else if (STRCMP(pMediaSource, "framesrc") == 0) {
+        // Stream the repo's pre-encoded frame sequence, decoded + re-encoded live so
+        // TWCC can drive the x264enc bitrate. Reuses CANARY_ASSET_SET (same selector
+        // as the disk path). Pipeline built in the FRAME_SOURCE case below.
+        DLOGI("[KVS GStreamer Master] Using frame-file source (multifilesrc, decode+re-encode) in GStreamer");
+        pSampleConfiguration->srcType = FRAME_SOURCE;
     } else {
         DLOGI("[KVS GStreamer Master] Unrecognized %s value '%s'. Defaulting to device source", CANARY_MEDIA_SOURCE_ENV_VAR, pMediaSource);
     }

@@ -83,6 +83,8 @@ typedef enum {
     TEST_SOURCE,
     DEVICE_SOURCE,
     RTSP_SOURCE,
+    FILE_SOURCE,
+    FRAME_SOURCE,
 } SampleSourceType;
 
 typedef struct __SampleStreamingSession SampleStreamingSession;
