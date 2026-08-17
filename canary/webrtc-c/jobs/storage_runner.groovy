@@ -557,13 +557,15 @@ pipeline {
 
     options {
         skipDefaultCheckout()
-        // Whole-pipeline hard timeout: scenario duration + 35 min buffer (incremental
-        // build ~2-5 min, viewer wait, consumer runs DURATION+120s, GetClip + verify).
-        // Guarantees the executor is always released even if any step hangs
-        // (GetClip, git, flock, viewer waits, ...) — the backstop that would have
-        // capped the 2.5-day gamma queue pile-up at ~40 min
-        // (see docs/gamma-queue-pileup-investigation.md).
-        timeout(time: params.DURATION_IN_SECONDS.toInteger() + 2100, unit: 'SECONDS')
+        // Whole-pipeline hard timeout: scenario duration + buffer (viewer wait,
+        // consumer runs DURATION+120s, GetClip + verify). Guarantees the executor is
+        // always released even if any step hangs (GetClip, git, flock, viewer waits,
+        // ...) — the backstop that would have capped the 2.5-day gamma queue pile-up
+        // at ~40 min (see docs/gamma-queue-pileup-investigation.md).
+        // Disk path builds incrementally (~2-5 min) -> 35 min buffer. GStreamer media
+        // sources (testsrc/devicesrc/rtspsrc) can trigger a COLD build (~35-40 min on
+        // the Pi), so they get a 90 min buffer to avoid aborting mid-build.
+        timeout(time: params.DURATION_IN_SECONDS.toInteger() + (((params.CANARY_MEDIA_SOURCE ?: 'disk') == 'disk') ? 2100 : 5400), unit: 'SECONDS')
     }
 
     parameters {

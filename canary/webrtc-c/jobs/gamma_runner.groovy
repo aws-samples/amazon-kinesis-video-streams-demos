@@ -626,7 +626,11 @@ pipeline {
         // the whole node (see docs/gamma-queue-pileup-investigation.md). Same-scenario
         // concurrency is already prevented by the 'Skip if duplicate' stage, which
         // exits in seconds instead of holding an executor.
-        timeout(time: params.DURATION_IN_SECONDS.toInteger() + 2100, unit: 'SECONDS')
+        //
+        // Disk path builds incrementally (~2-5 min) -> 35 min buffer. GStreamer media
+        // sources (testsrc/devicesrc/rtspsrc) can trigger a COLD build (~35-40 min on
+        // the Pi), so they get a 90 min buffer to avoid aborting mid-build.
+        timeout(time: params.DURATION_IN_SECONDS.toInteger() + (((params.CANARY_MEDIA_SOURCE ?: 'disk') == 'disk') ? 2100 : 5400), unit: 'SECONDS')
         // Skip the declarative per-stage automatic SCM checkout (matches storage_runner).
         // Without this, every stage with an agent does a 'git checkout' into the node's
         // DEFAULT workspace; with all viewer stages sharing one viewer node, an aborted
