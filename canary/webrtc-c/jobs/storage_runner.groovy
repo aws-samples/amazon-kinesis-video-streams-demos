@@ -770,7 +770,7 @@ pipeline {
                                 sh "touch '${env.WORKSPACE}/.in_use'"
                                 try {
                                     def mutableParams = [:] + params
-                                    mutableParams.DURATION_IN_SECONDS = "156"
+                                    mutableParams.DURATION_IN_SECONDS = params.DURATION_IN_SECONDS ?: "156"
                                     buildStorageCanary(false, mutableParams)
                                 } finally {
                                     sh "rm -f '${env.WORKSPACE}/.in_use'"
@@ -814,7 +814,7 @@ pipeline {
                             sh "touch '${env.WORKSPACE}/.in_use'"
                             try {
                                 def mutableParams = [:] + params
-                                mutableParams.DURATION_IN_SECONDS = "156"
+                                mutableParams.DURATION_IN_SECONDS = params.DURATION_IN_SECONDS ?: "156"
                                 buildStorageCanary(true, mutableParams)
                             } finally {
                                 sh "rm -f '${env.WORKSPACE}/.in_use'"
@@ -840,7 +840,7 @@ pipeline {
                                 sh "touch '${env.WORKSPACE}/.in_use'"
                                 try {
                                     def mutableParams = [:] + params
-                                    mutableParams.DURATION_IN_SECONDS = "156"
+                                    mutableParams.DURATION_IN_SECONDS = params.DURATION_IN_SECONDS ?: "156"
                                     buildStorageCanary(false, mutableParams)
                                 } finally {
                                     sh "rm -f '${env.WORKSPACE}/.in_use'"
@@ -890,7 +890,7 @@ pipeline {
                             sh "touch '${env.WORKSPACE}/.in_use'"
                             try {
                                 def mutableParams = [:] + params
-                                mutableParams.DURATION_IN_SECONDS = "156"
+                                mutableParams.DURATION_IN_SECONDS = params.DURATION_IN_SECONDS ?: "156"
                                 buildStorageCanary(true, mutableParams)
                             } finally {
                                 sh "rm -f '${env.WORKSPACE}/.in_use'"
@@ -916,7 +916,7 @@ pipeline {
                                 sh "touch '${env.WORKSPACE}/.in_use'"
                                 try {
                                     def mutableParams = [:] + params
-                                    mutableParams.DURATION_IN_SECONDS = "156"
+                                    mutableParams.DURATION_IN_SECONDS = params.DURATION_IN_SECONDS ?: "156"
                                     buildStorageCanary(false, mutableParams)
                                 } finally {
                                     sh "rm -f '${env.WORKSPACE}/.in_use'"
@@ -979,7 +979,7 @@ pipeline {
                             sh "touch '${env.WORKSPACE}/.in_use'"
                             try {
                                 def mutableParams = [:] + params
-                                mutableParams.DURATION_IN_SECONDS = "156"
+                                mutableParams.DURATION_IN_SECONDS = params.DURATION_IN_SECONDS ?: "156"
                                 buildStorageCanary(true, mutableParams)
                             } finally {
                                 sh "rm -f '${env.WORKSPACE}/.in_use'"
@@ -1005,7 +1005,7 @@ pipeline {
                                 sh "touch '${env.WORKSPACE}/.in_use'"
                                 try {
                                     def mutableParams = [:] + params
-                                    mutableParams.DURATION_IN_SECONDS = "156"
+                                    mutableParams.DURATION_IN_SECONDS = params.DURATION_IN_SECONDS ?: "156"
                                     // Set video-only mode for the master
                                     env.CANARY_MEDIA_TYPE = "video_only"
                                     // Wait for all viewers to join before starting the master binary
