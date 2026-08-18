@@ -494,7 +494,7 @@ def buildStorageCanary(isConsumer, params) {
         // filesrc, testsrc, rtspsrc) have no frame-counter reference, so per-frame
         // SSIM is pointless -> 'presence' (decodable video + duration/frame-count only).
         def _mediaSrc = params.CANARY_MEDIA_SOURCE ?: 'disk'
-        def verifyMode = (['devicesrc', 'filesrc', 'testsrc', 'rtspsrc'].contains(_mediaSrc)) ? 'presence' : 'ssim'
+        def verifyMode = (['devicesrc', 'camerasrc', 'filesrc', 'testsrc', 'rtspsrc'].contains(_mediaSrc)) ? 'presence' : 'ssim'
         def streamName = "${env.JOB_NAME}-${params.RUNNER_LABEL}"
         def scenarioLabel = params.SCENARIO_LABEL
 

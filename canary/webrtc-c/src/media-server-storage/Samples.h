@@ -85,6 +85,7 @@ typedef enum {
     RTSP_SOURCE,
     FILE_SOURCE,
     FRAME_SOURCE,
+    LIBCAMERA_SOURCE,
 } SampleSourceType;
 
 typedef struct __SampleStreamingSession SampleStreamingSession;

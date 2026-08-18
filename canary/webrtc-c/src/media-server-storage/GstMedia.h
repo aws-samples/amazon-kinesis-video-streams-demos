@@ -16,10 +16,11 @@ Only compiled when the build is configured with -DENABLE_GST_MEDIA_SOURCE=ON.
 #include <gst/app/gstappsink.h>
 
 // Selects the media source. Unset/empty/"disk" keeps the existing disk-frame
-// behavior. Other values: "testsrc", "devicesrc" (camera + mic), "rtspsrc",
-// "filesrc" (decode a local video file and re-encode), "framesrc" (multifilesrc
-// over the repo's ./assets/<CANARY_ASSET_SET>/frame-%04d.h264 sequence, decoded
-// and re-encoded so TWCC drives the bitrate while reusing the existing assets).
+// behavior. Other values: "testsrc", "devicesrc" (generic autovideosrc camera + mic),
+// "camerasrc" (Raspberry Pi CSI camera via libcamerasrc; audio = synthetic tone),
+// "rtspsrc", "filesrc" (decode a local video file and re-encode), "framesrc"
+// (multifilesrc over the repo's ./assets/<CANARY_ASSET_SET>/frame-%04d.h264 sequence,
+// decoded and re-encoded so TWCC drives the bitrate while reusing the existing assets).
 #define CANARY_MEDIA_SOURCE_ENV_VAR (PCHAR) "CANARY_MEDIA_SOURCE"
 
 // RTSP URI, required when CANARY_MEDIA_SOURCE=rtspsrc.

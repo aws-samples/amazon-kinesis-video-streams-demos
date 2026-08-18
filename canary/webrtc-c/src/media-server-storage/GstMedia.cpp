@@ -293,6 +293,31 @@ PVOID sendGstreamerAudioVideo(PVOID args)
                 senderPipeline = gst_parse_launch(pipelineBuffer, &gError);
                 break;
             }
+            case LIBCAMERA_SOURCE: {
+                // Raspberry Pi CSI camera via libcamera (e.g. imx708). The generic
+                // devicesrc/autovideosrc path can't reliably drive a libcamera camera
+                // (and its autoaudiosrc has no mic to open). No mic, so audio is a
+                // synthetic tone. x264enc is named sampleVideoEncoder so TWCC drives it.
+                //
+                // libcamerasrc caps, verified on an imx708 (gst-launch on the Pi):
+                //   - MUST pin the pixel format (format=NV12) or negotiation fails
+                //     ("not-negotiated"); NV12 is what libcamerasrc offers and x264enc
+                //     accepts, so NO videoconvert is needed (per the low-bitrate SOP).
+                //   - MUST NOT pin framerate in these caps (framerate=N/1 also fails to
+                //     negotiate); libcamera runs the mode's native fps.
+                //   - width/height are fine once format is pinned (libcamera ISP scales).
+                senderPipeline = gst_parse_launch(
+                    "libcamerasrc ! video/x-raw,format=NV12,width=1280,height=720 ! "
+                    "x264enc name=sampleVideoEncoder bframes=0 key-int-max=30 speed-preset=veryfast bitrate=512 "
+                    "byte-stream=TRUE tune=zerolatency ! "
+                    "video/x-h264,stream-format=byte-stream,alignment=au,profile=baseline ! "
+                    "appsink sync=TRUE emit-signals=TRUE name=appsink-video "
+                    "audiotestsrc wave=ticks is-live=TRUE ! queue leaky=2 max-size-buffers=400 ! audioconvert ! "
+                    "audioresample ! opusenc name=sampleAudioEncoder ! audio/x-opus,rate=48000,channels=2 ! "
+                    "appsink sync=TRUE emit-signals=TRUE name=appsink-audio",
+                    &gError);
+                break;
+            }
         }
     }
 
@@ -428,6 +453,12 @@ STATUS gstParseSrcTypeFromEnv(PSampleConfiguration pSampleConfiguration)
         // as the disk path). Pipeline built in the FRAME_SOURCE case below.
         DLOGI("[KVS GStreamer Master] Using frame-file source (multifilesrc, decode+re-encode) in GStreamer");
         pSampleConfiguration->srcType = FRAME_SOURCE;
+    } else if (STRCMP(pMediaSource, "camerasrc") == 0) {
+        // Raspberry Pi CSI camera via libcamera. The generic devicesrc/autovideosrc
+        // path can't open a libcamera camera; this uses libcamerasrc explicitly.
+        // Needs gstreamer1.0-libcamera (installed by rpi-onboard.sh / install-twcc-node.sh).
+        DLOGI("[KVS GStreamer Master] Using libcamera camera source (libcamerasrc) in GStreamer");
+        pSampleConfiguration->srcType = LIBCAMERA_SOURCE;
     } else {
         DLOGI("[KVS GStreamer Master] Unrecognized %s value '%s'. Defaulting to device source", CANARY_MEDIA_SOURCE_ENV_VAR, pMediaSource);
     }
