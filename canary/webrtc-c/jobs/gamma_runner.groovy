@@ -488,6 +488,13 @@ def buildStorageCanary(isConsumer, params) {
         def clipPath = "${repoDir}/canary/consumer-java/clip-${START_TIMESTAMP}.mp4"
         def verifyScript = "${repoDir}/canary/webrtc-c/scripts/video-verification/verify.py"
         def sourceFrames = "${repoDir}/canary/webrtc-c/assets/${assetSet}"
+        // Verification mode by source. Deterministic sample-frame sources (disk /
+        // framesrc) carry a burned-in frame counter, so we can rebuild a reference
+        // and score each frame -> 'ssim'. Live / non-deterministic sources (camera,
+        // filesrc, testsrc, rtspsrc) have no frame-counter reference, so per-frame
+        // SSIM is pointless -> 'presence' (decodable video + duration/frame-count only).
+        def _mediaSrc = params.CANARY_MEDIA_SOURCE ?: 'disk'
+        def verifyMode = (['devicesrc', 'filesrc', 'testsrc', 'rtspsrc'].contains(_mediaSrc)) ? 'presence' : 'ssim'
         def streamName = "${env.JOB_NAME}-${params.RUNNER_LABEL}"
         def scenarioLabel = params.SCENARIO_LABEL
 
@@ -506,7 +513,7 @@ def buildStorageCanary(isConsumer, params) {
                         fi
                         . "\$VENV_DIR/bin/activate"
                         pip install -q pytesseract Pillow scikit-image numpy 2>/dev/null
-                        python3 '${verifyScript}' --recording '${clipPath}' --source-frames '${sourceFrames}' --expected-duration '${params.DURATION_IN_SECONDS}' --json
+                        python3 '${verifyScript}' --recording '${clipPath}' --source-frames '${sourceFrames}' --mode '${verifyMode}' --expected-duration '${params.DURATION_IN_SECONDS}' --json
                     """,
                     returnStdout: true
                 ).trim()

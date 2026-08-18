@@ -2,18 +2,26 @@
 """
 Video verification script for WebRTC storage canary.
 
-Compares the received video (GetClip or viewer recording) against the source
-H.264 frames to determine StorageAvailability.
+Verifies the received video (GetClip or viewer recording) to determine
+StorageAvailability. Two modes:
 
-Pipeline:
-  1. Build a reference video from the raw H.264 sample frames
-  2. Extract 1fps from the received clip
-  3. OCR each clip frame to read the frame counter
-  4. Extract only the needed reference frames (by frame number)
-  5. Compare each clip frame against its matching reference frame via SSIM
-  6. Emit storage_availability: 1 if thresholds pass, 0 otherwise
+  ssim (default) — deterministic sources (disk / framesrc): the stream carries
+    the repo's sample frames with a burned-in frame counter, so we can rebuild a
+    reference and score each clip frame against its matching source frame:
+      1. Build a reference video from the raw H.264 sample frames
+      2. Extract 1fps from the received clip
+      3. OCR each clip frame to read the frame counter
+      4. Extract only the needed reference frames (by frame number)
+      5. Compare each clip frame against its matching reference frame via SSIM
 
-Thresholds (matching VideoVerificationComponent.java):
+  presence — live / non-deterministic sources (camera / filesrc / testsrc):
+    there is no frame-counter reference to OCR-match, so per-frame SSIM is
+    pointless. Instead we only confirm the clip is a decodable video of roughly
+    the right length (duration + frame count). TWCC varies bitrate, not frame
+    rate, so a healthy ingest still delivers ~FPS*duration frames even under
+    congestion.
+
+ssim thresholds (matching VideoVerificationComponent.java):
   - Duration >= 120 seconds
   - Max SSIM > 0.99
   - Avg SSIM > 0.85
@@ -22,6 +30,7 @@ Thresholds (matching VideoVerificationComponent.java):
 
 Usage:
   python verify.py --recording clip.mp4 --source-frames ../../assets/h264SampleFrames --json
+  python verify.py --recording clip.mp4 --mode presence --expected-duration 600 --json
 """
 
 import argparse
@@ -43,6 +52,12 @@ FPS = 30
 TOTAL_SOURCE_FRAMES = 4676
 EXPECTED_DURATION = TOTAL_SOURCE_FRAMES / FPS  # ~155.87s
 DROPPED_FRAME_THRESHOLD = 1500
+
+# Presence-mode thresholds (no frame-by-frame comparison): the clip just has to
+# be a decodable video of roughly the right length. TWCC varies bitrate, not
+# frame rate, so a healthy ingest still delivers ~FPS*duration frames.
+PRESENCE_DURATION_FRACTION = 0.8   # clip must cover >= 80% of the expected run
+PRESENCE_FRAME_FRACTION = 0.5      # and decode >= 50% of FPS*duration frames
 
 # Sync box crop coordinates for 1280x720 frames
 TIMER_CROP = (25, 20, 145, 90)
@@ -93,6 +108,20 @@ def get_video_duration(video_path):
         return float(result.stdout.strip())
     except ValueError:
         return None
+
+
+def count_video_frames(video_path):
+    """Count decoded video frames in a clip via ffprobe. Returns int (0 on error)."""
+    fc_cmd = [
+        'ffprobe', '-v', 'error', '-select_streams', 'v:0',
+        '-count_frames', '-show_entries', 'stream=nb_read_frames',
+        '-of', 'default=noprint_wrappers=1:nokey=1', video_path
+    ]
+    fc_result = subprocess.run(fc_cmd, capture_output=True, text=True)
+    try:
+        return int(fc_result.stdout.strip())
+    except ValueError:
+        return 0
 
 
 def build_reference_video(source_dir, output_path):
@@ -183,13 +212,20 @@ def compute_ssim(img_path_a, img_path_b):
 
 def main():
     parser = argparse.ArgumentParser(
-        description='Verify received video against source frames for StorageAvailability')
+        description='Verify received video for StorageAvailability')
     parser.add_argument('--recording', required=True, nargs='+',
                         help='Path(s) to received video. A viewer session that reconnects '
                              'produces one recording segment per connection; pass all of '
                              'them and they are verified as one logical recording '
                              '(durations and frame counts are summed before thresholds).')
-    parser.add_argument('--source-frames', required=True, help='Path to H.264 source frames directory')
+    parser.add_argument('--source-frames', required=False, default=None,
+                        help='Path to H.264 source frames directory (required for --mode ssim; '
+                             'ignored for --mode presence)')
+    parser.add_argument('--mode', choices=['ssim', 'presence'], default='ssim',
+                        help="ssim = frame-by-frame SSIM vs the source frames (deterministic "
+                             "sources: disk/framesrc). presence = decodable-video + duration/"
+                             "frame-count only, no per-frame comparison (live/non-deterministic "
+                             "sources: camera/filesrc/testsrc, which have no frame-counter reference).")
     parser.add_argument('--expected-duration', type=float, default=EXPECTED_DURATION,
                         help=f'Expected duration in seconds (default: {EXPECTED_DURATION})')
     parser.add_argument('--keep-frames', action='store_true', help='Keep extracted frames')
@@ -211,24 +247,14 @@ def main():
     if not recordings:
         print("No recordings found", file=sys.stderr)
         sys.exit(1)
-    if not os.path.isdir(args.source_frames):
-        print(f"Source frames directory not found: {args.source_frames}", file=sys.stderr)
-        sys.exit(1)
 
     work_dir = tempfile.mkdtemp(prefix='video-verify-')
     try:
-        # Phase 1: Build reference video
-        print("\n--- Phase 1: Building reference video ---")
-        ref_video = build_reference_video(
-            args.source_frames, os.path.join(work_dir, 'reference.mp4'))
-        if not ref_video:
-            print("Failed to build reference video", file=sys.stderr)
-            sys.exit(1)
-
-        # Phase 2: Duration and frame count check — summed across all segments so a
-        # reconnected session (multiple files) is judged against the same session-wide
-        # thresholds as a single uninterrupted recording.
-        print("\n--- Phase 2: Duration and frame count ---")
+        # --- Duration and frame count (both modes) ---
+        # Summed across all segments so a reconnected session (multiple files) is
+        # judged against the same session-wide thresholds as one uninterrupted
+        # recording.
+        print("\n--- Duration and frame count ---")
         expected = args.expected_duration
         clip_duration = None
         clip_total_frames = 0
@@ -236,17 +262,7 @@ def main():
             seg_duration = get_video_duration(rec)
             if seg_duration is not None:
                 clip_duration = (clip_duration or 0.0) + seg_duration
-
-            fc_cmd = [
-                'ffprobe', '-v', 'error', '-select_streams', 'v:0',
-                '-count_frames', '-show_entries', 'stream=nb_read_frames',
-                '-of', 'default=noprint_wrappers=1:nokey=1', rec
-            ]
-            fc_result = subprocess.run(fc_cmd, capture_output=True, text=True)
-            try:
-                seg_frames = int(fc_result.stdout.strip())
-            except ValueError:
-                seg_frames = 0
+            seg_frames = count_video_frames(rec)
             clip_total_frames += seg_frames
             print(f"  segment {rec}: duration={seg_duration if seg_duration is not None else 'N/A'}s frames={seg_frames}")
 
@@ -255,9 +271,51 @@ def main():
         print(f"Clip total frames:  {clip_total_frames}")
         print(f"Expected duration:  {expected:.2f}s")
 
-        # Phase 3: Extract 1fps from every segment into a combined frame list. Order
-        # across segments doesn't matter — OCR maps each frame back to its source
-        # frame number independently.
+        # --- Presence mode: decodable video of roughly the right length, no
+        # frame-by-frame comparison (live/non-deterministic sources) ---
+        if args.mode == 'presence':
+            print("\n--- Presence check (no frame-by-frame comparison) ---")
+            duration_threshold = expected * PRESENCE_DURATION_FRACTION
+            min_frames = int(FPS * expected * PRESENCE_FRAME_FRACTION)
+            duration_ok = clip_duration is not None and clip_duration >= duration_threshold
+            frames_ok = clip_total_frames >= min_frames
+            available = 1 if (duration_ok and frames_ok) else 0
+
+            dur_str = f"{clip_duration:.2f}s" if clip_duration is not None else "N/A"
+            print(f"Duration:           {dur_str} ({'PASS' if duration_ok else 'FAIL'} — threshold: >= {duration_threshold:.1f}s)")
+            print(f"Clip frames:        {clip_total_frames} ({'PASS' if frames_ok else 'FAIL'} — threshold: >= {min_frames})")
+            print(f"Storage available:  {available}")
+
+            result = {
+                'storage_availability': available,
+                'mode': 'presence',
+                'frames_decoded': clip_total_frames,
+                'clip_duration': round(clip_duration, 2) if clip_duration else None,
+                'expected_duration': round(expected, 2),
+                'segments': len(recordings),
+            }
+            if args.json_output:
+                json.dump(result, sys.stdout)
+                print()
+            sys.exit(0)
+
+        # --- SSIM mode (deterministic sources: disk / framesrc) ---
+        if not args.source_frames or not os.path.isdir(args.source_frames):
+            print(f"--mode ssim requires a valid --source-frames directory: {args.source_frames}",
+                  file=sys.stderr)
+            sys.exit(1)
+
+        # Phase 1: Build reference video
+        print("\n--- Phase 1: Building reference video ---")
+        ref_video = build_reference_video(
+            args.source_frames, os.path.join(work_dir, 'reference.mp4'))
+        if not ref_video:
+            print("Failed to build reference video", file=sys.stderr)
+            sys.exit(1)
+
+        # Phase 3: Extract 1fps from every segment into a combined frame list.
+        # Order across segments doesn't matter — OCR maps each frame back to its
+        # source frame number independently.
         print("\n--- Phase 3: Extracting clip frames at 1 FPS ---")
         clip_frames = []
         for idx, rec in enumerate(recordings):
@@ -307,7 +365,8 @@ def main():
         print("\n--- Results ---")
         if not scores:
             print("No frames compared!", file=sys.stderr)
-            result = {'storage_availability': 0, 'clip_duration': clip_duration,
+            result = {'storage_availability': 0, 'mode': 'ssim',
+                      'clip_duration': clip_duration,
                       'frames_compared': 0, 'ocr_failures': ocr_failures,
                       'segments': len(recordings)}
         else:
@@ -333,6 +392,7 @@ def main():
 
             result = {
                 'storage_availability': available,
+                'mode': 'ssim',
                 'max_ssim': round(max_ssim, 4),
                 'avg_ssim': round(avg_ssim, 4),
                 'min_ssim': round(min_ssim, 4),
