@@ -9,11 +9,21 @@
 set -euo pipefail
 
 MASTER_HOME="${HOME}/webrtc-c-storage-master"
+REPO_DIR="${MASTER_HOME}/repo"
+
+# Ensure the log target directory exists (cron redirects into it; if missing,
+# the shell can't open the >> target and the script never runs).
+mkdir -p "${MASTER_HOME}/logs"
 
 echo "$(date -u '+%Y-%m-%dT%H:%M:%SZ') [cleanup-master] Starting cleanup"
 
 # Build logs older than 24 hours (keep recent for debugging)
 find "${MASTER_HOME}/logs" -name 'build-*.log' -mmin +1440 -delete 2>/dev/null || true
+
+# GetClip MP4 files older than 1 hour. The consumer/GetClip step runs on the
+# master node in some topologies, so clips land here too — without this rule
+# they accumulate unbounded and fill the disk.
+find "${REPO_DIR}/canary/consumer-java" -name 'clip-*.mp4' -mmin +60 -delete 2>/dev/null || true
 
 # IoT cert artifacts older than 1 hour
 # Certs are regenerated each run, old ones are stale
@@ -44,5 +54,10 @@ find "${MASTER_HOME}" -name 'core.*' -mmin +60 -delete 2>/dev/null || true
 
 # firstFrameSentTimeStamp files
 find "${MASTER_HOME}/build" -name 'firstFrameSentTimeStamp*.txt' -mmin +60 -delete 2>/dev/null || true
+
+# Video verification temp dirs (from verify.py) — present when the consumer/
+# GetClip verification step runs on this node.
+find /tmp -maxdepth 1 -name 'video-verify-*' -type d -mmin +60 -exec rm -rf {} + 2>/dev/null || true
+find /tmp -maxdepth 1 -name 'tess_*' -mmin +60 -exec rm -rf {} + 2>/dev/null || true
 
 echo "$(date -u '+%Y-%m-%dT%H:%M:%SZ') [cleanup-master] Done"

@@ -12,6 +12,10 @@ set -euo pipefail
 
 VIEWER_HOME="${HOME}/JS-viewer-build"
 
+# Ensure the log target directory exists (cron redirects into it; if missing,
+# the shell can't open the >> target and the script never runs).
+mkdir -p "${VIEWER_HOME}"
+
 echo "$(date -u '+%Y-%m-%dT%H:%M:%SZ') [cleanup-viewer] Starting cleanup"
 
 # Dev server logs older than 1 hour
@@ -41,8 +45,15 @@ for dir in "${HOME}/Jenkins"/webrtc-*-[Vv]iewer*; do
     rm -rf "$dir"
 done
 
-# Puppeteer crash dumps if any
-find /tmp -name 'puppeteer_dev_*' -mmin +60 -delete 2>/dev/null || true
+# Video verification temp dirs (from verify.py) — the biggest disk hog on
+# viewer nodes. Each verified session leaves a ~150-300MB working dir of
+# extracted frames, plus Tesseract OCR scratch files.
+find /tmp -maxdepth 1 -name 'video-verify-*' -type d -mmin +60 -exec rm -rf {} + 2>/dev/null || true
+find /tmp -maxdepth 1 -name 'tess_*' -mmin +60 -exec rm -rf {} + 2>/dev/null || true
+
+# Puppeteer / Chromium crash dumps and profiles if any
+find /tmp -name 'puppeteer_dev_*' -mmin +60 -exec rm -rf {} + 2>/dev/null || true
 find /tmp -name 'chrome_crashpad*' -type d -mmin +60 -exec rm -rf {} + 2>/dev/null || true
+find /tmp -maxdepth 1 -name 'org.chromium.Chromium.*' -mmin +60 -exec rm -rf {} + 2>/dev/null || true
 
 echo "$(date -u '+%Y-%m-%dT%H:%M:%SZ') [cleanup-viewer] Done"

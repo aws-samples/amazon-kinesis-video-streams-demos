@@ -11,6 +11,10 @@ set -euo pipefail
 CONSUMER_HOME="${HOME}/webrtc-c-storage-master"
 REPO_DIR="${CONSUMER_HOME}/repo"
 
+# Ensure the log target directory exists (cron redirects into it; if missing,
+# the shell can't open the >> target and the script never runs).
+mkdir -p "${CONSUMER_HOME}/logs"
+
 echo "$(date -u '+%Y-%m-%dT%H:%M:%SZ') [cleanup-consumer] Starting cleanup"
 
 # GetClip MP4 files older than 1 hour
@@ -37,8 +41,10 @@ for dir in "${HOME}/Jenkins/workspace"/webrtc-* "${HOME}/Jenkins"/webrtc-*; do
     rm -rf "$dir"
 done
 
-# Video verification temp files (from verify.py)
-find /tmp -name 'verify_*' -mmin +60 -delete 2>/dev/null || true
-find /tmp -name 'frame_extract_*' -type d -mmin +60 -exec rm -rf {} + 2>/dev/null || true
+# Video verification temp dirs (from verify.py). The actual dirs are named
+# video-verify-* with Tesseract OCR scratch files (tess_*) — the earlier
+# verify_*/frame_extract_* patterns never matched, so these piled up.
+find /tmp -maxdepth 1 -name 'video-verify-*' -type d -mmin +60 -exec rm -rf {} + 2>/dev/null || true
+find /tmp -maxdepth 1 -name 'tess_*' -mmin +60 -exec rm -rf {} + 2>/dev/null || true
 
 echo "$(date -u '+%Y-%m-%dT%H:%M:%SZ') [cleanup-consumer] Done"
