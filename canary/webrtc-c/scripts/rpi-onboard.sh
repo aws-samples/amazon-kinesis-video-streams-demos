@@ -156,7 +156,11 @@ S env DEBIAN_FRONTEND=noninteractive apt-get install -y \
     libssl-dev libcurl4-openssl-dev pkg-config autossh \
     iptables libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev \
     gstreamer1.0-tools gstreamer1.0-plugins-base gstreamer1.0-plugins-good \
-    gstreamer1.0-plugins-bad gstreamer1.0-plugins-ugly gstreamer1.0-libav
+    gstreamer1.0-plugins-bad gstreamer1.0-plugins-ugly gstreamer1.0-libav \
+    gstreamer1.0-libcamera libcamera-tools
+# gstreamer1.0-libcamera provides libcamerasrc for Pi CSI cameras (the devicesrc
+# autovideosrc path can't grab the CSI cam); libcamera-tools gives cam/libcamera-hello
+# to smoke-test the camera. Harmless no-op on camera-less Pis (apt just installs them).
 if ! command -v aws >/dev/null; then
   cd /tmp
   curl -s "https://awscli.amazonaws.com/awscli-exe-linux-aarch64.zip" -o awscliv2.zip
