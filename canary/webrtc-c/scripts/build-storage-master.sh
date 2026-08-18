@@ -74,23 +74,51 @@ if [ -z "$WEBRTC_GIT_TAG" ]; then
     grep 'GIT_TAG' "$REPO_DIR/canary/webrtc-c/CMakeLists.txt" || echo "  (none found)"
     CURRENT_WEBRTC_VERSION="unknown-$(date +%s)"
 else
-    # Resolve branch/tag names to actual commit SHA so we detect upstream changes
-    WEBRTC_REPO_URL=$(grep 'GIT_REPOSITORY' "$REPO_DIR/canary/webrtc-c/CMakeLists.txt" \
+    # Resolve branch/tag names to a concrete commit SHA. Two reasons:
+    #   1. cache stamp — detect when an upstream branch (e.g. develop) moves.
+    #   2. reliability — we pin the resolved SHA into CMakeLists below so CMake's
+    #      FetchContent checks out a deterministic SHA. A bare branch name works
+    #      too, but couples the build to a live clone+checkout; a transient
+    #      network blip during ls-remote OR the clone once left us passing the
+    #      unresolved name "develop" straight through, which failed the checkout
+    #      with a confusing "fatal: invalid reference: develop".
+    CML="${REPO_DIR}/canary/webrtc-c/CMakeLists.txt"
+    WEBRTC_REPO_URL=$(grep 'GIT_REPOSITORY' "$CML" \
         | head -1 \
         | sed 's/.*GIT_REPOSITORY\s*//' | tr -d '[:space:]') || true
-    if [ -n "$WEBRTC_REPO_URL" ]; then
-        RESOLVED_SHA=$(git ls-remote "$WEBRTC_REPO_URL" "$WEBRTC_GIT_TAG" 2>/dev/null | awk '{print $1}' | head -1)
-        if [ -n "$RESOLVED_SHA" ]; then
-            CURRENT_WEBRTC_VERSION="$RESOLVED_SHA"
-            echo "Resolved webrtc-c '${WEBRTC_GIT_TAG}' to commit: ${RESOLVED_SHA:0:12}"
-        else
-            # GIT_TAG might be a commit SHA already, use as-is
-            CURRENT_WEBRTC_VERSION="$WEBRTC_GIT_TAG"
-            echo "Could not resolve '${WEBRTC_GIT_TAG}' via ls-remote, using as-is"
-        fi
-    else
+
+    if [[ "$WEBRTC_GIT_TAG" =~ ^[0-9a-fA-F]{40}$ ]]; then
+        # Already a full commit SHA — nothing to resolve or rewrite.
         CURRENT_WEBRTC_VERSION="$WEBRTC_GIT_TAG"
-        echo "Could not parse GIT_REPOSITORY URL, using GIT_TAG as-is"
+        echo "webrtc-c GIT_TAG is already a commit SHA, using as-is"
+    elif [ -z "$WEBRTC_REPO_URL" ]; then
+        echo "ERROR: could not parse GIT_REPOSITORY URL from CMakeLists.txt"
+        flock -u 9
+        exit 1
+    else
+        # Retry so a transient DNS/network blip does not silently degrade to an
+        # unresolvable bare branch name.
+        RESOLVED_SHA=""
+        for attempt in 1 2 3 4 5; do
+            RESOLVED_SHA=$(git ls-remote "$WEBRTC_REPO_URL" "$WEBRTC_GIT_TAG" 2>/dev/null | awk '{print $1}' | head -1)
+            [ -n "$RESOLVED_SHA" ] && break
+            echo "ls-remote attempt ${attempt}/5 for '${WEBRTC_GIT_TAG}' failed, retrying in $((attempt * 3))s..."
+            sleep $((attempt * 3))
+        done
+        if [ -z "$RESOLVED_SHA" ]; then
+            echo "ERROR: could not resolve webrtc-c ref '${WEBRTC_GIT_TAG}' via ls-remote after 5 attempts."
+            echo "       Refusing to build against an unresolved branch name (would fail the FetchContent checkout)."
+            flock -u 9
+            exit 1
+        fi
+        CURRENT_WEBRTC_VERSION="$RESOLVED_SHA"
+        echo "Resolved webrtc-c '${WEBRTC_GIT_TAG}' to commit: ${RESOLVED_SHA:0:12}"
+        # Pin the resolved SHA into CMakeLists (first GIT_TAG = the webrtc one, not
+        # the cloudwatch dep) for a deterministic FetchContent checkout. Transient:
+        # section 1's `git checkout -f` / `git reset --hard` restores the branch
+        # name next build, so an upstream ref like develop is re-resolved fresh.
+        sed -i "0,/GIT_TAG/s|\(GIT_TAG[[:space:]]*\).*|\1${RESOLVED_SHA}|" "$CML"
+        echo "Pinned CMakeLists webrtc GIT_TAG -> ${RESOLVED_SHA:0:12} for this build"
     fi
 fi
 echo "webrtc-c dependency version: $CURRENT_WEBRTC_VERSION"
