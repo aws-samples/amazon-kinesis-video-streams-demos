@@ -36,6 +36,27 @@ IFB=ifb-kvs
 RUNUSER=jenkins
 PIDFILE=/run/twcc-throttle.pid
 THROTTLE_LOG=/var/log/twcc-throttle.log
+# State file: the currently-applied netem bandwidth cap in kbps. The canary master
+# reads this each metrics interval and emits it as the AppliedBandwidthKbps CloudWatch
+# metric (so a dashboard can overlay the cap vs the encoder bitrate). Cleared on stop.
+CURRENT_KBPS_FILE=/run/twcc-current-kbps
+
+# Convert a tc rate token (e.g. "3mbit", "500kbit") to integer kbps.
+bw_to_kbps() {
+  local n; n=$(printf '%s' "$1" | grep -oE '^[0-9]+')
+  case "$1" in
+    *mbit) echo $(( ${n:-0} * 1000 )) ;;
+    *kbit) echo "${n:-0}" ;;
+    *)     echo 0 ;;
+  esac
+}
+
+# Publish the applied cap (kbps) to the state file, world-readable so the (non-root)
+# canary master can read it. Called on every stage change.
+write_current_kbps() {
+  local k; k=$(bw_to_kbps "$1")
+  echo "$k" > "$CURRENT_KBPS_FILE" 2>/dev/null && chmod 644 "$CURRENT_KBPS_FILE" 2>/dev/null || true
+}
 DNS=${TWCC_DNS:-8.8.8.8}
 LIMIT=1000
 CORR=25%
@@ -119,6 +140,7 @@ __throttle_loop() {
          delay "${D}ms" "${J}ms" "$CORR" distribution normal \
          loss "${LOSS}%" rate "$BW" limit "$LIMIT" || exit 0
       echo "[$(date +%H:%M:%S)] $L -> bw=$BW loss=${LOSS}% delay=${D}ms jitter=${J}ms"
+      write_current_kbps "$BW"
       sleep "$stage"
     done
   done
@@ -133,6 +155,7 @@ throttle_stop() {
   tc qdisc del dev "$IFB" root 2>/dev/null || true
   ip link set "$IFB" down 2>/dev/null || true
   ip link del "$IFB" 2>/dev/null || true
+  rm -f "$CURRENT_KBPS_FILE" 2>/dev/null || true
   echo "twcc-net throttle stopped"
 }
 
@@ -152,6 +175,7 @@ throttle_hold() {
          delay "${D}ms" "${J}ms" "$CORR" distribution normal \
          loss "${LOSS}%" rate "$BW" limit "$LIMIT"
       echo "twcc-net hold $L -> bw=$BW loss=${LOSS}% delay=${D}ms jitter=${J}ms"
+      write_current_kbps "$BW"
       found=1; break
     fi
   done

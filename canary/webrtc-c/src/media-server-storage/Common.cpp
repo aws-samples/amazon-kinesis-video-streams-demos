@@ -205,6 +205,21 @@ STATUS canaryRtpOutboundStats(UINT32 timerId, UINT64 currentTime, UINT64 customD
                         }
                     }
 
+                    // AppliedBandwidthKbps: the netem cap the twcc-net shaper currently
+                    // enforces, written to a state file by the cycler. Emitted only when
+                    // shaping is active (file present) so non-shaped runs are unaffected.
+                    // Lets a dashboard overlay the applied cap vs OutgoingBitrate/EstimatedBitrate.
+                    {
+                        FILE* bwFp = fopen(TWCC_APPLIED_BW_FILE, "r");
+                        if (bwFp != NULL) {
+                            UINT64 appliedKbps = 0;
+                            if (fscanf(bwFp, "%llu", (unsigned long long*) &appliedKbps) == 1 && appliedKbps > 0) {
+                                Canary::Cloudwatch::getInstance().monitoring.pushAppliedBandwidth((DOUBLE) appliedKbps);
+                            }
+                            fclose(bwFp);
+                        }
+                    }
+
                     // Update prev values for next interval
                     pSampleStreamingSession->rtcMetricsHistory.prevTs = rtcCandidatePairMetrics.timestamp;
                     pSampleStreamingSession->rtcMetricsHistory.prevNumberOfPacketsSent =

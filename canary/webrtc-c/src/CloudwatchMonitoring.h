@@ -67,6 +67,10 @@ class CloudwatchMonitoring {
     // driven by TWCC feedback; DelayTrend is the smoothed one-way delay slope (ms).
     VOID pushEstimatedBitrate(DOUBLE);
     VOID pushDelayTrend(DOUBLE);
+    // Network bandwidth cap currently applied by the TWCC netns shaper (tc/netem),
+    // read from the twcc-net state file. Lets a dashboard overlay the applied cap
+    // against OutgoingBitrate/EstimatedBitrate to see the encoder track the network.
+    VOID pushAppliedBandwidth(DOUBLE);
 
     // End-of-session totals
     VOID pushTotalPacketsSent(UINT64);

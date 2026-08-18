@@ -738,6 +738,15 @@ VOID CloudwatchMonitoring::pushDelayTrend(DOUBLE delayTrendMs)
     this->push(datum);
 }
 
+VOID CloudwatchMonitoring::pushAppliedBandwidth(DOUBLE kbps)
+{
+    MetricDatum datum;
+    datum.SetMetricName("AppliedBandwidthKbps");
+    datum.SetValue(kbps);
+    datum.SetUnit(Aws::CloudWatch::Model::StandardUnit::Kilobits_Second);
+    this->push(datum);
+}
+
 VOID CloudwatchMonitoring::pushPliCountPerSecond(DOUBLE rate)
 {
     MetricDatum datum;

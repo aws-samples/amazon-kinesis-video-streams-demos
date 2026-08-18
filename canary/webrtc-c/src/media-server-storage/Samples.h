@@ -40,6 +40,12 @@ Shared include file for the samples
 #define MIN_AUDIO_BITRATE_BPS               4000   // bits/sec
 #define MAX_AUDIO_BITRATE_BPS               128000 // bits/sec
 
+// State file the twcc-net netns shaper writes with the currently-applied netem
+// bandwidth cap (in kbps). The master reads it each metrics interval and emits
+// AppliedBandwidthKbps so a dashboard can overlay the cap vs the encoder bitrate.
+// Absent on non-shaped runs, in which case the metric is simply not emitted.
+#define TWCC_APPLIED_BW_FILE "/run/twcc-current-kbps"
+
 #define SAMPLE_SESSION_CLEANUP_WAIT_PERIOD (5 * HUNDREDS_OF_NANOS_IN_A_SECOND)
 
 #define SAMPLE_PENDING_MESSAGE_CLEANUP_DURATION (20 * HUNDREDS_OF_NANOS_IN_A_SECOND)
