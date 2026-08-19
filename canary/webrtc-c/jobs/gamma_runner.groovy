@@ -373,6 +373,9 @@ def buildStorageCanary(isConsumer, params) {
     // the encoder floor the ported master reads (CANARY_MIN_VIDEO_BITRATE_KBPS).
     if (params.CANARY_TWCC_SHAPING?.toString() == 'true') {
         masterEnvs['CANARY_MIN_VIDEO_BITRATE_KBPS'] = params.TWCC_MIN_VIDEO_BITRATE_KBPS ?: '100'
+        // Sample metrics fast (default 5s) so CloudWatch resolves the ~20s cap steps;
+        // only TWCC-shaped runs pay the higher put-metric-data rate.
+        masterEnvs['CANARY_METRICS_PERIOD_SECONDS'] = params.TWCC_METRICS_PERIOD_SECONDS ?: '5'
         if (!masterEnvs['CANARY_MEDIA_SOURCE']) {
             masterEnvs['CANARY_MEDIA_SOURCE'] = 'testsrc'
         }
@@ -619,6 +622,7 @@ pipeline {
         booleanParam(name: 'CANARY_TWCC_SHAPING', defaultValue: false, description: 'Shape the master uplink with a netns mid-path router + tc/netem so TWCC bitrate adaptation is exercised. Requires CANARY_MEDIA_SOURCE=testsrc (live encoder), a dedicated rpi5 node, and the /usr/local/bin/twcc-net wrapper + sudoers grant provisioned on that node.')
         string(name: 'TWCC_MIN_VIDEO_BITRATE_KBPS', defaultValue: '100', description: 'Encoder video floor (kbps) when TWCC shaping is on, so the encoder can reach the 250 kbps BAD profile. Read by the master via CANARY_MIN_VIDEO_BITRATE_KBPS.')
         string(name: 'TWCC_STAGE_SECONDS', defaultValue: '20', description: 'Seconds held per throttle profile when cycling (TWCC_PROFILE empty).')
+        string(name: 'TWCC_METRICS_PERIOD_SECONDS', defaultValue: '5', description: 'Metrics emit interval (s) for TWCC-shaped runs, so CloudWatch resolves the cap steps (default 5; empty falls back to the 60s default in code).')
         string(name: 'TWCC_THROTTLE_LOSS', defaultValue: '0', description: 'Packet-loss %% override for every throttle profile (0 = no injected loss; loss is decode damage, not congestion).')
         string(name: 'TWCC_PROFILE', defaultValue: '', description: 'Hold ONE steady network condition for the whole run: GOOD|MEDIUM|CONGESTING|BAD|RECOVERING (per-condition canary). Empty = cycle all profiles (transition/adaptation test).')
     }

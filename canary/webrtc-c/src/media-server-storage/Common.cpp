@@ -480,7 +480,18 @@ STATUS initMetricsTimers(PSampleStreamingSession pSampleStreamingSession)
     pSampleStreamingSession->pushProfilingThread = std::thread(sendProfilingMetricsThread, pSampleStreamingSession);
     pSampleStreamingSession->pushProfilingThread.join();
 
-    CHK_STATUS(timerQueueAddTimer(pSampleConfiguration->timerQueueHandle, METRICS_INVOCATION_PERIOD, METRICS_INVOCATION_PERIOD, canaryRtpOutboundStats, (UINT64) pSampleStreamingSession,
+    // Metrics emit interval: default METRICS_INVOCATION_PERIOD (60s). TWCC cycling runs
+    // change the network cap every ~20s, so 60s aliases the sweep; allow a faster period
+    // via CANARY_METRICS_PERIOD_SECONDS (set by the runner only for TWCC-shaped runs) so
+    // AppliedBandwidthKbps/OutgoingBitrate resolve the cap steps. Other canaries stay 60s.
+    UINT64 metricsPeriod = METRICS_INVOCATION_PERIOD;
+    PCHAR pMetricsPeriodSec = GETENV((PCHAR) "CANARY_METRICS_PERIOD_SECONDS");
+    UINT32 metricsPeriodSec = 0;
+    if (pMetricsPeriodSec != NULL && STRTOUI32(pMetricsPeriodSec, NULL, 10, &metricsPeriodSec) == STATUS_SUCCESS && metricsPeriodSec > 0) {
+        metricsPeriod = (UINT64) metricsPeriodSec * HUNDREDS_OF_NANOS_IN_A_SECOND;
+        DLOGI("[Canary] Metrics emit period set to %u s via CANARY_METRICS_PERIOD_SECONDS", metricsPeriodSec);
+    }
+    CHK_STATUS(timerQueueAddTimer(pSampleConfiguration->timerQueueHandle, metricsPeriod, metricsPeriod, canaryRtpOutboundStats, (UINT64) pSampleStreamingSession,
                                       &pSampleStreamingSession->metricsTimerId));
     DLOGD("[Canary] Added metricsTimer");
 
