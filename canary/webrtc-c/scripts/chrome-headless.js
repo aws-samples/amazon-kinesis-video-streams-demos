@@ -1161,7 +1161,12 @@ class ViewerCanaryTest {
     
     // Start timer immediately since we already joined the storage session
     this.timerStarted = true;
-    const monitorDurationMs = 156000; // 2 min 36 sec
+    // Monitor for the master's stream length (MASTER_DURATION) so the viewer
+    // watches the whole run — e.g. a full TWCC cap-cycle. Capped below the hard
+    // kill-timeout (config.duration) so cleanup/verify still run. Defaults to the
+    // old 156s when MASTER_DURATION is unset.
+    const masterDurationSec = parseInt(process.env.MASTER_DURATION) || 156;
+    const monitorDurationMs = Math.min(masterDurationSec, this.config.duration - 15) * 1000;
     log(`Storage session joined, monitoring connection for ${monitorDurationMs / 1000} seconds...`);
     setTimeout(() => {
       this.testCompleted = true;
