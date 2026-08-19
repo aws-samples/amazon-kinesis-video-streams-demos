@@ -192,13 +192,21 @@ if [ "$NEED_REBUILD" = "true" ]; then
     # sample source — so a full `make` fails at link time on those two targets
     # even though kvsWebrtcStorageSample links fine. Restrict the build to the
     # one target we run.
-    (
-        cd "$BUILD_DIR"
-        cmake "$REPO_DIR/canary/webrtc-c" $CMAKE_FLAGS
-        make -j"$(nproc)" kvsWebrtcStorageSample
-    ) > "$BUILD_LOG" 2>&1
+    # NOTE: capture the exit with `|| BUILD_EXIT=$?` rather than a bare `$?` — under
+    # `set -e` a failing build subshell would abort the whole script before the
+    # error handler below could run (surfacing as a bare "exit 2" with no tail).
+    BUILD_EXIT=0
+    ( cd "$BUILD_DIR" && cmake "$REPO_DIR/canary/webrtc-c" $CMAKE_FLAGS && make -j"$(nproc)" kvsWebrtcStorageSample ) > "$BUILD_LOG" 2>&1 || BUILD_EXIT=$?
 
-    BUILD_EXIT=$?
+    # The KVS webrtc SDK's open-source dep libs (e.g. libkvspicUtils.a) can lose a
+    # parallel-build race on a cold `make -j`, so a target links a .a that is still
+    # being written -> "file too short". It's transient: an incremental retry resumes
+    # with the dep now fully built. Retry once before declaring failure.
+    if [ $BUILD_EXIT -ne 0 ]; then
+        echo "Build attempt 1 failed (exit $BUILD_EXIT); retrying incrementally once (transient parallel-dep race, e.g. 'libkvspicUtils.a: file too short')..." | tee -a "$BUILD_LOG"
+        BUILD_EXIT=0
+        ( cd "$BUILD_DIR" && make -j"$(nproc)" kvsWebrtcStorageSample ) >> "$BUILD_LOG" 2>&1 || BUILD_EXIT=$?
+    fi
 
     if [ $BUILD_EXIT -ne 0 ]; then
         echo "ERROR: Build failed (exit code $BUILD_EXIT). See log: $BUILD_LOG"
