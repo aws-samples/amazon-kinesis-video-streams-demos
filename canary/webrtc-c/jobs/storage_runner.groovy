@@ -657,13 +657,16 @@ pipeline {
         stage('Skip if duplicate') {
             steps {
                 script {
-                    // Dedup on the scenario identifier so distinct scenarios don't skip each other.
-                    // Fall back to RUNNER_LABEL if SCENARIO_LABEL is unset (matches gamma_runner).
-                    def myLabel = params.SCENARIO_LABEL ?: params.RUNNER_LABEL
+                    // Dedup on RUNNER_LABEL: the real collision resource is the KVS channel
+                    // (${JOB_NAME}-${RUNNER_LABEL}), so only same-RUNNER_LABEL runs actually
+                    // conflict. Distinct RUNNER_LABELs (e.g. ingest vs egress, or the per-
+                    // condition jobs — all SCENARIO_LABEL=StorageWithViewer) must run
+                    // concurrently. Fall back to SCENARIO_LABEL if RUNNER_LABEL is unset.
+                    def myLabel = params.RUNNER_LABEL ?: params.SCENARIO_LABEL
                     def runningBuilds = Jenkins.instance.getItemByFullName(env.JOB_NAME).builds.findAll { b ->
                         b.isBuilding() && b.number != currentBuild.number &&
-                        (b.getAction(hudson.model.ParametersAction)?.getParameter('SCENARIO_LABEL')?.value ?:
-                         b.getAction(hudson.model.ParametersAction)?.getParameter('RUNNER_LABEL')?.value) == myLabel
+                        (b.getAction(hudson.model.ParametersAction)?.getParameter('RUNNER_LABEL')?.value ?:
+                         b.getAction(hudson.model.ParametersAction)?.getParameter('SCENARIO_LABEL')?.value) == myLabel
                     }
                     if (runningBuilds) {
                         echo "Another ${myLabel} build is already running (#${runningBuilds[0].number}), skipping"
