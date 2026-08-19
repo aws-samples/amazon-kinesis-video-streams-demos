@@ -57,6 +57,19 @@ write_current_kbps() {
   local k; k=$(bw_to_kbps "$1")
   echo "$k" > "$CURRENT_KBPS_FILE" 2>/dev/null && chmod 644 "$CURRENT_KBPS_FILE" 2>/dev/null || true
 }
+
+# Sleep until the next wall-clock multiple of $1 seconds. With stage=60 this pins
+# every stage transition to :00 of a minute, so each transition aligns with
+# CloudWatch's 1-minute metric buckets and a stage fills exactly one bucket (no
+# straddle-blending of the Average). Self-correcting each call, so sleep drift
+# can't accumulate. Falls back to a plain sleep for a non-positive-integer stage.
+sleep_aligned() {
+  local s="$1" now
+  case "$s" in ''|*[!0-9]*) sleep "${s:-20}"; return;; esac
+  [ "$s" -gt 0 ] || { sleep 1; return; }
+  now=$(date +%s)
+  sleep $(( (now / s + 1) * s - now ))
+}
 DNS=${TWCC_DNS:-8.8.8.8}
 LIMIT=1000
 CORR=25%
@@ -132,6 +145,9 @@ throttle_start() {
 __throttle_loop() {
   local stage="$1" lossov="${2:-}"
   trap 'exit 0' TERM INT
+  # Align the first transition to a wall-clock boundary so every stage fills whole
+  # CloudWatch minute buckets (avoids Average-blending across stage boundaries).
+  sleep_aligned "$stage"
   while true; do
     for p in "${PROFILES[@]}"; do
       read -r L BW LOSS D J <<< "$p"
@@ -141,7 +157,7 @@ __throttle_loop() {
          loss "${LOSS}%" rate "$BW" limit "$LIMIT" || exit 0
       echo "[$(date +%H:%M:%S)] $L -> bw=$BW loss=${LOSS}% delay=${D}ms jitter=${J}ms"
       write_current_kbps "$BW"
-      sleep "$stage"
+      sleep_aligned "$stage"
     done
   done
 }
