@@ -1283,6 +1283,17 @@ class ViewerCanaryTest {
           await CloudWatchMetrics.publishCountMetric(this.getMetricName('PacketsReceivedPerSecond'), this.config.channelName, packetsReceivedPerSec);
           await CloudWatchMetrics.publishCountMetric(this.getMetricName('PacketsLostPerSecond'), this.config.channelName, packetsLostPerSec);
 
+          // Egress downlink cap applied by twcc-viewer-net (VIEWER_TWCC_SHAPING runs).
+          // The shaper writes the current netem cap (kbps) to this file; we publish it
+          // so a dashboard can overlay the cap against IncomingBitrateKbps. Absent on
+          // non-shaped runs -> the read throws and we skip (no metric emitted).
+          try {
+            const appliedCapKbps = parseInt(fs.readFileSync('/run/twcc-viewer-current-kbps', 'utf8'));
+            if (appliedCapKbps > 0) {
+              await CloudWatchMetrics.publishCountMetric(this.getMetricName('AppliedBandwidthKbps'), this.config.channelName, appliedCapKbps);
+            }
+          } catch (_) { /* not a shaped run (file absent) — skip */ }
+
           log(`[Canary] Periodic RTP: nack/s=${nackPerSec.toFixed(2)} pli/s=${pliPerSec.toFixed(2)} decoded/s=${framesDecodedPerSec.toFixed(1)} dropped/s=${framesDroppedPerSec.toFixed(2)} bitrate=${incomingBitrateKbps.toFixed(1)}kbps pktsRecv/s=${packetsReceivedPerSec.toFixed(1)} pktsLost/s=${packetsLostPerSec.toFixed(2)}`);
 
           // Outbound audio stats — confirm viewer is sending audio
