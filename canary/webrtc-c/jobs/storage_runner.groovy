@@ -247,8 +247,7 @@ def runViewerSessions(viewerId = "", waitMinutes = 2, viewerCount = "1", stagger
             VIEWER_STARTED = true
             
             try {
-                def output = sh(
-                    script: """
+                def viewerExports = """
                         export JOB_NAME="${env.JOB_NAME}"
                         export RUNNER_LABEL="${params.RUNNER_LABEL}"
                         export AWS_DEFAULT_REGION="${params.AWS_DEFAULT_REGION}"
@@ -264,11 +263,31 @@ def runViewerSessions(viewerId = "", waitMinutes = 2, viewerCount = "1", stagger
                         export JS_PAGE_URL="${params.JS_BRANCH ?: 'master'}"
                         export VIEWER_SEND_AUDIO="${sendAudio}"
                         export VIEWER_AUDIO_FILE="\${WORKSPACE}/canary/webrtc-c/assets/audio-source.wav"
-                        
+                """
+                def viewerScript
+                if (params.VIEWER_TWCC_SHAPING?.toString() == 'true') {
+                    // EGRESS TWCC: shape the browser's DOWNLINK so the media service's
+                    // send-side congestion control must adapt. The whole viewer (dev
+                    // server + chrome) runs inside viewerns — the local dev server rides
+                    // netns loopback (unshaped); only the KVS media downlink is shaped.
+                    // Requires twcc-viewer-net provisioned on this node (install-twcc-viewer-node.sh).
+                    def stageSecs = params.TWCC_STAGE_SECONDS ?: '20'
+                    def loss = params.TWCC_THROTTLE_LOSS ?: '0'
+                    viewerScript = viewerExports + """
+                        ENVFILE="\$(mktemp)"; chmod 600 "\$ENVFILE"
+                        umask 077
+                        env | grep -E '^(JOB_NAME|RUNNER_LABEL|AWS_|DURATION_IN_SECONDS|MASTER_DURATION|FORCE_TURN|VIEWER_|CLIENT_ID|ENDPOINT|METRIC_SUFFIX|KEEP_RECORDING|JS_PAGE_URL|CANARY_|TEST_|WORKSPACE|HOME|PATH|NODE|NVM)=' > "\$ENVFILE"
+                        trap 'sudo /usr/local/bin/twcc-viewer-net throttle-stop || true; sudo /usr/local/bin/twcc-viewer-net down || true; rm -f "\$ENVFILE"' EXIT
+                        sudo /usr/local/bin/twcc-viewer-net up
+                        sudo /usr/local/bin/twcc-viewer-net throttle-start ${stageSecs} ${loss}
+                        sudo /usr/local/bin/twcc-viewer-net run --cwd "\${WORKSPACE}" --env-file "\$ENVFILE" -- ./canary/webrtc-c/scripts/run-storage-viewer.sh
+                    """
+                } else {
+                    viewerScript = viewerExports + """
                         ./canary/webrtc-c/scripts/run-storage-viewer.sh
-                    """,
-                    returnStdout: true
-                ).trim()
+                    """
+                }
+                def output = sh(script: viewerScript, returnStdout: true).trim()
                 
                 echo output
                 
@@ -622,6 +641,7 @@ pipeline {
         string(name: 'JS_BRANCH', defaultValue: 'master', description: 'JS SDK branch name to clone and serve locally (default: master)')
         string(name: 'STS_DURATION_SECONDS', defaultValue: '43200', description: 'STS session duration. Use 3600 for nodes with role-chained credentials (e.g. rpi5-master, whose IoT-certificate base credentials cap chained sessions at 1 hour).')
         booleanParam(name: 'CANARY_TWCC_SHAPING', defaultValue: false, description: 'Shape the master uplink with a netns mid-path router + tc/netem so TWCC bitrate adaptation is exercised. Requires CANARY_MEDIA_SOURCE=testsrc (live encoder), a dedicated rpi5 node, and the /usr/local/bin/twcc-net wrapper + sudoers grant provisioned on that node.')
+        booleanParam(name: 'VIEWER_TWCC_SHAPING', defaultValue: false, description: 'EGRESS test: shape the JS viewer DOWNLINK (netns + tc/netem) so the media service send-side congestion control adapts. Keep the master UNSHAPED (CANARY_TWCC_SHAPING=false) to isolate egress. Requires /usr/local/bin/twcc-viewer-net + sudoers on the viewer node (install-twcc-viewer-node.sh). Reuses TWCC_STAGE_SECONDS / TWCC_THROTTLE_LOSS.')
         string(name: 'TWCC_MIN_VIDEO_BITRATE_KBPS', defaultValue: '100', description: 'Encoder video floor (kbps) when TWCC shaping is on, so the encoder can reach the 250 kbps BAD profile. Read by the master via CANARY_MIN_VIDEO_BITRATE_KBPS.')
         string(name: 'TWCC_STAGE_SECONDS', defaultValue: '20', description: 'Seconds held per throttle profile when cycling (TWCC_PROFILE empty).')
         string(name: 'TWCC_METRICS_PERIOD_SECONDS', defaultValue: '5', description: 'Metrics emit interval (s) for TWCC-shaped runs, so CloudWatch resolves the cap steps (default 5; empty falls back to the 60s default in code).')
