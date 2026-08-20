@@ -276,7 +276,7 @@ def runViewerSessions(viewerId = "", waitMinutes = 2, viewerCount = "1", stagger
                     viewerScript = viewerExports + """
                         ENVFILE="\$(mktemp)"; chmod 600 "\$ENVFILE"
                         umask 077
-                        env | grep -E '^(JOB_NAME|RUNNER_LABEL|AWS_|DURATION_IN_SECONDS|MASTER_DURATION|FORCE_TURN|VIEWER_|CLIENT_ID|ENDPOINT|METRIC_SUFFIX|KEEP_RECORDING|JS_PAGE_URL|CANARY_|TEST_|WORKSPACE|HOME|PATH|NODE|NVM)=' > "\$ENVFILE"
+                        env | grep -E '^(JOB_NAME|RUNNER_LABEL|AWS_|DURATION_IN_SECONDS|MASTER_DURATION|FORCE_TURN|VIEWER_|CLIENT_ID|ENDPOINT|METRIC_SUFFIX|KEEP_RECORDING|JS_PAGE_URL|CANARY_|TEST_|WORKSPACE|HOME|PATH|NODE|NVM)' > "\$ENVFILE"
                         trap 'sudo /usr/local/bin/twcc-viewer-net throttle-stop || true; sudo /usr/local/bin/twcc-viewer-net down || true; rm -f "\$ENVFILE"' EXIT
                         sudo /usr/local/bin/twcc-viewer-net up
                         sudo /usr/local/bin/twcc-viewer-net throttle-start ${stageSecs} ${loss}
