@@ -31,6 +31,7 @@ LOGS_DIR="${BUILD_HOME}/logs"
 LOCK_FILE="${BUILD_HOME}/.build.lock"
 COMMIT_FILE="${BUILD_HOME}/.last-commit"
 WEBRTC_VERSION_FILE="${BUILD_HOME}/.webrtc-c-version"
+CODE_FP_FILE="${BUILD_HOME}/.code-fingerprint"
 
 mkdir -p "$BUILD_HOME" "$LOGS_DIR"
 
@@ -59,6 +60,13 @@ fi
 
 CURRENT_COMMIT=$(cd "$REPO_DIR" && git rev-parse HEAD)
 echo "Current commit: ${CURRENT_COMMIT:0:12}"
+
+# Fingerprint ONLY the paths that feed the C build (the src tree + CMakeLists), so a
+# commit touching only jobs/*.groovy, cron, docs, non-build scripts, etc. does NOT
+# trigger a rebuild. `git rev-parse HEAD:<path>` is the exact content hash (tree SHA
+# for the dir, blob SHA for the file) — changes iff that subtree/file changes.
+CURRENT_CODE_FP=$(cd "$REPO_DIR" && git rev-parse "HEAD:canary/webrtc-c/src" "HEAD:canary/webrtc-c/CMakeLists.txt" 2>/dev/null | tr '\n' ' ')
+echo "Build-relevant code fingerprint: ${CURRENT_CODE_FP}"
 
 # ---------------------------------------------------------------------------
 # 2. Extract webrtc-c dependency version from CMakeLists.txt
@@ -145,17 +153,22 @@ BUILD_FLAGS_FILE="${BUILD_HOME}/.build-flags"
 
 CACHED_COMMIT=$(cat "$COMMIT_FILE" 2>/dev/null || echo "")
 CACHED_WEBRTC_VERSION=$(cat "$WEBRTC_VERSION_FILE" 2>/dev/null || echo "")
+CACHED_CODE_FP=$(cat "$CODE_FP_FILE" 2>/dev/null || echo "")
 BINARY_PATH="${BUILD_DIR}/kvsWebrtcStorageSample"
 
-echo "Comparing: current commit=${CURRENT_COMMIT:0:12} vs cached commit=${CACHED_COMMIT:0:12}"
+echo "Comparing: current commit=${CURRENT_COMMIT:0:12} vs cached commit=${CACHED_COMMIT:0:12} (commit is informational; rebuild keys on the code fingerprint)"
 echo "Comparing: current webrtc-c=${CURRENT_WEBRTC_VERSION} vs cached webrtc-c=${CACHED_WEBRTC_VERSION}"
+echo "Comparing: current code-fp=[${CURRENT_CODE_FP}] vs cached code-fp=[${CACHED_CODE_FP}]"
 
 NEED_REBUILD=false
 if [ ! -f "$BINARY_PATH" ]; then
     echo "Binary not found, rebuild needed"
     NEED_REBUILD=true
-elif [ "$CURRENT_COMMIT" != "$CACHED_COMMIT" ]; then
-    echo "Commit changed ($CACHED_COMMIT -> $CURRENT_COMMIT), rebuild needed"
+elif [ -z "$CURRENT_CODE_FP" ]; then
+    echo "Could not compute code fingerprint (unexpected repo layout), rebuilding to be safe"
+    NEED_REBUILD=true
+elif [ "$CURRENT_CODE_FP" != "$CACHED_CODE_FP" ]; then
+    echo "Build-relevant code changed (src/ or CMakeLists.txt), rebuild needed"
     NEED_REBUILD=true
 elif [ "$CURRENT_WEBRTC_VERSION" != "$CACHED_WEBRTC_VERSION" ]; then
     echo "webrtc-c version changed ($CACHED_WEBRTC_VERSION -> $CURRENT_WEBRTC_VERSION), rebuild needed"
@@ -255,6 +268,7 @@ if [ "$NEED_REBUILD" = "true" ]; then
     echo "$CURRENT_COMMIT" > "$COMMIT_FILE"
     echo "$CURRENT_WEBRTC_VERSION" > "$WEBRTC_VERSION_FILE"
     echo "$CURRENT_BUILD_FLAGS" > "$BUILD_FLAGS_FILE"
+    echo "$CURRENT_CODE_FP" > "$CODE_FP_FILE"
 
     # Pin the fresh artifacts and stamps to disk immediately. Without this, a
     # power loss during the kernel writeback window leaves "valid" stamps
