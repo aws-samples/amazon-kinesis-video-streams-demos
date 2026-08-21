@@ -43,11 +43,17 @@ INT32 main(INT32 argc, CHAR* argv[])
     signal(SIGINT, sigintHandler);
 #endif
 
-#ifdef IOT_CORE_ENABLE_CREDENTIALS
-    CHK_ERR((pChannelName = getenv(IOT_CORE_THING_NAME)) != NULL, STATUS_INVALID_OPERATION, "AWS_IOT_CORE_THING_NAME must be set");
-#else
+    // Default to the canary channel name. Only when running with IoT credentials AND an
+    // explicit thing name is supplied do we key the channel off the thing (some IoT setups
+    // require thing==channel); our canary sets CANARY_CHANNEL_NAME directly and leaves
+    // AWS_IOT_CORE_THING_NAME unset, so this stays a no-op override for the common path.
     pChannelName = (PCHAR) canaryConfig.channelName.value.c_str();
-#endif
+    {
+        PCHAR pIotCoreThingName = getenv(IOT_CORE_THING_NAME);
+        if (pIotCoreThingName != NULL) {
+            pChannelName = pIotCoreThingName;
+        }
+    }
 
     CHK_STATUS(createSampleConfiguration(pChannelName, SIGNALING_CHANNEL_ROLE_TYPE_MASTER, TRUE, TRUE, logLevel, &pSampleConfiguration));
 

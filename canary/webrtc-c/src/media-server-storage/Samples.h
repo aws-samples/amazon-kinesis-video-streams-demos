@@ -77,7 +77,11 @@ Shared include file for the samples
 // comment out this line to disable the feature
 #define KVS_USE_SIGNALING_CHANNEL_THREADPOOL 1
 
-/* Uncomment the following line in order to enable IoT credentials checks in the provided samples */
+/* NOTE: IoT credentials are now selected at RUNTIME, not via this compile-time macro.
+ * Set AWS_IOT_CORE_CREDENTIAL_ENDPOINT (+ _CERT / _PRIVATE_KEY / _ROLE_ALIAS) in the
+ * environment and createSampleConfiguration() uses the auto-refreshing IoT provider;
+ * leave them unset for the static AWS_ACCESS_KEY_ID/SECRET/SESSION_TOKEN provider. The
+ * macro below is intentionally left disabled and unreferenced. */
 // #define IOT_CORE_ENABLE_CREDENTIALS  1
 
 typedef enum {
@@ -171,6 +175,11 @@ typedef struct {
     // GStreamer media path, where a live encoder exists to re-target).
     BOOL enableTwcc;
     UINT32 twccMinVideoBitrateKbps; // MIN_VIDEO_BITRATE_KBPS, or CANARY_MIN_VIDEO_BITRATE_KBPS override
+
+    // TRUE when the IoT (auto-refreshing) credential provider was created instead of
+    // the static one — chosen at runtime by the presence of AWS_IOT_CORE_* env. Recorded
+    // so freeSampleConfiguration() calls the matching free (mismatched free would crash).
+    BOOL usingIotCredentials;
 } SampleConfiguration, *PSampleConfiguration;
 
 typedef struct {

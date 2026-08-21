@@ -400,6 +400,19 @@ def buildStorageCanary(isConsumer, params) {
         }
     }
 
+    // Long runs (> the STS role-chaining 1h cap, e.g. reconnect tests) opt into the
+    // auto-refreshing IoT credential provider instead of the fixed-lifetime static creds.
+    // Just setting AWS_IOT_CORE_CREDENTIAL_ENDPOINT flips the master to the IoT provider at
+    // runtime (Common.cpp); cert/key/role-alias are node-local IoT provisioning artifacts.
+    // NOTE: requires the IoT role-alias to vend a KVS-capable role directly (see the IAM
+    // change spelled out in docs) — otherwise the master gets assume-only creds and KVS 401s.
+    if (params.USE_IOT_CREDENTIALS?.toString() == 'true') {
+        masterEnvs['AWS_IOT_CORE_CREDENTIAL_ENDPOINT'] = params.IOT_CORE_CREDENTIAL_ENDPOINT ?: ''
+        masterEnvs['AWS_IOT_CORE_CERT']                = params.IOT_CORE_CERT ?: ''
+        masterEnvs['AWS_IOT_CORE_PRIVATE_KEY']         = params.IOT_CORE_PRIVATE_KEY ?: ''
+        masterEnvs['AWS_IOT_CORE_ROLE_ALIAS']          = params.IOT_CORE_ROLE_ALIAS ?: ''
+    }
+
     def repoDir = "${env.HOME}/webrtc-c-storage-master/repo"
 
     def consumerEnvs = [
@@ -645,6 +658,11 @@ pipeline {
         string(name: 'TWCC_METRICS_PERIOD_SECONDS', defaultValue: '5', description: 'Metrics emit interval (s) for TWCC-shaped runs, so CloudWatch resolves the cap steps (default 5; empty falls back to the 60s default in code).')
         string(name: 'TWCC_THROTTLE_LOSS', defaultValue: '0', description: 'Packet-loss %% override for every throttle profile (0 = no injected loss; loss is decode damage, not congestion).')
         string(name: 'TWCC_PROFILE', defaultValue: '', description: 'Hold ONE steady network condition for the whole run: GOOD|MEDIUM|CONGESTING|BAD|RECOVERING (per-condition canary). Empty = cycle all profiles (transition/adaptation test).')
+        booleanParam(name: 'USE_IOT_CREDENTIALS', defaultValue: false, description: 'Feed the master the auto-refreshing IoT credential provider instead of fixed-lifetime static STS creds. REQUIRED for runs longer than the STS role-chaining 1h cap (e.g. reconnect tests). Needs the IoT role-alias to vend a KVS-capable role directly (see docs/iot-credential-rotation.md for the IAM change) and IoT cert/key provisioned on the master node.')
+        string(name: 'IOT_CORE_CREDENTIAL_ENDPOINT', defaultValue: 'c1a3vjg139zfzv.credentials.iot.us-west-2.amazonaws.com', description: 'IoT credentials-provider endpoint (account-specific). Used only when USE_IOT_CREDENTIALS=true.')
+        string(name: 'IOT_CORE_ROLE_ALIAS', defaultValue: 'rpi5-canary_role_alias', description: 'IoT role-alias the credentials endpoint resolves to a role. Used only when USE_IOT_CREDENTIALS=true.')
+        string(name: 'IOT_CORE_CERT', defaultValue: '/home/jenkins/.aws-iot/rpi5-canary_certificate.pem', description: 'Absolute path on the master node to the IoT device certificate. Used only when USE_IOT_CREDENTIALS=true.')
+        string(name: 'IOT_CORE_PRIVATE_KEY', defaultValue: '/home/jenkins/.aws-iot/rpi5-canary_private.key', description: 'Absolute path on the master node to the IoT device private key. Used only when USE_IOT_CREDENTIALS=true.')
     }
     
     options {
