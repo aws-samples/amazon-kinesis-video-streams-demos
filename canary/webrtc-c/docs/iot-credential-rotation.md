@@ -38,13 +38,19 @@ single hop — it does not chain onward. So today it would vend `rpi5-canary-boo
 which have no KVS permissions. (The static Jenkins path works only because Jenkins itself does
 the second hop `sts:AssumeRole → Canary-STS`.)
 
-## The exact IAM change (Option A — recommended)
+## The exact IAM change (dedicated KVS alias)
 
-Repoint the role-alias directly at `Canary-STS`, which already has exactly the right perms and
-a 12h max session.
+> **Do NOT repoint the existing `rpi5-canary_role_alias`.** That alias is *also* what the Pi's
+> `credhelper.sh` (an AWS CLI `credential_process` in `~/.aws/config`) uses for the node's
+> *ambient* credentials, and the runner's `Fetch STS credentials` stage relies on those being
+> the assume-only `bootstrap` role so it can chain `bootstrap → Canary-STS`. Pointing that alias
+> at `Canary-STS` makes the ambient identity *become* `Canary-STS`, and the runner's
+> `sts:AssumeRole Canary-STS` then fails with `AccessDenied` (a role cannot assume itself) —
+> breaking every rpi5 canary. (Learned the hard way on 2026-08-20.) Instead, give the master's
+> IoT path its **own** alias and leave the ambient alias as `bootstrap`.
 
 **1. Let the IoT credentials service assume `Canary-STS`** — add this statement to the
-`Canary-STS` trust policy (keep the two existing statements):
+`Canary-STS` trust policy (keep the existing statements):
 
 ```json
 {
@@ -54,40 +60,61 @@ a 12h max session.
 }
 ```
 
-**2. Repoint the role-alias and raise the duration past 1h:**
+**2. Create a dedicated KVS role-alias → `Canary-STS`:**
 
 ```bash
-aws iot update-role-alias \
-  --role-alias rpi5-canary_role_alias \
+aws iot create-role-alias \
+  --role-alias rpi5-canary-kvs_role_alias \
   --role-arn arn:aws:iam::232283333863:role/Canary-STS \
   --credential-duration-seconds 43200 \
   --region us-west-2
 ```
 
-`43200` is valid: it is ≤ `Canary-STS` `MaxSessionDuration` (43200) and ≤ the IoT role-alias
-max (43200). The SDK's IoT provider auto-refreshes before expiry, so even a 12-h ceiling is
-just "how often it refreshes," not a run cap.
+**3. Allow the device cert to use the new alias** — add a new default version to the cert's
+IoT policy (`rpi5-canary_policy`) listing BOTH aliases in `Resource` (the old one for the
+ambient/credhelper path, the new one for the master's IoT path):
 
-**Result:** the endpoint vends `Canary-STS` creds directly (full KVS), auto-refreshed → no
-3600s cap → reconnect tests > 1h work. `rpi5-canary-bootstrap` + its `assume-canary-sts`
-inline policy become vestigial for the IoT path (leave them — the static Jenkins path still
-uses `Canary-STS` via chaining).
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [{
+    "Effect": "Allow",
+    "Action": ["iot:Connect", "iot:AssumeRoleWithCertificate"],
+    "Resource": [
+      "arn:aws:iot:us-west-2:232283333863:rolealias/rpi5-canary_role_alias",
+      "arn:aws:iot:us-west-2:232283333863:rolealias/rpi5-canary-kvs_role_alias"
+    ]
+  }]
+}
+```
+```bash
+aws iot create-policy-version --policy-name rpi5-canary_policy \
+  --policy-document file://policy.json --set-as-default --region us-west-2
+```
 
-### Option B (lower blast radius, more setup)
+**Result:** the ambient/credhelper alias (`rpi5-canary_role_alias` → `bootstrap`, unchanged)
+keeps the runner's two-hop `bootstrap → Canary-STS` working for all existing canaries. The
+master with `USE_IOT_CREDENTIALS=true` uses `rpi5-canary-kvs_role_alias`, which vends
+`Canary-STS` directly (full KVS) and the SDK auto-refreshes it → no 3600s cap → reconnect
+tests > 1h work. The two paths no longer share an alias.
 
-Instead of touching the shared `Canary-STS` trust, create a **new** role-alias pointing at a
-new role that (a) trusts `credentials.iot.amazonaws.com` and (b) attaches the `Canary-STS`
-managed policy. Then set `IOT_CORE_ROLE_ALIAS` to the new alias. Prefer Option A unless you
-want to avoid adding a principal to `Canary-STS`.
+`43200` on the new alias is just how often the provider refreshes, not a run cap (it
+auto-refreshes regardless); the only hard requirement is that the alias vends a KVS-capable
+role.
 
 ## Rollback
+
+Delete the dedicated alias and revert the cert policy to its single-alias version; the ambient
+alias was never changed, so nothing else needs reverting:
 
 ```bash
 aws iot update-role-alias --role-alias rpi5-canary_role_alias \
   --role-arn arn:aws:iam::232283333863:role/rpi5-canary-bootstrap \
-  --credential-duration-seconds 3600 --region us-west-2
+  --credential-duration-seconds 3600 --region us-west-2   # confirm it still points at bootstrap
+aws iot set-default-policy-version --policy-name rpi5-canary_policy --policy-version-id 1 --region us-west-2
+aws iot delete-role-alias --role-alias rpi5-canary-kvs_role_alias --region us-west-2
 ```
-and remove the `credentials.iot.amazonaws.com` statement from the `Canary-STS` trust policy.
+(The `credentials.iot.amazonaws.com` statement on `Canary-STS` trust is harmless to leave.)
 
 ## Running a >1h test after the IAM change
 
