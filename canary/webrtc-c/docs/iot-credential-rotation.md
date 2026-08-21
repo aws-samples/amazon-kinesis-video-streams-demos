@@ -123,14 +123,34 @@ Set on the job (defaults already point at the confirmed endpoint + alias):
 ```
 USE_IOT_CREDENTIALS=true
 DURATION_IN_SECONDS=3900          # 65 min
-IOT_CORE_CERT=/home/jenkins/.aws-iot/rpi5-canary_certificate.pem   # confirmed present on yuqi-pi
+IOT_CORE_THING_NAME=rpi5-002_thing      # REQUIRED, per-Pi (see below) -- NOT the channel name
+IOT_CORE_CERT=/home/jenkins/.aws-iot/rpi5-canary_certificate.pem
 IOT_CORE_PRIVATE_KEY=/home/jenkins/.aws-iot/rpi5-canary_private.key
 ```
 
-Confirmed on `yuqi-pi` (mi-07723b1aaa1d55ef4) via SSM on 2026-08-20 — the IoT cert chain lives
-at `/home/jenkins/.aws-iot/`: `rpi5-canary_certificate.pem`, `rpi5-canary_private.key`,
-`AmazonRootCA1.pem` (+ a `credhelper.sh`). The runner param defaults now point at these.
+### Per-Pi gotchas (learned validating on rpi5-002, 2026-08-20)
+
+1. **Device cert filename differs per Pi.** `yuqi-pi` uses `rpi5-canary_certificate.pem` /
+   `rpi5-canary_private.key`; `rpi5-002` uses `certificate.pem` / `private.key`. The runner
+   `IOT_CORE_CERT`/`IOT_CORE_PRIVATE_KEY` defaults use the `rpi5-canary_*` names, so on
+   `rpi5-002` we added symlinks so the default resolves (additive, does not touch the real
+   files or the credhelper):
+   ```bash
+   sudo -u jenkins ln -sfn /home/jenkins/.aws-iot/certificate.pem /home/jenkins/.aws-iot/rpi5-canary_certificate.pem
+   sudo -u jenkins ln -sfn /home/jenkins/.aws-iot/private.key     /home/jenkins/.aws-iot/rpi5-canary_private.key
+   ```
+   Do this on any new Pi whose cert uses the short names (or set the two params per run).
+
+2. **`IOT_CORE_THING_NAME` is required and per-Pi.** The credentials request sends it as
+   `x-amzn-iot-thingname`; it must be a thing the device cert is attached to (else the endpoint
+   returns **403**). It is NOT the channel name. It differs per Pi — find it in that node's
+   `~/.aws-iot/credhelper.sh` (`grep x-amzn-iot-thingname`): `rpi5-002_thing` on rpi5-002,
+   `rpi5-canary_thing` on yuqi-pi. A missing value **segfaults** (the LWS provider does not
+   NULL-check it), so the master fails fast with "AWS_IOT_CORE_THING_NAME must be set".
+
+Verified end-to-end on `rpi5-002` (mi-0039bcbda0edd3f24): with the correct thing the endpoint
+returns 200, vends `Canary-STS` (12h), the master signs KVS with it and connects signaling.
 
 Verify on the master node before the run:
-- the master log shows the IoT provider in use and a successful `JoinStorageSession`, and
-  keeps streaming past the 1-h mark (the point where the static path used to die).
+- the master log shows `Connected with server response: 200` (not 403) on the credentials
+  fetch, IoT creds in use, and keeps streaming past the 1-h mark (where the static path died).

@@ -411,6 +411,10 @@ def buildStorageCanary(isConsumer, params) {
         masterEnvs['AWS_IOT_CORE_CERT']                = params.IOT_CORE_CERT ?: ''
         masterEnvs['AWS_IOT_CORE_PRIVATE_KEY']         = params.IOT_CORE_PRIVATE_KEY ?: ''
         masterEnvs['AWS_IOT_CORE_ROLE_ALIAS']          = params.IOT_CORE_ROLE_ALIAS ?: ''
+        // The device's IoT thing (x-amzn-iot-thingname). MUST match a thing the device cert is
+        // attached to (else 403) and must NOT be the channel name. Differs per Pi
+        // (e.g. rpi5-002_thing vs rpi5-canary_thing) -- it's the thing in the node's credhelper.sh.
+        masterEnvs['AWS_IOT_CORE_THING_NAME']          = params.IOT_CORE_THING_NAME ?: ''
     }
 
     def repoDir = "${env.HOME}/webrtc-c-storage-master/repo"
@@ -664,6 +668,7 @@ pipeline {
         string(name: 'IOT_CORE_ROLE_ALIAS', defaultValue: 'rpi5-canary-kvs_role_alias', description: 'IoT role-alias the credentials endpoint resolves to a role. Must vend a KVS-capable role directly (rpi5-canary-kvs_role_alias -> Canary-STS). Do NOT use rpi5-canary_role_alias here: that alias vends the assume-only bootstrap role and is what the Pi credhelper/ambient path uses. Used only when USE_IOT_CREDENTIALS=true.')
         string(name: 'IOT_CORE_CERT', defaultValue: '/home/jenkins/.aws-iot/rpi5-canary_certificate.pem', description: 'Absolute path on the master node to the IoT device certificate. Used only when USE_IOT_CREDENTIALS=true.')
         string(name: 'IOT_CORE_PRIVATE_KEY', defaultValue: '/home/jenkins/.aws-iot/rpi5-canary_private.key', description: 'Absolute path on the master node to the IoT device private key. Used only when USE_IOT_CREDENTIALS=true.')
+        string(name: 'IOT_CORE_THING_NAME', defaultValue: '', description: "The device's IoT thing name, sent as x-amzn-iot-thingname on the credentials request. REQUIRED when USE_IOT_CREDENTIALS=true and differs per Pi (e.g. rpi5-002_thing on rpi5-002, rpi5-canary_thing on yuqi-pi) -- it is the thing in that node's ~/.aws-iot/credhelper.sh. Must NOT be the channel name; a wrong/missing value yields a 403 or crash.")
     }
     
     options {

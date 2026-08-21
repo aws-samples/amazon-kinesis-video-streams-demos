@@ -1423,7 +1423,7 @@ STATUS createSampleConfiguration(PCHAR channelName, SIGNALING_CHANNEL_ROLE_TYPE 
     STATUS retStatus = STATUS_SUCCESS;
     PCHAR pAccessKey = NULL, pSecretKey = NULL, pSessionToken;
     // Declared up here (before any CHK) so no goto-to-CleanUp crosses their initialization.
-    PCHAR pIotCoreCredentialEndPoint = NULL, pIotCoreCert = NULL, pIotCorePrivateKey = NULL, pIotCoreRoleAlias = NULL;
+    PCHAR pIotCoreCredentialEndPoint = NULL, pIotCoreCert = NULL, pIotCorePrivateKey = NULL, pIotCoreRoleAlias = NULL, pIotCoreThingName = NULL;
     BOOL useIotCredentials = FALSE;
     PSampleConfiguration pSampleConfiguration = NULL;
 
@@ -1442,6 +1442,13 @@ STATUS createSampleConfiguration(PCHAR channelName, SIGNALING_CHANNEL_ROLE_TYPE 
         CHK_ERR((pIotCoreCert = GETENV(IOT_CORE_CERT)) != NULL, STATUS_INVALID_OPERATION, "AWS_IOT_CORE_CERT must be set");
         CHK_ERR((pIotCorePrivateKey = GETENV(IOT_CORE_PRIVATE_KEY)) != NULL, STATUS_INVALID_OPERATION, "AWS_IOT_CORE_PRIVATE_KEY must be set");
         CHK_ERR((pIotCoreRoleAlias = GETENV(IOT_CORE_ROLE_ALIAS)) != NULL, STATUS_INVALID_OPERATION, "AWS_IOT_CORE_ROLE_ALIAS must be set");
+        // The thing name is sent as x-amzn-iot-thingname on the credentials request. It MUST be a
+        // thing the device cert is attached to, or the IoT endpoint returns 403 — and it must NOT
+        // be the channel name (a common mistake; the channel is unrelated to the device's thing).
+        // It is REQUIRED: the underlying LWS provider dereferences it without a NULL check, so a
+        // missing value segfaults rather than "omits the header." Fail fast with a clear message.
+        CHK_ERR((pIotCoreThingName = GETENV(IOT_CORE_THING_NAME)) != NULL, STATUS_INVALID_OPERATION,
+                "AWS_IOT_CORE_THING_NAME must be set (the device's IoT thing, e.g. rpi5-002_thing)");
     } else {
         CHK_ERR((pAccessKey = GETENV(ACCESS_KEY_ENV_VAR)) != NULL, STATUS_INVALID_OPERATION, "AWS_ACCESS_KEY_ID must be set");
         CHK_ERR((pSecretKey = GETENV(SECRET_KEY_ENV_VAR)) != NULL, STATUS_INVALID_OPERATION, "AWS_SECRET_ACCESS_KEY must be set");
@@ -1457,7 +1464,7 @@ STATUS createSampleConfiguration(PCHAR channelName, SIGNALING_CHANNEL_ROLE_TYPE 
 
     if (useIotCredentials) {
         CHK_STATUS(createLwsIotCredentialProvider(pIotCoreCredentialEndPoint, pIotCoreCert, pIotCorePrivateKey, pSampleConfiguration->pCaCertPath,
-                                                  pIotCoreRoleAlias, channelName, &pSampleConfiguration->pCredentialProvider));
+                                                  pIotCoreRoleAlias, pIotCoreThingName, &pSampleConfiguration->pCredentialProvider));
     } else {
         CHK_STATUS(
             createStaticCredentialProvider(pAccessKey, 0, pSecretKey, 0, pSessionToken, 0, MAX_UINT64, &pSampleConfiguration->pCredentialProvider));
