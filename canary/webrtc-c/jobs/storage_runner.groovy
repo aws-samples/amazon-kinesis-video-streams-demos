@@ -653,6 +653,7 @@ pipeline {
         string(name: 'CANARY_ASSET_REGION', defaultValue: '', description: 'Region of the S3 asset bucket. May differ from AWS_DEFAULT_REGION. Empty falls back to AWS_DEFAULT_REGION.')
         string(name: 'JS_BRANCH', defaultValue: 'master', description: 'JS SDK branch name to clone and serve locally (default: master)')
         string(name: 'STS_DURATION_SECONDS', defaultValue: '43200', description: 'STS session duration. Use 3600 for nodes with role-chained credentials (e.g. rpi5-master, whose IoT-certificate base credentials cap chained sessions at 1 hour).')
+        string(name: 'STS_FETCH_NODE_LABEL', defaultValue: '', description: 'Node label to run the shared assume-role on. Empty = the master node (default). Set to an EC2 node (e.g. the consumer) when the master is a Pi (role-chained, 3600s cap) and the run must outlive 1h, so the consumer/viewer get creds valid for the full run. That node must have an instance profile that can assume Canary-STS. Requires STS_DURATION_SECONDS raised past 3600.')
         booleanParam(name: 'CANARY_TWCC_SHAPING', defaultValue: false, description: 'Shape the master uplink with a netns mid-path router + tc/netem so TWCC bitrate adaptation is exercised. Requires CANARY_MEDIA_SOURCE=testsrc (live encoder), a dedicated rpi5 node, and the /usr/local/bin/twcc-net wrapper + sudoers grant provisioned on that node.')
         booleanParam(name: 'VIEWER_TWCC_SHAPING', defaultValue: false, description: 'EGRESS test: shape the JS viewer DOWNLINK (netns + tc/netem) so the media service send-side congestion control adapts. Keep the master UNSHAPED (CANARY_TWCC_SHAPING=false) to isolate egress. Requires /usr/local/bin/twcc-viewer-net + sudoers on the viewer node (install-twcc-viewer-node.sh). Reuses TWCC_STAGE_SECONDS / TWCC_THROTTLE_LOSS.')
         string(name: 'TWCC_MIN_VIDEO_BITRATE_KBPS', defaultValue: '100', description: 'Encoder video floor (kbps) when TWCC shaping is on, so the encoder can reach the 250 kbps BAD profile. Read by the master via CANARY_MIN_VIDEO_BITRATE_KBPS.')
@@ -698,20 +699,34 @@ pipeline {
         stage('Fetch STS credentials') {
             steps {
                 script {
-                    // Mark workspace as in-use to prevent cron cleanup
+                    // Mark workspace as in-use to prevent cron cleanup (on the master agent).
                     sh "touch '${env.WORKSPACE}/.in_use'"
 
-                    // Role-chained credentials (e.g. the Raspberry Pi node's IoT-certificate
-                    // base credentials) are hard-capped at 3600s by STS; EC2 instance-profile
-                    // nodes can use the full 43200s.
+                    // The assume-role session length is capped by the NODE that runs it:
+                    // role-chained base creds (e.g. a Raspberry Pi master's IoT-certificate
+                    // creds) are hard-capped at 3600s, while EC2 instance-profile nodes can mint
+                    // the full 43200s. The pipeline's top-level agent is MASTER_NODE_LABEL, so by
+                    // default the fetch runs there (unchanged for EC2-master scenarios). When the
+                    // master is a Pi (3600 cap) but the run must outlive 1h, set STS_FETCH_NODE_LABEL
+                    // to an EC2 node (e.g. the consumer) whose instance profile can assume Canary-STS,
+                    // so the SHARED creds handed to the consumer/viewer last the whole run. The Pi
+                    // master itself is unaffected when USE_IOT_CREDENTIALS=true (it uses IoT creds
+                    // and ignores these STS creds entirely).
                     def stsDuration = params.STS_DURATION_SECONDS ?: '43200'
-                    def assumeRoleOutput = sh(script: "aws sts assume-role --role-arn \$AWS_KVS_STS_ROLE_ARN --role-session-name roleSessionName --duration-seconds ${stsDuration} --output json",
-                                                returnStdout: true).trim()
-                    def assumeRoleJson = readJSON text: assumeRoleOutput
-
-                    env.AWS_ACCESS_KEY_ID = assumeRoleJson.Credentials.AccessKeyId
-                    env.AWS_SECRET_ACCESS_KEY = assumeRoleJson.Credentials.SecretAccessKey
-                    env.AWS_SESSION_TOKEN = assumeRoleJson.Credentials.SessionToken
+                    def fetchCreds = {
+                        def assumeRoleOutput = sh(script: "aws sts assume-role --role-arn \$AWS_KVS_STS_ROLE_ARN --role-session-name roleSessionName --duration-seconds ${stsDuration} --output json",
+                                                    returnStdout: true).trim()
+                        def assumeRoleJson = readJSON text: assumeRoleOutput
+                        env.AWS_ACCESS_KEY_ID = assumeRoleJson.Credentials.AccessKeyId
+                        env.AWS_SECRET_ACCESS_KEY = assumeRoleJson.Credentials.SecretAccessKey
+                        env.AWS_SESSION_TOKEN = assumeRoleJson.Credentials.SessionToken
+                    }
+                    if (params.STS_FETCH_NODE_LABEL?.trim()) {
+                        // Allocate the named EC2 node just to mint the (longer) shared creds.
+                        node(params.STS_FETCH_NODE_LABEL) { fetchCreds() }
+                    } else {
+                        fetchCreds()
+                    }
                 }
             }
         }
