@@ -358,15 +358,15 @@ def buildStorageCanary(isConsumer, params) {
     def role_alias = "${thing_prefix}_role_alias"
     def thing_name = "${thing_prefix}_thing"
 
+    // NOTE: AWS_IOT_CORE_* are intentionally NOT set here. The master selects its credential
+    // provider at runtime by the *presence* of AWS_IOT_CORE_CREDENTIAL_ENDPOINT; setting it
+    // unconditionally (as this block used to) forces every run onto the IoT provider, which
+    // needs a device/per-channel cert and breaks the default static-creds path. They are set
+    // only when USE_IOT_CREDENTIALS=true, in the masterEnvs block below.
     def commonEnvs = [
         'AWS_KVS_LOG_LEVEL': params.AWS_KVS_LOG_LEVEL,
         'CANARY_USE_IOT_PROVIDER': params.USE_IOT ?: false,
-        'CANARY_LABEL': params.SCENARIO_LABEL,
-        'AWS_IOT_CORE_CREDENTIAL_ENDPOINT': "${endpoint}",
-        'AWS_IOT_CORE_CERT': "${core_cert_file}",
-        'AWS_IOT_CORE_PRIVATE_KEY': "${private_key_file}",
-        'AWS_IOT_CORE_ROLE_ALIAS': "${role_alias}",
-        'AWS_IOT_CORE_THING_NAME': "${thing_name}"
+        'CANARY_LABEL': params.SCENARIO_LABEL
     ]
 
     def masterEnvs = [
