@@ -54,7 +54,7 @@ find /tmp -maxdepth 1 -name 'tess_*' -mmin +60 -exec rm -rf {} + 2>/dev/null || 
 # Puppeteer / Chromium crash dumps and profiles if any
 find /tmp -name 'puppeteer_dev_*' -mmin +60 -exec rm -rf {} + 2>/dev/null || true
 find /tmp -name 'chrome_crashpad*' -type d -mmin +60 -exec rm -rf {} + 2>/dev/null || true
-find /tmp -maxdepth 1 -name 'org.chromium.Chromium.*' -mmin +60 -exec rm -rf {} + 2>/dev/null || true
+find /tmp -maxdepth 1 \( -name 'org.chromium.Chromium.*' -o -name '.org.chromium.Chromium.*' -o -name '.com.google.Chrome.*' \) -mmin +60 -exec rm -rf {} + 2>/dev/null || true
 
 # Orphan Chrome/Chromium processes. The longest viewer scenario is ~65 min
 # (SingleReconnect); any browser process alive past 90 min is orphaned from a
@@ -68,5 +68,13 @@ for pid in $(pgrep -i 'chrome|chromium' 2>/dev/null || true); do
         kill -9 "$pid" 2>/dev/null || true
     fi
 done
+
+# Clear stale Chrome shared-memory in /dev/shm (tmpfs = RAM). Only when no Chrome is running, so we
+# never unlink a segment an active viewer still has open (which frees nothing and could break it).
+# earlyoom handles LIVE memory pressure; this reclaims tmpfs left behind by already-dead Chrome,
+# which earlyoom can't (it kills processes, not orphaned files).
+if ! pgrep -i chrom >/dev/null 2>&1; then
+    find /dev/shm -maxdepth 1 \( -name '.org.chromium.*' -o -name '.com.google.Chrome.*' -o -name 'org.chromium.*' \) -exec rm -rf {} + 2>/dev/null || true
+fi
 
 echo "$(date -u '+%Y-%m-%dT%H:%M:%SZ') [cleanup-viewer] Done"
