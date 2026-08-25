@@ -56,4 +56,17 @@ find /tmp -name 'puppeteer_dev_*' -mmin +60 -exec rm -rf {} + 2>/dev/null || tru
 find /tmp -name 'chrome_crashpad*' -type d -mmin +60 -exec rm -rf {} + 2>/dev/null || true
 find /tmp -maxdepth 1 -name 'org.chromium.Chromium.*' -mmin +60 -exec rm -rf {} + 2>/dev/null || true
 
+# Orphan Chrome/Chromium processes. The longest viewer scenario is ~65 min
+# (SingleReconnect); any browser process alive past 90 min is orphaned from a
+# crashed session and leaks memory until the node OOMs. Kill those.
+# (earlyoom is the real-time backstop; this reaps slow leaks proactively.)
+for pid in $(pgrep -i 'chrome|chromium' 2>/dev/null || true); do
+    etimes=$(ps -o etimes= -p "$pid" 2>/dev/null | tr -d ' ')
+    [ -n "${etimes:-}" ] || continue
+    if [ "$etimes" -gt 5400 ]; then
+        echo "$(date -u '+%Y-%m-%dT%H:%M:%SZ') [cleanup-viewer] Killing orphan browser pid $pid (age ${etimes}s)"
+        kill -9 "$pid" 2>/dev/null || true
+    fi
+done
+
 echo "$(date -u '+%Y-%m-%dT%H:%M:%SZ') [cleanup-viewer] Done"
