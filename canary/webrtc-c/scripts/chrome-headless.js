@@ -661,8 +661,33 @@ class ViewerCanaryTest {
   async initializePage(page) {
     const url = this.buildTestUrl();
     log(`Opening URL: ${url}`);
-    
-    await page.goto(url);
+
+    // The sample page (JS SDK v2.9.0+) pulls several assets from remote CDNs at load time, and
+    // those <script>/<link> tags block the page 'load' event. Inside the bandwidth-shaped viewer
+    // netns (VIEWER_TWCC_SHAPING) the combined fetch can exceed the navigation timeout, so the
+    // page never becomes "loaded" and the whole viewer test fails before it can connect (this is
+    // NOT an SDK bug — an unshaped viewer loads the same assets fine). Two mitigations:
+    //  1) Drop the CDN assets a HEADLESS viewer never needs — Chart.js (cdn.jsdelivr.net) and
+    //     Google Charts (www.gstatic.com) are only used when DQP-metrics charts are enabled, and
+    //     @ungap/url-search-params (unpkg.com) is a polyfill Chrome already has natively. We keep
+    //     jQuery, Bootstrap, and the WebRTC adapter (app logic + the DOM the automation drives).
+    //  2) Wait for 'domcontentloaded' (DOM + blocking scripts ready — enough to click the viewer
+    //     button) instead of full 'load', with a larger timeout for headroom under shaping.
+    const DROP_CDN_HOSTS = ['cdn.jsdelivr.net', 'www.gstatic.com', 'unpkg.com'];
+    await page.setRequestInterception(true);
+    page.on('request', (req) => {
+      try {
+        if (DROP_CDN_HOSTS.some((h) => req.url().includes(h))) {
+          req.abort();
+        } else {
+          req.continue();
+        }
+      } catch (_) {
+        // request already handled/continued elsewhere — ignore
+      }
+    });
+
+    await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
     await page.evaluate(() => {
       document.querySelector('#ingest-media-manual-on').setAttribute('data-selected', 'true');
     });
