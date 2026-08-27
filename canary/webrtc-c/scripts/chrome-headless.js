@@ -1190,8 +1190,13 @@ class ViewerCanaryTest {
     // watches the whole run — e.g. a full TWCC cap-cycle. Capped below the hard
     // kill-timeout (config.duration) so cleanup/verify still run. Defaults to the
     // old 156s when MASTER_DURATION is unset.
+    // In continuous/soak mode each session is a recycle segment: monitor for the whole segment
+    // (config.duration, set to the recycle interval) rather than the MASTER_DURATION cap, then this
+    // segment ends cleanly and the outer loop starts a fresh one with refreshed credentials.
     const masterDurationSec = parseInt(process.env.MASTER_DURATION) || 156;
-    const monitorDurationMs = Math.min(masterDurationSec, this.config.duration - 15) * 1000;
+    const monitorDurationMs = this.config.continuous
+        ? (this.config.duration - 15) * 1000
+        : Math.min(masterDurationSec, this.config.duration - 15) * 1000;
     log(`Storage session joined, monitoring connection for ${monitorDurationMs / 1000} seconds...`);
     setTimeout(() => {
       this.testCompleted = true;
@@ -1740,21 +1745,90 @@ async function runViewerCanary(config) {
   }
 }
 
+// Refresh AWS credentials into process.env for a soak segment. The viewer bakes creds into the SDK
+// page URL at load and never refreshes them, so a session outlives its creds unless we start each
+// segment with fresh ones. When VIEWER_CREDENTIALS_ROLE_ARN (or CANARY_CREDENTIALS_ROLE_ARN) is set,
+// assume that role and write the temp creds to the env buildTestUrl() reads. The base creds are the
+// node instance profile (IMDS), NOT the ambient AWS_* env — those are themselves a temporary
+// Canary-STS session, and assuming Canary-STS from Canary-STS self-assumes and fails. Without a role
+// ARN we keep the existing static env creds (only viable for soaks shorter than their TTL).
+async function refreshCredentialsIntoEnv() {
+  const roleArn = process.env.VIEWER_CREDENTIALS_ROLE_ARN || process.env.CANARY_CREDENTIALS_ROLE_ARN;
+  if (!roleArn) {
+    log('[soak] no VIEWER_CREDENTIALS_ROLE_ARN/CANARY_CREDENTIALS_ROLE_ARN set; reusing existing env credentials (they will expire at their TTL)');
+    return;
+  }
+  const { STSClient, AssumeRoleCommand } = require('@aws-sdk/client-sts');
+  const { fromInstanceMetadata } = require('@aws-sdk/credential-providers');
+  const region = process.env.AWS_REGION || 'us-west-2';
+  const sts = new STSClient({ region, credentials: fromInstanceMetadata() });
+  const out = await sts.send(new AssumeRoleCommand({
+    RoleArn: roleArn,
+    RoleSessionName: 'canary-viewer',
+    DurationSeconds: 3600,
+  }));
+  process.env.AWS_ACCESS_KEY_ID = out.Credentials.AccessKeyId;
+  process.env.AWS_SECRET_ACCESS_KEY = out.Credentials.SecretAccessKey;
+  process.env.AWS_SESSION_TOKEN = out.Credentials.SessionToken;
+  log(`[soak] refreshed viewer credentials via assume-role (${roleArn}), expiry ${out.Credentials.Expiration}`);
+}
+
 // Run the test
-runViewerCanary({
-  channelName: process.env.CANARY_CHANNEL_NAME || 'ScaryTestStream',
-  region: process.env.AWS_REGION || 'us-west-2',
-  duration: parseInt(process.env.TEST_DURATION) || 180,
-  saveFrames: process.env.SAVE_FRAMES === 'true',
-  clientId: process.env.CLIENT_ID || `test-viewer-${Date.now()}`,
-  forceTURN: process.env.FORCE_TURN === 'true',
-  endpoint: process.env.ENDPOINT || '',
-  metricSuffix: process.env.METRIC_SUFFIX || ''
-}).then(async (result) => {
-  await CloudWatchLogger.shutdown();
-  process.exit(result.success ? 0 : 1);
-}).catch(async (error) => {
-  log(`Test failed with error: ${error.message}`);
-  await CloudWatchLogger.shutdown();
-  process.exit(1);
-});
+async function main() {
+  const continuous = process.env.CANARY_CONTINUOUS === 'true';
+  const baseClientId = process.env.CLIENT_ID || `test-viewer-${Date.now()}`;
+  const baseConfig = {
+    channelName: process.env.CANARY_CHANNEL_NAME || 'ScaryTestStream',
+    region: process.env.AWS_REGION || 'us-west-2',
+    saveFrames: process.env.SAVE_FRAMES === 'true',
+    forceTURN: process.env.FORCE_TURN === 'true',
+    endpoint: process.env.ENDPOINT || '',
+    metricSuffix: process.env.METRIC_SUFFIX || '',
+    continuous,
+  };
+
+  if (!continuous) {
+    // Bounded single run (unchanged behavior).
+    try {
+      const result = await runViewerCanary({
+        ...baseConfig,
+        duration: parseInt(process.env.TEST_DURATION) || 180,
+        clientId: baseClientId,
+      });
+      await CloudWatchLogger.shutdown();
+      process.exit(result.success ? 0 : 1);
+    } catch (error) {
+      log(`Test failed with error: ${error.message}`);
+      await CloudWatchLogger.shutdown();
+      process.exit(1);
+    }
+    return;
+  }
+
+  // Continuous/soak: recycle bounded segments forever, refreshing credentials before each so they
+  // never expire mid-session, and using a fresh browser per segment so leaks can't accumulate. A
+  // per-segment failure is logged and the loop continues (soak resilience) rather than exiting.
+  const recycleSecs = parseInt(process.env.VIEWER_SESSION_RECYCLE_SECONDS) || 2400; // 40 min < 1h cred TTL
+  log(`[soak] continuous viewer mode: recycling ${recycleSecs}s segments until killed`);
+  let seg = 0;
+  // eslint-disable-next-line no-constant-condition
+  while (true) {
+    seg++;
+    try {
+      await refreshCredentialsIntoEnv();
+      log(`[soak] starting viewer session segment ${seg} (${recycleSecs}s)`);
+      const result = await runViewerCanary({
+        ...baseConfig,
+        duration: recycleSecs,
+        clientId: `${baseClientId}-seg${seg}`,
+      });
+      log(`[soak] segment ${seg} ended (success=${result && result.success})`);
+    } catch (error) {
+      log(`[soak] segment ${seg} ended with error: ${error.message}; recycling`);
+    }
+    // Brief pause between segments so a tight failure loop can't hot-spin.
+    await new Promise(resolve => setTimeout(resolve, 2000));
+  }
+}
+
+main();

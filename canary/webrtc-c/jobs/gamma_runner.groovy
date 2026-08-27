@@ -247,6 +247,14 @@ def runViewerSessions(viewerId = "", waitMinutes = 2, viewerCount = "1", stagger
             VIEWER_STARTED = true
             
             try {
+                // Continuous/soak: tell the viewer to recycle bounded segments forever and refresh
+                // its assume-role credentials before each (see chrome-headless.js). VIEWER_ and
+                // CANARY_ prefixes are already captured by the shaping-path env-file grep below.
+                def soakViewerExports = (params.SOAK_MODE?.toString() == 'true') ? """
+                        export CANARY_CONTINUOUS="true"
+                        export VIEWER_CREDENTIALS_ROLE_ARN="${env.AWS_KVS_STS_ROLE_ARN}"
+                        export VIEWER_SESSION_RECYCLE_SECONDS="${params.VIEWER_SESSION_RECYCLE_SECONDS ?: '2400'}"
+                """ : ""
                 def viewerExports = """
                         export JOB_NAME="${env.JOB_NAME}"
                         export RUNNER_LABEL="${params.RUNNER_LABEL}"
@@ -263,6 +271,7 @@ def runViewerSessions(viewerId = "", waitMinutes = 2, viewerCount = "1", stagger
                         export JS_PAGE_URL="${params.JS_BRANCH ?: 'master'}"
                         export VIEWER_SEND_AUDIO="${sendAudio}"
                         export VIEWER_AUDIO_FILE="\${WORKSPACE}/canary/webrtc-c/assets/audio-source.wav"
+                        ${soakViewerExports}
                 """
                 def viewerScript
                 if (params.VIEWER_TWCC_SHAPING?.toString() == 'true') {
