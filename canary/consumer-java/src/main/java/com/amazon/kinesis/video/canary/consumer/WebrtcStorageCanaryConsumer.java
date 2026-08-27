@@ -9,6 +9,7 @@ import java.util.Timer;
 import java.util.TimerTask;
 import java.util.ArrayList;
 import java.util.concurrent.Future;
+import java.util.concurrent.CountDownLatch;
 import java.lang.Exception;
 import java.text.MessageFormat;
 
@@ -265,6 +266,17 @@ public class WebrtcStorageCanaryConsumer {
         }
     }
 
+    /**
+     * Blocks the calling (main) thread forever so the consumer runs until the process is killed,
+     * used for continuous/soak runs. The metric timers (fragment continuity + persistence
+     * heartbeat) are non-daemon and keep emitting for the life of the JVM; the finite
+     * sleep-then-shutdown path is skipped. Uses a latch that is never counted down (no busy-wait);
+     * only returns if the thread is interrupted (process shutdown).
+     */
+    private static void awaitForever() throws InterruptedException {
+        new CountDownLatch(1).await();
+    }
+
     protected static void shutdownCanaryResources() {
         if (mConnectionHeartbeatTimer != null) {
             mConnectionHeartbeatTimer.cancel();
@@ -372,10 +384,19 @@ public class WebrtcStorageCanaryConsumer {
 
         final Integer canaryRunTime = Integer.parseInt(System.getenv("CANARY_DURATION_IN_SECONDS"));
 
+        // Continuous/soak mode: instead of running for CANARY_DURATION_IN_SECONDS and exiting, keep
+        // the metric timers alive and run until the process is killed. The end-of-run GetClip and
+        // clean shutdown are skipped (there is no end); soak health comes from the continuous
+        // FragmentReceived / PersistenceStreamingAvailability metrics. NOTE: the Jenkins job still
+        // wraps the consumer in a hard timeout, so an actual never-ending run also requires lifting
+        // those runner-side bounds -- this flag removes only the consumer's own fixed-duration exit.
+        final boolean runForever = "true".equalsIgnoreCase(System.getenv("CANARY_CONTINUOUS"));
+
         logger.info("Stream name: " + mStreamName);
         logger.info("Region: " + mRegion);
         logger.info("Canary label: " + mCanaryLabel);
         logger.info("Canary run time: " + canaryRunTime + "s");
+        logger.info("Continuous mode: " + runForever);
 
         String controlPlaneUri = System.getenv("CONTROL_PLANE_URI");
         logger.info("Control plane URI: " + (controlPlaneUri != null ? controlPlaneUri : "(default)"));
@@ -489,6 +510,12 @@ public class WebrtcStorageCanaryConsumer {
                 periodicFragmentTimer.scheduleAtFixedRate(periodicFragmentTask,
                         CanaryConstants.LIST_FRAGMENTS_INITIAL_DELAY, CanaryConstants.LIST_FRAGMENTS_INTERVAL);
 
+                if (runForever) {
+                    logger.info("Continuous mode: consumer runs until killed; metric timers stay "
+                            + "active (no fixed duration, no end-of-run GetClip)");
+                    awaitForever();
+                }
+
                 // Wait for the canary duration
                 long remainingMs = (canaryRunTime * CanaryConstants.MILLISECONDS_IN_A_SECOND)
                         - (System.currentTimeMillis() - mCanaryStartTime.getTime());
@@ -538,6 +565,13 @@ public class WebrtcStorageCanaryConsumer {
                 // intervalInitialDelay
                 intervalMetricsTimer.scheduleAtFixedRate(intervalMetricsTask,
                         CanaryConstants.LIST_FRAGMENTS_INITIAL_DELAY, CanaryConstants.LIST_FRAGMENTS_INTERVAL);
+
+                if (runForever) {
+                    logger.info("Continuous mode: consumer runs until killed; metric timers stay "
+                            + "active (no fixed duration, no end-of-run GetClip)");
+                    awaitForever();
+                }
+
                 Thread.sleep(canaryRunTime * CanaryConstants.MILLISECONDS_IN_A_SECOND);
                 intervalMetricsTimer.cancel();
 

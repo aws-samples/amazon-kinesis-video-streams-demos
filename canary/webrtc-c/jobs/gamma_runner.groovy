@@ -440,6 +440,15 @@ def buildStorageCanary(isConsumer, params) {
         consumerEnvs['CANARY_CREDENTIALS_ROLE_ARN'] = env.AWS_KVS_STS_ROLE_ARN
     }
 
+    // Continuous/soak runs: the consumer keeps its metric timers alive and runs until killed
+    // instead of exiting after CANARY_DURATION_IN_SECONDS. Pairs with CONSUMER_AUTO_REFRESH_CREDS
+    // (the creds must outlive the fixed duration too). NOTE: the consumer is still wrapped in a
+    // Jenkins hard timeout below, so a truly never-ending run also needs those runner-side bounds
+    // lifted; this flag removes only the consumer's own fixed-duration exit.
+    if (params.CONSUMER_CONTINUOUS?.toString() == 'true') {
+        consumerEnvs['CANARY_CONTINUOUS'] = 'true'
+    }
+
     RUNNING_NODES_IN_BUILDING++
     if (!isConsumer) {
         MASTER_READY = false
@@ -680,6 +689,7 @@ pipeline {
         string(name: 'IOT_CORE_PRIVATE_KEY', defaultValue: '/home/jenkins/.aws-iot/rpi5-canary_private.key', description: 'Absolute path on the master node to the IoT device private key. Used only when USE_IOT_CREDENTIALS=true.')
         string(name: 'IOT_CORE_THING_NAME', defaultValue: '', description: "The device's IoT thing name, sent as x-amzn-iot-thingname on the credentials request. REQUIRED when USE_IOT_CREDENTIALS=true and differs per Pi (e.g. rpi5-002_thing on rpi5-002, rpi5-canary_thing on yuqi-pi) -- it is the thing in that node's ~/.aws-iot/credhelper.sh. Must NOT be the channel name; a wrong/missing value yields a 403 or crash.")
         booleanParam(name: 'CONSUMER_AUTO_REFRESH_CREDS', defaultValue: false, description: 'Give the consumer auto-refreshing assume-role credentials instead of the fixed-lifetime static STS session. REQUIRED for continuous/soak runs longer than the STS session (<=12h, 1h on role-chained nodes) -- otherwise the consumer dies when the creds expire mid-run. The consumer re-assumes CANARY_STS_ROLE_ARN using the consumer node instance profile as base, so that instance profile must be trusted by the role. The master has its own long-run path (USE_IOT_CREDENTIALS); this is the consumer counterpart.')
+        booleanParam(name: 'CONSUMER_CONTINUOUS', defaultValue: false, description: 'Run the consumer until killed (keep the fragment-continuity + persistence-heartbeat metric timers alive) instead of exiting after CANARY_DURATION_IN_SECONDS. For continuous/soak runs; pair with CONSUMER_AUTO_REFRESH_CREDS so the creds outlive the fixed duration. End-of-run GetClip video verification is skipped (there is no end). NOTE: the consumer is still wrapped in a Jenkins hard timeout, so a truly never-ending run also needs those runner-side timeout bounds lifted.')
     }
     
     options {
