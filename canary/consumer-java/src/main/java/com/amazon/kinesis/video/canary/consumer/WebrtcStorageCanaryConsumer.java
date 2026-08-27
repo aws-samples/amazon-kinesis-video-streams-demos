@@ -13,7 +13,12 @@ import java.lang.Exception;
 import java.text.MessageFormat;
 
 import com.amazonaws.ClientConfiguration;
+import com.amazonaws.auth.AWSCredentialsProvider;
 import com.amazonaws.auth.EnvironmentVariableCredentialsProvider;
+import com.amazonaws.auth.InstanceProfileCredentialsProvider;
+import com.amazonaws.auth.STSAssumeRoleSessionCredentialsProvider;
+import com.amazonaws.services.securitytoken.AWSSecurityTokenService;
+import com.amazonaws.services.securitytoken.AWSSecurityTokenServiceClientBuilder;
 import com.amazonaws.regions.Regions;
 import com.amazonaws.services.cloudwatch.AmazonCloudWatch;
 import com.amazonaws.services.cloudwatch.AmazonCloudWatchClientBuilder;
@@ -71,7 +76,7 @@ public class WebrtcStorageCanaryConsumer {
     private static final String mCanaryLabel = System.getenv(CanaryConstants.CANARY_LABEL_ENV_VAR);
     private static final String mRegion = System.getenv(CanaryConstants.AWS_DEFAULT_REGION_ENV_VAR);
 
-    private static EnvironmentVariableCredentialsProvider mCredentialsProvider;
+    private static AWSCredentialsProvider mCredentialsProvider;
     private static AmazonKinesisVideo mAmazonKinesisVideo;
     private static AmazonCloudWatch mCwClient;
     private static Timer mConnectionHeartbeatTimer;
@@ -358,7 +363,34 @@ public class WebrtcStorageCanaryConsumer {
         String controlPlaneUri = System.getenv("CONTROL_PLANE_URI");
         logger.info("Control plane URI: " + (controlPlaneUri != null ? controlPlaneUri : "(default)"));
 
-        mCredentialsProvider = new EnvironmentVariableCredentialsProvider();
+        // Credential selection.
+        //   - Default (short runs): static credentials from the environment. They're minted
+        //     once by the runner and are fine for a bounded run.
+        //   - Continuous/soak runs (CANARY_CREDENTIALS_ROLE_ARN set): auto-refreshing
+        //     assume-role credentials. A single static STS session expires (<=12h, and only
+        //     1h on role-chained nodes), which would fail every KVS/CloudWatch call partway
+        //     through a soak. STSAssumeRoleSessionCredentialsProvider re-assumes the role in
+        //     the background before expiry, so the consumer can run indefinitely.
+        //     IMPORTANT: the base credentials for the re-assume are the node's instance
+        //     profile (InstanceProfileCredentialsProvider), NOT the ambient AWS_* env creds —
+        //     those env creds are themselves a temporary Canary-STS session, and assuming
+        //     Canary-STS from Canary-STS is a self-assume that fails. This requires the
+        //     consumer node's instance profile to be trusted by the assumed role.
+        final String credsRoleArn = System.getenv("CANARY_CREDENTIALS_ROLE_ARN");
+        if (credsRoleArn != null && !credsRoleArn.isEmpty()) {
+            final AWSSecurityTokenService stsClient = AWSSecurityTokenServiceClientBuilder.standard()
+                    .withRegion(mRegion)
+                    .withCredentials(InstanceProfileCredentialsProvider.getInstance())
+                    .build();
+            mCredentialsProvider = new STSAssumeRoleSessionCredentialsProvider.Builder(credsRoleArn, "canary-consumer")
+                    .withStsClient(stsClient)
+                    .build();
+            logger.info("Using auto-refreshing assume-role credentials (role=" + credsRoleArn
+                    + ", base=instance profile) for continuous run");
+        } else {
+            mCredentialsProvider = new EnvironmentVariableCredentialsProvider();
+            logger.info("Using static environment-variable credentials");
+        }
 
         AmazonKinesisVideoClientBuilder kvsBuilder = AmazonKinesisVideoClientBuilder.standard()
                 .withCredentials(mCredentialsProvider);
