@@ -1,29 +1,30 @@
 package com.amazon.kinesis.video.canary.consumer;
 
-import java.util.List;
-import java.util.ArrayList;
-
-import com.amazonaws.services.kinesisvideo.model.Fragment;
-
+import java.util.Date;
 
 
 /*
-    CanaryFragmentList allows for intervalMetricsTask calls to access a shared list of fragments.
+    Carries the trailing-window cursor across successive fragment-continuity checks.
+
+    Each continuity tick lists only the fragments in (lastCheckTime, now] rather than the whole
+    history since canary start. Holding just the cursor (instead of an ever-growing List<Fragment>)
+    keeps memory flat and each ListFragments call cheap no matter how long the canary runs -- which
+    is what makes continuous/soak runs viable. A null cursor means "first tick": the caller starts
+    the window at canary start.
  */
 
 public class CanaryFragmentList {
-    private List<Fragment> mFragmentList = new ArrayList<>();
+    private Date mLastCheckTime = null;
 
-    
     public CanaryFragmentList() {
     }
 
-    public void setFragmentList(List<Fragment> fragmentList) {
-        this.mFragmentList = fragmentList;
+    public void setLastCheckTime(Date lastCheckTime) {
+        this.mLastCheckTime = lastCheckTime;
     }
 
-    public List<Fragment> getFragmentList() {
-        return this.mFragmentList;
+    public Date getLastCheckTime() {
+        return this.mLastCheckTime;
     }
 
 }

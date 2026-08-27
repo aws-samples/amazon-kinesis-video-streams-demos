@@ -88,9 +88,20 @@ public class WebrtcStorageCanaryConsumer {
             final String listFragmentsEndpoint = mAmazonKinesisVideo.getDataEndpoint(dataEndpointRequest)
                     .getDataEndpoint();
 
+            // Trailing window: list only the fragments since the previous check, NOT the whole
+            // history since canary start. Anchoring the window start at canary start makes both the
+            // ListFragments call and the retained list grow without bound over a long run (slower
+            // ticks, unbounded memory, and a false "count went up = new fragment" signal once old
+            // fragments age out of retention). A sliding window keeps each tick small and correct no
+            // matter how long the canary has run -- required for continuous/soak runs. On the first
+            // tick there is no prior cursor, so start at canary start.
+            final Date windowStart = fragmentList.getLastCheckTime() != null
+                    ? fragmentList.getLastCheckTime() : mCanaryStartTime;
+            final Date windowEnd = new Date();
+
             TimestampRange timestampRange = new TimestampRange();
-            timestampRange.setStartTimestamp(mCanaryStartTime);
-            timestampRange.setEndTimestamp(new Date());
+            timestampRange.setStartTimestamp(windowStart);
+            timestampRange.setEndTimestamp(windowEnd);
 
             FragmentSelector fragmentSelector = new FragmentSelector();
             fragmentSelector.setFragmentSelectorType(FragmentSelectorType.SERVER_TIMESTAMP.toString());
@@ -106,24 +117,24 @@ public class WebrtcStorageCanaryConsumer {
                 Thread thread = new Thread(futureTask);
                 thread.start();
 
-                final int prevFragmentCount = fragmentList.getFragmentList().size();
-                List<Fragment> newFragmentList = futureTask.get();
-                // NOTE: The below newFragmentReceived logic assumes that fragments are not
-                // expiring, so stream retention must be greater than canary run duration.
-                if (newFragmentList.size() > prevFragmentCount) {
-                    newFragmentReceived = true;
-                }
+                List<Fragment> windowFragments = futureTask.get();
+                // Only advance the cursor on a successful list. If this tick threw, the cursor stays
+                // put so the next window re-covers this interval and no fragments are missed.
+                fragmentList.setLastCheckTime(windowEnd);
+
+                // Fragments arrived in this interval iff the trailing window returned any.
+                newFragmentReceived = !windowFragments.isEmpty();
 
                 // IngestionIncomingBitrateKbps: bitrate of the fragments persisted to storage during
-                // this interval, computed from the fragments newly returned by ListFragments (delta
-                // over the previous count): sum(bytes)*8 / sum(seconds) / 1000. This is the storage
-                // (ingestion) side counterpart to the master's OutgoingBitrate and the viewer's
-                // IncomingBitrateKbps. Only emitted when new fragments with positive duration arrived.
-                if (newFragmentList.size() > prevFragmentCount) {
+                // this interval: sum(bytes)*8 / sum(seconds) / 1000. This is the storage (ingestion)
+                // side counterpart to the master's OutgoingBitrate and the viewer's
+                // IncomingBitrateKbps. Every fragment in this window is new (window is since the last
+                // check), so sum over the whole window. Only emitted when fragments with positive
+                // duration arrived.
+                if (newFragmentReceived) {
                     long deltaBytes = 0;
                     long deltaMillis = 0;
-                    for (int i = prevFragmentCount; i < newFragmentList.size(); i++) {
-                        Fragment f = newFragmentList.get(i);
+                    for (Fragment f : windowFragments) {
                         if (f.getFragmentSizeInBytes() != null) {
                             deltaBytes += f.getFragmentSizeInBytes();
                         }
@@ -137,7 +148,6 @@ public class WebrtcStorageCanaryConsumer {
                     }
                 }
 
-                fragmentList.setFragmentList(newFragmentList);
                 publishMetricToCW("FragmentReceived", newFragmentReceived ? 1.0 : 0.0, StandardUnit.None);
 
             } catch (Exception e) {
@@ -164,9 +174,16 @@ public class WebrtcStorageCanaryConsumer {
             final String listFragmentsEndpoint = mAmazonKinesisVideo.getDataEndpoint(dataEndpointRequest)
                     .getDataEndpoint();
 
+            // Bounded lookback (last heartbeat interval), NOT since canary start: this probe only
+            // needs to confirm KVS is reachable and the stream is retrievable, and a whole-history
+            // window would grow unbounded and slow over a long run. An empty result still counts as
+            // available (a successful response, not the presence of fragments, is the signal).
+            final Date now = new Date();
+            final Date lookbackStart = new Date(now.getTime() - CanaryConstants.CONNECTION_HEARTBEAT_INTERVAL);
+
             TimestampRange timestampRange = new TimestampRange();
-            timestampRange.setStartTimestamp(mCanaryStartTime);
-            timestampRange.setEndTimestamp(new Date());
+            timestampRange.setStartTimestamp(lookbackStart);
+            timestampRange.setEndTimestamp(now);
 
             FragmentSelector fragmentSelector = new FragmentSelector();
             fragmentSelector.setFragmentSelectorType(FragmentSelectorType.SERVER_TIMESTAMP.toString());
