@@ -10,6 +10,7 @@ import java.util.TimerTask;
 import java.util.ArrayList;
 import java.util.concurrent.Future;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import java.lang.Exception;
 import java.text.MessageFormat;
 
@@ -81,6 +82,13 @@ public class WebrtcStorageCanaryConsumer {
     private static AmazonKinesisVideo mAmazonKinesisVideo;
     private static AmazonCloudWatch mCwClient;
     private static Timer mConnectionHeartbeatTimer;
+
+    // Soak decodability probe cadence. First probe a minute in (give the master time to stream),
+    // then every 15 minutes. The probed window (SOAK_VERIFY_WINDOW_SECONDS) stays well under the
+    // GetClip ~100 MB / ~10 min cap.
+    private static final long SOAK_VERIFY_INITIAL_DELAY_MS = 60_000;
+    private static final long SOAK_VERIFY_INTERVAL_MS = 900_000;
+    private static final long SOAK_VERIFY_WINDOW_SECONDS = 300;
 
     private static void calculateFragmentContinuityMetric(CanaryFragmentList fragmentList) {
         try {
@@ -293,6 +301,10 @@ public class WebrtcStorageCanaryConsumer {
         String outputPath = System.getenv().getOrDefault(
                 CanaryConstants.CLIP_OUTPUT_PATH_ENV_VAR,
                 CanaryConstants.DEFAULT_CLIP_OUTPUT_PATH);
+        downloadClip(startTime, endTime, outputPath);
+    }
+
+    private static void downloadClip(Date startTime, Date endTime, String outputPath) {
         logger.info("downloadClip: outputPath='" + outputPath + "', stream=" + mStreamName
                 + ", startTime=" + startTime + ", endTime=" + endTime);
         try {
@@ -366,6 +378,71 @@ public class WebrtcStorageCanaryConsumer {
             logger.info("downloadClip: done");
         } catch (Exception e) {
             logger.error("GetClip failed: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Soak decodability probe: GetClip a short trailing window and confirm the resulting MP4 is a
+     * decodable clip via ffprobe, emitting SoakVideoDecodable (1/0). This replaces the runner's
+     * end-of-run GetClip+verify.py stage for continuous runs, which never end. Deliberately
+     * lightweight (no OCR/SSIM) and fully self-guarded so a probe failure (or a missing ffprobe)
+     * can never break the soak -- worst case it emits a 0 and the alarm surfaces it.
+     */
+    private static void runPeriodicClipVerification() {
+        File tmp = null;
+        boolean decodable = false;
+        try {
+            final Date end = new Date();
+            final Date start = new Date(end.getTime() - SOAK_VERIFY_WINDOW_SECONDS * 1000);
+            tmp = File.createTempFile("soak-verify-", ".mp4");
+            downloadClip(start, end, tmp.getAbsolutePath());
+            if (tmp.exists() && tmp.length() > 0) {
+                decodable = probeDecodable(tmp.getAbsolutePath());
+            } else {
+                logger.error("Soak verification: GetClip produced no clip for the trailing window");
+            }
+        } catch (Exception e) {
+            logger.error("Soak verification failed, " + e);
+        } finally {
+            if (tmp != null) {
+                try { tmp.delete(); } catch (Exception ignore) { }
+            }
+        }
+        publishMetricToCW("SoakVideoDecodable", decodable ? 1.0 : 0.0, StandardUnit.None);
+    }
+
+    /**
+     * Returns true if ffprobe reports a positive duration for the clip (i.e. it is a decodable
+     * container with media). Returns false -- never throws -- if ffprobe is missing, times out, or
+     * the clip is invalid, so the caller can treat "not decodable" and "can't check" alike.
+     */
+    private static boolean probeDecodable(String path) {
+        try {
+            final ProcessBuilder pb = new ProcessBuilder(
+                    "ffprobe", "-v", "error",
+                    "-show_entries", "format=duration",
+                    "-of", "default=noprint_wrappers=1:nokey=1", path);
+            pb.redirectErrorStream(true);
+            final Process p = pb.start();
+            final StringBuilder out = new StringBuilder();
+            try (InputStream is = p.getInputStream()) {
+                byte[] buf = new byte[512];
+                int n;
+                while ((n = is.read(buf)) != -1) {
+                    out.append(new String(buf, 0, n));
+                }
+            }
+            if (!p.waitFor(30, TimeUnit.SECONDS)) {
+                p.destroyForcibly();
+                logger.error("Soak verification: ffprobe timed out");
+                return false;
+            }
+            final double duration = Double.parseDouble(out.toString().trim());
+            logger.info("Soak verification: clip duration=" + duration + "s");
+            return duration > 0;
+        } catch (Exception e) {
+            logger.error("Soak verification: ffprobe probe failed (missing ffprobe or invalid clip), " + e);
+            return false;
         }
     }
 
@@ -456,6 +533,23 @@ public class WebrtcStorageCanaryConsumer {
                 emitPersistenceStreamingAvailability();
             }
         }, CanaryConstants.LIST_FRAGMENTS_INITIAL_DELAY, CanaryConstants.CONNECTION_HEARTBEAT_INTERVAL);
+
+        // Soak video verification: the runner's end-of-run GetClip+verify.py stage never runs in
+        // continuous mode (there is no end), so when verification is enabled for a soak we probe
+        // decodability periodically instead -- GetClip a short trailing window and confirm it
+        // decodes (emits SoakVideoDecodable). Lightweight (ffprobe only, no OCR/SSIM) so it can run
+        // for the whole soak; runs alongside the other metric timers for the life of the JVM.
+        if (runForever && "true".equalsIgnoreCase(System.getenv(CanaryConstants.VIDEO_VERIFY_ENABLED_ENV_VAR))) {
+            Timer soakVerifyTimer = new Timer("SoakVideoVerifyTimer");
+            soakVerifyTimer.scheduleAtFixedRate(new TimerTask() {
+                @Override
+                public void run() {
+                    runPeriodicClipVerification();
+                }
+            }, SOAK_VERIFY_INITIAL_DELAY_MS, SOAK_VERIFY_INTERVAL_MS);
+            logger.info("Soak video verification enabled: probing decodability every "
+                    + (SOAK_VERIFY_INTERVAL_MS / 1000) + "s");
+        }
 
         switch (mCanaryLabel) {
             case CanaryConstants.PERIODIC_LABEL:

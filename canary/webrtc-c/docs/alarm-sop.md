@@ -307,6 +307,41 @@ Before escalating, you can check the media service processor logs yourself:
 
 ---
 
+## 7. Soak / Continuous-Run Alarming (SOAK_MODE)
+
+A soak run (runner param `SOAK_MODE=true`) is a single never-ending session, not a series of
+bounded runs. That changes the alarm model:
+
+- **There is no per-run SUCCESS/FAILURE and no end-of-run GetClip video verification.** The
+  stage-heartbeat liveness chain in Section 2 (`MasterFinished`, `ViewerSessionComplete`, etc.)
+  does **not** fire on a soak — those stages only emit when a bounded run completes. Do **not**
+  wait for them on a soak; alarm on the continuous in-run metrics instead.
+- **Health comes entirely from continuously-emitted metrics.** Alarm on these (namespace
+  `KinesisVideoSDKCanary`), all emitted throughout the soak:
+
+  | Metric | Emitted by | Cadence | Alarm condition |
+  |---|---|---|---|
+  | `FragmentReceived` | consumer | ~20s | SUM over 5 min == 0 (no new fragments ingested) |
+  | `PersistenceStreamingAvailability` | consumer | ~60s | AVG < 1 for 3 consecutive periods (KVS unreachable / stream not retrievable) |
+  | `IngestionIncomingBitrateKbps` | consumer | on new fragments | drops to ~0 or far below the shaped floor for several periods |
+  | `SoakVideoDecodable` | consumer (soak only, when `VIDEO_VERIFY_ENABLED=true`) | 15 min | AVG < 1 for 2 consecutive periods (ingested media not decodable) |
+  | `ViewerStorageAvailability` / `ViewerConnectionSuccessRate` | viewer | per segment (~40 min recycle) | < 1 across a recycle interval (egress broken) |
+
+- **Liveness = the metric itself stops arriving.** Because the process is meant to run forever,
+  the strongest liveness signal is a **"no data" / missing-datapoint** alarm on `FragmentReceived`
+  (and `PersistenceStreamingAvailability`): if the consumer dies, creds expire, or the node OOMs,
+  these simply stop — treat missing datapoints as breaching.
+- **Viewer recycles every ~40 min by design.** Brief per-segment reconnect gaps are expected (fresh
+  credentials + fresh browser each segment); do not alarm on a single segment blip — require the
+  breach to persist across a full recycle interval.
+
+Set these up the same way as the existing alarms (see Sections 1–3 for response). When one fires,
+the investigation in Section 4 still applies; the only difference is there is no "re-trigger the
+run" step — a soak is fixed by resolving the node/creds/service issue and (if the process died)
+restarting the single soak job.
+
+---
+
 ## Appendix: Node IP Reference
 
 **Jump host (public):** `54.185.49.98` (instance: `testStorageMaster(jump_instance)`)
