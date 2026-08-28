@@ -139,8 +139,19 @@ INT32 main(INT32 argc, CHAR* argv[])
     CHK_STATUS(initSignaling(pSampleConfiguration, SAMPLE_MASTER_CLIENT_ID));
     DLOGI("[KVS Master] Channel %s set up done ", pChannelName);
 
-    if(canaryConfig.duration.value != 0) {
-        pSampleConfiguration->sampleDuration = canaryConfig.duration.value;
+    // A soak/continuous run must never self-terminate. sampleDuration == 0 disables the
+    // elapsed-time termination check in sessionCleanupWait() (Common.cpp), so the master streams
+    // until the process is killed -- a genuinely unbounded producer, not a very-long fixed
+    // duration. When CANARY_CONTINUOUS is set this overrides CANARY_DURATION_IN_SECONDS; otherwise
+    // the run is bounded to that duration as before.
+    {
+        PCHAR pContinuous = GETENV("CANARY_CONTINUOUS");
+        if (pContinuous != NULL && STRCMP(pContinuous, "true") == 0) {
+            pSampleConfiguration->sampleDuration = 0;
+            DLOGI("[KVS Master] CANARY_CONTINUOUS set: running indefinitely (no duration bound)");
+        } else if (canaryConfig.duration.value != 0) {
+            pSampleConfiguration->sampleDuration = canaryConfig.duration.value;
+        }
     }
 
     // Checking for termination

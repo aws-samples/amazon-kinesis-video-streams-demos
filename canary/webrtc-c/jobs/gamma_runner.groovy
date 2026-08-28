@@ -426,6 +426,13 @@ def buildStorageCanary(isConsumer, params) {
         masterEnvs['AWS_IOT_CORE_THING_NAME']          = params.IOT_CORE_THING_NAME ?: ''
     }
 
+    // Continuous/soak: the master binary runs indefinitely (sampleDuration=0, no self-terminate)
+    // instead of exiting after CANARY_DURATION_IN_SECONDS -- a genuinely unbounded producer. Pair
+    // with USE_IOT_CREDENTIALS on a Pi master so its credentials also auto-refresh forever.
+    if (params.SOAK_MODE?.toString() == 'true') {
+        masterEnvs['CANARY_CONTINUOUS'] = 'true'
+    }
+
     def repoDir = "${env.HOME}/webrtc-c-storage-master/repo"
 
     def consumerEnvs = [
@@ -702,7 +709,7 @@ pipeline {
         string(name: 'IOT_CORE_THING_NAME', defaultValue: '', description: "The device's IoT thing name, sent as x-amzn-iot-thingname on the credentials request. REQUIRED when USE_IOT_CREDENTIALS=true and differs per Pi (e.g. rpi5-002_thing on rpi5-002, rpi5-canary_thing on yuqi-pi) -- it is the thing in that node's ~/.aws-iot/credhelper.sh. Must NOT be the channel name; a wrong/missing value yields a 403 or crash.")
         booleanParam(name: 'CONSUMER_AUTO_REFRESH_CREDS', defaultValue: false, description: 'Give the consumer auto-refreshing assume-role credentials instead of the fixed-lifetime static STS session. REQUIRED for continuous/soak runs longer than the STS session (<=12h, 1h on role-chained nodes) -- otherwise the consumer dies when the creds expire mid-run. The consumer re-assumes CANARY_STS_ROLE_ARN using the consumer node instance profile as base, so that instance profile must be trusted by the role. The master has its own long-run path (USE_IOT_CREDENTIALS); this is the consumer counterpart.')
         booleanParam(name: 'CONSUMER_CONTINUOUS', defaultValue: false, description: 'Run the consumer until killed (keep the fragment-continuity + persistence-heartbeat metric timers alive) instead of exiting after CANARY_DURATION_IN_SECONDS. For continuous/soak runs; pair with CONSUMER_AUTO_REFRESH_CREDS so the creds outlive the fixed duration. End-of-run GetClip video verification is skipped (there is no end). NOTE: the consumer is still wrapped in a Jenkins hard timeout, so a truly never-ending run also needs those runner-side timeout bounds lifted.')
-        booleanParam(name: 'SOAK_MODE', defaultValue: false, description: 'Master switch for a continuous/soak run. Lifts the Jenkins hard timeouts (master + whole-pipeline) to a 30-day backstop, and implies CONSUMER_CONTINUOUS + CONSUMER_AUTO_REFRESH_CREDS (the granular flags still work on their own for testing). For a Pi master also set USE_IOT_CREDENTIALS=true so the master credentials auto-refresh. The master binary must additionally be told to run indefinitely (its own CANARY_DURATION handling) for the producer side to never stop.')
+        booleanParam(name: 'SOAK_MODE', defaultValue: false, description: 'Master switch for a continuous/soak run. Makes the master binary run indefinitely (CANARY_CONTINUOUS -> sampleDuration=0, no self-terminate), makes the consumer + viewer run continuously (implies CONSUMER_CONTINUOUS + CONSUMER_AUTO_REFRESH_CREDS + viewer session recycling), and lifts the Jenkins hard timeouts (master + whole-pipeline) to a 30-day backstop. The granular flags still work on their own for testing. For a Pi master also set USE_IOT_CREDENTIALS=true so the master credentials auto-refresh. With SOAK_MODE the whole pipeline (master, consumer, viewer) is genuinely unbounded; DURATION_IN_SECONDS is ignored by all three.')
     }
     
     options {
