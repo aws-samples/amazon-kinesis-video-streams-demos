@@ -545,6 +545,18 @@ def buildStorageCanary(isConsumer, params) {
         }
         pushKeepAlive('MasterFinished')
     } else {
+        // Soak: the SoakVideoDecodable probe shells out to ffprobe on this consumer node, but the
+        // end-of-run verify stage that normally installs ffmpeg doesn't run in soak mode. Ensure
+        // it here -- only when actually needed (SOAK_MODE + verification enabled) and only if
+        // ffprobe is missing, so it's a no-op (no apt-get) on every subsequent run.
+        if ((params.SOAK_MODE?.toString() == 'true') && (params.VIDEO_VERIFY_ENABLED?.toString() == 'true')) {
+            sh '''
+                if ! command -v ffprobe >/dev/null 2>&1; then
+                    echo "Soak: ffprobe missing, installing ffmpeg for SoakVideoDecodable probe..."
+                    sudo apt-get install -y ffmpeg 2>/dev/null || true
+                fi
+            '''
+        }
         def envs = (commonEnvs + consumerEnvs).collect{ k, v -> "${k}=${v}" }
         withRunnerWrapper(envs) {
             sh """
