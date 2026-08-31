@@ -2,6 +2,44 @@
 
 namespace Canary {
 
+// The master's auto-refreshing IoT credential provider, shared with the CloudWatch/Logs clients.
+// NULL until createSampleConfiguration registers it (USE_IOT_CREDENTIALS path only).
+static PAwsCredentialProvider gCwCredentialProvider = NULL;
+
+VOID setCwCredentialProvider(PAwsCredentialProvider provider)
+{
+    gCwCredentialProvider = provider;
+}
+
+PAwsCredentialProvider getCwCredentialProvider()
+{
+    return gCwCredentialProvider;
+}
+
+Aws::Auth::AWSCredentials IotBackedCredentialsProvider::GetAWSCredentials()
+{
+    PAwsCredentialProvider pProvider = getCwCredentialProvider();
+    if (pProvider != NULL && pProvider->getCredentialsFn != NULL) {
+        PAwsCredentials pCreds = NULL;
+        if (STATUS_SUCCEEDED(pProvider->getCredentialsFn(pProvider, &pCreds)) && pCreds != NULL) {
+            Aws::Auth::AWSCredentials creds;
+            creds.SetAWSAccessKeyId(Aws::String(pCreds->accessKeyId, pCreds->accessKeyIdLen));
+            creds.SetAWSSecretKey(Aws::String(pCreds->secretKey, pCreds->secretKeyLen));
+            if (pCreds->sessionToken != NULL && pCreds->sessionTokenLen > 0) {
+                creds.SetSessionToken(Aws::String(pCreds->sessionToken, pCreds->sessionTokenLen));
+            }
+            // C SDK expiration is in 100ns units since the Unix epoch; Aws::Utils::DateTime takes ms.
+            if (pCreds->expiration != MAX_UINT64) {
+                creds.SetExpiration(Aws::Utils::DateTime((int64_t) (pCreds->expiration / HUNDREDS_OF_NANOS_IN_A_MILLISECOND)));
+            }
+            return creds;
+        }
+    }
+    // No IoT provider registered (early build-stage metrics, or a non-IoT run): fall back to
+    // environment credentials -- the same source the default chain used before.
+    return mEnvFallback.GetAWSCredentials();
+}
+
 Cloudwatch::Cloudwatch(Canary::PConfig pConfig, ClientConfiguration* pClientConfig)
     : logs(pConfig, pClientConfig), monitoring(pConfig, pClientConfig), terminated(FALSE), useFileLogger(FALSE)
 {

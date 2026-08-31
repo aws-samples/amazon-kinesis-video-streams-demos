@@ -2,7 +2,8 @@
 
 namespace Canary {
 
-CloudwatchLogs::CloudwatchLogs(PConfig pConfig, ClientConfiguration* pClientConfig) : pConfig(pConfig), client(*pClientConfig)
+CloudwatchLogs::CloudwatchLogs(PConfig pConfig, ClientConfiguration* pClientConfig)
+    : pConfig(pConfig), client(Aws::MakeShared<IotBackedCredentialsProvider>("CanaryCwLogs"), *pClientConfig)
 {
 }
 

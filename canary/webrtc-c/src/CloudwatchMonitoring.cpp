@@ -2,7 +2,8 @@
 
 namespace Canary {
 
-CloudwatchMonitoring::CloudwatchMonitoring(PConfig pConfig, ClientConfiguration* pClientConfig) : pConfig(pConfig), client(*pClientConfig)
+CloudwatchMonitoring::CloudwatchMonitoring(PConfig pConfig, ClientConfiguration* pClientConfig)
+    : pConfig(pConfig), client(Aws::MakeShared<IotBackedCredentialsProvider>("CanaryCwMonitoring"), *pClientConfig)
 {
     pConfig->isStorage ? this->isStorage = true : this->isStorage = false;
 }

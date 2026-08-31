@@ -123,6 +123,7 @@
 #include <numeric>
 
 #include <aws/core/Aws.h>
+#include <aws/core/auth/AWSCredentialsProvider.h>
 #include <aws/monitoring/CloudWatchClient.h>
 #include <aws/monitoring/model/PutMetricDataRequest.h>
 #include <aws/logs/CloudWatchLogsClient.h>

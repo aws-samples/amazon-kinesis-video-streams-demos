@@ -1465,6 +1465,9 @@ STATUS createSampleConfiguration(PCHAR channelName, SIGNALING_CHANNEL_ROLE_TYPE 
     if (useIotCredentials) {
         CHK_STATUS(createLwsIotCredentialProvider(pIotCoreCredentialEndPoint, pIotCoreCert, pIotCorePrivateKey, pSampleConfiguration->pCaCertPath,
                                                   pIotCoreRoleAlias, pIotCoreThingName, &pSampleConfiguration->pCredentialProvider));
+        // Share the auto-refreshing IoT provider with the CloudWatch/Logs clients so the master's
+        // metric pushes don't die at the ~1h static-STS expiry on a role-chained Pi during a soak.
+        Canary::setCwCredentialProvider(pSampleConfiguration->pCredentialProvider);
     } else {
         CHK_STATUS(
             createStaticCredentialProvider(pAccessKey, 0, pSecretKey, 0, pSessionToken, 0, MAX_UINT64, &pSampleConfiguration->pCredentialProvider));
@@ -1898,6 +1901,8 @@ STATUS freeSampleConfiguration(PSampleConfiguration* ppSampleConfiguration)
     }
 
     if (pSampleConfiguration->usingIotCredentials) {
+        // Stop the CloudWatch/Logs clients from referencing the provider we're about to free.
+        Canary::setCwCredentialProvider(NULL);
         freeIotCredentialProvider(&pSampleConfiguration->pCredentialProvider);
     } else {
         freeStaticCredentialProvider(&pSampleConfiguration->pCredentialProvider);
