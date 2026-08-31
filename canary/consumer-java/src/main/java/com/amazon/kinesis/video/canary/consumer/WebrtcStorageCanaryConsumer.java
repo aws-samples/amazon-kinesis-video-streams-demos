@@ -92,7 +92,11 @@ public class WebrtcStorageCanaryConsumer {
     // by SOAK_VERIFY_TIMEOUT so a slow/hung verify is killed rather than piling up.
     private static final long SOAK_VERIFY_INITIAL_DELAY_MS = 60_000;
     private static final long SOAK_VERIFY_INTERVAL_MS = 900_000;
-    private static final long SOAK_VERIFY_WINDOW_SECONDS = 60;
+    // One full pass of the source frames (TOTAL_SOURCE_FRAMES/FPS = 4676/30 ~= 156s). SSIM aligns
+    // by the burned-in counter, so the window must span exactly one 1..N pass -- shorter clips
+    // fail the frame-count threshold and can straddle a loop wrap; this also gives the drift
+    // measurement a clean monotonic counter to work with.
+    private static final long SOAK_VERIFY_WINDOW_SECONDS = 156;
     private static final long SOAK_VERIFY_TIMEOUT_SECONDS = 600;
 
     private static void calculateFragmentContinuityMetric(CanaryFragmentList fragmentList) {
@@ -476,19 +480,40 @@ public class WebrtcStorageCanaryConsumer {
                 logger.error("Soak verification: verify.py timed out after " + SOAK_VERIFY_TIMEOUT_SECONDS + "s");
                 return false;
             }
+            final String output = out.toString();
+            // Emit the temporal-drift gauges (separate signal from availability, which is
+            // content-only). Best-effort: absent in presence mode / on parse failure.
+            emitJsonNumberAsMetric(output, "avg_drift_seconds", "FrameTimestampDriftSeconds");
+            emitJsonNumberAsMetric(output, "max_drift_seconds", "FrameTimestampDriftMaxSeconds");
             // Parse storage_availability from the --json output without pulling in a JSON dependency.
-            final Matcher m = Pattern.compile("\"storage_availability\"\\s*:\\s*([0-9.]+)").matcher(out.toString());
+            final Matcher m = Pattern.compile("\"storage_availability\"\\s*:\\s*([0-9.]+)").matcher(output);
             if (m.find()) {
                 final double avail = Double.parseDouble(m.group(1));
                 logger.info("Soak verification (verify.py, mode=" + mode + "): storage_availability=" + avail);
                 return avail >= 1.0;
             }
             logger.error("Soak verification: could not parse storage_availability from verify.py output: "
-                    + out.toString().trim());
+                    + output.trim());
             return false;
         } catch (Exception e) {
             logger.error("Soak verification: verify.py invocation failed, " + e);
             return false;
+        }
+    }
+
+    /**
+     * Extracts a numeric field from verify.py's --json output and publishes it as a CloudWatch
+     * gauge (Seconds). Best-effort: silently does nothing if the field is absent (e.g. presence
+     * mode, which emits no drift), so it never affects the availability path.
+     */
+    private static void emitJsonNumberAsMetric(String json, String field, String metricName) {
+        try {
+            final Matcher m = Pattern.compile("\"" + field + "\"\\s*:\\s*([0-9.]+)").matcher(json);
+            if (m.find()) {
+                publishMetricToCW(metricName, Double.parseDouble(m.group(1)), StandardUnit.Seconds);
+            }
+        } catch (Exception e) {
+            logger.error("Soak verification: failed to emit " + metricName + ", " + e);
         }
     }
 

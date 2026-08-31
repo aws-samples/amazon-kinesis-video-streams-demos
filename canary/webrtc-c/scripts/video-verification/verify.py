@@ -361,6 +361,25 @@ def main():
             if clip_sec <= 5 or score < 0.9 or args.verbose:
                 print(f"  [clip sec {clip_sec}] frame #{ref_num} -> SSIM={score:.4f}")
 
+        # Phase 6b: Temporal drift. SSIM aligns clip<->source by the OCR'd counter, so it is blind
+        # to *timing*. Measure how the frame-counter timeline diverges from the clip's real time:
+        # clip frames are sampled at 1 fps, so a frame's clip-second is its index, and for a healthy
+        # stream the counter advances by FPS per clip-second, hence
+        #     drift(t) = (counter - counter0)/FPS - (t - t0)
+        # anchored at the earliest matched frame. Growing |drift| = producer/pipeline time drift
+        # (the Verisure timestamp-drift class) that SSIM cannot see. Reported as avg/max seconds; a
+        # separate signal from storage_availability (which stays content-only).
+        drift_samples = []
+        if len(clip_to_ref) >= 2:
+            ordered = sorted((clip_frames.index(cf), num) for cf, num in clip_to_ref)
+            t0, c0 = ordered[0]
+            for t, c in ordered[1:]:
+                drift_samples.append(abs((c - c0) / FPS - (t - t0)))
+        avg_drift_seconds = round(sum(drift_samples) / len(drift_samples), 3) if drift_samples else 0.0
+        max_drift_seconds = round(max(drift_samples), 3) if drift_samples else 0.0
+        print(f"Avg frame-time drift: {avg_drift_seconds}s")
+        print(f"Max frame-time drift: {max_drift_seconds}s")
+
         # Phase 7: Compute availability
         print("\n--- Results ---")
         if not scores:
@@ -368,6 +387,7 @@ def main():
             result = {'storage_availability': 0, 'mode': 'ssim',
                       'clip_duration': clip_duration,
                       'frames_compared': 0, 'ocr_failures': ocr_failures,
+                      'avg_drift_seconds': avg_drift_seconds, 'max_drift_seconds': max_drift_seconds,
                       'segments': len(recordings)}
         else:
             avg_ssim = sum(scores) / len(scores)
@@ -398,6 +418,8 @@ def main():
                 'min_ssim': round(min_ssim, 4),
                 'frames_compared': len(scores),
                 'ocr_failures': ocr_failures,
+                'avg_drift_seconds': avg_drift_seconds,
+                'max_drift_seconds': max_drift_seconds,
                 'clip_duration': round(clip_duration, 2) if clip_duration else None,
                 'expected_duration': round(expected, 2),
                 'segments': len(recordings),
