@@ -11,6 +11,8 @@ import java.util.ArrayList;
 import java.util.concurrent.Future;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.lang.Exception;
 import java.text.MessageFormat;
 
@@ -83,12 +85,15 @@ public class WebrtcStorageCanaryConsumer {
     private static AmazonCloudWatch mCwClient;
     private static Timer mConnectionHeartbeatTimer;
 
-    // Soak decodability probe cadence. First probe a minute in (give the master time to stream),
-    // then every 15 minutes. The probed window (SOAK_VERIFY_WINDOW_SECONDS) stays well under the
-    // GetClip ~100 MB / ~10 min cap.
+    // Soak verification cadence. First probe a minute in (give the master time to stream), then
+    // every 15 minutes. The probed window (SOAK_VERIFY_WINDOW_SECONDS) is short so the heavier
+    // SSIM path (frame extraction + OCR + compare) stays fast and finishes well inside the
+    // interval; it's also well under the GetClip ~100 MB / ~10 min cap. The subprocess is bounded
+    // by SOAK_VERIFY_TIMEOUT so a slow/hung verify is killed rather than piling up.
     private static final long SOAK_VERIFY_INITIAL_DELAY_MS = 60_000;
     private static final long SOAK_VERIFY_INTERVAL_MS = 900_000;
-    private static final long SOAK_VERIFY_WINDOW_SECONDS = 300;
+    private static final long SOAK_VERIFY_WINDOW_SECONDS = 60;
+    private static final long SOAK_VERIFY_TIMEOUT_SECONDS = 600;
 
     private static void calculateFragmentContinuityMetric(CanaryFragmentList fragmentList) {
         try {
@@ -390,14 +395,20 @@ public class WebrtcStorageCanaryConsumer {
      */
     private static void runPeriodicClipVerification() {
         File tmp = null;
-        boolean decodable = false;
+        boolean ok = false;
         try {
             final Date end = new Date();
             final Date start = new Date(end.getTime() - SOAK_VERIFY_WINDOW_SECONDS * 1000);
             tmp = File.createTempFile("soak-verify-", ".mp4");
             downloadClip(start, end, tmp.getAbsolutePath());
             if (tmp.exists() && tmp.length() > 0) {
-                decodable = probeDecodable(tmp.getAbsolutePath());
+                // Prefer the full verify.py check (SSIM against the sample frames for framesrc, or
+                // presence for camera/testsrc) when it's configured; otherwise fall back to a bare
+                // ffprobe decodability check. Either way it runs as a separate, low-priority
+                // subprocess so it can't interfere with the ListFragments continuity/heartbeat
+                // threads (see runVerifyScript).
+                final Boolean scriptResult = runVerifyScript(tmp.getAbsolutePath());
+                ok = (scriptResult != null) ? scriptResult : probeDecodable(tmp.getAbsolutePath());
             } else {
                 logger.error("Soak verification: GetClip produced no clip for the trailing window");
             }
@@ -408,7 +419,77 @@ public class WebrtcStorageCanaryConsumer {
                 try { tmp.delete(); } catch (Exception ignore) { }
             }
         }
-        publishMetricToCW("SoakVideoDecodable", decodable ? 1.0 : 0.0, StandardUnit.None);
+        publishMetricToCW("SoakVideoDecodable", ok ? 1.0 : 0.0, StandardUnit.None);
+    }
+
+    /**
+     * Runs the repo's verify.py against a GetClip'd window when CANARY_VERIFY_SCRIPT is set,
+     * returning its storage_availability verdict (true=pass). Returns null when no script is
+     * configured, so the caller can fall back to a plain ffprobe check.
+     *
+     * Non-interference with the ListFragments continuity/heartbeat work is guaranteed three ways:
+     *   1. It's a separate OS process (not JVM threads), launched from the single-threaded
+     *      SoakVideoVerifyTimer, so verifications never overlap and never block a ListFragments tick.
+     *   2. It runs under `nice -n 19`, so the CPU-heavy frame-extraction/OCR/SSIM work is
+     *      deprioritized behind everything else (the ListFragments calls are network-bound anyway).
+     *   3. It's bounded by SOAK_VERIFY_TIMEOUT — a slow/hung verify is killed, never piling up.
+     */
+    private static Boolean runVerifyScript(String clipPath) {
+        final String script = System.getenv("CANARY_VERIFY_SCRIPT");
+        if (script == null || script.isEmpty()) {
+            return null;
+        }
+        final String python = System.getenv().getOrDefault("CANARY_VERIFY_PYTHON", "python3");
+        final String mode = System.getenv().getOrDefault("CANARY_VERIFY_MODE", "presence");
+        final String sourceFrames = System.getenv("CANARY_VERIFY_SOURCE_FRAMES");
+        try {
+            final List<String> cmd = new ArrayList<>();
+            cmd.add("nice");
+            cmd.add("-n");
+            cmd.add("19");
+            cmd.add(python);
+            cmd.add(script);
+            cmd.add("--recording");
+            cmd.add(clipPath);
+            cmd.add("--mode");
+            cmd.add(mode);
+            cmd.add("--expected-duration");
+            cmd.add(String.valueOf(SOAK_VERIFY_WINDOW_SECONDS));
+            cmd.add("--json");
+            if ("ssim".equalsIgnoreCase(mode) && sourceFrames != null && !sourceFrames.isEmpty()) {
+                cmd.add("--source-frames");
+                cmd.add(sourceFrames);
+            }
+            final ProcessBuilder pb = new ProcessBuilder(cmd);
+            pb.redirectErrorStream(true);
+            final Process p = pb.start();
+            final StringBuilder out = new StringBuilder();
+            try (InputStream is = p.getInputStream()) {
+                byte[] buf = new byte[1024];
+                int n;
+                while ((n = is.read(buf)) != -1) {
+                    out.append(new String(buf, 0, n));
+                }
+            }
+            if (!p.waitFor(SOAK_VERIFY_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
+                p.destroyForcibly();
+                logger.error("Soak verification: verify.py timed out after " + SOAK_VERIFY_TIMEOUT_SECONDS + "s");
+                return false;
+            }
+            // Parse storage_availability from the --json output without pulling in a JSON dependency.
+            final Matcher m = Pattern.compile("\"storage_availability\"\\s*:\\s*([0-9.]+)").matcher(out.toString());
+            if (m.find()) {
+                final double avail = Double.parseDouble(m.group(1));
+                logger.info("Soak verification (verify.py, mode=" + mode + "): storage_availability=" + avail);
+                return avail >= 1.0;
+            }
+            logger.error("Soak verification: could not parse storage_availability from verify.py output: "
+                    + out.toString().trim());
+            return false;
+        } catch (Exception e) {
+            logger.error("Soak verification: verify.py invocation failed, " + e);
+            return false;
+        }
     }
 
     /**
@@ -535,10 +616,12 @@ public class WebrtcStorageCanaryConsumer {
         }, CanaryConstants.LIST_FRAGMENTS_INITIAL_DELAY, CanaryConstants.CONNECTION_HEARTBEAT_INTERVAL);
 
         // Soak video verification: the runner's end-of-run GetClip+verify.py stage never runs in
-        // continuous mode (there is no end), so when verification is enabled for a soak we probe
-        // decodability periodically instead -- GetClip a short trailing window and confirm it
-        // decodes (emits SoakVideoDecodable). Lightweight (ffprobe only, no OCR/SSIM) so it can run
-        // for the whole soak; runs alongside the other metric timers for the life of the JVM.
+        // continuous mode (there is no end), so when verification is enabled for a soak we verify a
+        // short trailing window periodically instead -- GetClip it and run verify.py (SSIM against
+        // the sample frames for framesrc, or presence for camera/testsrc; falls back to a bare
+        // ffprobe decodability check if no verify script is configured). Emits SoakVideoDecodable.
+        // The verify runs as a low-priority subprocess on this dedicated timer, so it never blocks
+        // the ListFragments continuity/heartbeat threads.
         if (runForever && "true".equalsIgnoreCase(System.getenv(CanaryConstants.VIDEO_VERIFY_ENABLED_ENV_VAR))) {
             Timer soakVerifyTimer = new Timer("SoakVideoVerifyTimer");
             soakVerifyTimer.scheduleAtFixedRate(new TimerTask() {

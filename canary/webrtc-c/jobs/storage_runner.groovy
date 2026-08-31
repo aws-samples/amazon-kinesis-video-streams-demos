@@ -465,6 +465,19 @@ def buildStorageCanary(isConsumer, params) {
         consumerEnvs['CANARY_CONTINUOUS'] = 'true'
     }
 
+    // Soak periodic verification (verify.py) inputs, when SOAK_MODE + verification enabled: the
+    // script + reference frames on the consumer node, the mode (ssim for the deterministic
+    // framesrc/disk sources with a burned-in counter, presence for camera/testsrc/etc.), and the
+    // venv python the consumer ensure-step below creates.
+    if ((params.SOAK_MODE?.toString() == 'true') && (params.VIDEO_VERIFY_ENABLED?.toString() == 'true')) {
+        def _soakMediaSrc = params.CANARY_MEDIA_SOURCE ?: 'disk'
+        def _soakAssetSet = params.STORAGE_ASSET_SET ?: 'h264SampleFrames'
+        consumerEnvs['CANARY_VERIFY_SCRIPT']        = "${repoDir}/canary/webrtc-c/scripts/video-verification/verify.py"
+        consumerEnvs['CANARY_VERIFY_SOURCE_FRAMES'] = "${repoDir}/canary/webrtc-c/assets/${_soakAssetSet}"
+        consumerEnvs['CANARY_VERIFY_MODE']          = (['devicesrc', 'camerasrc', 'filesrc', 'testsrc', 'rtspsrc'].contains(_soakMediaSrc)) ? 'presence' : 'ssim'
+        consumerEnvs['CANARY_VERIFY_PYTHON']        = "${env.HOME}/.venv/video-verify/bin/python3"
+    }
+
     RUNNING_NODES_IN_BUILDING++
     if (!isConsumer) {
         MASTER_READY = false
@@ -545,15 +558,18 @@ def buildStorageCanary(isConsumer, params) {
         }
         pushKeepAlive('MasterFinished')
     } else {
-        // Soak: the SoakVideoDecodable probe shells out to ffprobe on this consumer node, but the
-        // end-of-run verify stage that normally installs ffmpeg doesn't run in soak mode. Ensure
-        // it here -- only when actually needed (SOAK_MODE + verification enabled) and only if
-        // ffprobe is missing, so it's a no-op (no apt-get) on every subsequent run.
+        // Soak: the periodic verify.py check runs on this consumer node (the end-of-run verify
+        // stage doesn't run in soak mode), so ensure its venv + system deps exist here -- the same
+        // setup the verify stage uses (python3-venv, ffmpeg, tesseract-ocr, and the pip deps).
+        // Guarded by the venv dir so it's a no-op (no apt-get/pip) on every subsequent run.
         if ((params.SOAK_MODE?.toString() == 'true') && (params.VIDEO_VERIFY_ENABLED?.toString() == 'true')) {
             sh '''
-                if ! command -v ffprobe >/dev/null 2>&1; then
-                    echo "Soak: ffprobe missing, installing ffmpeg for SoakVideoDecodable probe..."
-                    sudo apt-get install -y ffmpeg 2>/dev/null || true
+                VENV_DIR="${HOME}/.venv/video-verify"
+                if [ ! -x "$VENV_DIR/bin/python3" ]; then
+                    echo "Soak: setting up video-verify venv (ffmpeg/tesseract + pip deps)..."
+                    sudo apt-get install -y python3-venv ffmpeg tesseract-ocr 2>/dev/null || true
+                    python3 -m venv "$VENV_DIR"
+                    "$VENV_DIR/bin/pip" install -q pytesseract Pillow scikit-image numpy 2>/dev/null || true
                 fi
             '''
         }
