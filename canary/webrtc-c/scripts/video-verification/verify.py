@@ -373,7 +373,16 @@ def main():
         if len(clip_to_ref) >= 2:
             ordered = sorted((clip_frames.index(cf), num) for cf, num in clip_to_ref)
             t0, c0 = ordered[0]
+            prev_c = c0
             for t, c in ordered[1:]:
+                if c < prev_c:
+                    # Source frames loop 1..TOTAL_SOURCE_FRAMES; a counter decrease means the
+                    # stream wrapped to a new pass (common when verifying short soak segments).
+                    # Re-anchor rather than treating the wrap as a huge negative drift.
+                    t0, c0 = t, c
+                    prev_c = c
+                    continue
+                prev_c = c
                 drift_samples.append(abs((c - c0) / FPS - (t - t0)))
         avg_drift_seconds = round(sum(drift_samples) / len(drift_samples), 3) if drift_samples else 0.0
         max_drift_seconds = round(max(drift_samples), 3) if drift_samples else 0.0
@@ -394,18 +403,24 @@ def main():
             max_ssim = max(scores)
             min_ssim = min(scores)
 
-            duration_ok = clip_duration is not None and clip_duration >= 120
+            # Duration and frame-count thresholds scale with --expected-duration so short soak
+            # segments (e.g. 60s) are judged proportionally. At the default expected duration
+            # (one full source pass, ~156s) these reduce exactly to the original fixed
+            # thresholds: >=120s and >= TOTAL_SOURCE_FRAMES - DROPPED_FRAME_THRESHOLD.
+            duration_threshold = expected * (120.0 / EXPECTED_DURATION)
+            frames_threshold = FPS * expected - DROPPED_FRAME_THRESHOLD * (expected / EXPECTED_DURATION)
+            duration_ok = clip_duration is not None and clip_duration >= duration_threshold
             max_ssim_ok = max_ssim > 0.99
             avg_ssim_ok = avg_ssim > 0.85
             min_ssim_ok = min_ssim > 0.03
-            frames_ok = clip_total_frames >= (TOTAL_SOURCE_FRAMES - DROPPED_FRAME_THRESHOLD)
+            frames_ok = clip_total_frames >= frames_threshold
             available = 1 if (duration_ok and max_ssim_ok and avg_ssim_ok and min_ssim_ok and frames_ok) else 0
 
-            print(f"Duration:           {clip_duration:.2f}s ({'PASS' if duration_ok else 'FAIL'} — threshold: >= 120s)")
+            print(f"Duration:           {clip_duration:.2f}s ({'PASS' if duration_ok else 'FAIL'} — threshold: >= {duration_threshold:.1f}s)")
             print(f"Max SSIM:           {max_ssim:.4f} ({'PASS' if max_ssim_ok else 'FAIL'} — threshold: > 0.99)")
             print(f"Avg SSIM:           {avg_ssim:.4f} ({'PASS' if avg_ssim_ok else 'FAIL'} — threshold: > 0.85)")
             print(f"Min SSIM:           {min_ssim:.4f} ({'PASS' if min_ssim_ok else 'FAIL'} — threshold: > 0.03)")
-            print(f"Clip frames:        {clip_total_frames} ({'PASS' if frames_ok else 'FAIL'} — threshold: >= {TOTAL_SOURCE_FRAMES - DROPPED_FRAME_THRESHOLD})")
+            print(f"Clip frames:        {clip_total_frames} ({'PASS' if frames_ok else 'FAIL'} — threshold: >= {frames_threshold:.0f})")
             print(f"SSIM comparisons:   {len(scores)}")
             print(f"OCR failures:       {ocr_failures}")
             print(f"Storage available:  {available}")
