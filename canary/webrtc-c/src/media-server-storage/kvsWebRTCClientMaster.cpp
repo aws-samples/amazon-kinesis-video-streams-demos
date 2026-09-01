@@ -145,7 +145,7 @@ INT32 main(INT32 argc, CHAR* argv[])
     // duration. When CANARY_CONTINUOUS is set this overrides CANARY_DURATION_IN_SECONDS; otherwise
     // the run is bounded to that duration as before.
     {
-        PCHAR pContinuous = GETENV("CANARY_CONTINUOUS");
+        PCHAR pContinuous = GETENV(CANARY_CONTINUOUS_ENV_VAR);
         if (pContinuous != NULL && STRCMP(pContinuous, "true") == 0) {
             pSampleConfiguration->sampleDuration = 0;
             DLOGI("[KVS Master] CANARY_CONTINUOUS set: running indefinitely (no duration bound)");

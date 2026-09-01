@@ -21,6 +21,10 @@ Only compiled when the build is configured with -DENABLE_GST_MEDIA_SOURCE=ON.
 // "rtspsrc", "filesrc" (decode a local video file and re-encode), "framesrc"
 // (multifilesrc over the repo's ./assets/<CANARY_ASSET_SET>/frame-%04d.h264 sequence,
 // decoded and re-encoded so TWCC drives the bitrate while reusing the existing assets).
+//
+// Only "framesrc" and the live sources ("testsrc", "devicesrc", "camerasrc", "rtspsrc")
+// are usable for a soak (CANARY_CONTINUOUS): framesrc loops its sequence in that mode,
+// and the live sources never end. "filesrc" goes silent at end-of-file.
 #define CANARY_MEDIA_SOURCE_ENV_VAR (PCHAR) "CANARY_MEDIA_SOURCE"
 
 // RTSP URI, required when CANARY_MEDIA_SOURCE=rtspsrc.

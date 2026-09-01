@@ -262,32 +262,80 @@ PVOID sendGstreamerAudioVideo(PVOID args)
                 // Reuse the repo's pre-encoded frame sequence (same CANARY_ASSET_SET
                 // selector as the disk path), but decode + re-encode LIVE so TWCC drives
                 // the x264enc bitrate. multifilesrc reads frame-0001.h264, 0002, ... as
-                // one byte-stream. No loop=true: the sequence plays once (~4676 frames /
-                // 30fps ~= 156s) then EOSes, which lets the duration-terminate path work
-                // (appsink returns GST_FLOW_EOS -> bus EOS -> clean stop). A run configured
-                // longer than the content ends when the frames run out. avdec_h264 needs
-                // gstreamer1.0-libav (installed by rpi-onboard.sh).
+                // one byte-stream. avdec_h264 needs gstreamer1.0-libav (installed by
+                // rpi-onboard.sh).
+                //
+                // Whether the sequence loops is tied to CANARY_CONTINUOUS, because the two
+                // run shapes need opposite behavior and are mutually exclusive:
+                //   - bounded run: the source MUST EOS (~4676 frames / 30fps ~= 156s) so the
+                //     duration-terminate path completes -- appsink returns GST_FLOW_EOS, the
+                //     bus posts EOS, the pipeline stops cleanly. A run configured longer than
+                //     the content simply ends when the frames run out.
+                //   - soak run (CANARY_CONTINUOUS, sampleDuration == 0): a source that EOSes
+                //     leaves the master alive with no media at all. Observed on the 2026-08-31
+                //     soak: EOS at 163s, then 42 minutes of a live connection whose RTP
+                //     counters never moved -- consumer-side FragmentReceived went to 0 and
+                //     looked exactly like a service-side ingest outage. So loop the video and
+                //     swap the finite wav for a live tone: both branches then produce frames
+                //     until the process is killed.
+                // Aborting a looping run still works: appTerminateFlag makes on_new_sample
+                // return GST_FLOW_EOS (see on_new_sample above), which is what unblocks the
+                // bus wait -- that path never depended on the SOURCE reaching end-of-data.
                 PCHAR pAssetSet = GETENV((PCHAR) "CANARY_ASSET_SET");
+                PCHAR pContinuous = GETENV(CANARY_CONTINUOUS_ENV_VAR);
+                BOOL loopFrames = (pContinuous != NULL && STRCMP(pContinuous, "true") == 0);
+                // audio-source.wav is the real companion to the frames (PCM s16le 48kHz mono,
+                // ~156s; audioconvert upmixes mono->stereo for the channels=2 Opus caps), but
+                // it is finite and wavparse can't be handed a looped byte-stream (it would see
+                // a second RIFF header mid-data). A soak therefore synthesizes audio instead.
+                // Nothing verifies audio CONTENT (verify.py is video-only, and
+                // SoakStreamVerifier's ffmpeg segments with -an), but the audio bitrate is a
+                // real TWCC signal: on the 2026-08-31 soak the wav tracked the TWCC audio
+                // target from 108 down to 16.5 kbps at a constant 50 pps, i.e. only the bytes
+                // per packet shrank. So the wave matters.
+                //
+                // wave=white-noise, NOT wave=ticks (what the testsrc/camerasrc paths use).
+                // opusenc defaults to bitrate-type=constrained-vbr, so "bitrate" is a ceiling,
+                // not a mandate: Opus only spends what the content needs, and the target is
+                // only visible in the output when it is the binding constraint. Measured over
+                // 5s of 48kHz stereo, target 16k -> 128k (8x):
+                //     ticks        9.7k ->  43.1k  (4.5x, and clipped -- it never wants more
+                //                                   than ~43k, so the top of MAX_AUDIO_BITRATE_BPS
+                //                                   =128k is entirely invisible)
+                //     white-noise 14.4k -> 129.2k  (~1:1 readout of the target)
+                // White noise is incompressible so it always wants more than any target and
+                // stays ceiling-bound. That also beats real audio, whose bitrate is
+                // content-dependent (a quiet passage reads low regardless of the target).
+                //
+                // Also no is-live=TRUE (unlike the testsrc pipeline): multifilesrc is a non-live
+                // source, and mixing liveness classes in one pipeline changes preroll/base-time
+                // handling. audiotestsrc is infinite either way and the sync=TRUE appsink clocks
+                // it, so both branches stay non-live like the bounded variant below.
+                PCHAR pAudioBranch =
+                    loopFrames ? (PCHAR) "audiotestsrc wave=white-noise ! "
+                                         "queue leaky=2 max-size-buffers=400 ! audioconvert ! audioresample ! "
+                                         "opusenc name=sampleAudioEncoder ! audio/x-opus,rate=48000,channels=2 ! "
+                                         "appsink sync=TRUE emit-signals=TRUE name=appsink-audio"
+                               : (PCHAR) "filesrc location=./assets/audio-source.wav ! wavparse ! audioconvert ! "
+                                         "audioresample ! opusenc name=sampleAudioEncoder ! audio/x-opus,rate=48000,channels=2 ! "
+                                         "queue ! appsink sync=TRUE emit-signals=TRUE name=appsink-audio";
+                UINT32 stringOutcome;
                 if (pAssetSet == NULL || pAssetSet[0] == '\0') {
                     pAssetSet = (PCHAR) "h264SampleFrames";
                 }
-                UINT32 stringOutcome =
+                DLOGI("[KVS GStreamer Master] frame-source: assetSet='%s' loop=%s audio=%s", pAssetSet,
+                      loopFrames ? "TRUE (continuous)" : "FALSE (bounded)", loopFrames ? "white-noise" : "audio-source.wav");
+                stringOutcome =
                     (UINT32) SNPRINTF(pipelineBuffer, GST_PIPELINE_MAX_CHAR_COUNT,
-                                      "multifilesrc location=./assets/%s/frame-%%04d.h264 index=1 "
+                                      "multifilesrc location=./assets/%s/frame-%%04d.h264 index=1 %s"
                                       "caps=video/x-h264,stream-format=byte-stream,alignment=au,framerate=30/1 ! "
                                       "h264parse ! avdec_h264 ! videoconvert ! "
                                       "x264enc name=sampleVideoEncoder bframes=0 key-int-max=30 speed-preset=veryfast bitrate=512 "
                                       "byte-stream=TRUE tune=zerolatency ! "
                                       "video/x-h264,stream-format=byte-stream,alignment=au,profile=baseline ! "
                                       "appsink sync=TRUE emit-signals=TRUE name=appsink-video "
-                                      // Real audio companion to the frames (assets/audio-source.wav:
-                                      // PCM s16le 48kHz mono, ~156s). audioconvert upmixes mono->stereo
-                                      // for the channels=2 Opus caps. Plays once and EOSes ~= the video
-                                      // length, so both branches EOS together for a clean duration stop.
-                                      "filesrc location=./assets/audio-source.wav ! wavparse ! audioconvert ! "
-                                      "audioresample ! opusenc name=sampleAudioEncoder ! audio/x-opus,rate=48000,channels=2 ! "
-                                      "queue ! appsink sync=TRUE emit-signals=TRUE name=appsink-audio",
-                                      pAssetSet);
+                                      "%s",
+                                      pAssetSet, loopFrames ? "loop=true " : "", pAudioBranch);
                 CHK_ERR(stringOutcome < GST_PIPELINE_MAX_CHAR_COUNT, STATUS_INVALID_OPERATION,
                         "[KVS GStreamer Master] frame-source pipeline exceeds maximum allowed length");
                 senderPipeline = gst_parse_launch(pipelineBuffer, &gError);
@@ -415,7 +463,7 @@ STATUS gstParseSrcTypeFromEnv(PSampleConfiguration pSampleConfiguration)
 {
     ENTERS();
     STATUS retStatus = STATUS_SUCCESS;
-    PCHAR pMediaSource, pRtspUri, pFile;
+    PCHAR pMediaSource, pRtspUri, pFile, pContinuous;
 
     CHK(pSampleConfiguration != NULL, STATUS_NULL_ARG);
 
@@ -447,6 +495,17 @@ STATUS gstParseSrcTypeFromEnv(PSampleConfiguration pSampleConfiguration)
         DLOGI("[KVS GStreamer Master] Using file source in GStreamer: %s", fileUri);
         pSampleConfiguration->srcType = FILE_SOURCE;
         pSampleConfiguration->rtspUri = fileUri;
+        // uridecodebin has no loop knob (looping it needs segment-seek handling on EOS),
+        // so on a soak this source goes silent at end-of-file while the master keeps
+        // running -- the failure framesrc's conditional loop exists to avoid. Warn loudly
+        // rather than let a soak quietly measure only the file's length. Use framesrc, or
+        // a file longer than the intended soak.
+        pContinuous = GETENV(CANARY_CONTINUOUS_ENV_VAR);
+        if (pContinuous != NULL && STRCMP(pContinuous, "true") == 0) {
+            DLOGW("[KVS GStreamer Master] %s=filesrc does NOT loop: this soak will stop producing media at "
+                  "end-of-file while the master stays alive. Use framesrc for a soak.",
+                  CANARY_MEDIA_SOURCE_ENV_VAR);
+        }
     } else if (STRCMP(pMediaSource, "framesrc") == 0) {
         // Stream the repo's pre-encoded frame sequence, decoded + re-encoded live so
         // TWCC can drive the x264enc bitrate. Reuses CANARY_ASSET_SET (same selector

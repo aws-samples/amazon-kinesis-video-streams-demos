@@ -40,6 +40,45 @@ Runner picks the mode (bounded: verify stage `verifyMode`; soak: `CANARY_VERIFY_
 **框架取舍:** TWCC 自适应需要 live encoder(`framesrc`/camera/testsrc 走 x264enc;`disk` 不适应);
 SSIM 需要烧录计数器(`disk`/`framesrc`)。**两者兼得 = `framesrc`** —— soak 推荐。
 
+## Soak 的媒体源必须是无尽的
+
+一个会 EOS 的源在 soak 里不会结束 run —— master 仍然活着(`sampleDuration=0`),只是不再有媒体。
+2026-08-31 那次 soak 就是这样:framesrc 在 163s EOS,之后 42 分钟 RTP 计数器一动不动,
+consumer 侧 `FragmentReceived` 掉 0,长得和服务端 ingest 故障一模一样。
+
+现在 `framesrc` 在 `CANARY_CONTINUOUS` 下会循环(`multifilesrc loop=true`)。有界 run 的
+pipeline 完全没变 —— 它反而**需要**源 EOS 来触发时长终止。
+
+音轨在 soak 下换成 `audiotestsrc wave=white-noise`(`wavparse` 接不了循环字节流,回卷时会在
+数据中间看到第二个 RIFF 头)。音频**内容**无人校验(verify.py 纯视频,soak 的 ffmpeg 用 `-an`),
+所以换合成音不损失覆盖。
+
+**但波形的选择不是随意的**,因为音频码率本身是一条真实的 TWCC 信号:2026-08-31 那次 soak 里
+wav 音轨跟着 TWCC 目标从 108 降到 16.5 kbps,包率恒定 50pps,只有每包字节数在缩。
+
+`opusenc` 默认 `bitrate-type=constrained-vbr`,所以 `bitrate` 是**上限而非强制值**——Opus 只花
+内容需要的比特数,目标只有在成为**紧约束**时才会出现在输出里。实测 5s / 48kHz 立体声,
+目标 16k → 128k(8×):
+
+| wave | 16k → 产出 | 128k → 产出 | |
+|---|---|---|---|
+| `ticks` | 9.7k | **43.1k** | 4.5×,且削顶:它不需要 ~43k 以上,`MAX_AUDIO_BITRATE_BPS`=128k 的上半量程完全不可见 |
+| `white-noise` | 14.4k | 129.2k | ≈1:1 读出目标 |
+| `sine` | 16.6k | 129.4k | 同样可用 |
+
+白噪声不可压缩 → 永远想要比任何目标更多 → 始终被目标钳住。这也优于真实音频(其码率是内容
+相关的,安静段落无论目标多高都读得低)。
+
+> ⚠️ 既有问题:`testsrc` / `camerasrc` 一直用 `wave=ticks`,所以四个 TWCC 每条件 job
+> (全部跑在 `CANARY_MEDIA_SOURCE=testsrc`)的音频自适应量程是削顶的。一行改动可修,
+> 但会移动那些 job 的音频指标基线。
+
+| 源 | 能做 soak? |
+|---|---|
+| `framesrc` | ✅ 循环(唯一同时支持 SSIM 的) |
+| `testsrc`, `devicesrc`, `camerasrc`, `rtspsrc` | ✅ 活源,永不结束(仅 presence 模式) |
+| `filesrc` | ❌ 文件放完即静默(会打 WARN);`disk` 非 gst 路径,自身会循环但没有 encoder 给 TWCC 调 |
+
 ## Drift metric的发射路径(容易混)
 
 `verify.py` ssim 模式总会在 JSON 里输出 `avg/max_drift_seconds`;但发成 CloudWatch 指标

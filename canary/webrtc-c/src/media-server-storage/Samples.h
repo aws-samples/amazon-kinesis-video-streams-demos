@@ -46,6 +46,10 @@ Shared include file for the samples
 // Absent on non-shaped runs, in which case the metric is simply not emitted.
 #define TWCC_APPLIED_BW_FILE "/run/twcc-current-kbps"
 
+// Set to "true" for a soak run: the master streams until killed (sampleDuration
+// forced to 0) and any finite media source must loop instead of EOSing.
+#define CANARY_CONTINUOUS_ENV_VAR (PCHAR) "CANARY_CONTINUOUS"
+
 #define SAMPLE_SESSION_CLEANUP_WAIT_PERIOD (5 * HUNDREDS_OF_NANOS_IN_A_SECOND)
 
 #define SAMPLE_PENDING_MESSAGE_CLEANUP_DURATION (20 * HUNDREDS_OF_NANOS_IN_A_SECOND)
