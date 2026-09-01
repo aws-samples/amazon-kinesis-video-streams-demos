@@ -1,63 +1,50 @@
 #!/bin/bash
-# cleanup-consumer.sh — Cron job for storage consumer nodes
-# Removes temporary files older than 1 hour.
-# Respects .in_use lockfiles to avoid deleting active Jenkins workspaces.
+# cleanup-consumer.sh — cron job for storage CONSUMER nodes
 #
-# Install: crontab -e
-#   0 * * * * /home/ubuntu/webrtc-c-storage-master/repo/canary/webrtc-c/scripts/cron/cleanup-consumer.sh >> /home/ubuntu/webrtc-c-storage-master/logs/cleanup.log 2>&1
+# Per-run artifacts by age, plus /tmp scratch. Workspace reaping and the scratch
+# sweep live in cleanup-common.sh; read the "Workspace reaping safety" comment
+# there before changing anything about deletion.
+#
+# Install (bounded-canary node):
+#   0 * * * * $HOME/webrtc-c-storage-master/cleanup-consumer.sh >> $HOME/webrtc-c-storage-master/logs/cleanup.log 2>&1
+#
+# Install (soak-dedicated consumer node) — this is the node that actually needs a
+# high-frequency sweep. SoakStreamVerifier verifies one 60s segment per minute, and
+# each verify.py run leaves a 150-300MB /tmp/video-verify-* dir, so an hourly tick
+# can leave ~60 of them standing (9-18GB). Reaping off, sweep every 5 minutes:
+#   */5 * * * * REAP_WORKSPACES=0 $HOME/webrtc-c-storage-master/cleanup-consumer.sh >> $HOME/webrtc-c-storage-master/logs/cleanup.log 2>&1
+#
+# Verify before arming a node: DRY_RUN=1 $HOME/webrtc-c-storage-master/cleanup-consumer.sh
 
 set -euo pipefail
 
 CONSUMER_HOME="${HOME}/webrtc-c-storage-master"
 REPO_DIR="${CONSUMER_HOME}/repo"
 
-# Ensure the log target directory exists (cron redirects into it; if missing,
-# the shell can't open the >> target and the script never runs).
+# cron redirects into this directory; if it is missing the shell cannot open the
+# >> target and the script never runs at all.
 mkdir -p "${CONSUMER_HOME}/logs"
 
-echo "$(date -u '+%Y-%m-%dT%H:%M:%SZ') [cleanup-consumer] Starting cleanup"
+CLEANUP_TAG="cleanup-consumer"
+# shellcheck source=./cleanup-common.sh
+. "$(dirname "$0")/cleanup-common.sh"
 
-# GetClip MP4 files older than 1 hour
+log "Starting cleanup"
+
+# GetClip MP4s from the end-of-run verification. Soak skips that step entirely, so
+# this glob is empty on a soak node.
 find "${REPO_DIR}/canary/consumer-java" -name 'clip-*.mp4' -mmin +60 -delete 2>/dev/null || true
 
-# Maven build logs if any
-find "${REPO_DIR}/canary/consumer-java" -name '*.log' -mmin +60 -delete 2>/dev/null || true
+# Maven build logs. Scoped to target/ and to *build*.log so this can no longer
+# unlink a consumer log file that a live run is still writing to.
+find "${REPO_DIR}/canary/consumer-java/target" -maxdepth 1 -name '*.log' -mmin +60 -delete 2>/dev/null || true
 
-# Jenkins workspace leftovers
-# Covers both ~/Jenkins/workspace/webrtc-* (default) and ~/Jenkins/webrtc-* (custom ws() calls)
-# Skip workspaces that have a .in_use file younger than 2 hours (active builds)
-for dir in "${HOME}/Jenkins/workspace"/webrtc-* "${HOME}/Jenkins"/webrtc-*; do
-    [ -d "$dir" ] || continue
-    # Skip if directory is less than 60 minutes old
-    if ! find "$dir" -maxdepth 0 -mmin +60 | grep -q .; then
-        continue
-    fi
-    # NEVER reap a workspace a live process still references. Age alone is not "stale":
-    # a soak build legitimately runs for hours/days, and the glob also matches the
-    # Jenkins durable-task control dir '<ws>@tmp' (which has NO .in_use) — deleting it
-    # mid-run kills the build with "process apparently never started" / exit -2
-    # (this killed the first soak at ~72min). pgrep -f "$base" matches both the running
-    # build (cwd/cmdline under the workspace) and its durable wrapper (cmdline contains
-    # <ws>@tmp/durable-*).
-    base="${dir%@tmp}"
-    if pgrep -f "$base" > /dev/null 2>&1; then
-        echo "$(date -u '+%Y-%m-%dT%H:%M:%SZ') [cleanup-consumer] Skipping in-use workspace (live process): $dir"
-        continue
-    fi
-    # Skip if .in_use exists and is less than 2 hours old (active build); check the
-    # base workspace's .in_use for the @tmp sibling too.
-    if [ -f "$base/.in_use" ] && find "$base/.in_use" -mmin -120 | grep -q .; then
-        echo "$(date -u '+%Y-%m-%dT%H:%M:%SZ') [cleanup-consumer] Skipping active workspace: $dir"
-        continue
-    fi
-    echo "$(date -u '+%Y-%m-%dT%H:%M:%SZ') [cleanup-consumer] Removing stale workspace: $dir"
-    rm -rf "$dir"
-done
+# Jenkins workspaces. Two globs: the default per-job workspace and the custom
+# ws() workspaces the runner creates.
+reap_workspaces "${HOME}/Jenkins/workspace"/webrtc-* "${HOME}/Jenkins"/webrtc-*
 
-# Video verification temp dirs (from verify.py). The actual dirs are named
-# video-verify-* with Tesseract OCR scratch files (tess_*) — the earlier
-# verify_*/frame_extract_* patterns never matched, so these piled up.
-find /tmp -maxdepth 1 -name 'video-verify-*' -type d -mmin +60 -exec rm -rf {} + 2>/dev/null || true
-find /tmp -maxdepth 1 -name 'tess_*' -mmin +60 -exec rm -rf {} + 2>/dev/null || true
+# verify.py scratch + the soak GetMedia segment spool. This is the main reason a
+# soak consumer runs on a */5 schedule rather than hourly.
+sweep_verify_scratch
 
-echo "$(date -u '+%Y-%m-%dT%H:%M:%SZ') [cleanup-consumer] Done"
+log "Done"

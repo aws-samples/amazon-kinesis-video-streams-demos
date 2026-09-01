@@ -1,75 +1,64 @@
 #!/bin/bash
-# cleanup-master.sh — Cron job for storage master nodes
-# Removes temporary files older than 1 hour.
-# Respects .in_use lockfiles to avoid deleting active Jenkins workspaces.
+# cleanup-master.sh — cron job for storage MASTER nodes
 #
-# Install: crontab -e
-#   0 * * * * /home/ubuntu/webrtc-c-storage-master/repo/canary/webrtc-c/scripts/cron/cleanup-master.sh >> /home/ubuntu/webrtc-c-storage-master/logs/cleanup.log 2>&1
+# Per-run artifacts by age, plus /tmp scratch. Workspace reaping and the scratch
+# sweep live in cleanup-common.sh; read the "Workspace reaping safety" comment
+# there before changing anything about deletion.
+#
+# $HOME is /home/ubuntu on the EC2 nodes and /home/jenkins on the Raspberry Pi
+# masters, so the crontab path below differs per node. The script itself only ever
+# uses ${HOME}.
+#
+# Install (bounded-canary node):
+#   0 * * * * $HOME/webrtc-c-storage-master/cleanup-master.sh >> $HOME/webrtc-c-storage-master/logs/cleanup.log 2>&1
+#
+# Install (soak-dedicated master node) — a soak master produces almost nothing:
+# no verify.py runs here, the session never ends, and a workspace only appears
+# when the soak is restarted. Reaping is off; an hourly tick is plenty.
+#   0 * * * * REAP_WORKSPACES=0 $HOME/webrtc-c-storage-master/cleanup-master.sh >> $HOME/webrtc-c-storage-master/logs/cleanup.log 2>&1
+#
+# Verify before arming a node: DRY_RUN=1 $HOME/webrtc-c-storage-master/cleanup-master.sh
 
 set -euo pipefail
 
 MASTER_HOME="${HOME}/webrtc-c-storage-master"
 REPO_DIR="${MASTER_HOME}/repo"
 
-# Ensure the log target directory exists (cron redirects into it; if missing,
-# the shell can't open the >> target and the script never runs).
+# cron redirects into this directory; if it is missing the shell cannot open the
+# >> target and the script never runs at all.
 mkdir -p "${MASTER_HOME}/logs"
 
-echo "$(date -u '+%Y-%m-%dT%H:%M:%SZ') [cleanup-master] Starting cleanup"
+CLEANUP_TAG="cleanup-master"
+# shellcheck source=./cleanup-common.sh
+. "$(dirname "$0")/cleanup-common.sh"
 
-# Build logs older than 24 hours (keep recent for debugging)
+log "Starting cleanup"
+
+# Build logs (keep a day for debugging a failed build)
 find "${MASTER_HOME}/logs" -name 'build-*.log' -mmin +1440 -delete 2>/dev/null || true
 
-# GetClip MP4 files older than 1 hour. The consumer/GetClip step runs on the
-# master node in some topologies, so clips land here too — without this rule
-# they accumulate unbounded and fill the disk.
+# Post-build smoke-test logs
+find "${MASTER_HOME}/logs" -name 'smoke-*.log' -mmin +1440 -delete 2>/dev/null || true
+
+# GetClip MP4s: the consumer/GetClip step runs on the master node in the
+# single-node topologies, so clips land here too. Soak never produces these (it
+# skips the end-of-run GetClip), so this glob is simply empty on a soak node.
 find "${REPO_DIR}/canary/consumer-java" -name 'clip-*.mp4' -mmin +60 -delete 2>/dev/null || true
 
-# IoT cert artifacts older than 1 hour
-# Certs are regenerated each run, old ones are stale
-find "${MASTER_HOME}/certs" -type f -mmin +60 -delete 2>/dev/null || true
-# Remove empty cert prefix directories
-find "${MASTER_HOME}/certs" -type d -empty -delete 2>/dev/null || true
-
-# Jenkins workspace leftovers (old workspaces from previous runs)
-# Only clean workspaces, not the persistent repo/build dirs
-# Skip workspaces that have a .in_use file younger than 2 hours (active builds)
-for dir in "${HOME}/Jenkins/workspace"/webrtc-* "${HOME}/Jenkins"/webrtc-*; do
-    [ -d "$dir" ] || continue
-    # Skip if directory is less than 60 minutes old
-    if ! find "$dir" -maxdepth 0 -mmin +60 | grep -q .; then
-        continue
-    fi
-    # NEVER reap a workspace a live process still references. Age alone is not "stale":
-    # a soak build legitimately runs for hours/days, and the glob also matches the
-    # Jenkins durable-task control dir '<ws>@tmp' (which has NO .in_use) — deleting it
-    # mid-run kills the build with "process apparently never started" / exit -2
-    # (this killed the first soak's master at ~72min). pgrep -f "$base" matches both the
-    # running build and its durable wrapper (cmdline contains <ws>@tmp/durable-*).
-    base="${dir%@tmp}"
-    if pgrep -f "$base" > /dev/null 2>&1; then
-        echo "$(date -u '+%Y-%m-%dT%H:%M:%SZ') [cleanup-master] Skipping in-use workspace (live process): $dir"
-        continue
-    fi
-    # Skip if .in_use exists and is less than 2 hours old (active build); check the
-    # base workspace's .in_use for the @tmp sibling too.
-    if [ -f "$base/.in_use" ] && find "$base/.in_use" -mmin -120 | grep -q .; then
-        echo "$(date -u '+%Y-%m-%dT%H:%M:%SZ') [cleanup-master] Skipping active workspace: $dir"
-        continue
-    fi
-    echo "$(date -u '+%Y-%m-%dT%H:%M:%SZ') [cleanup-master] Removing stale workspace: $dir"
-    rm -rf "$dir"
-done
-
-# Core dumps if any
+# Core dumps
 find "${MASTER_HOME}" -name 'core.*' -mmin +60 -delete 2>/dev/null || true
 
-# firstFrameSentTimeStamp files
+# First-frame timestamp handoff files
 find "${MASTER_HOME}/build" -name 'firstFrameSentTimeStamp*.txt' -mmin +60 -delete 2>/dev/null || true
 
-# Video verification temp dirs (from verify.py) — present when the consumer/
-# GetClip verification step runs on this node.
-find /tmp -maxdepth 1 -name 'video-verify-*' -type d -mmin +60 -exec rm -rf {} + 2>/dev/null || true
-find /tmp -maxdepth 1 -name 'tess_*' -mmin +60 -exec rm -rf {} + 2>/dev/null || true
+# Leftover TWCC env-file if a shaped run died before its finally block
+find "${MASTER_HOME}/build" -maxdepth 1 -name '.twcc-master.env' -mmin +60 -delete 2>/dev/null || true
 
-echo "$(date -u '+%Y-%m-%dT%H:%M:%SZ') [cleanup-master] Done"
+# Jenkins workspaces. Two globs: the default per-job workspace and the custom
+# ws() workspaces the runner creates for the master stages.
+reap_workspaces "${HOME}/Jenkins/workspace"/webrtc-* "${HOME}/Jenkins"/webrtc-*
+
+# verify.py scratch, present when a co-resident consumer verification runs here.
+sweep_verify_scratch
+
+log "Done"

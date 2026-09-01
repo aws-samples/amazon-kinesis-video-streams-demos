@@ -73,9 +73,14 @@ def buildWebRTCProject(thing_prefix) {
     pushKeepAlive('GitCheckoutComplete')
 
     // Sync cleanup cron script if it changed
+    // cleanup-common.sh holds the workspace reaper the role script sources, so it
+    // must land alongside it or the deployed cron dies on the source line.
     sh """
-        cmp -s '${repoDir}/canary/webrtc-c/scripts/cron/cleanup-master.sh' '${env.HOME}/webrtc-c-storage-master/cleanup-master.sh' \
-            || cp '${repoDir}/canary/webrtc-c/scripts/cron/cleanup-master.sh' '${env.HOME}/webrtc-c-storage-master/cleanup-master.sh'"""
+        for f in cleanup-master.sh cleanup-common.sh; do
+            cmp -s '${repoDir}/canary/webrtc-c/scripts/cron/'\$f '${env.HOME}/webrtc-c-storage-master/'\$f \
+                || cp '${repoDir}/canary/webrtc-c/scripts/cron/'\$f '${env.HOME}/webrtc-c-storage-master/'\$f
+        done
+        chmod +x '${env.HOME}/webrtc-c-storage-master/cleanup-master.sh'"""
 
     // Build the binary (handles git fetch, skip-rebuild, and flock internally).
     // Export asset-set env so build-storage-master.sh can fetch the requested set from S3.
@@ -145,9 +150,14 @@ def buildConsumerProject() {
         flock -u 9"""
 
     // Sync cleanup cron script if it changed
+    // cleanup-common.sh holds the workspace reaper the role script sources, so it
+    // must land alongside it or the deployed cron dies on the source line.
     sh """
-        cmp -s '${repoDir}/canary/webrtc-c/scripts/cron/cleanup-consumer.sh' '${env.HOME}/webrtc-c-storage-master/cleanup-consumer.sh' \
-            || cp '${repoDir}/canary/webrtc-c/scripts/cron/cleanup-consumer.sh' '${env.HOME}/webrtc-c-storage-master/cleanup-consumer.sh'"""
+        for f in cleanup-consumer.sh cleanup-common.sh; do
+            cmp -s '${repoDir}/canary/webrtc-c/scripts/cron/'\$f '${env.HOME}/webrtc-c-storage-master/'\$f \
+                || cp '${repoDir}/canary/webrtc-c/scripts/cron/'\$f '${env.HOME}/webrtc-c-storage-master/'\$f
+        done
+        chmod +x '${env.HOME}/webrtc-c-storage-master/cleanup-consumer.sh'"""
 
     // Fetch bitrate-variant asset set into the repo's assets dir so verify.py can use it
     // as the SSIM reference (Option A: like-for-like comparison). Default set is a no-op
@@ -192,8 +202,11 @@ def runViewerSessions(viewerId = "", waitMinutes = 2, viewerCount = "1", stagger
             // Sync cleanup cron script if it changed
             sh """
                 mkdir -p '${env.HOME}/JS-viewer-build'
-                cmp -s './canary/webrtc-c/scripts/cron/cleanup-viewer.sh' '${env.HOME}/JS-viewer-build/cleanup-viewer.sh' \
-                    || cp './canary/webrtc-c/scripts/cron/cleanup-viewer.sh' '${env.HOME}/JS-viewer-build/cleanup-viewer.sh'"""
+                for f in cleanup-viewer.sh cleanup-common.sh; do
+                    cmp -s './canary/webrtc-c/scripts/cron/'\$f '${env.HOME}/JS-viewer-build/'\$f \
+                        || cp './canary/webrtc-c/scripts/cron/'\$f '${env.HOME}/JS-viewer-build/'\$f
+                done
+                chmod +x '${env.HOME}/JS-viewer-build/cleanup-viewer.sh'"""
             
             def endpointValue = params.ENDPOINT ?: ''
             def metricSuffixValue = params.METRIC_SUFFIX ?: ''
@@ -275,8 +288,11 @@ def runViewerSessions(viewerId = "", waitMinutes = 2, viewerCount = "1", stagger
                         # consumer) -- the node's crontab points at ~/JS-viewer-build/cleanup-viewer.sh,
                         # which previously required a manual copy and went stale.
                         mkdir -p "\${HOME}/JS-viewer-build"
-                        cmp -s "\${WORKSPACE}/canary/webrtc-c/scripts/cron/cleanup-viewer.sh" "\${HOME}/JS-viewer-build/cleanup-viewer.sh" \
-                            || cp "\${WORKSPACE}/canary/webrtc-c/scripts/cron/cleanup-viewer.sh" "\${HOME}/JS-viewer-build/cleanup-viewer.sh"
+                        for f in cleanup-viewer.sh cleanup-common.sh; do
+                            cmp -s "\${WORKSPACE}/canary/webrtc-c/scripts/cron/\$f" "\${HOME}/JS-viewer-build/\$f" \
+                                || cp "\${WORKSPACE}/canary/webrtc-c/scripts/cron/\$f" "\${HOME}/JS-viewer-build/\$f"
+                        done
+                        chmod +x "\${HOME}/JS-viewer-build/cleanup-viewer.sh"
                         ${soakViewerExports}
                 """
                 def viewerScript
