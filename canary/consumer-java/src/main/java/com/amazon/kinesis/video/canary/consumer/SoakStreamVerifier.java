@@ -61,8 +61,15 @@ public class SoakStreamVerifier {
     private final AWSCredentialsProvider credentialsProvider;
     private final AmazonKinesisVideo kvsClient;
 
+    // Emit an explicit SoakVideoDecodable=0.0 when no segment has been verified for this long
+    // (media outage -> ffmpeg produces no segments -> the worker would otherwise go silent for
+    // the whole gap, as it did for ~54min in the first soak). Keeps the metric a continuous
+    // signal instead of relying purely on missing-datapoint alarms.
+    private static final long NO_SEGMENT_EMIT_MS = 3 * SEGMENT_SECONDS * 1000;
+
     private File spoolDir;
     private volatile Process ffmpeg;
+    private volatile long lastEmitMs;
 
     public SoakStreamVerifier(String streamName, String region, AWSCredentialsProvider credentialsProvider,
                               AmazonKinesisVideo kvsClient) {
@@ -79,6 +86,7 @@ public class SoakStreamVerifier {
             logger.error("SoakStreamVerifier: failed to create spool dir, verification disabled, " + e);
             return;
         }
+        lastEmitMs = System.currentTimeMillis(); // grace period before the first no-segment 0.0
         logger.info("SoakStreamVerifier: continuous verification started (segment=" + SEGMENT_SECONDS
                 + "s, spool=" + spoolDir.getAbsolutePath() + ")");
 
@@ -178,6 +186,14 @@ public class SoakStreamVerifier {
         try {
             final File[] segs = spoolDir.listFiles((d, name) -> name.startsWith("seg_") && name.endsWith(".mp4"));
             if (segs == null || segs.length < 2) {
+                // No finished segment. If this persists (media outage: GetMedia delivers nothing,
+                // ffmpeg writes nothing), emit an explicit 0.0 so the metric keeps flowing.
+                if (System.currentTimeMillis() - lastEmitMs > NO_SEGMENT_EMIT_MS) {
+                    logger.warn("SoakStreamVerifier: no finished segment in "
+                            + (NO_SEGMENT_EMIT_MS / 1000) + "s (media outage?), emitting 0");
+                    WebrtcStorageCanaryConsumer.publishMetricToCW("SoakVideoDecodable", 0.0, StandardUnit.None);
+                    lastEmitMs = System.currentTimeMillis();
+                }
                 return; // newest segment (if any) is still being written
             }
             Arrays.sort(segs);
@@ -211,6 +227,7 @@ public class SoakStreamVerifier {
                     seg.delete();
                 }
                 WebrtcStorageCanaryConsumer.publishMetricToCW("SoakVideoDecodable", ok ? 1.0 : 0.0, StandardUnit.None);
+                lastEmitMs = System.currentTimeMillis();
             }
         } catch (Exception e) {
             // Never let the worker die -- the next tick retries.

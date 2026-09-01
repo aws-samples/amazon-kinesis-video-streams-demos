@@ -36,8 +36,18 @@ for dir in "${HOME}/Jenkins"/webrtc-*-[Vv]iewer*; do
     if ! find "$dir" -maxdepth 0 -mmin +60 | grep -q .; then
         continue
     fi
-    # Skip if .in_use exists and is less than 2 hours old (active build)
-    if [ -f "$dir/.in_use" ] && find "$dir/.in_use" -mmin -120 | grep -q .; then
+    # NEVER reap a workspace a live process still references. Age alone is not "stale":
+    # a soak build legitimately runs for hours/days, and Jenkins durable-task control
+    # dirs ('<ws>@tmp', no .in_use) must not be deleted mid-run — that kills the build
+    # with "process apparently never started" / exit -2.
+    base="${dir%@tmp}"
+    if pgrep -f "$base" > /dev/null 2>&1; then
+        echo "$(date -u '+%Y-%m-%dT%H:%M:%SZ') [cleanup-viewer] Skipping in-use workspace (live process): $dir"
+        continue
+    fi
+    # Skip if .in_use exists and is less than 2 hours old (active build); check the
+    # base workspace's .in_use for the @tmp sibling too.
+    if [ -f "$base/.in_use" ] && find "$base/.in_use" -mmin -120 | grep -q .; then
         echo "$(date -u '+%Y-%m-%dT%H:%M:%SZ') [cleanup-viewer] Skipping active workspace: $dir"
         continue
     fi

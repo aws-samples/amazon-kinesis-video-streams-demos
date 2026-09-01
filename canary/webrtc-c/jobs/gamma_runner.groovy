@@ -472,7 +472,10 @@ def buildStorageCanary(isConsumer, params) {
     if ((params.SOAK_MODE?.toString() == 'true') && (params.VIDEO_VERIFY_ENABLED?.toString() == 'true')) {
         def _soakMediaSrc = params.CANARY_MEDIA_SOURCE ?: 'disk'
         def _soakAssetSet = params.STORAGE_ASSET_SET ?: 'h264SampleFrames'
-        consumerEnvs['CANARY_VERIFY_SCRIPT']        = "${repoDir}/canary/webrtc-c/scripts/video-verification/verify.py"
+        // Run-private copy (made in the ensure-step below), NOT the shared repo checkout: other
+        // jobs on this node 'git checkout -f' their own branch in ${repoDir}, which swapped
+        // verify.py to an older version mid-soak (broke --mode parsing ~61min into the first soak).
+        consumerEnvs['CANARY_VERIFY_SCRIPT']        = "${env.HOME}/webrtc-c-storage-master/soak-video-verification/verify.py"
         consumerEnvs['CANARY_VERIFY_SOURCE_FRAMES'] = "${repoDir}/canary/webrtc-c/assets/${_soakAssetSet}"
         consumerEnvs['CANARY_VERIFY_MODE']          = (['devicesrc', 'camerasrc', 'filesrc', 'testsrc', 'rtspsrc'].contains(_soakMediaSrc)) ? 'presence' : 'ssim'
         consumerEnvs['CANARY_VERIFY_PYTHON']        = "${env.HOME}/.venv/video-verify/bin/python3"
@@ -576,13 +579,22 @@ def buildStorageCanary(isConsumer, params) {
                     python3 -m venv "$VENV_DIR"
                     "$VENV_DIR/bin/pip" install -q pytesseract Pillow scikit-image numpy 2>/dev/null || true
                 fi
+                # Run-private copy of the verification scripts: the shared repo checkout gets
+                # 'git checkout -f'-ed by OTHER jobs' builds on this node, which swaps verify.py
+                # mid-soak. Assets (untracked, fetched) survive branch flips, so only scripts move.
+                rm -rf "${HOME}/webrtc-c-storage-master/soak-video-verification"
+                cp -r "${HOME}/webrtc-c-storage-master/repo/canary/webrtc-c/scripts/video-verification" \
+                      "${HOME}/webrtc-c-storage-master/soak-video-verification"
             '''
         }
         def envs = (commonEnvs + consumerEnvs).collect{ k, v -> "${k}=${v}" }
         withRunnerWrapper(envs) {
             sh """
                 cd '${repoDir}/canary/consumer-java'
-                java -classpath target/aws-kinesisvideo-producer-sdk-canary-consumer-1.0-SNAPSHOT.jar:\$(cat tmp_jar) -Daws.accessKeyId=\${AWS_ACCESS_KEY_ID} -Daws.secretKey=\${AWS_SECRET_ACCESS_KEY} -Daws.sessionToken=\${AWS_SESSION_TOKEN} com.amazon.kinesis.video.canary.consumer.WebrtcStorageCanaryConsumer
+                # Credentials come from the AWS_* environment (EnvironmentVariableCredentialsProvider,
+                # or the auto-refreshing assume-role provider in soak mode) -- NOT -D system
+                # properties, which leak the live keys into the build log via shell xtrace.
+                java -classpath target/aws-kinesisvideo-producer-sdk-canary-consumer-1.0-SNAPSHOT.jar:\$(cat tmp_jar) com.amazon.kinesis.video.canary.consumer.WebrtcStorageCanaryConsumer
             """
         }
 
