@@ -271,6 +271,12 @@ def runViewerSessions(viewerId = "", waitMinutes = 2, viewerCount = "1", stagger
                         export JS_PAGE_URL="${params.JS_BRANCH ?: 'master'}"
                         export VIEWER_SEND_AUDIO="${sendAudio}"
                         export VIEWER_AUDIO_FILE="\${WORKSPACE}/canary/webrtc-c/assets/audio-source.wav"
+                        # Sync the viewer cleanup cron script (same cmp||cp pattern as master/
+                        # consumer) -- the node's crontab points at ~/JS-viewer-build/cleanup-viewer.sh,
+                        # which previously required a manual copy and went stale.
+                        mkdir -p "\${HOME}/JS-viewer-build"
+                        cmp -s "\${WORKSPACE}/canary/webrtc-c/scripts/cron/cleanup-viewer.sh" "\${HOME}/JS-viewer-build/cleanup-viewer.sh" \
+                            || cp "\${WORKSPACE}/canary/webrtc-c/scripts/cron/cleanup-viewer.sh" "\${HOME}/JS-viewer-build/cleanup-viewer.sh"
                         ${soakViewerExports}
                 """
                 def viewerScript
