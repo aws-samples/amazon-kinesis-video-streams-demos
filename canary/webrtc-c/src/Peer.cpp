@@ -787,8 +787,18 @@ STATUS Peer::publishEndToEndMetrics()
 STATUS Peer::publishRetryCount()
 {
     STATUS retStatus = STATUS_SUCCESS;
-    Canary::Cloudwatch::getInstance().monitoring.pushRetryCount(this->clientInfo.stateMachineRetryCountReadOnly);
+    SignalingClientMetrics signalingClientMetrics;
+
+    signalingClientMetrics.version = SIGNALING_CLIENT_METRICS_CURRENT_VERSION;
+    CHK_STATUS(signalingClientGetMetrics(signalingClientHandle, &signalingClientMetrics));
+
+    Canary::Cloudwatch::getInstance().monitoring.pushRetryCount(signalingClientMetrics.signalingClientStats.apiCallRetryCount);
+
 CleanUp:
+    if (retStatus != STATUS_SUCCESS) {
+        DLOGE("Error 0x%08x while getting signaling client metrics to publish signaling API retry count", retStatus);
+    }
+
     return retStatus;
 }
 
