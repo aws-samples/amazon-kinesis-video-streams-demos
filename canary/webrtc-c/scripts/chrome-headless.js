@@ -2,8 +2,104 @@ const puppeteer = require('puppeteer');
 const { CloudWatchClient } = require('@aws-sdk/client-cloudwatch');
 const { CloudWatchMetrics, CloudWatchLogger } = require('./cloudwatch');
 const fs = require('fs');
-const { execSync } = require('child_process');
+const { execFile } = require('child_process');
 const path = require('path');
+
+// ---------------------------------------------------------------------------
+// Async video-verification queue (soak / CANARY_CONTINUOUS only)
+// ---------------------------------------------------------------------------
+// verify.py used to run via execSync at the segment boundary, which blocked the
+// whole recycle loop: a segment could not end until verification finished, and in
+// ssim mode verify.py first re-encodes all 4676 source frames into a reference
+// video before comparing anything (it does that even when the clip has 0 frames,
+// as seen on soak #5281). The viewer is the only thing measuring the egress path,
+// so every second spent verifying is a second with nobody watching it -- #5281
+// recorded segments 2h00m to 2h46m apart against a 2400s (40 min) recycle setting,
+// leaving whole hour-long master sessions with no viewer attached at all.
+//
+// So in continuous mode the segment boundary only enqueues, and a single-flight
+// worker verifies in the background while the next segment is already connected.
+// Mirrors the consumer's SoakStreamVerifier: work happens in a niced subprocess,
+// never more than one at a time, and a backlog drops oldest rather than growing.
+//
+// Bounded runs stay synchronous on purpose -- the process exits right after, so
+// deferring would simply lose ViewerStorageAvailability for that run.
+const VERIFY_QUEUE_MAX = 3;
+const VERIFY_TIMEOUT_MS = 600000;
+const verifyQueue = [];
+let verifyWorkerBusy = false;
+
+function enqueueVerification(job) {
+  verifyQueue.push(job);
+  // Backpressure: keep the newest jobs. Verification is a sample, not a ledger --
+  // losing an old one costs a datapoint, letting the queue grow costs the disk.
+  while (verifyQueue.length > VERIFY_QUEUE_MAX) {
+    const dropped = verifyQueue.shift();
+    log(`[verify] backlog > ${VERIFY_QUEUE_MAX}, dropping oldest job (${dropped.recordings.length} segment(s))`);
+    CloudWatchMetrics.publishCountMetric(dropped.metrics.skipped, dropped.channelName, 1).catch(() => {});
+  }
+  log(`[verify] queued (depth=${verifyQueue.length}); segment loop continues`);
+  drainVerifyQueue();
+}
+
+// Single-flight: returns immediately if a job is already running, so the caller
+// (the segment boundary) is never blocked.
+async function drainVerifyQueue() {
+  if (verifyWorkerBusy) {
+    return;
+  }
+  verifyWorkerBusy = true;
+  try {
+    while (verifyQueue.length > 0) {
+      await runVerifyJob(verifyQueue.shift());
+    }
+  } finally {
+    verifyWorkerBusy = false;
+  }
+}
+
+async function runVerifyJob(job) {
+  const args = ['-n', '19', job.venvPython, job.verifyScript, '--recording', ...job.recordings];
+  if (job.mode === 'ssim') {
+    args.push('--source-frames', job.sourceFrames);
+  }
+  args.push('--mode', job.mode, '--json');
+
+  let output;
+  try {
+    output = await new Promise((resolve, reject) => {
+      // execFile, not a shell string: recording paths reach verify.py as argv
+      // entries, so no quoting to get wrong. nice -19 keeps it behind the browser.
+      execFile('nice', args, { encoding: 'utf-8', timeout: VERIFY_TIMEOUT_MS, maxBuffer: 16 * 1024 * 1024 },
+        (err, stdout) => (err ? reject(err) : resolve(stdout)));
+    });
+  } catch (error) {
+    log(`[verify] verification failed: ${error.message}`);
+    return;
+  }
+
+  let results;
+  try {
+    results = JSON.parse(output.trim());
+  } catch (error) {
+    log(`[verify] could not parse verify.py output: ${error.message}`);
+    return;
+  }
+
+  log(`[verify] mode=${job.mode} availability=${results.storage_availability} avgSSIM=${results.avg_ssim} ` +
+      `minSSIM=${results.min_ssim} maxSSIM=${results.max_ssim} segments=${results.segments}`);
+
+  try {
+    await CloudWatchMetrics.publishCountMetric(job.metrics.availability, job.channelName, results.storage_availability);
+    if (results.avg_ssim !== undefined) {
+      await CloudWatchMetrics.publishPercentageMetric(job.metrics.ssimAvg, job.channelName, results.avg_ssim * 100);
+      await CloudWatchMetrics.publishPercentageMetric(job.metrics.ssimMin, job.channelName, results.min_ssim * 100);
+      await CloudWatchMetrics.publishPercentageMetric(job.metrics.ssimMax, job.channelName, results.max_ssim * 100);
+    }
+  } catch (error) {
+    log(`[verify] publishing metrics failed: ${error.message}`);
+  }
+}
 
 function log(message) {
   const timestamp = new Date().toISOString();
@@ -1083,52 +1179,51 @@ class ViewerCanaryTest {
       return;
     }
 
-    try {
-      log('Running video verification...');
-      // Prefer the venv Python if available (PEP 668 blocks system-wide pip on modern Ubuntu)
-      const venvPython = path.join(process.env.HOME || '', '.venv', 'video-verify', 'bin', 'python3');
-      if (!fs.existsSync(venvPython)) {
-        log(`Video verification venv not found at ${venvPython} — run setup-storage-viewer.sh first`);
-        return;
-      }
-      const recordingArgs = existing.map(p => `"${p}"`).join(' ');
-      const cmd = `"${venvPython}" "${verifyScript}" --recording ${recordingArgs} --source-frames "${sourceFrames}" --json`;
-      const output = execSync(cmd, { encoding: 'utf-8', timeout: 600000 });
-      const results = JSON.parse(output.trim());
-
-      log(`Video verification results: availability=${results.storage_availability}, avg SSIM=${results.avg_ssim}, min SSIM=${results.min_ssim}, max SSIM=${results.max_ssim}, compared=${results.frames_compared}, segments=${results.segments}`);
-
-      await CloudWatchMetrics.publishCountMetric(
-        this.getMetricName('ViewerStorageAvailability'),
-        this.config.channelName,
-        results.storage_availability
-      );
-
-      if (results.avg_ssim !== undefined) {
-        await CloudWatchMetrics.publishPercentageMetric(
-          this.getMetricName('ViewerSSIMAvg'),
-          this.config.channelName,
-          results.avg_ssim * 100
-        );
-        await CloudWatchMetrics.publishPercentageMetric(
-          this.getMetricName('ViewerSSIMMin'),
-          this.config.channelName,
-          results.min_ssim * 100
-        );
-        await CloudWatchMetrics.publishPercentageMetric(
-          this.getMetricName('ViewerSSIMMax'),
-          this.config.channelName,
-          results.max_ssim * 100
-        );
-      }
-    } catch (error) {
-      log(`Video verification failed: ${error.message}`);
+    // Prefer the venv Python if available (PEP 668 blocks system-wide pip on modern Ubuntu)
+    const venvPython = path.join(process.env.HOME || '', '.venv', 'video-verify', 'bin', 'python3');
+    if (!fs.existsSync(venvPython)) {
+      log(`Video verification venv not found at ${venvPython} — run setup-storage-viewer.sh first`);
+      return;
     }
+
+    // Pick the mode from the media source, the way both runners already do for the
+    // consumer. This was never passed before, so verify.py always fell back to its
+    // 'ssim' default -- which aligns clip frames by OCRing a burned-in counter that
+    // a camera/filesrc/testsrc stream does not have, so every segment of a
+    // camerasrc soak would fail for the wrong reason.
+    const liveSources = ['devicesrc', 'camerasrc', 'filesrc', 'testsrc', 'rtspsrc'];
+    const mode = liveSources.includes(process.env.CANARY_MEDIA_SOURCE || '') ? 'presence' : 'ssim';
+
+    const job = {
+      recordings: existing,
+      venvPython,
+      verifyScript,
+      sourceFrames,
+      mode,
+      channelName: this.config.channelName,
+      metrics: {
+        availability: this.getMetricName('ViewerStorageAvailability'),
+        ssimAvg: this.getMetricName('ViewerSSIMAvg'),
+        ssimMin: this.getMetricName('ViewerSSIMMin'),
+        ssimMax: this.getMetricName('ViewerSSIMMax'),
+        skipped: this.getMetricName('ViewerVerifySkipped'),
+      },
+    };
 
     // Preserve recordings for manual verification
     for (const segment of existing) {
       log(`Viewer recording preserved at: ${segment}`);
     }
+
+    if (this.config.continuous) {
+      // Hand off and return, so the recycle loop can bring up the next segment
+      // while this verifies. See the queue comment at the top of the file.
+      enqueueVerification(job);
+      return;
+    }
+
+    log('Running video verification...');
+    await runVerifyJob(job);
   }
 
   async handleVideoDetection(page) {
