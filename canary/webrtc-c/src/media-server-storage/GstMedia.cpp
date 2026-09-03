@@ -397,9 +397,50 @@ PVOID sendGstreamerAudioVideo(PVOID args)
     DLOGD("[KVS GStreamer Master] State change null->playing returned status: %d", stateChangeStatus);
     CHK_ERR(stateChangeStatus != GST_STATE_CHANGE_FAILURE, STATUS_FORMAT_ERROR, "State change to PLAYING failed!");
 
-    /* block until error or EOS */
+    /* Wait for ERROR or EOS -- but never unboundedly.
+     *
+     * This used to be a single gst_bus_timed_pop_filtered() with GST_CLOCK_TIME_NONE,
+     * which is safe only while some source is guaranteed to reach end-of-data. A
+     * looping source (framesrc under CANARY_CONTINUOUS) never does, so the only EOS
+     * path left is appTerminateFlag -> on_new_sample -> GST_FLOW_EOS -- and that fires
+     * only while samples still reach the appsink. A stalled pipeline never delivers
+     * one, so main()'s teardown (which sets appTerminateFlag then THREAD_JOINs this
+     * thread) blocks forever. Observed 2026-09-02: the master logged "Exiting with
+     * 0x0000000f" at 01:29:15 and "Cleanup done" at 04:41:06 -- 3h12m wedged here,
+     * holding its Jenkins executor, bounded only by the 30-day SOAK_MODE timeout.
+     *
+     * So poll the bus instead, and once teardown is requested push the EOS event onto
+     * the pipeline directly. gst_element_send_event() does not depend on sample flow,
+     * so it unblocks a stalled pipeline too. If even that produces no bus message
+     * within the grace period, give up and let CleanUp force the pipeline to NULL --
+     * a noisy exit beats an unbounded hang.
+     */
     bus = gst_element_get_bus(senderPipeline);
-    msg = gst_bus_timed_pop_filtered(bus, GST_CLOCK_TIME_NONE, (GstMessageType) (GST_MESSAGE_ERROR | GST_MESSAGE_EOS));
+    {
+        BOOL eosRequested = FALSE;
+        UINT64 eosRequestedAt = 0;
+        while (TRUE) {
+            msg = gst_bus_timed_pop_filtered(bus, GST_BUS_POLL_INTERVAL, (GstMessageType) (GST_MESSAGE_ERROR | GST_MESSAGE_EOS));
+            if (msg != NULL) {
+                break;
+            }
+            if (!ATOMIC_LOAD_BOOL(&pSampleConfiguration->appTerminateFlag)) {
+                continue;
+            }
+            if (!eosRequested) {
+                DLOGI("[KVS GStreamer Master] Teardown requested; sending EOS to the pipeline");
+                gst_element_send_event(senderPipeline, gst_event_new_eos());
+                eosRequested = TRUE;
+                eosRequestedAt = GETTIME();
+                continue;
+            }
+            if (GETTIME() - eosRequestedAt > GST_TEARDOWN_EOS_TIMEOUT) {
+                DLOGW("[KVS GStreamer Master] No EOS on the bus %u seconds after requesting it; abandoning the wait",
+                      (UINT32) (GST_TEARDOWN_EOS_TIMEOUT / HUNDREDS_OF_NANOS_IN_A_SECOND));
+                break;
+            }
+        }
+    }
 
 CleanUp:
     if (gError != NULL) {

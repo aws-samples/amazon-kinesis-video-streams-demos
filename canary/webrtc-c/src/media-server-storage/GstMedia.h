@@ -50,6 +50,15 @@ Only compiled when the build is configured with -DENABLE_GST_MEDIA_SOURCE=ON.
 
 #define GST_PIPELINE_MAX_CHAR_COUNT 2048
 
+// How long the media thread waits on the GStreamer bus per poll, so it can notice
+// appTerminateFlag instead of blocking on GST_CLOCK_TIME_NONE.
+#define GST_BUS_POLL_INTERVAL (1 * GST_SECOND)
+
+// Grace period after pushing EOS onto the pipeline during teardown. If no ERROR/EOS
+// reaches the bus in this window the media thread stops waiting, so a stalled
+// pipeline can no longer wedge main()'s THREAD_JOIN indefinitely.
+#define GST_TEARDOWN_EOS_TIMEOUT (15 * HUNDREDS_OF_NANOS_IN_A_SECOND)
+
 // Initializes GStreamer and plugs sendGstreamerAudioVideo in as the video
 // source (a single thread drives both the video and audio appsinks, so
 // audioSource is left NULL).
