@@ -69,6 +69,14 @@ wav 音轨跟着 TWCC 目标从 108 降到 16.5 kbps,包率恒定 50pps,只有�
 白噪声不可压缩 → 永远想要比任何目标更多 → 始终被目标钳住。这也优于真实音频(其码率是内容
 相关的,安静段落无论目标多高都读得低)。
 
+> ⚠️ **`is-live=TRUE` 必须加**,和 testsrc/camerasrc 两条管道一致。不加的话 audiotestsrc
+> 是非 live 源,会以下游能接受的最快速度灌 buffer,配上 `queue leaky=2` 和 `sync=TRUE` 的
+> sink,这条分支只送出一两个包就卡死。同一视频分支下实测 25 秒:不加 → **574 字节**;
+> 加了 → **199,640 字节(约 64 kbps)**;有界路径的 wav 分支 → 196,645 字节。
+> soak build #5281 就是漏了它,**整个 run 一包音频都没发出去**
+> (`RtpAudioPacketsSentPerSecond` 取值集合只有 `{0}`,音频 SSRC 恒为 0 packets/0 bytes),
+> 而同期视频发了 384,498 包 / 331 MB / 2.3 Mbps。
+
 > ⚠️ 既有问题:`testsrc` / `camerasrc` 一直用 `wave=ticks`,所以四个 TWCC 每条件 job
 > (全部跑在 `CANARY_MEDIA_SOURCE=testsrc`)的音频自适应量程是削顶的。一行改动可修,
 > 但会移动那些 job 的音频指标基线。

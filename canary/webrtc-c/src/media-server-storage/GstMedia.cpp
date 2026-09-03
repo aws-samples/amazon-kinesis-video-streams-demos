@@ -307,12 +307,18 @@ PVOID sendGstreamerAudioVideo(PVOID args)
                 // stays ceiling-bound. That also beats real audio, whose bitrate is
                 // content-dependent (a quiet passage reads low regardless of the target).
                 //
-                // Also no is-live=TRUE (unlike the testsrc pipeline): multifilesrc is a non-live
-                // source, and mixing liveness classes in one pipeline changes preroll/base-time
-                // handling. audiotestsrc is infinite either way and the sync=TRUE appsink clocks
-                // it, so both branches stay non-live like the bounded variant below.
+                // is-live=TRUE is REQUIRED, matching the testsrc/camerasrc pipelines. Without it
+                // audiotestsrc is a non-live source that floods buffers as fast as downstream
+                // takes them; against `queue leaky=2` plus a sync=TRUE sink the branch delivers
+                // one or two packets and then wedges. Measured over 25s against this same video
+                // branch: no is-live -> 574 audio bytes; is-live=TRUE -> 199,640 (~64 kbps),
+                // and the finite wav branch -> 196,645. Soak build #5281 shipped without it and
+                // sent ZERO audio for its whole run (RtpAudioPacketsSentPerSecond only ever 0,
+                // audio SSRC stuck at 0 packets / 0 bytes) while video pushed 384,498 packets /
+                // 331 MB at 2.3 Mbps. The 2026-08-31 run, still on the wav branch, sent audio
+                // fine -- so this was the regression, not the media service.
                 PCHAR pAudioBranch =
-                    loopFrames ? (PCHAR) "audiotestsrc wave=white-noise ! "
+                    loopFrames ? (PCHAR) "audiotestsrc wave=white-noise is-live=TRUE ! "
                                          "queue leaky=2 max-size-buffers=400 ! audioconvert ! audioresample ! "
                                          "opusenc name=sampleAudioEncoder ! audio/x-opus,rate=48000,channels=2 ! "
                                          "appsink sync=TRUE emit-signals=TRUE name=appsink-audio"
