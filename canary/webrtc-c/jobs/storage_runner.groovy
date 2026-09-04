@@ -630,7 +630,10 @@ def buildStorageCanary(isConsumer, params) {
                 # Credentials come from the AWS_* environment (EnvironmentVariableCredentialsProvider,
                 # or the auto-refreshing assume-role provider in soak mode) -- NOT -D system
                 # properties, which leak the live keys into the build log via shell xtrace.
-                java -classpath target/aws-kinesisvideo-producer-sdk-canary-consumer-1.0-SNAPSHOT.jar:\$(cat tmp_jar) com.amazon.kinesis.video.canary.consumer.WebrtcStorageCanaryConsumer
+                # -Duser.timezone=UTC: log4j 1.2's PatternLayout renders %d in the JVM default
+                # timezone and takes no timezone argument, so this is what makes the consumer
+                # log's wall clock comparable with the viewer log and CloudWatch.
+                java -Duser.timezone=UTC -classpath target/aws-kinesisvideo-producer-sdk-canary-consumer-1.0-SNAPSHOT.jar:\$(cat tmp_jar) com.amazon.kinesis.video.canary.consumer.WebrtcStorageCanaryConsumer
             """
         }
 

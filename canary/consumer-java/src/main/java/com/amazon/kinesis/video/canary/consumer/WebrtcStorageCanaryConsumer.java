@@ -51,7 +51,6 @@ import com.amazonaws.services.kinesisvideo.model.GetClipResult;
 import com.amazonaws.services.kinesisvideo.model.ClipFragmentSelectorType;
 
 import org.apache.log4j.Logger;
-import org.apache.log4j.BasicConfigurator;
 
 import java.io.File;
 import java.io.FileOutputStream;
@@ -508,7 +507,10 @@ public class WebrtcStorageCanaryConsumer {
     }
 
     public static void main(final String[] args) throws Exception {
-        BasicConfigurator.configure();
+        // Logging is configured by src/main/resources/log4j.properties, which our jar carries
+        // first on the classpath. BasicConfigurator.configure() used to run here and its
+        // SimpleLayout printed only milliseconds since JVM start, leaving a 16.6h soak log with
+        // no wall clock to correlate against; calling it now would also double every line.
 
         // Fail fast if anything escapes main(). Non-daemon timers (e.g. the persistence
         // heartbeat, scheduled before the run-mode switch) otherwise keep the JVM alive
