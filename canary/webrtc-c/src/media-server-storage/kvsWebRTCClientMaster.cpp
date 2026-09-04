@@ -41,6 +41,13 @@ INT32 main(INT32 argc, CHAR* argv[])
 
 #ifndef _WIN32
     signal(SIGINT, sigintHandler);
+    // Jenkins aborts (and the soak watchdog's abort, which has to precede a restart because
+    // `Skip if duplicate` keys off isBuilding()) deliver SIGTERM, not SIGINT. Without this the
+    // process dies before teardown runs: the 2026-09-03 soak log ends with neither "Teardown
+    // requested; sending EOS to the pipeline" nor "Cleanup done", which is also why the bounded
+    // teardown added in b30f9daa has never actually been exercised. Leaving the storage session
+    // un-torn-down risks the restarted master colliding with its own dangling session.
+    signal(SIGTERM, sigintHandler);
 #endif
 
     // The signaling channel name is always the canary channel — the viewer and consumer connect
