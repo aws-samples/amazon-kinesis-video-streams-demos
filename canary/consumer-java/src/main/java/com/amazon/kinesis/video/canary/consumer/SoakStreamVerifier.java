@@ -5,6 +5,8 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.file.Files;
 import java.util.Arrays;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -38,7 +40,8 @@ import org.apache.log4j.Logger;
  *   2. ffmpeg subprocess (nice): -c:v copy (no transcode) split into SEGMENT_SECONDS mp4 segments
  *      in a spool dir. Video only (-an); verification is video-based.
  *   3. Segment worker (single-threaded, fixed-delay): picks up finished segments (all but the
- *      newest, which ffmpeg is still writing), runs verify.py on each via
+ *      newest, which ffmpeg is still writing, and the generation-boundary ones -- see
+ *      boundarySegments), runs verify.py on each via
  *      WebrtcStorageCanaryConsumer.runVerifyScript (itself a niced, timeout-bounded subprocess),
  *      publishes SoakVideoDecodable (+ drift metrics inside runVerifyScript), and deletes the
  *      segment. Fixed-delay + single thread means verifies never overlap; if verification falls
@@ -70,6 +73,21 @@ public class SoakStreamVerifier {
     private File spoolDir;
     private volatile Process ffmpeg;
     private volatile long lastEmitMs;
+
+    // Segments at a generation boundary are structurally incomplete rather than undecodable
+    // media, so they must not count as SoakVideoDecodable=0:
+    //   - on the way out, ffmpeg is killed mid-write (destroyForcibly below), leaving a
+    //     truncated segment with no moov atom;
+    //   - on the way in, GetMedia's NOW start selector drops us mid-GOP, so the first segment
+    //     of a generation can lack a leading keyframe.
+    // Both used to be handed to verify.py: on the 2026-09-03 soak 35 of 46 zeros fell within
+    // 600s of one of the 17 hourly reconnects. They are discarded and counted separately so a
+    // change in the rate is still visible instead of being smoothed into the availability
+    // metric. The comment on processSegments' "all but the newest are finished" only holds
+    // within one generation -- a new generation reseeds segment numbering upward, so the dying
+    // generation's truncated tail stops being the newest file and becomes eligible.
+    private final Set<String> boundarySegments = ConcurrentHashMap.newKeySet();
+    private volatile long currentGenStart;
 
     public SoakStreamVerifier(String streamName, String region, AWSCredentialsProvider credentialsProvider,
                               AmazonKinesisVideo kvsClient) {
@@ -155,12 +173,17 @@ public class SoakStreamVerifier {
                 if (!proc.waitFor(10, TimeUnit.SECONDS)) {
                     proc.destroyForcibly();
                 }
+                markGenerationTailAsBoundary();
             }
             media.shutdown();
         }
     }
 
     private Process startFfmpeg() throws Exception {
+        // Seed numbering with epoch seconds so a reconnect's new ffmpeg never collides with
+        // (or sorts before) segments still pending from the previous session.
+        currentGenStart = System.currentTimeMillis() / 1000;
+        boundarySegments.add(segmentName(currentGenStart));
         final ProcessBuilder pb = new ProcessBuilder(
                 "nice", "-n", "19", "ffmpeg",
                 "-hide_banner", "-loglevel", "error",
@@ -168,9 +191,7 @@ public class SoakStreamVerifier {
                 "-an", "-c:v", "copy",
                 "-f", "segment",
                 "-segment_time", String.valueOf(SEGMENT_SECONDS),
-                // Seed numbering with epoch seconds so a reconnect's new ffmpeg never collides
-                // with (or sorts before) segments still pending from the previous session.
-                "-segment_start_number", String.valueOf(System.currentTimeMillis() / 1000),
+                "-segment_start_number", String.valueOf(currentGenStart),
                 "-reset_timestamps", "1",
                 new File(spoolDir, "seg_%010d.mp4").getAbsolutePath());
         // Drain ffmpeg's output into a log file so a full pipe can never stall it.
@@ -178,6 +199,37 @@ public class SoakStreamVerifier {
         pb.redirectErrorStream(true);
         pb.redirectOutput(ProcessBuilder.Redirect.to(log));
         return pb.start();
+    }
+
+    private static String segmentName(long number) {
+        return String.format("seg_%010d.mp4", number);
+    }
+
+    /*
+     * Mark the segment this generation's ffmpeg was writing when it exited. Called after the
+     * process is gone, so the highest-numbered file from this generation is by definition the
+     * one that was open: on a forced kill it is truncated, and even on a clean stdin close it
+     * is a short tail that would fail the duration threshold. Either way it is a boundary
+     * artefact, not a media failure.
+     */
+    private void markGenerationTailAsBoundary() {
+        final File[] segs = spoolDir.listFiles((d, name) -> name.startsWith("seg_") && name.endsWith(".mp4"));
+        if (segs == null || segs.length == 0) {
+            return;
+        }
+        Arrays.sort(segs);
+        final File tail = segs[segs.length - 1];
+        if (segmentNumber(tail.getName()) >= currentGenStart) {
+            boundarySegments.add(tail.getName());
+        }
+    }
+
+    private static long segmentNumber(String name) {
+        try {
+            return Long.parseLong(name.substring("seg_".length(), name.length() - ".mp4".length()));
+        } catch (Exception e) {
+            return -1;
+        }
     }
 
     // ------------------------------------------------------------------ verify side
@@ -206,6 +258,7 @@ public class SoakStreamVerifier {
             if (pending > MAX_PENDING_SEGMENTS) {
                 final int toSkip = pending - MAX_PENDING_SEGMENTS;
                 for (int i = 0; i < toSkip; i++) {
+                    boundarySegments.remove(segs[i].getName());
                     segs[i].delete();
                 }
                 skipFrom = toSkip;
@@ -215,6 +268,14 @@ public class SoakStreamVerifier {
 
             for (int i = skipFrom; i < segs.length - 1; i++) {
                 final File seg = segs[i];
+                if (boundarySegments.remove(seg.getName())) {
+                    seg.delete();
+                    WebrtcStorageCanaryConsumer.publishMetricToCW(
+                            "SoakSegmentBoundaryDiscarded", 1.0, StandardUnit.Count);
+                    logger.info("SoakStreamVerifier: discarding boundary segment " + seg.getName()
+                            + " (incomplete by construction, not a media failure)");
+                    continue;
+                }
                 boolean ok = false;
                 try {
                     final Boolean scriptResult =

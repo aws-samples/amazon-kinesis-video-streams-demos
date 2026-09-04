@@ -301,9 +301,17 @@ def main():
         clip_total_frames = 0
         for rec in recordings:
             seg_duration = get_video_duration(rec)
+            seg_frames = count_video_frames(rec)
+            # A container can report a duration that is really an absolute timestamp: a soak
+            # segment once came back as duration=1788427222.035s (epoch + 5s of content).
+            # Cross-check against the decoded frame count, which is timestamp-independent, so
+            # a nonsense duration cannot pass the duration threshold or poison the sum.
+            if seg_duration is not None and seg_frames > 0 and seg_duration > 2 * seg_frames / FPS + 60:
+                print(f"  segment {rec}: duration={seg_duration}s is implausible for {seg_frames} "
+                      f"frames, using {seg_frames / FPS:.2f}s")
+                seg_duration = seg_frames / FPS
             if seg_duration is not None:
                 clip_duration = (clip_duration or 0.0) + seg_duration
-            seg_frames = count_video_frames(rec)
             clip_total_frames += seg_frames
             print(f"  segment {rec}: duration={seg_duration if seg_duration is not None else 'N/A'}s frames={seg_frames}")
 
