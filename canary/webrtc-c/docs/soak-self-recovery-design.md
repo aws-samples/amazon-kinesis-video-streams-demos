@@ -61,6 +61,11 @@
 | 有 | 有 | **缺** | **viewer 死了** |
 | 全缺 | | | 节点/controller 级故障（L5），watchdog 自己可能也受影响 |
 
+**三个组件任一死亡都重启整条 pipeline**（§9.2 已决策）。所以这张矩阵**不是**「要不要重启」的判据 ——
+那个判据就是「不健康」这一件事。矩阵的作用只剩两个：给 `SoakRestartTrigger` 打 dimension（master /
+consumer / viewer），以及把「consumer 死了没人发 `FragmentReceived`」和「master 真的不推流了」区分开，
+免得日志里把因归错。这让 watchdog 的逻辑比原设计简单一档：判健康 → 不健康就走同一条重启路径。
+
 ---
 
 ## 2.5 前置改动：让组件失败真的结束 build（已实现）
@@ -131,9 +136,13 @@ abort 要能**及时**完成。在 `b30f9daa` 之前，master 的 teardown 可�
 
 没有预算，一次服务端故障会变成无限重启循环，而且把真正的问题藏起来。
 
-- **上限**：滚动 24 小时内最多 **3 次**（建议值，待定）
+- **上限**：滚动 24 小时内最多 **6 次**（已决策）
 - **状态存哪**：不需要额外存储 —— 查我们自己发的 `SoakRestarted` 指标在过去 24h 的 SUM。**无状态，天然幂等**
 - **超预算时**：停止重启，发 `SoakRestartBudgetExhausted=1`
+
+6 次/24h 是配合「三个组件都触发重启」定的（见 §9.2）。三个组件都能触发，预算被消耗的速率就是单组件的
+三倍左右，所以上限比原先设想的 3 次高一档；同时 6 次仍然远低于「无限重启循环」，一天内烧到第 6 次必然
+是系统性问题，那时 `SoakRestartBudgetExhausted` 会把人叫醒。
 
 > 「soak 反复起不来」比「soak 死了一次」更需要人介入。所以 `SoakRestartBudgetExhausted` 才是应该 page 人的那个指标，而不是 `SoakRestarted`。
 
@@ -203,18 +212,35 @@ abort 要能**及时**完成。在 `b30f9daa` 之前，master 的 teardown 可�
 1. **watchdog job 的骨架**：只查指标、只记录判断结果、**不做任何 abort/重启**（`DRY_RUN` 模式）。跑几天，确认判据不误报
 2. 加 `SoakWatchdogHealthy` + `SoakRestartTrigger`（仍不重启），验证诊断矩阵在真实故障上给出正确结论
 3. 打开 abort + 重启，预算设 1 次/24h
-4. 观察一周后放宽到 3 次/24h
+4. 观察一周后放宽到 6 次/24h（§4 的目标值）
 
 第 1、2 步是**只读**的，零风险，但能验证整套判据 —— 这比直接上线自动重启安全得多。
 
 ---
 
-## 9. 待定（需要决策）
+## 9. 已决策（2026-09-04）
 
-1. **重启预算**：3 次/24h 是猜的。取决于你能接受多频繁的重启 vs 多快想被叫醒
-2. **viewer 死了要不要重启整个 soak？** 重启 master 会中断 ingest 覆盖。也可以只重启 viewer stage —— 但 Jenkins 的 parallel 分支不支持单独重跑，所以实际上只能重启整条 pipeline。**倾向：viewer 死了先只告警不重启**，因为它不影响 ingest 结论
-3. **多个 soak 时的 watchdog**：一个 job 轮询所有 `RUNNER_LABEL`，还是每个 soak 一个 watchdog job？倾向前者（一个 job 遍历列表）
-4. **检测延迟 5–15 分钟够不够**？如果不够就要上告警驱动，代价是打通 Lambda → Jenkins 的网络路径
+1. **重启预算：6 次/24h。** 见 §4。
+2. **viewer 死了要重启，consumer 死了也要重启。** 三个组件任一死亡 → 重启整条 pipeline。
+
+   这推翻了本文原先「viewer 死了只告警」的倾向。原倾向的理由是重启会中断 ingest 覆盖，而 viewer
+   不影响 ingest 结论；但反过来说，**一个只有 ingest 数据、egress 一片空白的 soak 得不出「端到端可
+   用」的结论** —— 2026-09-03 那次跑了 16.6h，egress 覆盖率只有 75.6%，正是这种半盲状态。宁可付
+   重启的代价换三条链路都在线。
+
+   代价要认下来：viewer 或 consumer 的**系统性** bug 会拿 ingest 覆盖率去换重启，最坏情况一天烧掉 6
+   次预算而 master 始终是健康的。挡这个的是预算本身 + `SoakRestartBudgetExhausted` 叫人，不是判据。
+   注意 viewer 的判据是 `ActiveViewersPerSession`（进程存活），**不是** verify 相关指标，所以
+   verify.py 层面的失败（超时、崩溃）不会触发重启 —— 那类问题归 Phase 9 告警，别混进重启触发器。
+
+   实现上也没有别的选择：Jenkins 的 parallel 分支不支持单独重跑，所以「只重启 viewer stage」做不到。
+3. **多个 soak：一个 watchdog job 遍历所有 `RUNNER_LABEL`。** 不做每 soak 一个 job。预算按 label
+   分别计算（`SoakRestarted` 查询时带 `RunnerLabel` dimension），否则一个 soak 抖动会饿死其他 soak
+   的重启额度。
+
+### 仍待定
+
+- **检测延迟 5–15 分钟够不够**？如果不够就要上告警驱动，代价是打通 Lambda → Jenkins 的网络路径。
 
 ---
 
