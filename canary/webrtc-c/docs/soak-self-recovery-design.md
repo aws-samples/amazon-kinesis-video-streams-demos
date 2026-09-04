@@ -63,6 +63,35 @@
 
 ---
 
+## 2.5 前置改动：让组件失败真的结束 build（已实现）
+
+在做 watchdog 之前必须先修一个根本阻塞点。`withRunnerWrapper` 过去把**所有**组件失败
+都吞成 UNSTABLE：
+
+```groovy
+try { fn() }
+catch (FlowInterruptedException err) { HAS_ERROR = true; unstable err.toString() }
+catch (err)                          { HAS_ERROR = true; unstable err.toString() }
+```
+
+后果链：master 二进制以 0x0f 退出 → `sh` 失败 → 抛异常 → **被吞** → build 继续 →
+永远不会变成 FAILURE → **`failFast` 永不触发**（它只对 FAILURE 生效）→ 其他组件继续跑。
+这就是 #5281 里 master 明明退出了、日志却还接着推 `MasterFinished` 心跳的原因。
+
+改动（`storage_runner.groovy` + `gamma_runner.groovy`）：
+
+1. `withRunnerWrapper` 在 `SOAK_MODE=true` 时**重新抛出**，包括
+   `FlowInterruptedException`（不重抛中断的话 failFast 无法中止兄弟分支，用户也无法
+   abort build）。有界 run 保持原样 —— 那里一个 viewer 失败不该阻止其余部分报出自己的
+   per-run 指标。
+2. 四个 continuous-master 的 parallel 块加 `failFast true`。对有界 run 是**休眠的**：
+   它们的失败仍被吞成 UNSTABLE，永远到不了 FAILURE，所以 failFast 不会触发。只有
+   SOAK_MODE 下才活起来。
+
+于是「任一组件失败 → 整个 build 迅速结束」成立，watchdog 才有一个明确的信号可用。
+
+---
+
 ## 3. 机制：Jenkins 主动轮询 CloudWatch
 
 一个独立的小 Jenkins job（`soak-watchdog`），cron `*/5`，跑在**任意有 AWS 凭证的 EC2 节点**上。
@@ -132,7 +161,21 @@ abort 要能**及时**完成。在 `b30f9daa` 之前，master 的 teardown 可�
 | soak master 节点（Pi） | **2** —— 顶层 agent + 嵌套 `ViewerContinuousMaster` 的 agent（这就是历史上那个 1-executor 自死锁，见 `project_gamma-pileup-root-cause`） |
 | watchdog | **1 个瞬时**，在任意 EC2 节点上（**不要放 Pi**） |
 
-之前我说 Pi 需要 3 个 executor —— 那是假设 watchdog 用同一个 job 的 cron 触发。**独立 job 放到 EC2 上，Pi 只需要 2 个。**
+### 为什么不用 Jenkins cron 做重启器
+
+考虑过让 soak job 自己挂一条定时触发行，靠已有的 `Skip if duplicate` 判重来实现重启
+（§2.5 之后 `isBuilding()` 变准了，所以这个方案在原理上是可行的）。**放弃了**，因为它
+和 watchdog 冗余：
+
+- watchdog 的第一条分支「build 没在跑 → 触发」就是 cron 的全部作用
+- cron 覆盖不了 L2（媒体停但进程活着，build 仍是 BUILDING，dedup 必然挡掉），而 watchdog
+  顺手就覆盖
+- 两者都能触发重启 → 重启预算要在两处协调，且会出现重复触发（dedup 挡得住，但日志和
+  计数变浑浊）
+- cron 触发的 build 需要在 **Pi 上**再占一个 executor 来跑 dedup 检查（→ 需要 3 个）；
+  watchdog 在 EC2 上，Pi 保持 2 个就够
+
+结论：**只做 watchdog，不加 cron。**
 
 ---
 
@@ -151,6 +194,12 @@ abort 要能**及时**完成。在 `b30f9daa` 之前，master 的 teardown 可�
 
 ## 8. 实施顺序
 
+0. ✅ **§2.5 的两项**（`withRunnerWrapper` 在 SOAK_MODE 下重抛 + 四个 parallel 块加
+   `failFast true`）。做完这一步，L3/L4/L5 已经会让 build **干净地结束** —— 还不会自动
+   重启，但失效从"静默继续"变成"可见地失败"，这本身就消掉了 #5281 那种 12 小时无人察觉
+   的情况。**建议在这里停一下观察一段时间**：`b30f9daa` 把 teardown 压到 ~16 秒之后，
+   #5281 那类 L2 会在 16 秒内变成 L3，所以真正剩下的 L2 可能比想象的罕见得多。先看数据
+   再决定 watchdog 的判据要多灵敏。
 1. **watchdog job 的骨架**：只查指标、只记录判断结果、**不做任何 abort/重启**（`DRY_RUN` 模式）。跑几天，确认判据不误报
 2. 加 `SoakWatchdogHealthy` + `SoakRestartTrigger`（仍不重启），验证诊断矩阵在真实故障上给出正确结论
 3. 打开 abort + 重启，预算设 1 次/24h

@@ -177,14 +177,33 @@ def buildConsumerProject() {
 }
 
 def withRunnerWrapper(envs, fn) {
+    // In SOAK_MODE a component failure must end the whole build, because a soak's
+    // recovery lives in the orchestration layer (the watchdog) and that can only act on
+    // a build that actually finished. Swallowing every failure into `unstable` leaves the
+    // build BUILDING with dead components inside it: on soak #5281 the master exited
+    // 0x0000000f at 01:29:15, this wrapper turned that into UNSTABLE, and the pipeline
+    // kept "running" -- consumer and viewer span uselessly for 8h43m until a human
+    // aborted. It also means failFast can never fire, since that triggers on FAILURE.
+    //
+    // Bounded runs keep the old behaviour deliberately: there, one viewer failing should
+    // still let the rest of the run finish and report its own per-run metrics.
+    def soakMode = params.SOAK_MODE?.toString() == 'true'
     withEnv(envs) {
         try {
             fn()
         } catch (FlowInterruptedException err) {
             echo "Interrupted: ${err.getMessage()}"
+            // An interrupt has to propagate under SOAK_MODE or failFast cannot abort the
+            // sibling branches -- and a user abort could not stop the build either.
+            if (soakMode) {
+                throw err
+            }
             HAS_ERROR = true
             unstable err.toString()
         } catch (err) {
+            if (soakMode) {
+                throw err
+            }
             HAS_ERROR = true
             unstable err.toString()
         }
@@ -924,6 +943,10 @@ pipeline {
         }
 
         stage('Single Viewer with Continuous Master') {
+            // Under SOAK_MODE a failed component must take the whole build down so the
+            // watchdog can restart it; dormant for bounded runs, whose failures never
+            // reach FAILURE (see withRunnerWrapper).
+            failFast true
             when {
                 equals expected: true, actual: params.JS_STORAGE_VIEWER_JOIN
             }
@@ -994,6 +1017,10 @@ pipeline {
         }
 
         stage('Two Viewers with Continuous Master') {
+            // Under SOAK_MODE a failed component must take the whole build down so the
+            // watchdog can restart it; dormant for bounded runs, whose failures never
+            // reach FAILURE (see withRunnerWrapper).
+            failFast true
             when {
                 equals expected: true, actual: params.JS_STORAGE_TWO_VIEWERS
             }
@@ -1070,6 +1097,10 @@ pipeline {
         }
 
         stage('Three Viewers with Continuous Master') {
+            // Under SOAK_MODE a failed component must take the whole build down so the
+            // watchdog can restart it; dormant for bounded runs, whose failures never
+            // reach FAILURE (see withRunnerWrapper).
+            failFast true
             when {
                 equals expected: true, actual: params.JS_STORAGE_THREE_VIEWERS
             }
@@ -1159,6 +1190,10 @@ pipeline {
         }
 
         stage('VO Master with Mixed Viewers') {
+            // Under SOAK_MODE a failed component must take the whole build down so the
+            // watchdog can restart it; dormant for bounded runs, whose failures never
+            // reach FAILURE (see withRunnerWrapper).
+            failFast true
             when {
                 equals expected: true, actual: params.JS_STORAGE_VO_MIXED_VIEWERS
             }
