@@ -10,9 +10,11 @@ StorageAvailability. Two modes:
     reference and score each clip frame against its matching source frame:
       1. Build a reference video from the raw H.264 sample frames
       2. Extract 1fps from the received clip
-      3. OCR each clip frame to read the frame counter
-      4. Extract only the needed reference frames (by frame number)
-      5. Compare each clip frame against its matching reference frame via SSIM
+      3. Sample at most --max-samples of those seconds (bounds wall time on long
+         soak segments, which otherwise outlive the caller's timeout)
+      4. OCR each sampled frame to read the frame counter
+      5. Extract only the needed reference frames (by frame number)
+      6. Compare each sampled frame against its matching reference frame via SSIM
 
   presence — live / non-deterministic sources (camera / filesrc / testsrc):
     there is no frame-counter reference to OCR-match, so per-frame SSIM is
@@ -36,11 +38,13 @@ Usage:
 import argparse
 import glob
 import json
+import math
 import os
 import shutil
 import subprocess
 import sys
 import tempfile
+import traceback
 
 import pytesseract
 import numpy as np
@@ -58,6 +62,15 @@ DROPPED_FRAME_THRESHOLD = 1500
 # frame rate, so a healthy ingest still delivers ~FPS*duration frames.
 PRESENCE_DURATION_FRACTION = 0.8   # clip must cover >= 80% of the expected run
 PRESENCE_FRAME_FRACTION = 0.5      # and decode >= 50% of FPS*duration frames
+
+# Cap on OCR + SSIM samples per verification (see --max-samples). Verification cost is
+# per clip second, but the caller's timeout is fixed: the viewer allows 600s
+# (VERIFY_TIMEOUT_MS in chrome-headless.js) while a 40 min segment yields ~2400 clip
+# seconds, which measured out at roughly 45 min of work. On the 2026-09-03 soak that
+# killed 18 of 19 segments mid-SSIM and the whole 16.6h run produced no egress verdict at
+# all. 240 samples keeps a 40 min segment near 6 min and leaves the consumer's 60s
+# segments (~55 frames) untouched.
+MAX_SSIM_SAMPLES = 240
 
 # Sync box crop coordinates for 1280x720 frames
 TIMER_CROP = (25, 20, 145, 90)
@@ -97,8 +110,14 @@ def get_video_duration(video_path):
     result = subprocess.run(cmd, capture_output=True, text=True)
     if result.returncode != 0 or result.stdout.strip() == 'N/A':
         remuxed = video_path + '.remuxed.mkv'
-        subprocess.run(['ffmpeg', '-y', '-i', video_path, '-c', 'copy', remuxed],
-                       capture_output=True, text=True)
+        remux = subprocess.run(['ffmpeg', '-y', '-i', video_path, '-c', 'copy', remuxed],
+                               capture_output=True, text=True)
+        # A stillborn session (audio-only, zero video frames -- seen 10 times on the
+        # 2026-09-03 soak when a viewer joined within ~30s of a master reconnect) makes the
+        # remux fail, so the file never appears. Removing it unconditionally raised
+        # FileNotFoundError out of main() and lost the whole run's metric.
+        if remux.returncode != 0 or not os.path.exists(remuxed):
+            return None
         result = subprocess.run(
             ['ffprobe', '-v', 'error', '-show_entries', 'format=duration',
              '-of', 'default=noprint_wrappers=1:nokey=1', remuxed],
@@ -210,6 +229,24 @@ def compute_ssim(img_path_a, img_path_b):
     return ssim(img_a, img_b)
 
 
+def emit_failure(msg, json_output, **extra):
+    """Emit a storage_availability=0 verdict for a hard failure, then exit.
+
+    Every failure path has to produce a datapoint. The viewer's runVerifyJob publishes
+    nothing when it cannot parse a verdict, so a crash used to become a silent hole in the
+    coverage record instead of a visible zero -- and CloudWatch treats a missing datapoint
+    very differently from a 0. Exits 0 whenever a verdict was written to stdout so the
+    caller's execFile resolves and can read it; without --json there is no consumer to keep
+    happy, so keep the non-zero status for humans.
+    """
+    print(msg, file=sys.stderr)
+    if json_output:
+        json.dump({'storage_availability': 0, 'error': msg, **extra}, sys.stdout)
+        sys.stdout.flush()
+        sys.exit(0)
+    sys.exit(1)
+
+
 def main():
     parser = argparse.ArgumentParser(
         description='Verify received video for StorageAvailability')
@@ -228,6 +265,11 @@ def main():
                              "sources: camera/filesrc/testsrc, which have no frame-counter reference).")
     parser.add_argument('--expected-duration', type=float, default=EXPECTED_DURATION,
                         help=f'Expected duration in seconds (default: {EXPECTED_DURATION})')
+    parser.add_argument('--max-samples', type=int, default=MAX_SSIM_SAMPLES,
+                        help='Cap on how many clip seconds are OCR-ed and SSIM-compared in '
+                             f'ssim mode (default: {MAX_SSIM_SAMPLES}, 0 = no cap). Frames are '
+                             'sampled at an even stride, so wall time stays bounded no matter '
+                             'how long the segment is.')
     parser.add_argument('--keep-frames', action='store_true', help='Keep extracted frames')
     parser.add_argument('--verbose', action='store_true')
     parser.add_argument('--json', action='store_true', dest='json_output',
@@ -245,8 +287,7 @@ def main():
         else:
             print(f"Recording not found (skipping): {rec}", file=sys.stderr)
     if not recordings:
-        print("No recordings found", file=sys.stderr)
-        sys.exit(1)
+        emit_failure("No recordings found", args.json_output, segments=0)
 
     work_dir = tempfile.mkdtemp(prefix='video-verify-')
     try:
@@ -301,49 +342,66 @@ def main():
 
         # --- SSIM mode (deterministic sources: disk / framesrc) ---
         if not args.source_frames or not os.path.isdir(args.source_frames):
-            print(f"--mode ssim requires a valid --source-frames directory: {args.source_frames}",
-                  file=sys.stderr)
-            sys.exit(1)
+            emit_failure(
+                f"--mode ssim requires a valid --source-frames directory: {args.source_frames}",
+                args.json_output, mode='ssim', segments=len(recordings))
 
         # Phase 1: Build reference video
         print("\n--- Phase 1: Building reference video ---")
         ref_video = build_reference_video(
             args.source_frames, os.path.join(work_dir, 'reference.mp4'))
         if not ref_video:
-            print("Failed to build reference video", file=sys.stderr)
-            sys.exit(1)
+            emit_failure("Failed to build reference video", args.json_output,
+                         mode='ssim', clip_duration=clip_duration, segments=len(recordings))
 
         # Phase 3: Extract 1fps from every segment into a combined frame list.
         # Order across segments doesn't matter — OCR maps each frame back to its
         # source frame number independently.
         print("\n--- Phase 3: Extracting clip frames at 1 FPS ---")
+        # (clip_sec, path). clip_sec is the 1-based second into the concatenated timeline,
+        # carried explicitly rather than derived from list position so that sampling below
+        # cannot shift it -- the drift math in Phase 6b is in real seconds.
         clip_frames = []
         for idx, rec in enumerate(recordings):
-            clip_frames.extend(
-                extract_frames_1fps(rec, os.path.join(work_dir, f'clip-{idx}')))
+            for path in extract_frames_1fps(rec, os.path.join(work_dir, f'clip-{idx}')):
+                clip_frames.append((len(clip_frames) + 1, path))
         if not clip_frames:
-            print("Failed to extract clip frames", file=sys.stderr)
-            sys.exit(1)
+            # Reached when the clip has no decodable video at all, and also when a segment
+            # carries absolute-epoch PTS (observed duration=1788427222.035s) -- see the
+            # frame-index extraction note in extract_frames_1fps.
+            emit_failure("Failed to extract clip frames", args.json_output,
+                         mode='ssim', clip_duration=clip_duration,
+                         frames_decoded=clip_total_frames, segments=len(recordings))
 
-        # Phase 4: OCR all clip frames to get frame numbers
+        # Verification cost scales with clip length but the caller's timeout does not, so
+        # sample at an even stride to bound wall time. See MAX_SSIM_SAMPLES. Done before
+        # OCR because OCR is as expensive as the SSIM pass itself.
+        clip_seconds_total = len(clip_frames)
+        if args.max_samples and clip_seconds_total > args.max_samples:
+            stride = math.ceil(clip_seconds_total / args.max_samples)
+            clip_frames = clip_frames[::stride]
+            print(f"Sampling every {stride}s: {len(clip_frames)} of {clip_seconds_total} "
+                  f"clip seconds (--max-samples {args.max_samples})")
+
+        # Phase 4: OCR the sampled clip frames to get frame numbers
         print(f"\n--- Phase 4: OCR {len(clip_frames)} clip frames ---")
-        clip_to_ref = []  # list of (clip_frame_path, ref_frame_number)
+        clip_to_ref = []  # list of (clip_sec, clip_frame_path, ref_frame_number)
         ocr_failures = 0
-        for i, clip_frame in enumerate(clip_frames):
+        for i, (clip_sec, clip_frame) in enumerate(clip_frames):
             frame_num = ocr_frame_number(clip_frame)
             if frame_num is None or frame_num < 1 or frame_num > TOTAL_SOURCE_FRAMES:
                 if i < 5 or args.verbose:
-                    print(f"  [clip sec {i+1}] OCR: {frame_num} — skipping")
+                    print(f"  [clip sec {clip_sec}] OCR: {frame_num} — skipping")
                 ocr_failures += 1
                 continue
-            clip_to_ref.append((clip_frame, frame_num))
+            clip_to_ref.append((clip_sec, clip_frame, frame_num))
             if i < 5 or args.verbose:
-                print(f"  [clip sec {i+1}] frame #{frame_num}")
+                print(f"  [clip sec {clip_sec}] frame #{frame_num}")
 
         print(f"OCR complete: {len(clip_to_ref)} matched, {ocr_failures} failed")
 
         # Phase 5: Extract only the needed reference frames
-        needed_frames = set(num for _, num in clip_to_ref)
+        needed_frames = set(num for _, _, num in clip_to_ref)
         print(f"\n--- Phase 5: Extracting {len(needed_frames)} reference frames ---")
         ref_frame_map = extract_specific_frames(
             ref_video, os.path.join(work_dir, 'ref'), needed_frames)
@@ -351,27 +409,27 @@ def main():
         # Phase 6: SSIM comparison
         print(f"\n--- Phase 6: SSIM comparison ---")
         scores = []
-        for i, (clip_frame, ref_num) in enumerate(clip_to_ref):
+        for clip_sec, clip_frame, ref_num in clip_to_ref:
             ref_path = ref_frame_map.get(ref_num)
             if not ref_path:
                 continue
             score = compute_ssim(clip_frame, ref_path)
             scores.append(score)
-            clip_sec = clip_frames.index(clip_frame) + 1
             if clip_sec <= 5 or score < 0.9 or args.verbose:
                 print(f"  [clip sec {clip_sec}] frame #{ref_num} -> SSIM={score:.4f}")
 
         # Phase 6b: Temporal drift. SSIM aligns clip<->source by the OCR'd counter, so it is blind
         # to *timing*. Measure how the frame-counter timeline diverges from the clip's real time:
-        # clip frames are sampled at 1 fps, so a frame's clip-second is its index, and for a healthy
-        # stream the counter advances by FPS per clip-second, hence
+        # each frame carries its real clip-second (not its position in the sampled list, so
+        # --max-samples does not distort this), and for a healthy stream the counter advances by
+        # FPS per clip-second, hence
         #     drift(t) = (counter - counter0)/FPS - (t - t0)
         # anchored at the earliest matched frame. Growing |drift| = producer/pipeline time drift
         # (the Verisure timestamp-drift class) that SSIM cannot see. Reported as avg/max seconds; a
         # separate signal from storage_availability (which stays content-only).
         drift_samples = []
         if len(clip_to_ref) >= 2:
-            ordered = sorted((clip_frames.index(cf), num) for cf, num in clip_to_ref)
+            ordered = sorted((sec, num) for sec, _, num in clip_to_ref)
             t0, c0 = ordered[0]
             prev_c = c0
             for t, c in ordered[1:]:
@@ -396,6 +454,8 @@ def main():
             result = {'storage_availability': 0, 'mode': 'ssim',
                       'clip_duration': clip_duration,
                       'frames_compared': 0, 'ocr_failures': ocr_failures,
+                      'clip_seconds_total': clip_seconds_total,
+                      'clip_seconds_sampled': len(clip_frames),
                       'avg_drift_seconds': avg_drift_seconds, 'max_drift_seconds': max_drift_seconds,
                       'segments': len(recordings)}
         else:
@@ -433,6 +493,10 @@ def main():
                 'min_ssim': round(min_ssim, 4),
                 'frames_compared': len(scores),
                 'ocr_failures': ocr_failures,
+                # How much of the clip the verdict actually looked at. Without this a
+                # sampled verdict and a full one are indistinguishable after the fact.
+                'clip_seconds_total': clip_seconds_total,
+                'clip_seconds_sampled': len(clip_frames),
                 'avg_drift_seconds': avg_drift_seconds,
                 'max_drift_seconds': max_drift_seconds,
                 'clip_duration': round(clip_duration, 2) if clip_duration else None,
@@ -453,4 +517,13 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    try:
+        main()
+    except Exception:
+        # Last resort so an unanticipated crash is still a visible zero rather than a
+        # missing datapoint (see emit_failure). argv is inspected directly because the
+        # crash may predate argument parsing. SystemExit is a BaseException and so still
+        # propagates untouched.
+        traceback.print_exc()
+        emit_failure('verify.py crashed: ' + traceback.format_exc(limit=0).strip().splitlines()[-1],
+                     '--json' in sys.argv)

@@ -66,24 +66,37 @@ async function runVerifyJob(job) {
   args.push('--mode', job.mode, '--json');
 
   let output;
+  let failure = null;
   try {
     output = await new Promise((resolve, reject) => {
       // execFile, not a shell string: recording paths reach verify.py as argv
       // entries, so no quoting to get wrong. nice -19 keeps it behind the browser.
       execFile('nice', args, { encoding: 'utf-8', timeout: VERIFY_TIMEOUT_MS, maxBuffer: 16 * 1024 * 1024 },
-        (err, stdout) => (err ? reject(err) : resolve(stdout)));
+        (err, stdout) => (err ? reject(Object.assign(err, { stdout })) : resolve(stdout)));
     });
   } catch (error) {
-    log(`[verify] verification failed: ${error.message}`);
-    return;
+    // Keep whatever landed on stdout: verify.py emits a verdict on its own hard-failure
+    // paths and exits 0, but a SIGTERM from VERIFY_TIMEOUT_MS kills it mid-run, and a
+    // future non-zero exit that still printed a verdict should be honoured, not discarded.
+    failure = error.message;
+    output = error.stdout || '';
   }
 
   let results;
   try {
     results = JSON.parse(output.trim());
   } catch (error) {
-    log(`[verify] could not parse verify.py output: ${error.message}`);
+    // A killed or unparseable verify still has to produce a datapoint. Returning silently
+    // made a crash indistinguishable from "no data", which alarms treat as healthy: on the
+    // 2026-09-03 soak 18 of 19 segments were killed mid-SSIM by VERIFY_TIMEOUT_MS and the
+    // whole 16.6h run recorded zero egress verdicts, with nothing in the metrics to say so.
+    log(`[verify] no usable verdict (${failure || error.message}); publishing availability=0`);
+    await CloudWatchMetrics.publishCountMetric(job.metrics.availability, job.channelName, 0)
+      .catch((err) => log(`[verify] publishing availability=0 failed: ${err.message}`));
     return;
+  }
+  if (failure) {
+    log(`[verify] verify.py exited non-zero (${failure}) but emitted a verdict; using it`);
   }
 
   log(`[verify] mode=${job.mode} availability=${results.storage_availability} avgSSIM=${results.avg_ssim} ` +

@@ -89,15 +89,30 @@ const mk = (id) => ({
   ok(completed.includes('j5'), 'newest job still ran');
   ok(pubCalls.some(([n, v]) => n === 'Avail' && v === 1), 'ViewerStorageAvailability published');
 
-  // A failing verify must not wedge the worker.
+  // A failing verify must not wedge the worker, and must still leave a datapoint --
+  // silence here is what let 18 of 19 timed-out segments look like "no data" on the
+  // 2026-09-03 soak.
   execFile = (c, a, o, cb) => setTimeout(() => cb(new Error('boom')), 10);
   const before = logs.length;
+  const pubBefore = pubCalls.length;
   q.enqueueVerification(mk('j6'));
   await new Promise((r) => setTimeout(r, 300));
-  ok(logs.slice(before).some((l) => l.includes('verification failed')), 'a failing verify is caught, not thrown');
+  ok(logs.slice(before).some((l) => l.includes('no usable verdict')), 'a failing verify is caught, not thrown');
+  ok(pubCalls.slice(pubBefore).some(([n, v]) => n === 'Avail' && v === 0),
+    'a failing verify still publishes availability=0');
   ok(!q.busy, 'worker released after a failure');
   ok(q.depth === 0, 'queue drained');
 
-  console.log(`\nPASS=${9 - fail} FAIL=${fail}`);
+  // A non-zero exit that still printed a verdict must be honoured, not discarded:
+  // verify.py's own hard-failure paths emit {"storage_availability": 0, ...}.
+  execFile = (c, a, o, cb) => setTimeout(
+    () => cb(Object.assign(new Error('exit 1'), {}), JSON.stringify({ storage_availability: 0, segments: 1 })), 10);
+  const pubBefore2 = pubCalls.length;
+  q.enqueueVerification(mk('j7'));
+  await new Promise((r) => setTimeout(r, 300));
+  ok(pubCalls.slice(pubBefore2).some(([n, v]) => n === 'Avail' && v === 0),
+    'a verdict on stdout is used even when the exit code is non-zero');
+
+  console.log(`\nPASS=${11 - fail} FAIL=${fail}`);
   process.exit(fail ? 1 : 0);
 })();
