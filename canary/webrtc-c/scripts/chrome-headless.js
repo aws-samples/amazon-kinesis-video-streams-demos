@@ -131,6 +131,65 @@ function log(message) {
   CloudWatchLogger.log(formatted);
 }
 
+// How long a joined session may decode no video before the viewer stops waiting on it.
+//
+// The failure this bounds is real and repeatable: a viewer can join the storage session,
+// negotiate audio+video, reach `connected`, and then receive zero RTP for the whole session
+// while the master ingests losslessly (see docs/viewer-no-video-investigation.md -- the media
+// server confirmed 0% loss and GetClip returned the complete stream, so only the live fan-out
+// lost the media). Before this the viewer sat there for the entire recycle interval, up to 40
+// minutes of egress coverage spent watching nothing, and the run reported success because the
+// session *was* joined.
+//
+// 60s is chosen against the two timings we have measured, and it has to clear both: the media
+// server reaps its own idle viewer sessions at ~60-66s, and a healthy viewer takes up to ~31s
+// after reconnecting before the first frame decodes (10/10 correlation on the 2026-09-03 soak,
+// +9s to +31s). A threshold below ~35s would recycle healthy sessions during that startup
+// window; 60s sits above it with margin and still costs at most one minute of coverage.
+const NO_VIDEO_TIMEOUT_SECONDS = parseInt(process.env.VIEWER_NO_VIDEO_TIMEOUT_SECONDS) || 60;
+
+/**
+ * State machine behind that threshold, kept out of the monitor loop so it can be tested against
+ * timings taken from real logs (test-no-video-watchdog.js) instead of only in a live soak.
+ *
+ * Call observe() once per poll with the current inbound framesDecoded (null/undefined when there
+ * are no video stats to read) and the current time. It returns { stalled, resumed, gapSec }:
+ *   stalled  - the timeout has just elapsed with no decoded frame; emitted once per stall
+ *   resumed  - a frame decoded after a stall was reported
+ *   gapSec   - how long since the last decoded frame, for logging
+ *
+ * Only an *increase* in framesDecoded counts as progress. Absent video stats deliberately do not
+ * reset the clock: when the peer connection drops, rtcStats.video is null, and reading that as
+ * "no news, keep waiting" is the failure this whole watchdog exists to bound.
+ */
+function makeNoVideoWatchdog(timeoutSec = NO_VIDEO_TIMEOUT_SECONDS, startAt = Date.now()) {
+  let lastProgressAt = startAt;
+  let lastFramesDecoded = null;
+  let reported = false;
+  return {
+    observe(framesDecoded, now) {
+      let resumed = false;
+      let resumedGapSec = 0;
+      if (framesDecoded != null) {
+        if (lastFramesDecoded === null || framesDecoded > lastFramesDecoded) {
+          resumed = reported;
+          // Measured before the reset -- this is the length of the outage that just ended.
+          resumedGapSec = (now - lastProgressAt) / 1000;
+          reported = false;
+          lastProgressAt = now;
+        }
+        lastFramesDecoded = framesDecoded;
+      }
+      const gapSec = (now - lastProgressAt) / 1000;
+      const stalled = !reported && gapSec >= timeoutSec;
+      if (stalled) reported = true;
+      return { stalled, resumed, gapSec, resumedGapSec };
+    },
+    get framesDecoded() { return lastFramesDecoded; },
+    get inStall() { return reported; },
+  };
+}
+
 // Capture unhandled errors and flush logs before dying
 process.on('unhandledRejection', async (reason) => {
   log(`FATAL: Unhandled rejection: ${reason}`);
@@ -231,6 +290,11 @@ class ViewerCanaryTest {
     this.isRecording = false;
     this.recordingFilePath = null;
     this.recordingWriteStream = null;
+
+    // Set when monitorConnection gave up on a silent session (see NO_VIDEO_TIMEOUT_SECONDS).
+    // Distinguishes "segment ended because its time was up" from "segment ended because no
+    // video ever arrived", which otherwise look identical from outside the loop.
+    this.endedForNoVideo = false;
   }
 
   async initializeCloudWatch() {
@@ -1343,7 +1407,14 @@ class ViewerCanaryTest {
     // Track RTCStats snapshots for final packet loss calculation
     this.firstRTCStats = null;
     this.lastRTCStats = null;
-    
+
+    // No-video watchdog. framesDecoded is the only honest liveness signal here: hasActiveVideo
+    // only asks whether a <video> element has a srcObject and readyState >= 2, which stays true
+    // after the media stops. The clock starts now (the session is joined at this point), so a
+    // session that never decodes a single frame is caught by the same rule as one that goes
+    // silent mid-way.
+    const noVideo = makeNoVideoWatchdog();
+
     while (!this.testCompleted) {
       const frameStats = await this.getFrameStats(page);
       
@@ -1381,6 +1452,43 @@ class ViewerCanaryTest {
       }
       
       const now = Date.now();
+
+      const videoWatch = noVideo.observe(rtcStats?.video?.framesDecoded, now);
+      const noVideoSec = videoWatch.gapSec;
+      if (videoWatch.resumed) {
+        log(`[Canary] Video resumed after a ${videoWatch.resumedGapSec.toFixed(0)}s gap`);
+      }
+      if (videoWatch.stalled) {
+        log(`[Canary] No video decoded for ${noVideoSec.toFixed(0)}s (framesDecoded stuck at `
+          + `${noVideo.framesDecoded === null ? 'none' : noVideo.framesDecoded}, storageSessionActive=`
+          + `${frameStats.storageSessionActive})`);
+        // 1 = this session went the timeout without media. The healthy path emits 0 at the end of
+        // every segment (below), so this metric has a datapoint either way and an alarm on it does
+        // not have to distinguish "no breach" from "viewer died before reporting".
+        await CloudWatchMetrics.publishCountMetric(
+          this.getMetricName('ViewerSessionNoVideo'),
+          this.config.channelName,
+          1
+        );
+        // The session is joined but carrying nothing, so availability is 0 for it. Without this the
+        // 20s heartbeat below would keep reporting 1, which it does whenever signaling is up.
+        await CloudWatchMetrics.publishCountMetric(
+          this.getMetricName('ViewerStreamingAvailability'),
+          this.config.channelName,
+          0
+        );
+        // Only a soak segment is safe to cut short: ending it hands control back to the recycle
+        // loop in main(), which immediately starts a fresh session -- that is the reconnect. A
+        // bounded run has no such loop, so cutting it short would just truncate the recording and
+        // shorten the very egress window the run exists to measure. There we report and keep
+        // watching, which also leaves the case recoverable if the media starts late.
+        if (this.config.continuous) {
+          log('[Canary] Ending this soak segment so the recycle loop reconnects');
+          this.endedForNoVideo = true;
+          this.testCompleted = true;
+          break;
+        }
+      }
 
       // Push ViewerStreamingAvailability heartbeat every 20 seconds
       if (now - lastAvailabilityPush >= availabilityInterval) {
@@ -1469,7 +1577,9 @@ class ViewerCanaryTest {
 
       if (now - lastStatusLog >= statusLogInterval) {
         const elapsed = Math.floor((now - this.sessionStartTime) / 1000);
-        let statusMsg = `[${elapsed}s]ActiveVideo: ${frameStats.hasActiveVideo}`;
+        // noVideo included because ActiveVideo stays true after the media stops (it is a
+        // readyState check); this is the number the watchdog above acts on.
+        let statusMsg = `[${elapsed}s]ActiveVideo: ${frameStats.hasActiveVideo} noVideo:${noVideoSec.toFixed(0)}s`;
         if (rtcStats?.video) {
           const v = rtcStats.video;
           statusMsg += ` | pktsRecv:${v.packetsReceived} pktsLost:${v.packetsLost} fps:${v.framesPerSecond} jitter:${(v.jitter * 1000).toFixed(1)}ms`;
@@ -1484,14 +1594,29 @@ class ViewerCanaryTest {
       await new Promise(resolve => setTimeout(resolve, 2000));
     }
 
-    // If monitoring loop completed normally (timeout, not failure), push final 1.0
-    if (this.storageSessionJoined) {
+    // If monitoring loop completed normally (timeout, not failure), push final 1.0.
+    // endedForNoVideo is not a normal completion: it already published availability=0 and must
+    // not be overwritten with a 1 here.
+    if (this.storageSessionJoined && !this.endedForNoVideo) {
       log('[Canary] Viewer monitoring completed normally — pushing ViewerStreamingAvailability = 1 (clean exit)');
       await CloudWatchMetrics.publishCountMetric(
         this.getMetricName('ViewerStreamingAvailability'),
         this.config.channelName,
         1
       );
+      // Explicit 0 on the healthy path so ViewerSessionNoVideo is a continuous series rather than
+      // a metric that only exists when it fires -- a series that only appears on failure cannot be
+      // told apart from a viewer that stopped emitting, which is how the 2026-09-03 soak's egress
+      // metrics managed to never breach anything while never being emitted. Skipped when the run
+      // ends still inside a stall (bounded mode keeps watching rather than exiting), where a
+      // trailing 0 would contradict the 1 this same session just published.
+      if (!noVideo.inStall) {
+        await CloudWatchMetrics.publishCountMetric(
+          this.getMetricName('ViewerSessionNoVideo'),
+          this.config.channelName,
+          0
+        );
+      }
     }
   }
 

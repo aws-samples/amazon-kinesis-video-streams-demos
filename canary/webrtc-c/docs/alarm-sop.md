@@ -319,7 +319,9 @@ bounded runs. That changes the alarm model:
 - **Health comes entirely from continuously-emitted metrics.** Alarm on these (namespace
   `KinesisVideoSDKCanary`), all emitted throughout the soak. Thresholds are set off the
   2026-09-03 16.6h soak, so they are calibrated against observed behaviour rather than guessed;
-  the rate each one was actually running at is in the last column.
+  the rate each one was actually running at is in the last column. That run is written up in
+  [soak-2026-09-03-findings.md](soak-2026-09-03-findings.md) — read it before changing a threshold
+  here, since it is where the numbers below come from.
 
   **Page (ingest broken — the soak has stopped proving anything):**
 
@@ -336,6 +338,7 @@ bounded runs. That changes the alarm model:
   |---|---|---|---|---|
   | `ViewerStorageAvailability` / `ViewerConnectionSuccessRate` | viewer | per segment (~40 min recycle) | < 1 across a full recycle interval | see the caveat below |
   | `ActiveViewersPerSession` | master | ~60s | 0 for 3 consecutive periods | this is also the watchdog's viewer-death trigger |
+  | `ViewerSessionNoVideo` | viewer | 1 per segment (0 healthy, 1 on a stall) | SUM over 1h >= 2 | new; 0 expected — see below |
 
   **Ticket (media content degraded, ingest and egress both up):**
 
@@ -370,6 +373,20 @@ bounded runs. That changes the alarm model:
   why the threshold is a rolling mean rather than "AVG < 1 for 2 periods". At the old threshold one
   reconnect-boundary segment paged.
 
+- **`ViewerSessionNoVideo` is the one egress metric that is not sampled.** Every other viewer
+  metric is a verdict on a finished segment, so a session that joins and then receives nothing for
+  40 minutes used to be indistinguishable from a healthy one (it *did* join; that is what
+  `ViewerStorageAvailability` measured). The viewer now watches `framesDecoded` and, after 60s with
+  no decoded frame, publishes `ViewerSessionNoVideo=1` plus `ViewerStreamingAvailability=0` and ends
+  the soak segment so the recycle loop reconnects. A healthy segment publishes an explicit 0, so the
+  series is continuous and the alarm does not have to guess about missing data. Threshold is 2/hour
+  rather than 1 because a single occurrence is self-healing by construction — it recycles — while
+  two in an hour means the reconnect is not clearing it. 60s is the floor here: the media server
+  reaps idle viewer sessions at ~60-66s and a healthy reconnect takes up to ~31s to first frame, so
+  anything under ~35s would recycle healthy sessions. Override with
+  `VIEWER_NO_VIDEO_TIMEOUT_SECONDS` if a scenario needs longer. Bounded (non-soak) runs emit the
+  metric but do **not** cut the run short — there is no recycle loop to reconnect them, so ending
+  early would only shorten the egress window being measured.
 - **Liveness = the metric itself stops arriving.** Because the process is meant to run forever,
   the strongest liveness signal is a **"no data" / missing-datapoint** alarm on `FragmentReceived`
   (and `PersistenceStreamingAvailability`): if the consumer dies, creds expire, or the node OOMs,
