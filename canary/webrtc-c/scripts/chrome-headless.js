@@ -99,8 +99,12 @@ async function runVerifyJob(job) {
     log(`[verify] verify.py exited non-zero (${failure}) but emitted a verdict; using it`);
   }
 
+  // ocr counters included because verify.py drops frame counters it judges to be misreads: the
+  // SSIM figures are only meaningful alongside how many samples survived to produce them.
   log(`[verify] mode=${job.mode} availability=${results.storage_availability} avgSSIM=${results.avg_ssim} ` +
-      `minSSIM=${results.min_ssim} maxSSIM=${results.max_ssim} segments=${results.segments}`);
+      `minSSIM=${results.min_ssim} maxSSIM=${results.max_ssim} segments=${results.segments} ` +
+      `compared=${results.frames_compared}/${results.clip_seconds_sampled} ` +
+      `ocrFailures=${results.ocr_failures} ocrOutliers=${results.ocr_outliers}`);
 
   try {
     await CloudWatchMetrics.publishCountMetric(job.metrics.availability, job.channelName, results.storage_availability);

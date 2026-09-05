@@ -439,6 +439,13 @@ public class WebrtcStorageCanaryConsumer {
             // content-only). Best-effort: absent in presence mode / on parse failure.
             emitJsonNumberAsMetric(output, "avg_drift_seconds", "FrameTimestampDriftSeconds");
             emitJsonNumberAsMetric(output, "max_drift_seconds", "FrameTimestampDriftMaxSeconds");
+            // OCR health. verify.py now discards frame counters it judges to be misreads, which
+            // is what makes min_ssim and max_drift_seconds mean anything -- but it converts a loud
+            // failure into a quiet loss of samples, so an OCR regression (new asset set, changed
+            // resolution, sync box moved) would otherwise look like a perfectly healthy soak.
+            emitJsonNumberAsMetric(output, "ocr_outliers", "FrameCounterOcrOutliers");
+            emitJsonNumberAsMetric(output, "ocr_failures", "FrameCounterOcrFailures");
+            emitJsonNumberAsMetric(output, "frames_compared", "FrameCounterOcrMatched");
             // Parse storage_availability from the --json output without pulling in a JSON dependency.
             final Matcher m = Pattern.compile("\"storage_availability\"\\s*:\\s*([0-9.]+)").matcher(output);
             if (m.find()) {

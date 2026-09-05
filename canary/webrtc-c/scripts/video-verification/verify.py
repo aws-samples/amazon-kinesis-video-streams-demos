@@ -13,8 +13,10 @@ StorageAvailability. Two modes:
       3. Sample at most --max-samples of those seconds (bounds wall time on long
          soak segments, which otherwise outlive the caller's timeout)
       4. OCR each sampled frame to read the frame counter
-      5. Extract only the needed reference frames (by frame number)
-      6. Compare each sampled frame against its matching reference frame via SSIM
+      5. Discard counters that are transient excursions, i.e. OCR misreads: they
+         would otherwise be scored against unrelated reference content
+      6. Extract only the needed reference frames (by frame number)
+      7. Compare each sampled frame against its matching reference frame via SSIM
 
   presence — live / non-deterministic sources (camera / filesrc / testsrc):
     there is no frame-counter reference to OCR-match, so per-frame SSIM is
@@ -72,6 +74,12 @@ PRESENCE_FRAME_FRACTION = 0.5      # and decode >= 50% of FPS*duration frames
 # segments (~55 frames) untouched.
 MAX_SSIM_SAMPLES = 240
 
+# How far a frame counter may sit from its time neighbours before it is treated as an OCR
+# misread (see reject_ocr_outliers). Measured against ground truth, every misread was a
+# digit-level error and so landed >= 200 frames (6.7s) away, while real frame-time drift has a
+# mode of 0.6s (18 frames). 90 frames (3s) sits in that gap with margin on both sides.
+OCR_OUTLIER_TOLERANCE_FRAMES = 90
+
 # Sync box crop coordinates for 1280x720 frames
 TIMER_CROP = (25, 20, 145, 90)
 
@@ -97,6 +105,88 @@ def ocr_frame_number(frame_path):
     if text and text.isdigit():
         return int(text)
     return None
+
+
+def counter_residual(clip_sec, frame_num):
+    """Position of a frame counter relative to a healthy timeline, modulo one source pass.
+
+    For a healthy stream the counter advances FPS per clip second, so counter - FPS*second is
+    constant. Taking it modulo TOTAL_SOURCE_FRAMES makes it constant *across* source loops too,
+    which matters because a long clip wraps several times.
+    """
+    return (frame_num - FPS * clip_sec) % TOTAL_SOURCE_FRAMES
+
+
+def ring_delta(a, b):
+    """Signed shortest distance from b to a on the TOTAL_SOURCE_FRAMES ring."""
+    half = TOTAL_SOURCE_FRAMES / 2.0
+    return (a - b + half) % TOTAL_SOURCE_FRAMES - half
+
+
+def reject_ocr_outliers(clip_to_ref, tolerance=OCR_OUTLIER_TOLERANCE_FRAMES):
+    """Drop frames whose OCR'd counter is a transient excursion. Returns (kept, dropped).
+
+    ocr_frame_number returns a wrong-but-in-range number on roughly 1.7% of frames even on a
+    pristine source (measured against ground truth: 515->915, 983->1983, 2373->3373 -- the digit
+    OCR inserts or drops a digit, so the error is a multiple of 100 frames). The ocr_failures
+    counter cannot see these, because it only rejects unreadable or out-of-range reads. They are
+    disproportionately damaging because the verdict uses extremes: min_ssim compares the frame
+    against unrelated reference content and collapses toward the availability threshold, and
+    max_drift_seconds inflates by 100/FPS seconds or more. At 240 samples the chance of at least
+    one misread is 98%, i.e. essentially every verification.
+
+    The test is whether the excursion *comes back*, which is a physical argument rather than a
+    statistical one: a stream cannot lose 13s of content and then get it back, so a residual that
+    leaves its level and returns to it was never a timing event. Concretely, the samples are cut
+    into runs of consecutive reads that agree within `tolerance` -- comparing each read against
+    the run's previous read, so arbitrarily large *gradual* drift stays one run -- and a short run
+    is dropped when the runs on either side of it agree with each other. Real events survive by
+    construction: smooth drift never leaves its run, and a permanent step (the reconnect gap
+    between two concatenated viewer segments, say) produces two long runs that do not agree.
+
+    Deliberately not a median/MAD filter over all residuals: with a real step at the midpoint the
+    global centre sits between the two levels and half the clip looks like an outlier. Also not
+    the single-neighbour form -- OCR misreads the same glyph the same way on consecutive frames,
+    so runs of two or three identical misreads are common (observed on a 120s clip at secs 19-20,
+    both exactly +400).
+
+    Adjacent short runs at different levels are kept: with nothing stable on both sides there is
+    no level to declare a return to. That is the conservative direction (a suspect read survives
+    rather than a real event being erased).
+    """
+    if len(clip_to_ref) < 3:
+        return clip_to_ref, []
+    residuals = [counter_residual(sec, num) for sec, _, num in clip_to_ref]
+
+    runs = [[0]]
+    for i in range(1, len(residuals)):
+        if abs(ring_delta(residuals[i], residuals[runs[-1][-1]])) <= tolerance:
+            runs[-1].append(i)
+        else:
+            runs.append([i])
+
+    # A returning excursion is an artefact however long it is, but cap the length anyway so a
+    # pathological clip cannot have most of itself discarded by one rule.
+    max_spike = max(3, len(residuals) // 10)
+    outlier_idx = set()
+    for k, run in enumerate(runs):
+        if len(run) > max_spike:
+            continue
+        before = runs[k - 1] if k > 0 else None
+        after = runs[k + 1] if k + 1 < len(runs) else None
+        if before is not None and after is not None:
+            spike = abs(ring_delta(residuals[after[0]], residuals[before[-1]])) <= tolerance
+        else:
+            # A short run at either end has only one side to lean on; treat it as a spike when
+            # that side is a stable level.
+            neighbour = after if before is None else before
+            spike = neighbour is not None and len(neighbour) > max_spike
+        if spike:
+            outlier_idx.update(run)
+
+    kept = [f for i, f in enumerate(clip_to_ref) if i not in outlier_idx]
+    dropped = [f for i, f in enumerate(clip_to_ref) if i in outlier_idx]
+    return kept, dropped
 
 
 def get_video_duration(video_path):
@@ -408,6 +498,16 @@ def main():
 
         print(f"OCR complete: {len(clip_to_ref)} matched, {ocr_failures} failed")
 
+        # Phase 4b: drop OCR misreads before they reach either SSIM or the drift math. Rejected
+        # here rather than filtered later so the reference frames they point at are never even
+        # extracted. See reject_ocr_outliers for why ocr_failures does not already cover this.
+        clip_to_ref, ocr_outliers = reject_ocr_outliers(clip_to_ref)
+        if ocr_outliers:
+            print(f"Rejected {len(ocr_outliers)} OCR outlier(s): counter left its level by "
+                  f"> {OCR_OUTLIER_TOLERANCE_FRAMES / FPS:.1f}s and came back")
+            for sec, _, num in ocr_outliers[:10]:
+                print(f"  [clip sec {sec}] frame #{num}")
+
         # Phase 5: Extract only the needed reference frames
         needed_frames = set(num for _, _, num in clip_to_ref)
         print(f"\n--- Phase 5: Extracting {len(needed_frames)} reference frames ---")
@@ -462,6 +562,7 @@ def main():
             result = {'storage_availability': 0, 'mode': 'ssim',
                       'clip_duration': clip_duration,
                       'frames_compared': 0, 'ocr_failures': ocr_failures,
+                      'ocr_outliers': len(ocr_outliers),
                       'clip_seconds_total': clip_seconds_total,
                       'clip_seconds_sampled': len(clip_frames),
                       'avg_drift_seconds': avg_drift_seconds, 'max_drift_seconds': max_drift_seconds,
@@ -491,6 +592,7 @@ def main():
             print(f"Clip frames:        {clip_total_frames} ({'PASS' if frames_ok else 'FAIL'} — threshold: >= {frames_threshold:.0f})")
             print(f"SSIM comparisons:   {len(scores)}")
             print(f"OCR failures:       {ocr_failures}")
+            print(f"OCR outliers:       {len(ocr_outliers)}")
             print(f"Storage available:  {available}")
 
             result = {
@@ -500,7 +602,11 @@ def main():
                 'avg_ssim': round(avg_ssim, 4),
                 'min_ssim': round(min_ssim, 4),
                 'frames_compared': len(scores),
+                # ocr_failures: unreadable or out-of-range. ocr_outliers: read cleanly but
+                # inconsistent with its neighbours, i.e. the silent misreads. Both are OCR
+                # health, and only together do they add up to it.
                 'ocr_failures': ocr_failures,
+                'ocr_outliers': len(ocr_outliers),
                 # How much of the clip the verdict actually looked at. Without this a
                 # sampled verdict and a full one are indistinguishable after the fact.
                 'clip_seconds_total': clip_seconds_total,
