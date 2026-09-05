@@ -392,6 +392,17 @@ public class WebrtcStorageCanaryConsumer {
      *      deprioritized behind everything else (the ListFragments calls are network-bound anyway).
      *   3. It's bounded by SOAK_VERIFY_TIMEOUT — a slow/hung verify is killed, never piling up.
      */
+    /**
+     * Where verify.py keeps its prebuilt reference video. Under the system temp dir so it survives
+     * across verifications but not across a node rebuild, and named after the asset set so
+     * switching STORAGE_ASSET_SET cannot reuse the wrong reference.
+     */
+    private static String referenceCachePath(String sourceFrames) {
+        final String assetSet = new File(sourceFrames).getName().replaceAll("[^A-Za-z0-9._-]", "_");
+        return new File(System.getProperty("java.io.tmpdir"),
+                "kvs-canary-reference-" + assetSet + ".mp4").getAbsolutePath();
+    }
+
     static Boolean runVerifyScript(String clipPath, long expectedDurationSeconds) {
         final String script = System.getenv("CANARY_VERIFY_SCRIPT");
         if (script == null || script.isEmpty()) {
@@ -417,6 +428,14 @@ public class WebrtcStorageCanaryConsumer {
             if ("ssim".equalsIgnoreCase(mode) && sourceFrames != null && !sourceFrames.isEmpty()) {
                 cmd.add("--source-frames");
                 cmd.add(sourceFrames);
+                // Without this verify.py rebuilds the reference video from 4676 H.264 frames every
+                // time, which measured as 18s of a 34s run on a 60s segment -- and a soak hands it
+                // a 60s segment every 60s. That is what exhausted the worker's capacity on the
+                // 2026-09-03 soak (141 of 858 segments skipped). Keyed on the source-frames path so
+                // two asset sets never share a reference; verify.py also rebuilds if the frames are
+                // newer than the cache.
+                cmd.add("--reference-cache");
+                cmd.add(referenceCachePath(sourceFrames));
             }
             final ProcessBuilder pb = new ProcessBuilder(cmd);
             pb.redirectErrorStream(true);

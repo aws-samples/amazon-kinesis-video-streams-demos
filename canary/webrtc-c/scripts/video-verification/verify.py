@@ -257,6 +257,47 @@ def build_reference_video(source_dir, output_path):
     return output_path
 
 
+def cached_reference_video(source_dir, cache_path, work_dir):
+    """Return a reference video, reusing cache_path when it is still valid.
+
+    The reference is a pure function of the source frames, but rebuilding it dominated the cost of
+    a short verification: 18s of a 34s run on a 60s segment locally. The soak consumer verifies a
+    60s segment every 60s, so on the node (~2.4x slower) this alone consumed most of the budget and
+    is why 141 of 858 segments were skipped for lack of capacity.
+
+    Cache validity is by mtime against the newest source frame, so switching --source-frames to
+    another asset set (or editing one) rebuilds. Written via a temp file plus os.replace so a
+    concurrent verifier -- the viewer runs its own, and a crash mid-build is possible -- can never
+    observe a half-written reference.
+    """
+    if not cache_path:
+        return build_reference_video(source_dir, os.path.join(work_dir, 'reference.mp4'))
+
+    newest_source = 0.0
+    for frame in glob.glob(os.path.join(source_dir, 'frame-*.h264')):
+        newest_source = max(newest_source, os.path.getmtime(frame))
+    if os.path.exists(cache_path) and os.path.getmtime(cache_path) >= newest_source:
+        duration = get_video_duration(cache_path)
+        # A cache truncated by a crash or a full disk has the right mtime but the wrong length.
+        if duration is not None and duration >= 0.9 * EXPECTED_DURATION:
+            print(f"Reusing cached reference video: {cache_path} ({duration:.1f}s)")
+            return cache_path
+        print(f"Cached reference video at {cache_path} is unusable (duration={duration}), rebuilding")
+
+    staging = os.path.join(work_dir, 'reference.mp4')
+    if not build_reference_video(source_dir, staging):
+        return None
+    try:
+        os.makedirs(os.path.dirname(os.path.abspath(cache_path)), exist_ok=True)
+        os.replace(staging, cache_path)
+        print(f"Cached reference video at {cache_path}")
+        return cache_path
+    except OSError as e:
+        # An unwritable cache location must not fail the verification.
+        print(f"Could not cache reference video at {cache_path} ({e}); using it in place")
+        return staging
+
+
 def extract_specific_frames(video_path, output_dir, frame_numbers):
     """Extract specific frames from a video by frame number (1-based).
     Uses a single ffmpeg call with a select filter for efficiency."""
@@ -360,6 +401,11 @@ def main():
                              f'ssim mode (default: {MAX_SSIM_SAMPLES}, 0 = no cap). Frames are '
                              'sampled at an even stride, so wall time stays bounded no matter '
                              'how long the segment is.')
+    parser.add_argument('--reference-cache', default=None,
+                        help='Path to keep the built reference video at, reused across '
+                             'invocations while it is newer than the source frames. Rebuilding it '
+                             'is over half the cost of verifying a short segment, so a continuous '
+                             'soak (one 60s segment per 60s) needs this to keep up.')
     parser.add_argument('--keep-frames', action='store_true', help='Keep extracted frames')
     parser.add_argument('--verbose', action='store_true')
     parser.add_argument('--json', action='store_true', dest='json_output',
@@ -446,8 +492,8 @@ def main():
 
         # Phase 1: Build reference video
         print("\n--- Phase 1: Building reference video ---")
-        ref_video = build_reference_video(
-            args.source_frames, os.path.join(work_dir, 'reference.mp4'))
+        ref_video = cached_reference_video(
+            args.source_frames, args.reference_cache, work_dir)
         if not ref_video:
             emit_failure("Failed to build reference video", args.json_output,
                          mode='ssim', clip_duration=clip_duration, segments=len(recordings))

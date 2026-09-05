@@ -317,15 +317,58 @@ bounded runs. That changes the alarm model:
   does **not** fire on a soak — those stages only emit when a bounded run completes. Do **not**
   wait for them on a soak; alarm on the continuous in-run metrics instead.
 - **Health comes entirely from continuously-emitted metrics.** Alarm on these (namespace
-  `KinesisVideoSDKCanary`), all emitted throughout the soak:
+  `KinesisVideoSDKCanary`), all emitted throughout the soak. Thresholds are set off the
+  2026-09-03 16.6h soak, so they are calibrated against observed behaviour rather than guessed;
+  the rate each one was actually running at is in the last column.
 
-  | Metric | Emitted by | Cadence | Alarm condition |
-  |---|---|---|---|
-  | `FragmentReceived` | consumer | ~20s | SUM over 5 min == 0 (no new fragments ingested) |
-  | `PersistenceStreamingAvailability` | consumer | ~60s | AVG < 1 for 3 consecutive periods (KVS unreachable / stream not retrievable) |
-  | `IngestionIncomingBitrateKbps` | consumer | on new fragments | drops to ~0 or far below the shaped floor for several periods |
-  | `SoakVideoDecodable` | consumer (soak only, when `VIDEO_VERIFY_ENABLED=true`) | 15 min | AVG < 1 for 2 consecutive periods (ingested media not decodable) |
-  | `ViewerStorageAvailability` / `ViewerConnectionSuccessRate` | viewer | per segment (~40 min recycle) | < 1 across a recycle interval (egress broken) |
+  **Page (ingest broken — the soak has stopped proving anything):**
+
+  | Metric | Emitted by | Cadence | Alarm condition | Observed |
+  |---|---|---|---|---|
+  | `FragmentReceived` | consumer | ~20s | SUM over 5 min == 0, **missing datapoints breaching** | continuous except the 40s reconnect gaps |
+  | `PersistenceStreamingAvailability` | consumer | ~60s | AVG < 1 for 3 consecutive periods | 1.0 |
+  | `IngestionIncomingBitrateKbps` | consumer | on new fragments | ~0 or far below the shaped floor for several periods | steady |
+  | `SoakRestartBudgetExhausted` | watchdog | on trigger | any datapoint (self-recovery gave up — see soak-self-recovery-design.md §4) | n/a, not yet deployed |
+
+  **Page (egress broken — ingest is fine but nobody can play it back):**
+
+  | Metric | Emitted by | Cadence | Alarm condition | Observed |
+  |---|---|---|---|---|
+  | `ViewerStorageAvailability` / `ViewerConnectionSuccessRate` | viewer | per segment (~40 min recycle) | < 1 across a full recycle interval | see the caveat below |
+  | `ActiveViewersPerSession` | master | ~60s | 0 for 3 consecutive periods | this is also the watchdog's viewer-death trigger |
+
+  **Ticket (media content degraded, ingest and egress both up):**
+
+  | Metric | Emitted by | Cadence | Alarm condition | Observed |
+  |---|---|---|---|---|
+  | `SoakVideoDecodable` | consumer (soak only, `VIDEO_VERIFY_ENABLED=true`) | **per 60s segment** | rolling 1h AVG < 0.9 | 46 zeros / 858 segments = 5.4%, of which 35 were reconnect-boundary artefacts now discarded, leaving ~1.3% |
+  | `SoakSegmentSkipped` | consumer | on backpressure | SUM over 1h > 6 | 141 / 858 = 16.4% — see the capacity note below |
+  | `SoakSegmentBoundaryDiscarded` | consumer | per generation boundary | SUM over 1h > 10 | ~2 per reconnect at ~1 reconnect/h |
+
+  **Ticket (the verifier itself is degrading — these guard the metrics above):**
+
+  | Metric | Emitted by | Cadence | Alarm condition | Observed |
+  |---|---|---|---|---|
+  | `FrameCounterOcrMatched` | consumer | per segment | AVG < 30 over 1h | ~52 of 60 clip seconds |
+  | `FrameCounterOcrOutliers` | consumer | per segment | AVG > 10 over 1h | ~2 (1.7% silent misread rate, measured against ground truth) |
+
+- **Do not alarm on `FrameTimestampDriftSeconds` / `FrameTimestampDriftMaxSeconds` yet.** Until the
+  OCR outlier filter has run for a full soak these have no trustworthy baseline: on a clip built
+  losslessly from the source frames themselves, where the true drift is 0, they read 0.545s and
+  33.3s purely from OCR misreads. Get a clean distribution first, then set a threshold.
+
+- **`SoakSegmentSkipped` needs the reference-video cache to be deployed before it is alarmable.**
+  The 16.4% skip rate was a capacity shortfall, not a media problem: verify.py rebuilt the
+  reference video from 4676 H.264 frames on every invocation (18s of a 34s local run), so a 60s
+  segment cost ~83s on the node and the worker could never catch up. With `--reference-cache` that
+  is ~40s, under the 60s arrival rate. If this alarm fires on a build without the cache, it is
+  measuring the verifier, not the stream.
+
+- **`SoakVideoDecodable` is per-segment, not per-15-minutes.** The 15 min figure belonged to the old
+  periodic GetClip probe. `SoakStreamVerifier` verifies every 60s segment continuously, so there
+  are ~60 datapoints an hour and a single bad segment is 1.7% of the hour, not 25% of it — which is
+  why the threshold is a rolling mean rather than "AVG < 1 for 2 periods". At the old threshold one
+  reconnect-boundary segment paged.
 
 - **Liveness = the metric itself stops arriving.** Because the process is meant to run forever,
   the strongest liveness signal is a **"no data" / missing-datapoint** alarm on `FragmentReceived`
@@ -334,6 +377,23 @@ bounded runs. That changes the alarm model:
 - **Viewer recycles every ~40 min by design.** Brief per-segment reconnect gaps are expected (fresh
   credentials + fresh browser each segment); do not alarm on a single segment blip — require the
   breach to persist across a full recycle interval.
+- **Caveat on the viewer metrics: absence of a breach is not evidence of health.** On the
+  2026-09-03 soak `ViewerStorageAvailability` never breached because it was never *emitted* —
+  verify.py could not finish inside the 600s timeout on a 40 min segment, so 18 of 19 segments were
+  killed mid-SSIM and the whole 16.6h run produced no egress verdict at all. A missing-datapoint
+  alarm is therefore mandatory on the viewer side too, not just on ingest. `--max-samples` bounds
+  the verification so this is fixed going forward, but the general lesson holds: for every soak
+  alarm, ask what a *crash* looks like on that graph, not just what a failure looks like.
+- **Two structural gaps are expected and must not be alarmed into a page.** The master reconnects
+  roughly hourly and each reconnect costs ~40s of ingest (17 of them = 1.17% of the run), and video
+  stays unavailable for ~30s after the viewer reconnects (10/10 correlation, +9s to +31s). Any
+  alarm with a period under ~5 min will see both. This is why the ingest alarms are SUM-over-5-min
+  rather than per-datapoint.
+- **A restart resets nothing.** The self-recovery watchdog aborts and relaunches the Jenkins job,
+  so metrics resume under a new build number but the same channel/`RUNNER_LABEL` dimension. Alarms
+  therefore span restarts, which is intended: three restarts in an hour should still page even
+  though each individual post-restart window looks healthy. That is what `SoakRestartTrigger`
+  (count) and `SoakRestartBudgetExhausted` are for.
 
 Set these up the same way as the existing alarms (see Sections 1–3 for response). When one fires,
 the investigation in Section 4 still applies; the only difference is there is no "re-trigger the

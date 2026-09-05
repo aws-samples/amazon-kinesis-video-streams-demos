@@ -4,6 +4,7 @@ const { CloudWatchMetrics, CloudWatchLogger } = require('./cloudwatch');
 const fs = require('fs');
 const { execFile } = require('child_process');
 const path = require('path');
+const os = require('os');
 
 // ---------------------------------------------------------------------------
 // Async video-verification queue (soak / CANARY_CONTINUOUS only)
@@ -62,6 +63,11 @@ async function runVerifyJob(job) {
   const args = ['-n', '19', job.venvPython, job.verifyScript, '--recording', ...job.recordings];
   if (job.mode === 'ssim') {
     args.push('--source-frames', job.sourceFrames);
+    // Reuse the prebuilt reference video across segments. Rebuilding it from the source frames is
+    // a fixed ~18s of every verification, which a recycling viewer pays once per segment for no
+    // reason. Named after the asset set so two of them cannot share a reference.
+    args.push('--reference-cache',
+      path.join(os.tmpdir(), `kvs-canary-reference-${path.basename(job.sourceFrames)}.mp4`));
   }
   args.push('--mode', job.mode, '--json');
 

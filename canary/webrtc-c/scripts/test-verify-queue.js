@@ -14,7 +14,10 @@
 // the block don't break it.
 
 const fs = require('fs');
+// path and os are chrome-headless.js's own module-level requires; the extracted block builds the
+// --reference-cache path from them, and eval() only sees what this scope defines.
 const path = require('path');
+const os = require('os');
 
 const src = fs.readFileSync(path.join(__dirname, 'chrome-headless.js'), 'utf-8');
 const start = src.indexOf('const VERIFY_QUEUE_MAX');
@@ -32,6 +35,7 @@ const skipCalls = [];
 let running = 0;
 let maxConcurrent = 0;
 const completed = [];
+const argvCalls = [];
 
 function log(m) { logs.push(m); }
 const CloudWatchMetrics = {
@@ -45,6 +49,7 @@ let execFile = (cmd, args, opts, cb) => {
   running++;
   maxConcurrent = Math.max(maxConcurrent, running);
   const id = args[args.indexOf('--recording') + 1];
+  argvCalls.push(args);
   setTimeout(() => {
     running--;
     completed.push(id);
@@ -88,6 +93,11 @@ const mk = (id) => ({
   ok(!completed.includes('j2'), `oldest job dropped, not the newest (ran: ${completed.join(',')})`);
   ok(completed.includes('j5'), 'newest job still ran');
   ok(pubCalls.some(([n, v]) => n === 'Avail' && v === 1), 'ViewerStorageAvailability published');
+  // Without --reference-cache verify.py rebuilds the reference video from the source frames on
+  // every segment (~18s), which is what starved the worker and produced the skips above.
+  ok(argvCalls.every((a) => a.indexOf('--reference-cache') > 0
+      && a[a.indexOf('--reference-cache') + 1].endsWith('.mp4')),
+    'ssim jobs pass a --reference-cache path');
 
   // A failing verify must not wedge the worker, and must still leave a datapoint --
   // silence here is what let 18 of 19 timed-out segments look like "no data" on the
@@ -113,6 +123,6 @@ const mk = (id) => ({
   ok(pubCalls.slice(pubBefore2).some(([n, v]) => n === 'Avail' && v === 0),
     'a verdict on stdout is used even when the exit code is non-zero');
 
-  console.log(`\nPASS=${11 - fail} FAIL=${fail}`);
+  console.log(`\nPASS=${12 - fail} FAIL=${fail}`);
   process.exit(fail ? 1 : 0);
 })();
