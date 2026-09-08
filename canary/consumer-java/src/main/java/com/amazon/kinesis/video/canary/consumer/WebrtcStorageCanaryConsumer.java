@@ -658,7 +658,10 @@ public class WebrtcStorageCanaryConsumer {
             case CanaryConstants.THREE_VIEWERS_LABEL:
             case CanaryConstants.GAMMA_WITH_VIEWER_LABEL:
             case CanaryConstants.GAMMA_TWO_VIEWERS_LABEL:
-            case CanaryConstants.GAMMA_THREE_VIEWERS_LABEL: {
+            case CanaryConstants.GAMMA_THREE_VIEWERS_LABEL:
+            // Continuous soak. Same entry point as the viewer scenarios; the runForever branch
+            // below (CANARY_CONTINUOUS=true) is what makes it never exit.
+            case CanaryConstants.SOAK_LABEL: {
                 logger.info("Periodic case: canaryRunTime=" + canaryRunTime
                         + "s, mCanaryStartTime=" + mCanaryStartTime
                         + ", now=" + new Date()
@@ -722,8 +725,15 @@ public class WebrtcStorageCanaryConsumer {
                         !mCanaryLabel.equals(CanaryConstants.SUB_RECONNECT_LABEL) &&
                         !mCanaryLabel.equals(CanaryConstants.GAMMA_SINGLE_RECONNECT_LABEL) &&
                         !mCanaryLabel.equals(CanaryConstants.GAMMA_SUB_RECONNECT_LABEL)) {
-                    logger.error(String.format("Env var CANARY_LABEL: %s must be set to either %s, %s, %s, or %s.",
-                            mCanaryLabel, CanaryConstants.PERIODIC_LABEL, CanaryConstants.EXTENDED_LABEL,
+                    // The switch above is a closed allowlist, so a new SCENARIO_LABEL in a cron line
+                    // fails here until it is added as a case. The old message named only these four
+                    // labels, which sent readers looking for a config bug instead of the missing
+                    // case -- point at the real fix and at the file that has the full list.
+                    logger.error(String.format("Env var CANARY_LABEL: '%s' is not a recognized canary label. "
+                            + "Recognized reconnect labels are %s, %s, %s; every other label must appear as a "
+                            + "'case' in the periodic group of this switch. Add a constant in CanaryConstants "
+                            + "and a case here, then rebuild the consumer jar.",
+                            mCanaryLabel, CanaryConstants.EXTENDED_LABEL,
                             CanaryConstants.SINGLE_RECONNECT_LABEL, CanaryConstants.SUB_RECONNECT_LABEL));
                     throw new Exception("Improper canary label " + mCanaryLabel + " assigned to "
                             + CanaryConstants.CANARY_LABEL_ENV_VAR + " env var.");

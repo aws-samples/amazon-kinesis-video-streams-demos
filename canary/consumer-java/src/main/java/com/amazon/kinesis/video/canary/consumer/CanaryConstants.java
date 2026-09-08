@@ -68,6 +68,12 @@ public final class CanaryConstants {
     public static final String GAMMA_SHORT_VA_MASTER_RO_VIEWER_1MBPS_LABEL = "GammaShortVAMasterROViewer-1mbps";
     public static final String GAMMA_SHORT_VA_MASTER_RO_VIEWER_5MBPS_LABEL = "GammaShortVAMasterROViewer-5mbps";
 
+    // Continuous soak (SOAK_MODE=true -> CANARY_CONTINUOUS=true). Takes the same code path as
+    // WITH_VIEWER_LABEL -- the run-mode branch is driven by CANARY_CONTINUOUS, not by the label --
+    // but keeps its own name so the soak's 24/7 datapoints do not pollute the StorageWithViewer
+    // aggregate that the short periodic crons alarm on.
+    public static final String SOAK_LABEL = "RpiSoak";
+
     public static final String CW_DIMENSION_INDIVIDUAL = "StorageWebRTCSDKCanaryStreamName";
     public static final String CW_DIMENSION_AGGREGATE = "StorageWebRTCSDKCanaryLabel";
 
