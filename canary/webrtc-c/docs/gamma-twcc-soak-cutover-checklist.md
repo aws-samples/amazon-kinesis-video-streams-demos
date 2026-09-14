@@ -89,16 +89,15 @@ These determine most of the checklist, so confirm they still hold before plannin
       has no consumer, so only line 18 dies today.) The file still carries
       `REPLACE-WITH-GAMMA-CONTROL-PLANE-URI` and `GIT_HASH=rpi5-sample`, so it looks like it was
       never actually deployed.
-- [ ] **[B] Original wording, kept for the TWCC half — decide the gamma label strategy.** Every pre-existing scenario
-      has a `Gamma*` twin (`CanaryConstants.java:33-59`) precisely so gamma datapoints stay out
-      of the prod aggregates that prod alarms on. The new scenarios have no twin:
-      `twcc_cron.txt` sets `SCENARIO_LABEL=StorageWithViewer` (the **prod** label) and `RpiSoak`
-      exists only as one label. Because the consumer ignores `METRIC_SUFFIX`, running these on
-      gamma pollutes prod's `StorageWebRTCSDKCanaryLabel=StorageWithViewer` aggregate.
-      Options: (a) add `GammaStorageWithViewer` to the gamma TWCC crons — already defined and
-      allowlisted, zero code change; (b) add `GammaRpiSoak` to `CanaryConstants` **and** a
-      `case` in the `WebrtcStorageCanaryConsumer` switch (see the `default:` throw above).
-      Do not skip (b) if you introduce a new label — the consumer dies on an unknown one.
+- [ ] **[B] The TWCC scenarios still need their gamma label.** The soak half is done (above); the
+      four TWCC entries are not. `twcc_cron.txt` sets `SCENARIO_LABEL=StorageWithViewer` — the
+      **prod** label — so running them on gamma pollutes prod's
+      `StorageWebRTCSDKCanaryLabel=StorageWithViewer` aggregate, which is what prod alarms on.
+      Every pre-existing scenario has a `Gamma*` twin (`CanaryConstants.java`) for exactly this
+      reason. Use `GammaStorageWithViewer` in the gamma copy: it already exists as a constant and
+      already has a `case`, so this is a cron edit with **zero code change**. If you invent any
+      other new label instead, it needs both a constant and a `case` — the switch's `default:`
+      throws and the consumer dies on startup.
 - [x] **[B] Credential leak in the viewer's log — fixed at the chokepoint.**
       `buildTestUrl()` puts `accessKeyId` / `secretAccessKey` / `sessionToken` into the sample
       page's query string and `initializePage()` logged the whole URL (`Opening URL: …`) — ~17
@@ -152,8 +151,8 @@ These determine most of the checklist, so confirm they still hold before plannin
       request that will be answered with "that is GA now".
 - [ ] **[B]** Set data retention on the new streams. The soak ingests continuously
       (~1617 kbps measured), so an unbounded retention is a standing cost.
-- [ ] **[B] Set `retentionInDays` on `WebrtcSDK` — measured 2026-09-13, account 232283333863,
-      ReadOnly:**
+- [x] **[R] `WebrtcSDK` retention — measured 2026-09-13, account 232283333863, ReadOnly; decided
+      to leave alone:**
 
       | Region | Group | Stored | Retention |
       |---|---|---|---|
@@ -161,14 +160,28 @@ These determine most of the checklist, so confirm they still hold before plannin
       | us-east-1 | `WebrtcSDK` | **18.3 GB** | **None** |
       | us-east-1 | `JSSDK` | 1.49 GB | **None** |
 
-      Promoted from `[R]` to `[B]`: 294 GB of unbounded growth since 2020, and `WebrtcSDK` gains
-      **two new writers per run** — the Java consumer's appender and the JS viewer — on top of the
-      C master, with a soak writing all three continuously.
+      **Decision: leave retention at `None`. Do not set it.** An earlier revision of this item
+      promoted it to `[B]` and recommended 60 days. That was wrong, and the accounting is worth
+      keeping so nobody re-escalates it:
 
-      **Setting retention deletes every event older than the threshold, irreversibly.** Six years
-      of history in us-west-2 is the thing being traded away, so the number is a decision, not a
-      default. A 30-day soak needs >30 days to survive its own run plus analysis time; 60 days is
-      the smallest number that does.
+      - **Cost is negligible and not the argument.** ~$0.03/GB-month puts 294 GB at roughly
+        **$9/month**. The group has grown 294 GB since 2020-10-06, i.e. ~50 GB/year. The two new
+        writers add little: the consumer measures ~0.24 MB/h (~2 GB/year for a continuous soak)
+        and the viewer is the same order, so the rate goes to perhaps ~65 GB/year — about
+        $0.15/month more per year. **Ingestion ($0.50/GB) is charged regardless of retention**, so
+        a retention policy saves nothing on the dominant cost.
+      - **Security is not the argument either.** The credentials the viewer used to log came from
+        `AWS_*`, which are Canary-STS *temporary* sessions expiring within 12 hours. Retaining
+        them forever is not an active risk, so "old logs hold live credentials" does not hold.
+      - **The one real problem is stream count, not bytes.** Enumerating this group's streams
+        times out: `DescribeLogStreams` pages 50 at a time at 5 TPS, and one stream per run per
+        component — now three components instead of one — triples the count.
+        **But the fix for that is querying by stream-name prefix, or using Insights (which scans
+        by time range and never enumerates streams), not deleting history.** Trading six years of
+        irreversible history for faster pagination is not a good trade.
+
+      If a bound is ever wanted for its own sake, pick one long enough to be practically lossless
+      (a year or more) rather than one tuned to a soak's length.
 
       Stream naming is confirmed live and matches what the new code assumes:
       `StorageWithViewer-StorageMaster-<ts>`, `StorageThreeViewers-StorageMaster-<ts>`,
@@ -185,7 +198,7 @@ These determine most of the checklist, so confirm they still hold before plannin
       since the name appears nowhere in the repo". The name is indeed absent from the code, but
       the group exists with 1.49 GB and no retention — so something writes it, and it is a
       candidate holder of the historical credential exposure. Identify the writer before deciding
-      whether that group needs purging as well as retention.
+      anything about that group; it is not covered by the decision above.
 - [ ] **[R] Confirm the consumer node's role can write logs.** The appender calls
       `CreateLogGroup` / `CreateLogStream` / `PutLogEvents`. The C master already makes exactly
       these three calls against the same group (`src/CloudwatchLogs.cpp:20-24`,
