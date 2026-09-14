@@ -1,0 +1,84 @@
+# Continuous soak canary cron entry (RPi5 master + EC2 viewer/consumer).
+#
+# ONE entry, and it is a RESTARTER, not a scheduler. The soak itself never ends:
+# SOAK_MODE makes the master run with sampleDuration=0, the consumer block in
+# awaitForever(), and the viewer recycle 2400s segments in a while(true) loop.
+# The build therefore stays BUILDING indefinitely and `Skip if duplicate`
+# (gamma_runner.groovy:829) marks every tick NOT_BUILT while it is healthy.
+# The tick only does something after the soak has actually died.
+#
+# WHAT THIS RECOVERS (verified against the code, not assumed):
+#   yes - master process exits / build error. SOAK_MODE makes withRunnerWrapper
+#         rethrow instead of swallowing into `unstable` (:180-190), so the build
+#         goes FAILURE, failFast tears down the other stages, and the next tick
+#         starts a fresh soak.
+#   yes - node reboot, SSH drop, Jenkins agent lost -> build fails -> next tick.
+#   NO  - any "alive but not working" failure. All three components are
+#         deliberately built never to exit: the viewer's no-video watchdog
+#         (VIEWER_NO_VIDEO_TIMEOUT_SECONDS, 60s) only ends the current segment so
+#         the recycle loop reconnects; the consumer's timeouts all bound
+#         sub-operations (GetClip 10min clientExecution, verify.py 600s) and
+#         never the process. So the build stays BUILDING, dedup keys on
+#         isBuilding(), and this cron is blind to it.
+#         Those cases are covered by ALARMS, not by this cron. Each one leaves a
+#         live zero-valued datapoint: ViewerStreamingAvailability=0 every 60s,
+#         PersistenceStreamingAvailability=0 every 60s, SoakVideoDecodable=0
+#         every 300s (NO_SEGMENT_EMIT_MS), MasterStreamingAvailability=0.
+#         Alarm on those; do not expect this cron to clear them.
+#
+# INTERVAL TRADE-OFF: H/30 gives <=30min recovery and 48 build records/day. A
+# tighter H/10 (144/day) evicts the soak's own failed builds from history in
+# ~3.5 days at the default Max=500 retention -- i.e. it destroys exactly the
+# evidence you need. Raise retention before tightening this.
+#
+# H/30 rather than 0,30: identical frequency, but Jenkins' H hashes the job name
+# to a fixed offset within each half hour instead of firing on the :00/:30 that
+# every other cron in this controller also uses. The tick's own work is trivial
+# (dedup marks it NOT_BUILT while the soak is healthy), but the tick that DOES
+# fire starts a full soak -- a clone, a possible gst=ON rebuild, and three nodes
+# coming up -- and that is worth keeping off the same instant as everything else.
+# The offset is stable per job, so the interval never drifts. This is also what
+# the live controller already runs; the file was the thing out of step.
+#
+# PREREQUISITES:
+#   - rpi5-002 DEDICATED to the soak. CANARY_MEDIA_SOURCE=framesrc flips the
+#     node's ~/webrtc-c-storage-master/build/.build-flags to gst=ON; alternating
+#     with a disk-path job forces a full rebuild every run.
+#   - The soak holds one executor forever. Its viewer and consumer nodes must NOT
+#     be shared with the periodic jobs or those queue indefinitely (this is the
+#     gamma-pileup failure mode).
+#   - IOT_CORE_THING_NAME must match this node's ~/.aws-iot/credhelper.sh thing.
+#     The other three IOT_CORE_* params have working defaults.
+#   - Consumer node instance profile trusted by Canary-STS (SOAK_MODE implies
+#     CONSUMER_AUTO_REFRESH_CREDS, which re-assumes CANARY_STS_ROLE_ARN).
+#   - Cleanup crons installed on all three nodes; a soak node without them fills
+#     its disk.
+#
+# NOTES ON OMITTED PARAMS:
+#   - DURATION_IN_SECONDS: omitted on purpose. All three components ignore it
+#     under SOAK_MODE, and its '156' default is only read by the non-soak branch
+#     of the timeout ternaries.
+#   - VIEWER_SESSION_RECYCLE_SECONDS: NOT a declared parameter in either runner
+#     (only read as `params.X ?: '2400'`), so setting it here does nothing. The
+#     recycle interval is fixed at 2400s, which must stay under
+#     STS_DURATION_SECONDS.
+#   - CONSUMER_CONTINUOUS / CONSUMER_AUTO_REFRESH_CREDS: implied by SOAK_MODE
+#     (:496, :505).
+#   - IOT_CORE_CREDENTIAL_ENDPOINT stays on its us-west-2 default while this runs
+#     against us-east-1. That is fine: the endpoint is account-scoped and the STS
+#     credentials it vends are global.
+#
+# ON METRIC_SUFFIX: it is set to '-soak', not left on its '-gamma' default and not
+# blanked. The default is a lie here -- this runs against prod us-east-1 with no
+# ENDPOINT -- while blanking it would merge the soak's viewer metrics into the prod
+# metric names, where the by-design hourly reconnect (10 availability=0 per day)
+# would pollute prod alarms. Note the suffix reaches the JS VIEWER ONLY
+# (chrome-headless.js:314, :1511); the master binary emits unsuffixed names and is
+# separated by its RUNNER_LABEL/channel dimension, and the consumer ignores the
+# suffix entirely and is separated by SCENARIO_LABEL.
+
+# RpiSoak -- SCENARIO_LABEL must be RpiSoak, not StorageWithViewer. RpiSoak
+# exists precisely so the soak's 24/7 datapoints stay out of the StorageWithViewer
+# aggregate that the short periodic crons alarm on (CanaryConstants.java:75), and
+# it is already past the consumer's label allowlist as of d6b3dbc9.
+H/30 * * * * %RUNNER_LABEL=RpiSoak;SCENARIO_LABEL=RpiSoak;SOAK_MODE=true;JS_STORAGE_VIEWER_JOIN=true;VIDEO_VERIFY_ENABLED=true;CANARY_MEDIA_SOURCE=framesrc;MASTER_NODE_LABEL=rpi5-002;STORAGE_VIEWER_NODE_LABEL=test-webrtc-storage-multi-viewer-1;CONSUMER_NODE_LABEL=test-webrtc-storage-consumer;USE_IOT_CREDENTIALS=true;IOT_CORE_THING_NAME=rpi5-002_thing;STS_DURATION_SECONDS=3600;VIEWER_WAIT_MINUTES=120;AWS_DEFAULT_REGION=us-east-1;METRIC_SUFFIX=-soak;GIT_HASH=twcc-canary

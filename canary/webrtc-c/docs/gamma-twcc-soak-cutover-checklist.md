@@ -67,7 +67,29 @@ These determine most of the checklist, so confirm they still hold before plannin
       The Groovy `defaultValue` is only the declared value; Jenkins persists parameter values in
       the job's `config.xml`, so a job previously built or hand-edited with `RESCHEDULE=true`
       can have a different effective default. Not visible from the repo.
-- [ ] **[B] Decide the gamma label strategy for the new scenarios.** Every pre-existing scenario
+- [x] **[B] Gamma label strategy — decided and implemented for the soak.** `GammaRpiSoak` now
+      exists as `CanaryConstants.GAMMA_SOAK_LABEL` with a `case` alongside `SOAK_LABEL` in the
+      consumer's switch (both take the identical path; the run mode is driven by
+      `CANARY_CONTINUOUS`, not by the label). Chose the twin over reusing `RpiSoak` because the
+      consumer never reads `METRIC_SUFFIX`, so the label is its only gamma/prod separation — and
+      the prod soak's alarms are tuned to tolerate exactly 10 `MasterStreamingAvailability=0`
+      events per day from *one* soak's by-design hourly reconnect, a threshold a second soak
+      sharing the label would silently double. `gamma_soak_cron.txt` sets it.
+      `METRIC_SUFFIX=-gamma-soak` handles the same problem one layer out, keeping the gamma soak's
+      viewer metrics out of the gamma *periodic* aggregates, which also carry `-gamma`.
+      **For the TWCC scenarios the decision still stands open** — `twcc_cron.txt` sets the prod
+      `SCENARIO_LABEL=StorageWithViewer`; use the already-defined, already-allowlisted
+      `GammaStorageWithViewer` in the gamma copy.
+- [ ] **[B] `gamma_camera_cron.txt` will kill the consumer as written.** Same trap, already
+      committed: line 18 sets `IS_STORAGE=true` + `IS_STORAGE_SINGLE_NODE=true` +
+      `CONSUMER_NODE_LABEL` with `SCENARIO_LABEL=CameraStoragePeriodic`, and neither
+      `CameraStoragePeriodic` nor `CameraStorageWithViewer` exists in `CanaryConstants` — so the
+      consumer hits `default:` and throws `Improper canary label`. Either add both constants and
+      cases, or point those entries at an allowlisted label, before that file is used. (Line 21
+      has no consumer, so only line 18 dies today.) The file still carries
+      `REPLACE-WITH-GAMMA-CONTROL-PLANE-URI` and `GIT_HASH=rpi5-sample`, so it looks like it was
+      never actually deployed.
+- [ ] **[B] Original wording, kept for the TWCC half — decide the gamma label strategy.** Every pre-existing scenario
       has a `Gamma*` twin (`CanaryConstants.java:33-59`) precisely so gamma datapoints stay out
       of the prod aggregates that prod alarms on. The new scenarios have no twin:
       `twcc_cron.txt` sets `SCENARIO_LABEL=StorageWithViewer` (the **prod** label) and `RpiSoak`
@@ -210,8 +232,20 @@ These determine most of the checklist, so confirm they still hold before plannin
       `AWS_DEFAULT_REGION=us-east-1`, no `ENDPOINT`, `MASTER_NODE_LABEL=rpi5-twcc`,
       `STORAGE_VIEWER_NODE_LABEL=webrtc-storage-viewer`, and the prod `SCENARIO_LABEL`. Every
       one of those is wrong for gamma.
-- [ ] **[B] Write `gamma_soak_cron.txt`** — no soak cron file exists yet in
-      `canary/webrtc-c/jobs/cron/`.
+- [x] **[B] `gamma_soak_cron.txt` written**, with every parameter traced against
+      `gamma_runner.groovy`'s declared defaults and the reasoning recorded inline: what is set and
+      would be wrong on the default, what is omitted *because* the gamma runner's default is
+      already right (`AWS_DEFAULT_REGION`, `LOG_GROUP_NAME`, the `gamma-*` node labels), and what
+      is omitted because it does nothing under `SOAK_MODE` (`DURATION_IN_SECONDS`,
+      `VIEWER_SESSION_RECYCLE_SECONDS`, the two consumer flags `SOAK_MODE` already implies).
+      Three placeholders remain and cannot be guessed: the gamma control-plane URI, the three
+      dedicated node labels, and the master Pi's IoT thing name. The Pi-specific trio
+      (`USE_IOT_CREDENTIALS`, `IOT_CORE_THING_NAME`, `STS_DURATION_SECONDS=3600`) is documented to
+      be **deleted** if the gamma soak master turns out to be EC2.
+- [ ] **[R]** Align `soak_cron.txt` — done: `0,30` → `H/30`, matching what the live controller
+      already ran. Same frequency, but the offset is hashed per job so the tick that actually
+      starts a soak (clone, possible `gst=ON` rebuild, three nodes coming up) does not land on the
+      same instant as every other cron.
 - [ ] **[B] Apply the cron-line discipline to every parameter**, per the standing rule: (1) is
       it declared in the runner, (2) does it equal the `defaultValue` — delete it if so,
       (3) is it actually read in this mode — trace every use site, (4) what is the failure mode

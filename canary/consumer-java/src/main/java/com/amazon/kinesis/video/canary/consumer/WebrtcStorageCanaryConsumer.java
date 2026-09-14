@@ -669,8 +669,11 @@ public class WebrtcStorageCanaryConsumer {
             case CanaryConstants.GAMMA_TWO_VIEWERS_LABEL:
             case CanaryConstants.GAMMA_THREE_VIEWERS_LABEL:
             // Continuous soak. Same entry point as the viewer scenarios; the runForever branch
-            // below (CANARY_CONTINUOUS=true) is what makes it never exit.
-            case CanaryConstants.SOAK_LABEL: {
+            // below (CANARY_CONTINUOUS=true) is what makes it never exit. Both labels take the
+            // identical path -- the gamma twin exists only to keep gamma's 24/7 datapoints out of
+            // the prod aggregate, since this consumer separates environments by label alone.
+            case CanaryConstants.SOAK_LABEL:
+            case CanaryConstants.GAMMA_SOAK_LABEL: {
                 logger.info("Periodic case: canaryRunTime=" + canaryRunTime
                         + "s, mCanaryStartTime=" + mCanaryStartTime
                         + ", now=" + new Date()

@@ -74,6 +74,15 @@ public final class CanaryConstants {
     // aggregate that the short periodic crons alarm on.
     public static final String SOAK_LABEL = "RpiSoak";
 
+    // Gamma twin of SOAK_LABEL. Needed for the same reason every other scenario here has a Gamma
+    // variant, and needed more sharply: the consumer never reads METRIC_SUFFIX (the mechanism the
+    // master and viewer use to separate gamma), so CANARY_LABEL is its ONLY separation. Without
+    // this constant a gamma soak would have to reuse "RpiSoak" and its 24/7 datapoints would land
+    // in the same StorageWebRTCSDKCanaryLabel aggregate that the prod soak alarms on -- and those
+    // alarms are already tuned to tolerate exactly 10 MasterStreamingAvailability=0 events per day
+    // from one soak's by-design hourly reconnect, a threshold a second soak would silently double.
+    public static final String GAMMA_SOAK_LABEL = "GammaRpiSoak";
+
     public static final String CW_DIMENSION_INDIVIDUAL = "StorageWebRTCSDKCanaryStreamName";
     public static final String CW_DIMENSION_AGGREGATE = "StorageWebRTCSDKCanaryLabel";
 
