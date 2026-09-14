@@ -83,6 +83,7 @@ public class WebrtcStorageCanaryConsumer {
     private static AmazonKinesisVideo mAmazonKinesisVideo;
     private static AmazonCloudWatch mCwClient;
     private static Timer mConnectionHeartbeatTimer;
+    private static CloudWatchLogsAppender mLogsAppender;
 
     // Bound on a single verify.py subprocess (see runVerifyScript); a slow/hung verify is killed
     // rather than piling up. Segmenting/cadence for continuous soak verification lives in
@@ -339,6 +340,14 @@ public class WebrtcStorageCanaryConsumer {
                     .build();
             logger.info("downloadClip: archived media client built");
 
+        // LAST: a bounded run ends between two flush ticks (nothing aligns the end of a run to the
+        // 5s tick), so without this the tail of the log would never be shipped. Closing it after the
+        // other clients means any teardown line they emit still makes it into the stream. Idempotent
+        // with the shutdown hook attach() registers, which is what covers the exit paths that never
+        // reach this method at all.
+        if (mLogsAppender != null) {
+            mLogsAppender.close();
+        }
             ClipTimestampRange timestampRange = new ClipTimestampRange()
                     .withStartTimestamp(startTime)
                     .withEndTimestamp(endTime);
@@ -693,6 +702,21 @@ public class WebrtcStorageCanaryConsumer {
                 if (runForever) {
                     logger.info("Continuous mode: consumer runs until killed; metric timers stay "
                             + "active (no fixed duration, no end-of-run GetClip)");
+        // Ship this run's log to CloudWatch Logs, one stream per run, mirroring what the C master
+        // already does (webrtc-c/jobs/*_runner.groovy set CANARY_LOG_STREAM_NAME to
+        // "<RUNNER_LABEL>-StorageMaster-<START_TIMESTAMP>"; ours is the -StorageConsumer twin).
+        // Attached HERE, after the credential provider exists, and not from log4j.properties: log4j
+        // initializes from a static initializer before main() runs, at which point the soak's
+        // assume-role provider has not been built yet. Sharing mCredentialsProvider also means the
+        // soak's credential auto-refresh is inherited rather than reimplemented.
+        // Returns null and logs why if the group/stream env vars are unset or the client cannot be
+        // built -- shipping logs never blocks a canary run.
+        mLogsAppender = CloudWatchLogsAppender.attach(
+                System.getenv("CANARY_LOG_GROUP_NAME"),
+                System.getenv("CANARY_LOG_STREAM_NAME"),
+                mRegion,
+                mCredentialsProvider);
+
                     awaitForever();
                 }
 

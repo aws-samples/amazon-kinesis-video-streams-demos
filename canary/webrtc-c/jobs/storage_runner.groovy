@@ -291,6 +291,16 @@ def runViewerSessions(viewerId = "", waitMinutes = 2, viewerCount = "1", stagger
                         export JOB_NAME="${env.JOB_NAME}"
                         export RUNNER_LABEL="${params.RUNNER_LABEL}"
                         export AWS_DEFAULT_REGION="${params.AWS_DEFAULT_REGION}"
+                        # One log stream per RUN, matching the master's -StorageMaster-<ts> naming.
+                        # Without these the viewer falls through to the Date.now() fallback in
+                        # chrome-headless.js:307 -- which under SOAK_MODE is evaluated once per
+                        # recycle segment, so a soak created a brand new stream every 40 minutes
+                        # (~36/day) and no stream held a whole run. START_TIMESTAMP is taken once at
+                        # the top of this script, so it is stable across every segment of a run.
+                        # viewerId is included for the multi-viewer scenarios so two viewers on one
+                        # run do not interleave into a single stream.
+                        export CANARY_LOG_GROUP_NAME="${params.LOG_GROUP_NAME}"
+                        export CANARY_LOG_STREAM_NAME="${params.RUNNER_LABEL}${viewerId ? '-' + viewerId : ''}-JSViewer-${START_TIMESTAMP}"
                         export DURATION_IN_SECONDS="${viewerSessionDuration}"
                         export MASTER_DURATION="${params.DURATION_IN_SECONDS ?: '153'}"
                         export FORCE_TURN="${params.FORCE_TURN ?: 'false'}"
@@ -484,7 +494,16 @@ def buildStorageCanary(isConsumer, params) {
         'CANARY_DURATION_IN_SECONDS': "${params.DURATION_IN_SECONDS.toInteger() + 120}",
         'VIDEO_VERIFY_ENABLED': params.VIDEO_VERIFY_ENABLED?.toString() ?: 'false',
         'CANARY_CLIP_OUTPUT_PATH': "${repoDir}/canary/consumer-java/clip-${START_TIMESTAMP}.mp4",
-        'CONTROL_PLANE_URI': params.ENDPOINT ?: ''
+        'CONTROL_PLANE_URI': params.ENDPOINT ?: '',
+        // One log stream per RUN, the -StorageConsumer twin of the master's -StorageMaster-<ts>
+        // (:437) and the viewer's -JSViewer-<ts> (:303). Read by CloudWatchLogsAppender.attach(),
+        // which main() calls once the credential provider exists; if either of these is unset the
+        // appender declines to attach and the consumer stays stdout-only, so these two lines are
+        // what turn CloudWatch log shipping on for the consumer at all. START_TIMESTAMP is taken
+        // once at the top of this script, so a soak keeps appending to ONE stream for its whole
+        // life (flushed every 5s) instead of starting a new one per segment.
+        'CANARY_LOG_GROUP_NAME': params.LOG_GROUP_NAME,
+        'CANARY_LOG_STREAM_NAME': "${params.RUNNER_LABEL}-StorageConsumer-${START_TIMESTAMP}"
     ]
 
     // Continuous/soak runs: hand the consumer the role ARN so it uses auto-refreshing
@@ -625,7 +644,17 @@ def buildStorageCanary(isConsumer, params) {
         }
         def envs = (commonEnvs + consumerEnvs).collect{ k, v -> "${k}=${v}" }
         withRunnerWrapper(envs) {
-            sh """
+            // The shebang and pipefail are both load-bearing, because of the `| tee` below.
+            // Jenkins otherwise runs this with `/bin/sh -xe`, and that is wrong twice over:
+            // /bin/sh is dash, which has no pipefail, and -x would xtrace this stage's AWS_*
+            // credentials into the build log. Without pipefail the stage's exit status is
+            // tee's, not java's -- so a crashed consumer would exit 0, withRunnerWrapper
+            // would never rethrow under SOAK_MODE, failFast would never fire, and the soak
+            // cron could not see the one failure class it exists to recover from. The -e
+            // restores what the shebang costs us; -x is deliberately not restored.
+            sh """#!/bin/bash
+                set -eo pipefail
+                mkdir -p "\${HOME}/canary-logs"
                 cd '${repoDir}/canary/consumer-java'
                 # Credentials come from the AWS_* environment (EnvironmentVariableCredentialsProvider,
                 # or the auto-refreshing assume-role provider in soak mode) -- NOT -D system
@@ -633,7 +662,16 @@ def buildStorageCanary(isConsumer, params) {
                 # -Duser.timezone=UTC: log4j 1.2's PatternLayout renders %d in the JVM default
                 # timezone and takes no timezone argument, so this is what makes the consumer
                 # log's wall clock comparable with the viewer log and CloudWatch.
-                java -Duser.timezone=UTC -classpath target/aws-kinesisvideo-producer-sdk-canary-consumer-1.0-SNAPSHOT.jar:\$(cat tmp_jar) com.amazon.kinesis.video.canary.consumer.WebrtcStorageCanaryConsumer
+                #
+                # tee: the consumer pushes NOTHING to CloudWatch Logs -- its only appender is
+                # ConsoleAppender -> stdout (consumer-java/src/main/resources/log4j.properties),
+                # and no CloudWatch Logs client has ever existed in that source tree. So its
+                # log has only ever lived in the Jenkins console log, which dies with the build
+                # record. This file outlives it. 2>&1 because it then also captures what an
+                # in-process appender structurally cannot: the log4j:ERROR lines emitted before
+                # log4j is configured, and JVM crash output. Measured ~0.24 MB/h (a 30-day soak
+                # is ~170MB, one file); reaped by cleanup-consumer.sh.
+                java -Duser.timezone=UTC -classpath target/aws-kinesisvideo-producer-sdk-canary-consumer-1.0-SNAPSHOT.jar:\$(cat tmp_jar) com.amazon.kinesis.video.canary.consumer.WebrtcStorageCanaryConsumer 2>&1 | tee "\${HOME}/canary-logs/consumer-${env.BUILD_NUMBER}.log"
             """
         }
 

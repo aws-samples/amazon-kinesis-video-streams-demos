@@ -171,6 +171,27 @@ class CloudWatchLogger {
             return;
         }
 
+        // Re-entry guard. chrome-headless.js calls initializeCloudWatch() once per viewer
+        // session, and under SOAK_MODE that is once per recycle segment -- so on a soak this
+        // runs ~36 times a day, now always against the SAME group and stream because the
+        // runner pins CANARY_LOG_STREAM_NAME per run instead of letting the Date.now()
+        // fallback mint a new one per segment. Without this guard each of those calls
+        // overwrote this.flushInterval with a fresh setInterval and orphaned the previous
+        // one, leaking a timer per segment (~1080 over a 30-day soak). No events were lost --
+        // every timer drains the same static buffer -- but each extra timer is one more 5s
+        // PutLogEvents attempt contending for the single `flushing` flag, for no benefit.
+        if (this.initialized && this.logGroupName === logGroupName && this.logStreamName === logStreamName) {
+            return;
+        }
+
+        // A genuinely different destination (no current call site does this, but a future one
+        // might): drain and stop the old timer before repointing, so the previous stream's
+        // tail is flushed to the previous stream rather than appearing in the new one.
+        if (this.initialized) {
+            await this.shutdown();
+            this.initialized = false;
+        }
+
         this.logsClient = new CloudWatchLogsClient({ region });
         this.logGroupName = logGroupName;
         this.logStreamName = logStreamName;
