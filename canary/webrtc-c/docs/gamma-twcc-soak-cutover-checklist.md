@@ -293,8 +293,10 @@ These determine most of the checklist, so confirm they still hold before plannin
       if it is wrong. Specifically confirm `METRIC_SUFFIX` is set deliberately rather than
       inherited from the `-gamma` default, and that `DURATION_IN_SECONDS` is omitted under
       `SOAK_MODE` (all three components ignore it).
-- [ ] **[B]** Confirm `SOAK_MODE`'s timeout lift (30-day backstop on master + whole pipeline)
-      is present in `gamma_runner.groovy`, not only `storage_runner.groovy`.
+- [x] **[B]** `SOAK_MODE`'s timeout lift **is** present in `gamma_runner.groovy`, verified
+      2026-09-14: `:589` lifts the master/stage timeout and `:853` the whole-pipeline `options`
+      timeout, both to `2592000` seconds (30 days) when `SOAK_MODE=true`. Since the soak already
+      runs on this runner rather than `storage_runner.groovy`, this was the one that mattered.
 - [ ] **[R]** Build retention: soak builds are few but enormous. Raise `Max` to ~500 and add
       `keepLog(true)` on soak failure so the evidence survives.
 - [ ] **[R]** Verify no cron entry shares a `RUNNER_LABEL` with an existing gamma job — a

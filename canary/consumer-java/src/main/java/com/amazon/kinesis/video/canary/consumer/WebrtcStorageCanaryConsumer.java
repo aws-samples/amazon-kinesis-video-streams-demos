@@ -529,9 +529,13 @@ public class WebrtcStorageCanaryConsumer {
             // is what makes min_ssim and max_drift_seconds mean anything -- but it converts a loud
             // failure into a quiet loss of samples, so an OCR regression (new asset set, changed
             // resolution, sync box moved) would otherwise look like a perfectly healthy soak.
-            emitJsonNumberAsMetric(output, "ocr_outliers", "FrameCounterOcrOutliers");
-            emitJsonNumberAsMetric(output, "ocr_failures", "FrameCounterOcrFailures");
-            emitJsonNumberAsMetric(output, "frames_compared", "FrameCounterOcrMatched");
+            // Count, not the overload's Seconds default: these are frame tallies, and the two
+            // sibling counters just above already say Count. A wrong unit is not cosmetic --
+            // CloudWatch renders and aggregates the metric as a duration, so a dashboard reads
+            // "12 seconds of OCR outliers" and any statistic derived from it is mislabelled.
+            emitJsonNumberAsMetric(output, "ocr_outliers", "FrameCounterOcrOutliers", StandardUnit.Count);
+            emitJsonNumberAsMetric(output, "ocr_failures", "FrameCounterOcrFailures", StandardUnit.Count);
+            emitJsonNumberAsMetric(output, "frames_compared", "FrameCounterOcrMatched", StandardUnit.Count);
             // Content margin. Without these the soak only ever reports storage_availability as a
             // boolean, so a segment scoring min_ssim=0.031 against a 0.03 threshold is
             // indistinguishable on a graph from one scoring 0.9 -- we would first learn the margin
