@@ -151,10 +151,30 @@
 #                                 SoakRestarted=1.
 #
 # ---------------------------------------------------------------------------
-# Three values below are placeholders and the entry will misbehave until each is
-# replaced. Nothing here can guess them:
-#   REPLACE-WITH-GAMMA-CONTROL-PLANE-URI  the gamma control plane
-#   gamma-rpi5-soak / ...-viewer / ...-consumer  the three dedicated node labels
-#   REPLACE-WITH-SOAK-PI_thing            the master Pi's IoT thing name
+# ONE placeholder left: REPLACE-WITH-GAMMA-CONTROL-PLANE-URI. Leaving it means the run
+# silently tests PROD -- see the ENDPOINT note above.
 #
-H/30 * * * * %RUNNER_LABEL=GammaRpiSoak;SCENARIO_LABEL=GammaRpiSoak;SOAK_MODE=true;JS_STORAGE_VIEWER_JOIN=true;VIDEO_VERIFY_ENABLED=true;CANARY_MEDIA_SOURCE=framesrc;MASTER_NODE_LABEL=gamma-rpi5-soak;STORAGE_VIEWER_NODE_LABEL=gamma-webrtc-soak-viewer;CONSUMER_NODE_LABEL=gamma-webrtc-soak-consumer;USE_IOT_CREDENTIALS=true;IOT_CORE_THING_NAME=REPLACE-WITH-SOAK-PI_thing;STS_DURATION_SECONDS=3600;VIEWER_WAIT_MINUTES=120;ENDPOINT=https://REPLACE-WITH-GAMMA-CONTROL-PLANE-URI;METRIC_SUFFIX=-gamma-soak;GIT_HASH=twcc-canary
+# NODES ARE BORROWED, NOT DEDICATED (first-run configuration, 2026-09-14). rpi5-002,
+# test-webrtc-storage-multi-viewer-1 and test-webrtc-storage-consumer are the PROD soak's
+# three nodes (soak_cron.txt). That is fine for a first gamma run but is NOT the end state:
+#   - A soak holds one executor forever. Running this alongside the prod soak needs >=2
+#     executors on all three nodes; with one each, the second soak queues forever, which is
+#     the gamma-pileup failure mode. Simplest first run: stop the prod soak, run this one.
+#   - 'Skip if duplicate' will NOT protect you here: it dedups on RUNNER_LABEL
+#     (gamma_runner.groovy:867-885), and GammaRpiSoak != RpiSoak, so both are allowed to
+#     start and then fight over executors.
+#   - Both soaks are framesrc, so .build-flags stays gst=ON and neither forces a rebuild --
+#     but two concurrent runs mean one Pi 5 doing two x264enc encodes and two ~1617kbps
+#     uplinks. Watch CPU and upstream bandwidth if you do run them together.
+# Move to dedicated labels before this becomes a standing job.
+#
+# CHANNEL AND STREAM NAME: the runner computes "${JOB_NAME}-${RUNNER_LABEL}" (:384, :493),
+# so on the webrtc-gamma-runner job that is exactly
+#     webrtc-gamma-runner-GammaRpiSoak
+# with ONE hyphen. Nothing echoes this name, so a mismatch does not announce itself: the
+# master would create/attach a differently-named channel, the stream you provisioned would
+# never be associated, and the consumer would report availability=0 against an empty stream
+# while the build stays green. Verify the master log line "[KVS Master] Channel <name> set
+# up done" on the first run matches the stream you created.
+#
+H/30 * * * * %RUNNER_LABEL=GammaRpiSoak;SCENARIO_LABEL=GammaRpiSoak;SOAK_MODE=true;JS_STORAGE_VIEWER_JOIN=true;VIDEO_VERIFY_ENABLED=true;CANARY_MEDIA_SOURCE=framesrc;MASTER_NODE_LABEL=rpi5-002;STORAGE_VIEWER_NODE_LABEL=test-webrtc-storage-multi-viewer-1;CONSUMER_NODE_LABEL=test-webrtc-storage-consumer;USE_IOT_CREDENTIALS=true;IOT_CORE_THING_NAME=rpi5-002_thing;STS_DURATION_SECONDS=3600;VIEWER_WAIT_MINUTES=120;ENDPOINT=https://REPLACE-WITH-GAMMA-CONTROL-PLANE-URI;METRIC_SUFFIX=-gamma-soak;GIT_HASH=twcc-canary
