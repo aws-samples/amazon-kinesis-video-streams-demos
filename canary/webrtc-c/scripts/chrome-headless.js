@@ -124,9 +124,47 @@ async function runVerifyJob(job) {
   }
 }
 
+// Environment variables whose VALUE is a live secret. Read on every call rather than cached at
+// module load: a run that rotates its credentials mid-flight (the soak re-assumes Canary-STS)
+// would otherwise keep scrubbing the retired value and print the new one in the clear.
+const SECRET_ENV_VARS = ['AWS_SECRET_ACCESS_KEY', 'AWS_SESSION_TOKEN', 'AWS_ACCESS_KEY_ID'];
+
+// Backstop for secrets we do NOT hold in our own environment -- anything the page itself mints or
+// echoes back. Matches a query-parameter or header name whose value is sensitive, up to the next
+// separator. Deliberately broader than what buildTestUrl() puts in the URL today.
+const SECRET_PARAM_RE =
+  /((?:secretAccessKey|sessionToken|accessKeyId|X-Amz-Security-Token|X-Amz-Credential|X-Amz-Signature)["']?\s*[=:]\s*["']?)[^&\s"',}]+/gi;
+
+// Strips live credentials out of a log line.
+//
+// This is load-bearing, not defensive tidiness. buildTestUrl() puts AWS_ACCESS_KEY_ID,
+// AWS_SECRET_ACCESS_KEY and AWS_SESSION_TOKEN into the sample page's query string, and
+// initializePage() logs that whole URL (`Opening URL: ...`) -- roughly 17 times over an 11-hour
+// run. Every path out of log() is a publication: console.log reaches the Jenkins build log (and
+// from there the JenkinsBuildLogs group via the controller's CloudWatch agent), and
+// CloudWatchLogger.log now reaches the WebrtcSDK log group, because the runners started setting
+// CANARY_LOG_GROUP_NAME. Before that env var was set the CloudWatch half was inert -- init()
+// returned early on an empty group name -- so turning per-run viewer log streams on is exactly
+// what would have made these credentials durable in CloudWatch. Scrub at the single chokepoint
+// instead: setupConsoleListener() also funnels the page's own console output through log(), so
+// anything the JS SDK sample prints about its config is covered by the same pass.
+function redactSecrets(message) {
+  let text = typeof message === 'string' ? message : String(message);
+  for (const name of SECRET_ENV_VARS) {
+    const value = process.env[name];
+    // The length floor matters: an unset-but-present var ('' or a stub) would otherwise match
+    // between every character in the line and destroy the log. split/join rather than a regex
+    // because these values contain regex metacharacters (+ / =) and need no escaping this way.
+    if (value && value.length >= 8 && text.includes(value)) {
+      text = text.split(value).join(`<redacted:${name}>`);
+    }
+  }
+  return text.replace(SECRET_PARAM_RE, '$1<redacted>');
+}
+
 function log(message) {
   const timestamp = new Date().toISOString();
-  const formatted = `[${timestamp}] ${message}`;
+  const formatted = `[${timestamp}] ${redactSecrets(message)}`;
   console.log(formatted);
   CloudWatchLogger.log(formatted);
 }
