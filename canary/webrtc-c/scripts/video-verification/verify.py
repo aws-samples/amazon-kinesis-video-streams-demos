@@ -80,6 +80,14 @@ MAX_SSIM_SAMPLES = 240
 # mode of 0.6s (18 frames). 90 frames (3s) sits in that gap with margin on both sides.
 OCR_OUTLIER_TOLERANCE_FRAMES = 90
 
+# The same idea applied to the drift series rather than the raw counters, and much tighter,
+# because a correctly-read counter is exact: a healthy stream's drift is flat at 0.0 with no
+# jitter, and genuine drift accumulates smoothly. 0.5s (15 frames) is therefore already far
+# outside anything timing can do between two samples, while sitting well below the misreads that
+# survive OCR_OUTLIER_TOLERANCE_FRAMES -- the 11h soak of 2026-09-08 produced 50- and 70-frame
+# misreads, i.e. 1.667s and 2.333s of phantom drift, which this catches and that check cannot.
+DRIFT_SPIKE_TOLERANCE_SECONDS = 0.5
+
 # Sync box crop coordinates for 1280x720 frames
 TIMER_CROP = (25, 20, 145, 90)
 
@@ -153,21 +161,47 @@ def reject_ocr_outliers(clip_to_ref, tolerance=OCR_OUTLIER_TOLERANCE_FRAMES):
     Adjacent short runs at different levels are kept: with nothing stable on both sides there is
     no level to declare a return to. That is the conservative direction (a suspect read survives
     rather than a real event being erased).
+
+    Known blind spot, by construction: runs are grown by `<= tolerance` agreement, so a misread of
+    m frames never starts a new run when m <= tolerance (90) and can never be dropped. The
+    "multiple of 100" premise above held for the samples it was built from, but the 11h soak of
+    2026-09-08 produced misreads of 50 and 70 frames, which land inside the tolerance and pass
+    straight through. Lowering the tolerance is not the fix -- it would start splitting genuine
+    gradual drift into separate runs. The drift computation therefore has its own impossibility
+    clamp downstream (a sample larger than the span it was measured over cannot be real); min_ssim
+    has no such defence and can still be dragged down by a surviving misread.
     """
     if len(clip_to_ref) < 3:
         return clip_to_ref, []
     residuals = [counter_residual(sec, num) for sec, _, num in clip_to_ref]
+    outlier_idx = returning_excursion_indices(residuals, tolerance, ring_delta)
+
+    kept = [f for i, f in enumerate(clip_to_ref) if i not in outlier_idx]
+    dropped = [f for i, f in enumerate(clip_to_ref) if i in outlier_idx]
+    return kept, dropped
+
+
+def returning_excursion_indices(values, tolerance, delta=lambda a, b: a - b):
+    """Indices of `values` that leave their level and come back. See reject_ocr_outliers.
+
+    Extracted so the same physical argument can be applied to a second series: the frame-counter
+    residuals (on the TOTAL_SOURCE_FRAMES ring, hence the delta parameter) and the drift samples
+    computed from them. `tolerance` is what counts as "agreeing", so each caller sets it from what
+    its own series can legitimately do between samples.
+    """
+    if len(values) < 3:
+        return set()
 
     runs = [[0]]
-    for i in range(1, len(residuals)):
-        if abs(ring_delta(residuals[i], residuals[runs[-1][-1]])) <= tolerance:
+    for i in range(1, len(values)):
+        if abs(delta(values[i], values[runs[-1][-1]])) <= tolerance:
             runs[-1].append(i)
         else:
             runs.append([i])
 
     # A returning excursion is an artefact however long it is, but cap the length anyway so a
     # pathological clip cannot have most of itself discarded by one rule.
-    max_spike = max(3, len(residuals) // 10)
+    max_spike = max(3, len(values) // 10)
     outlier_idx = set()
     for k, run in enumerate(runs):
         if len(run) > max_spike:
@@ -175,7 +209,7 @@ def reject_ocr_outliers(clip_to_ref, tolerance=OCR_OUTLIER_TOLERANCE_FRAMES):
         before = runs[k - 1] if k > 0 else None
         after = runs[k + 1] if k + 1 < len(runs) else None
         if before is not None and after is not None:
-            spike = abs(ring_delta(residuals[after[0]], residuals[before[-1]])) <= tolerance
+            spike = abs(delta(values[after[0]], values[before[-1]])) <= tolerance
         else:
             # A short run at either end has only one side to lean on; treat it as a spike when
             # that side is a stable level.
@@ -184,9 +218,7 @@ def reject_ocr_outliers(clip_to_ref, tolerance=OCR_OUTLIER_TOLERANCE_FRAMES):
         if spike:
             outlier_idx.update(run)
 
-    kept = [f for i, f in enumerate(clip_to_ref) if i not in outlier_idx]
-    dropped = [f for i, f in enumerate(clip_to_ref) if i in outlier_idx]
-    return kept, dropped
+    return outlier_idx
 
 
 def get_video_duration(video_path):
@@ -581,7 +613,8 @@ def main():
         # anchored at the earliest matched frame. Growing |drift| = producer/pipeline time drift
         # (the Verisure timestamp-drift class) that SSIM cannot see. Reported as avg/max seconds; a
         # separate signal from storage_availability (which stays content-only).
-        drift_samples = []
+        raw_drift = []
+        raw_span = []
         if len(clip_to_ref) >= 2:
             ordered = sorted((sec, num) for sec, _, num in clip_to_ref)
             t0, c0 = ordered[0]
@@ -595,11 +628,43 @@ def main():
                     prev_c = c
                     continue
                 prev_c = c
-                drift_samples.append(abs((c - c0) / FPS - (t - t0)))
+                raw_drift.append(abs((c - c0) / FPS - (t - t0)))
+                raw_span.append(t - t0)
+
+        # The raw series still carries OCR misreads, specifically the ones reject_ocr_outliers is
+        # structurally unable to see: it grows runs by `<= OCR_OUTLIER_TOLERANCE_FRAMES` agreement,
+        # so a misread of m frames never even starts a new run when m <= 90. A misread of m yields
+        # drift = m/FPS exactly, independent of t, which is where the 11h soak of 2026-09-08 got
+        # 86.667s (=2600/30), 17.333s (=520/30), 2.333s (=70/30) and 1.667s (=50/30) on *60-second*
+        # segments. Two filters, in order:
+        #
+        # 1. Impossibility. A sample cannot exceed the span it was measured over -- the worst a
+        #    stalled counter does is fall behind by the whole span, and a 30fps source cannot run
+        #    ahead of real time at all. This alone only catches the gross cases: 86.667s inside a
+        #    60s window is impossible by definition, but 1.667s is perfectly possible.
+        # 2. Returning excursion -- the physical argument reject_ocr_outliers makes, applied to the
+        #    drift series rather than the residuals, and with a far tighter tolerance. Tightness is
+        #    affordable here because a correctly-read counter is *exact*: a healthy stream's drift
+        #    series is flat at 0.0 with no jitter whatsoever, and genuine drift accumulates
+        #    smoothly. So a value that jumps by more than DRIFT_SPIKE_TOLERANCE_SECONDS and comes
+        #    straight back is a misread. This is what catches the small ones.
+        #
+        # Verified against synthetic series: all four observed misread magnitudes are rejected
+        # (max drift returns to 0.000s), runs of three identical misreads are rejected, and both a
+        # smooth 2%/s clock drift and a permanent +300-frame content step survive completely
+        # intact -- the filters remove OCR noise, not the events the metric exists to catch.
+        impossible = {i for i, d in enumerate(raw_drift) if d > max(raw_span[i], 1.0)}
+        survivors = [d for i, d in enumerate(raw_drift) if i not in impossible]
+        spikes = returning_excursion_indices(survivors, DRIFT_SPIKE_TOLERANCE_SECONDS)
+        drift_samples = [d for i, d in enumerate(survivors) if i not in spikes]
+        drift_rejected = len(impossible) + len(spikes)
         avg_drift_seconds = round(sum(drift_samples) / len(drift_samples), 3) if drift_samples else 0.0
         max_drift_seconds = round(max(drift_samples), 3) if drift_samples else 0.0
         print(f"Avg frame-time drift: {avg_drift_seconds}s")
         print(f"Max frame-time drift: {max_drift_seconds}s")
+        # Without the sample count a drift of 0.0s over 2 samples is indistinguishable from
+        # 0.0s over 200, and 0.0s is also what an empty sample list reports.
+        print(f"Drift samples:        {len(drift_samples)} used, {drift_rejected} rejected as OCR misreads")
 
         # Phase 7: Compute availability
         print("\n--- Results ---")
@@ -612,6 +677,7 @@ def main():
                       'clip_seconds_total': clip_seconds_total,
                       'clip_seconds_sampled': len(clip_frames),
                       'avg_drift_seconds': avg_drift_seconds, 'max_drift_seconds': max_drift_seconds,
+                      'drift_samples': len(drift_samples), 'drift_rejected': drift_rejected,
                       'segments': len(recordings)}
         else:
             avg_ssim = sum(scores) / len(scores)
@@ -659,6 +725,11 @@ def main():
                 'clip_seconds_sampled': len(clip_frames),
                 'avg_drift_seconds': avg_drift_seconds,
                 'max_drift_seconds': max_drift_seconds,
+                # How many samples the two numbers above are made of, and how many were thrown out
+                # as OCR misreads. A rising drift_rejected means OCR is degrading, which is a
+                # different failure from the stream drifting and wants a different response.
+                'drift_samples': len(drift_samples),
+                'drift_rejected': drift_rejected,
                 'clip_duration': round(clip_duration, 2) if clip_duration else None,
                 'expected_duration': round(expected, 2),
                 'segments': len(recordings),

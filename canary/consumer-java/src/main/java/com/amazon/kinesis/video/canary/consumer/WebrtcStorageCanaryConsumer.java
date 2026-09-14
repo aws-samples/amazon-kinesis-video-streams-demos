@@ -90,6 +90,14 @@ public class WebrtcStorageCanaryConsumer {
     // SoakStreamVerifier (GetMedia -> ffmpeg segments -> per-segment verify).
     static final long SOAK_VERIFY_TIMEOUT_SECONDS = 600;
 
+    // Ceiling on how far behind wall clock the ListFragments cursor may sit (see
+    // calculateFragmentContinuityMetric). The cursor holds its place whenever a window returns
+    // nothing conclusive, which is correct but must not run away: ListFragments returns at most
+    // 1000 fragments per call and truncates silently past that, which at the measured ~10s
+    // fragment duration is about 2.8h of media. One hour keeps a wide margin under that while
+    // still tolerating a long ingestion outage without skipping fragments on recovery.
+    static final long MAX_CURSOR_LAG_MILLIS = 60 * 60 * 1000L;
+
     private static void calculateFragmentContinuityMetric(CanaryFragmentList fragmentList) {
         try {
             final GetDataEndpointRequest dataEndpointRequest = new GetDataEndpointRequest()
@@ -117,6 +125,7 @@ public class WebrtcStorageCanaryConsumer {
             fragmentSelector.setTimestampRange(timestampRange);
 
             Boolean newFragmentReceived = false;
+            boolean checkSucceeded = false;
 
             // Try with resources to utilize AutoClosable implementation of
             // CanaryListFragmentWorker
@@ -127,9 +136,39 @@ public class WebrtcStorageCanaryConsumer {
                 thread.start();
 
                 List<Fragment> windowFragments = futureTask.get();
-                // Only advance the cursor on a successful list. If this tick threw, the cursor stays
-                // put so the next window re-covers this interval and no fragments are missed.
-                fragmentList.setLastCheckTime(windowEnd);
+
+                // Advance the cursor to the end of the newest fragment actually returned, not to
+                // wall clock. A fragment cannot be indexed until it CLOSES, which is one fragment
+                // duration after it opens, so the newest fragment overlapping any window is still
+                // open and is never returned. Setting the cursor to windowEnd stepped past that
+                // fragment's start timestamp, so it was never seen in this window or any later
+                // one: every window came up exactly one fragment short, whatever the window
+                // length. Measured on the 11h soak of 2026-09-08 -- a 20s window returned exactly
+                // 1 fragment on 98.0% of calls (mean 1.02) and a 60s window exactly 5 on 98.1%
+                // (mean 4.955); solving n = (W - L)/D on that pair gives D = 10.0s and L = 10.0s,
+                // i.e. the visibility lag is exactly one fragment, as the closure argument
+                // predicts.
+                //
+                // Using the fragments' own end timestamps is self-tuning: nothing is skipped,
+                // consecutive windows never overlap so no dedupe is needed, and it stays correct
+                // if the fragment duration changes. When a window returns nothing there is
+                // nothing to learn from, so the cursor holds -- advancing it there would
+                // reintroduce exactly the skip this fixes. Only the runaway case needs a bound.
+                long nextCursorMillis = windowStart.getTime();
+                for (Fragment f : windowFragments) {
+                    if (f.getServerTimestamp() == null) {
+                        continue;
+                    }
+                    final long fragmentEnd = f.getServerTimestamp().getTime()
+                            + (f.getFragmentLengthInMilliseconds() != null
+                                    ? f.getFragmentLengthInMilliseconds() : 0L);
+                    nextCursorMillis = Math.max(nextCursorMillis, fragmentEnd);
+                }
+                // Clamp forward if the cursor has fallen further behind than MAX_CURSOR_LAG_MILLIS
+                // (a long outage, or fragments whose timestamps never advanced). Skipping media is
+                // the lesser evil against a window large enough to be silently truncated.
+                fragmentList.setLastCheckTime(
+                        new Date(Math.max(nextCursorMillis, windowEnd.getTime() - MAX_CURSOR_LAG_MILLIS)));
 
                 // Fragments arrived in this interval iff the trailing window returned any.
                 newFragmentReceived = !windowFragments.isEmpty();
@@ -157,10 +196,20 @@ public class WebrtcStorageCanaryConsumer {
                     }
                 }
 
-                publishMetricToCW("FragmentReceived", newFragmentReceived ? 1.0 : 0.0, StandardUnit.None);
-
+                checkSucceeded = true;
             } catch (Exception e) {
                 logger.error("Failed while calculating continuity metric, " + e);
+            } finally {
+                // Emit unconditionally. This used to sit inside the try, so a throttled or failed
+                // ListFragments published *nothing* -- and a missing datapoint does not breach an
+                // alarm, so a tick that could not check looked identical to a healthy tick under
+                // treatMissingData=notBreaching. Being unable to confirm that media is reaching
+                // storage is not evidence that it is, so 0 is the fail-safe value.
+                publishMetricToCW("FragmentReceived", newFragmentReceived ? 1.0 : 0.0, StandardUnit.None);
+                // ...and this separates the two causes of a 0, which need different responses:
+                // storage stopped accepting media (investigate ingestion) versus the canary could
+                // not ask (investigate the canary's credentials, throttling, endpoint).
+                publishMetricToCW("FragmentListCheckFailed", checkSucceeded ? 0.0 : 1.0, StandardUnit.None);
             }
         } catch (Exception e) {
             logger.error("Failed while fetching attributes for CanaryListFragmentWorker, " + e);
@@ -467,6 +516,15 @@ public class WebrtcStorageCanaryConsumer {
             // content-only). Best-effort: absent in presence mode / on parse failure.
             emitJsonNumberAsMetric(output, "avg_drift_seconds", "FrameTimestampDriftSeconds");
             emitJsonNumberAsMetric(output, "max_drift_seconds", "FrameTimestampDriftMaxSeconds");
+            // How many samples those two gauges are built from, and how many verify.py threw out
+            // as physically impossible (drift larger than the span it was measured over -- always
+            // an OCR misread). Both drift gauges report 0.0 when there are no samples at all, so
+            // without the count a total OCR collapse reads as perfect timing. A rising
+            // FrameTimestampDriftRejected is an OCR problem, not a drift problem.
+            emitJsonNumberAsMetric(output, "drift_samples", "FrameTimestampDriftSamples",
+                    StandardUnit.Count);
+            emitJsonNumberAsMetric(output, "drift_rejected", "FrameTimestampDriftRejected",
+                    StandardUnit.Count);
             // OCR health. verify.py now discards frame counters it judges to be misreads, which
             // is what makes min_ssim and max_drift_seconds mean anything -- but it converts a loud
             // failure into a quiet loss of samples, so an OCR regression (new asset set, changed
@@ -474,6 +532,22 @@ public class WebrtcStorageCanaryConsumer {
             emitJsonNumberAsMetric(output, "ocr_outliers", "FrameCounterOcrOutliers");
             emitJsonNumberAsMetric(output, "ocr_failures", "FrameCounterOcrFailures");
             emitJsonNumberAsMetric(output, "frames_compared", "FrameCounterOcrMatched");
+            // Content margin. Without these the soak only ever reports storage_availability as a
+            // boolean, so a segment scoring min_ssim=0.031 against a 0.03 threshold is
+            // indistinguishable on a graph from one scoring 0.9 -- we would first learn the margin
+            // had gone the day it crossed over and started emitting zeros. verify.py computes all
+            // four already; the periodic scenarios publish ConsumerSSIM* from the runner's
+            // end-of-run stage (storage_runner.groovy), but that stage is unreachable in soak mode
+            // because the consumer never returns, so this is the soak's only chance to emit them.
+            // Raw 0..1 (Unit=None) to match ConsumerSSIM*, so soak and periodic stay comparable.
+            emitJsonNumberAsMetric(output, "min_ssim", "SoakSSIMMin", StandardUnit.None);
+            emitJsonNumberAsMetric(output, "avg_ssim", "SoakSSIMAvg", StandardUnit.None);
+            emitJsonNumberAsMetric(output, "max_ssim", "SoakSSIMMax", StandardUnit.None);
+            emitJsonNumberAsMetric(output, "clip_duration", "SoakSegmentDurationSeconds",
+                    StandardUnit.Seconds);
+            // Log the whole verdict too. The digest of an 11h soak log had zero occurrences of
+            // min_ssim, so a post-hoc audit could not reconstruct why a segment passed or failed.
+            logger.info("Soak verification (verify.py, mode=" + mode + ") verdict: " + output.trim());
             // Parse storage_availability from the --json output without pulling in a JSON dependency.
             final Matcher m = Pattern.compile("\"storage_availability\"\\s*:\\s*([0-9.]+)").matcher(output);
             if (m.find()) {
@@ -496,10 +570,22 @@ public class WebrtcStorageCanaryConsumer {
      * mode, which emits no drift), so it never affects the availability path.
      */
     private static void emitJsonNumberAsMetric(String json, String field, String metricName) {
+        emitJsonNumberAsMetric(json, field, metricName, StandardUnit.Seconds);
+    }
+
+    /**
+     * As above, with an explicit unit. SSIM scores are dimensionless ratios, not seconds.
+     */
+    private static void emitJsonNumberAsMetric(String json, String field, String metricName,
+            StandardUnit unit) {
         try {
-            final Matcher m = Pattern.compile("\"" + field + "\"\\s*:\\s*([0-9.]+)").matcher(json);
+            // Accept a leading '-' and exponent notation. SSIM can legitimately go negative on
+            // badly corrupted video, which is precisely the case worth seeing -- the old
+            // "([0-9.]+)" pattern would have failed to match it and emitted nothing at all.
+            final Matcher m = Pattern.compile("\"" + field
+                    + "\"\\s*:\\s*(-?\\d+(?:\\.\\d+)?(?:[eE][+-]?\\d+)?)").matcher(json);
             if (m.find()) {
-                publishMetricToCW(metricName, Double.parseDouble(m.group(1)), StandardUnit.Seconds);
+                publishMetricToCW(metricName, Double.parseDouble(m.group(1)), unit);
             }
         } catch (Exception e) {
             logger.error("Soak verification: failed to emit " + metricName + ", " + e);
@@ -512,6 +598,17 @@ public class WebrtcStorageCanaryConsumer {
      * the clip is invalid, so the caller can treat "not decodable" and "can't check" alike.
      */
     static boolean probeDecodable(String path) {
+        return probeDurationSeconds(path) > 0;
+    }
+
+    /**
+     * Duration in seconds as ffprobe reports it, or -1 if ffprobe is missing, times out, or the
+     * file is not a readable container. Never throws. Split out from probeDecodable because a
+     * short-but-valid segment (the first segment of a GetMedia generation, cut short by the NOW
+     * start selector) needs its real length, not just a yes/no, so verify.py can be told what
+     * duration to judge it against.
+     */
+    static double probeDurationSeconds(String path) {
         try {
             final ProcessBuilder pb = new ProcessBuilder(
                     "ffprobe", "-v", "error",
@@ -530,14 +627,14 @@ public class WebrtcStorageCanaryConsumer {
             if (!p.waitFor(30, TimeUnit.SECONDS)) {
                 p.destroyForcibly();
                 logger.error("Soak verification: ffprobe timed out");
-                return false;
+                return -1;
             }
             final double duration = Double.parseDouble(out.toString().trim());
             logger.info("Soak verification: clip duration=" + duration + "s");
-            return duration > 0;
+            return duration;
         } catch (Exception e) {
             logger.error("Soak verification: ffprobe probe failed (missing ffprobe or invalid clip), " + e);
-            return false;
+            return -1;
         }
     }
 
@@ -650,8 +747,10 @@ public class WebrtcStorageCanaryConsumer {
         // Soak video verification: the runner's end-of-run GetClip+verify.py stage never runs in
         // continuous mode (there is no end), so verify the ingested media CONTINUOUSLY instead:
         // SoakStreamVerifier pulls the stream via GetMedia, an ffmpeg subprocess splits it into
-        // fixed-length segments, and every segment is verified with verify.py (SSIM against the
-        // sample frames for framesrc/disk, presence otherwise) -- 100% coverage, no sampling gaps.
+        // fixed-length segments, and each finished segment is verified with verify.py (SSIM against
+        // the sample frames for framesrc/disk, presence otherwise). Segments lost to reconnects,
+        // boundary discards and skips are not verified and are not currently measured, so make no
+        // claim about what fraction of the media this covers.
         // All heavy work runs in niced subprocesses off dedicated threads, so it never blocks the
         // ListFragments continuity/heartbeat threads. Emits SoakVideoDecodable + drift per segment.
         if (runForever && "true".equalsIgnoreCase(System.getenv(CanaryConstants.VIDEO_VERIFY_ENABLED_ENV_VAR))) {

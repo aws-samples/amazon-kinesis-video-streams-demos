@@ -28,9 +28,11 @@ import org.apache.log4j.Logger;
 /*
  * Continuous soak video verification: GetMedia -> ffmpeg segmenter -> per-segment verify.py.
  *
- * Unlike the old periodic GetClip probe (which sampled ~156s every 15min, leaving most of the
- * stream unverified), this pulls the ingested stream CONTINUOUSLY and verifies every segment, so
- * every minute of media is content-checked (SSIM for deterministic sources) with no coverage gaps.
+ * Unlike the old periodic GetClip probe (which sampled ~156s every 15min), this pulls the ingested
+ * stream continuously, so verification is driven by what GetMedia delivers rather than by a timer.
+ * How much of the wall clock that actually accounts for is NOT known: reconnects, boundary
+ * discards (see boundarySegments) and skips all subtract from it, and nothing here measures the
+ * total. Do not treat this path as complete coverage until a metric proves the accounted fraction.
  *
  * Pipeline (all heavy work outside the JVM, in niced subprocesses):
  *   1. Pull thread (daemon, blocking I/O only): GetMedia from the stream's data endpoint and pump
@@ -64,29 +66,48 @@ public class SoakStreamVerifier {
     private final AWSCredentialsProvider credentialsProvider;
     private final AmazonKinesisVideo kvsClient;
 
-    // Emit an explicit SoakVideoDecodable=0.0 when no segment has been verified for this long
+    // Emit an explicit SoakVideoDecodable=0.0 when there has been no sign of life for this long
     // (media outage -> ffmpeg produces no segments -> the worker would otherwise go silent for
     // the whole gap, as it did for ~54min in the first soak). Keeps the metric a continuous
     // signal instead of relying purely on missing-datapoint alarms.
-    private static final long NO_SEGMENT_EMIT_MS = 3 * SEGMENT_SECONDS * 1000;
+    //
+    // Was 3 * SEGMENT_SECONDS = 180s, which sits *inside* the normal distribution: on the 11h
+    // soak of 2026-09-08 the gap between consecutive verified segments exceeded 180s twelve
+    // times, reaching 209s, and every one of those twelve is fully accounted for by a reconnect
+    // plus its boundary discards -- media was flowing the whole time. None of them actually
+    // published a false 0, but only because the tick never landed in the armed window; the
+    // watchdog was one unlucky alignment away from reporting an outage that did not happen.
+    // 5 * SEGMENT_SECONDS leaves ~90s of headroom above the observed ceiling, and the fix below
+    // (counting a boundary discard as a sign of life) keeps the real gap near one segment anyway.
+    private static final long NO_SEGMENT_EMIT_MS = 5 * SEGMENT_SECONDS * 1000;
 
     private File spoolDir;
     private volatile Process ffmpeg;
     private volatile long lastEmitMs;
 
     // Segments at a generation boundary are structurally incomplete rather than undecodable
-    // media, so they must not count as SoakVideoDecodable=0:
-    //   - on the way out, ffmpeg is killed mid-write (destroyForcibly below), leaving a
-    //     truncated segment with no moov atom;
-    //   - on the way in, GetMedia's NOW start selector drops us mid-GOP, so the first segment
-    //     of a generation can lack a leading keyframe.
-    // Both used to be handed to verify.py: on the 2026-09-03 soak 35 of 46 zeros fell within
-    // 600s of one of the 17 hourly reconnects. They are discarded and counted separately so a
-    // change in the rate is still visible instead of being smoothed into the availability
-    // metric. The comment on processSegments' "all but the newest are finished" only holds
-    // within one generation -- a new generation reseeds segment numbering upward, so the dying
-    // generation's truncated tail stops being the newest file and becomes eligible.
+    // media, so they must not count as SoakVideoDecodable=0. Both used to be handed to verify.py:
+    // on the 2026-09-03 soak 35 of 46 zeros fell within 600s of one of the 17 hourly reconnects.
+    //
+    // The two ends are NOT equivalent, though, and treating them alike threw away good media:
+    //   - the TAIL is written while ffmpeg is killed mid-write (destroyForcibly below), so it is
+    //     truncated with no moov atom. Nothing can read it; it can only be discarded.
+    //   - the HEAD is a complete, well-formed file. GetMedia's NOW start selector merely drops us
+    //     mid-GOP, so it is *short* and may lack a leading keyframe. Its content is real media.
+    // Discarding heads cost the soak exactly the media it most wants to look at -- the seconds
+    // straight after a reconnect, where the ~30s post-reconnect no-video window lives. So heads
+    // are now verified against their own ffprobe'd duration (verify.py scales its duration and
+    // frame-count thresholds with --expected-duration, and the SSIM thresholds do not depend on
+    // length at all), while tails are still discarded and counted.
+    //
+    // A generation shorter than one segment produces a file that is both head and tail -- which
+    // happens often, since the hourly recycle breaks GetMedia four times inside ~26s. Tail wins
+    // there: a truncated file is unreadable no matter how it started.
     private final Set<String> boundarySegments = ConcurrentHashMap.newKeySet();
+    private final Set<String> headSegments = ConcurrentHashMap.newKeySet();
+    // The comment on processSegments' "all but the newest are finished" only holds within one
+    // generation -- a new generation reseeds segment numbering upward, so the dying generation's
+    // truncated tail stops being the newest file and becomes eligible.
     private volatile long currentGenStart;
 
     public SoakStreamVerifier(String streamName, String region, AWSCredentialsProvider credentialsProvider,
@@ -124,10 +145,40 @@ public class SoakStreamVerifier {
 
     private void pullLoop() {
         while (true) {
+            final long startedMs = System.currentTimeMillis();
+            boolean clean = false;
             try {
                 pullOnce();
+                clean = true;
             } catch (Exception e) {
-                logger.error("SoakStreamVerifier: GetMedia pull ended, reconnecting: " + e);
+                logger.error("SoakStreamVerifier: GetMedia pull failed after "
+                        + ((System.currentTimeMillis() - startedMs) / 1000) + "s, reconnecting: " + e);
+            }
+            final long genSeconds = (System.currentTimeMillis() - startedMs) / 1000;
+            if (clean) {
+                // A clean EOF -- GetMedia closed without an error -- used to return silently, so
+                // a reconnect left no trace in the log at all. The only evidence was the *next*
+                // "GetMedia connected" line, which is why reconstructing the 11h soak's 57
+                // generations meant counting connects and inferring the breaks between them. The
+                // media server recycles the session roughly hourly by design, so this is the
+                // normal path, not an exceptional one, and it earns its own line.
+                logger.info("SoakStreamVerifier: GetMedia stream ended cleanly after "
+                        + genSeconds + "s, reconnecting");
+            }
+            // How long each GetMedia generation lasted, as a metric rather than something only
+            // recoverable by diffing log timestamps. On the 11h soak the generations fell into
+            // two clean families -- a cluster of short ones around each hourly server-side
+            // recycle, plus exactly one break per hour at ~910s offset with no counterpart in
+            // the master log. That structure is invisible in SoakGetMediaReconnect alone, which
+            // only counts events; the duration is what separates the by-design recycle from
+            // anything new.
+            WebrtcStorageCanaryConsumer.publishMetricToCW(
+                    "SoakGetMediaGenerationSeconds", genSeconds, StandardUnit.Seconds);
+            WebrtcStorageCanaryConsumer.publishMetricToCW(
+                    "SoakGetMediaReconnect", 1.0, StandardUnit.Count);
+            if (!clean) {
+                WebrtcStorageCanaryConsumer.publishMetricToCW(
+                        "SoakGetMediaError", 1.0, StandardUnit.Count);
             }
             try {
                 Thread.sleep(PULL_RETRY_BACKOFF_MS);
@@ -183,7 +234,7 @@ public class SoakStreamVerifier {
         // Seed numbering with epoch seconds so a reconnect's new ffmpeg never collides with
         // (or sorts before) segments still pending from the previous session.
         currentGenStart = System.currentTimeMillis() / 1000;
-        boundarySegments.add(segmentName(currentGenStart));
+        headSegments.add(segmentName(currentGenStart));
         final ProcessBuilder pb = new ProcessBuilder(
                 "nice", "-n", "19", "ffmpeg",
                 "-hide_banner", "-loglevel", "error",
@@ -197,7 +248,11 @@ public class SoakStreamVerifier {
         // Drain ffmpeg's output into a log file so a full pipe can never stall it.
         final File log = new File(spoolDir, "ffmpeg.log");
         pb.redirectErrorStream(true);
-        pb.redirectOutput(ProcessBuilder.Redirect.to(log));
+        // appendTo, not to: Redirect.to() truncates, and a new ffmpeg is started on every
+        // GetMedia reconnect -- 57 times in an 11h soak. Every restart therefore erased the log
+        // of the generation that had just ended, which is precisely the generation whose ffmpeg
+        // errors would explain why the stream broke.
+        pb.redirectOutput(ProcessBuilder.Redirect.appendTo(log));
         return pb.start();
     }
 
@@ -221,6 +276,9 @@ public class SoakStreamVerifier {
         final File tail = segs[segs.length - 1];
         if (segmentNumber(tail.getName()) >= currentGenStart) {
             boundarySegments.add(tail.getName());
+            // If this generation never outlived its first segment, that one file is both head and
+            // tail. It is truncated, so the tail verdict must win.
+            headSegments.remove(tail.getName());
         }
     }
 
@@ -259,6 +317,7 @@ public class SoakStreamVerifier {
                 final int toSkip = pending - MAX_PENDING_SEGMENTS;
                 for (int i = 0; i < toSkip; i++) {
                     boundarySegments.remove(segs[i].getName());
+                    headSegments.remove(segs[i].getName());
                     segs[i].delete();
                 }
                 skipFrom = toSkip;
@@ -269,17 +328,53 @@ public class SoakStreamVerifier {
             for (int i = skipFrom; i < segs.length - 1; i++) {
                 final File seg = segs[i];
                 if (boundarySegments.remove(seg.getName())) {
+                    headSegments.remove(seg.getName());
                     seg.delete();
                     WebrtcStorageCanaryConsumer.publishMetricToCW(
                             "SoakSegmentBoundaryDiscarded", 1.0, StandardUnit.Count);
-                    logger.info("SoakStreamVerifier: discarding boundary segment " + seg.getName()
+                    logger.info("SoakStreamVerifier: discarding truncated tail segment " + seg.getName()
                             + " (incomplete by construction, not a media failure)");
+                    // A discard is still proof of life: ffmpeg only produces a segment when
+                    // GetMedia delivered media to cut it from. Not refreshing the watchdog here
+                    // is what let a run of discards around a reconnect look like an outage --
+                    // exactly the twelve near-misses described at NO_SEGMENT_EMIT_MS. The
+                    // segment is not *scored*, so no SoakVideoDecodable datapoint is published;
+                    // SoakSegmentBoundaryDiscarded above is what makes the omission visible.
+                    lastEmitMs = System.currentTimeMillis();
                     continue;
+                }
+                // A head segment is short by construction, so judging it against SEGMENT_SECONDS
+                // would fail it on duration and frame count no matter how good the picture is.
+                // Judge it against what it actually contains instead: verify.py scales those two
+                // thresholds with --expected-duration, and the three SSIM thresholds are
+                // length-independent, so the content check stays exactly as strict.
+                long expected = SEGMENT_SECONDS;
+                final boolean isHead = headSegments.remove(seg.getName());
+                if (isHead) {
+                    final double actual = WebrtcStorageCanaryConsumer
+                            .probeDurationSeconds(seg.getAbsolutePath());
+                    if (actual <= 0) {
+                        // Unreadable after all -- treat it as a boundary artefact rather than a
+                        // media failure, which is what the old code did for every head.
+                        seg.delete();
+                        WebrtcStorageCanaryConsumer.publishMetricToCW(
+                                "SoakSegmentBoundaryDiscarded", 1.0, StandardUnit.Count);
+                        logger.info("SoakStreamVerifier: discarding unreadable head segment "
+                                + seg.getName());
+                        lastEmitMs = System.currentTimeMillis();
+                        continue;
+                    }
+                    expected = Math.max(1L, Math.round(actual));
+                    logger.info("SoakStreamVerifier: verifying head segment " + seg.getName()
+                            + " against its own duration (" + expected + "s instead of "
+                            + SEGMENT_SECONDS + "s)");
+                    WebrtcStorageCanaryConsumer.publishMetricToCW(
+                            "SoakHeadSegmentVerified", 1.0, StandardUnit.Count);
                 }
                 boolean ok = false;
                 try {
                     final Boolean scriptResult =
-                            WebrtcStorageCanaryConsumer.runVerifyScript(seg.getAbsolutePath(), SEGMENT_SECONDS);
+                            WebrtcStorageCanaryConsumer.runVerifyScript(seg.getAbsolutePath(), expected);
                     ok = (scriptResult != null) ? scriptResult
                                                 : WebrtcStorageCanaryConsumer.probeDecodable(seg.getAbsolutePath());
                 } catch (Exception e) {
