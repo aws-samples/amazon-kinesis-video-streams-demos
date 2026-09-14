@@ -24,20 +24,19 @@
 #      association the master connects, nothing persists, and the consumer sits
 #      on an empty stream reporting availability=0 -- a green-looking failure.
 #      Set data retention on the stream: this ingests continuously.
-#   3. TWCC shadow-mode allowlist for account 232283333863 in **us-west-2**. The
-#      existing allowlisting is us-east-1. Not needed for the soak to run, but
-#      needed before any TWCC number from gamma means anything. Longest lead
-#      time of anything on this list -- start it first.
-#   4. Consumer node instance profile trusted by Canary-STS. SOAK_MODE implies
+#      (No TWCC allowlist step. TWCC is GA as of 2026-09-13, so there is no
+#      per-account, per-region twcc-shadow-mode allowlist to request. Older notes
+#      in this repo that say otherwise are stale.)
+#   3. Consumer node instance profile trusted by Canary-STS. SOAK_MODE implies
 #      CONSUMER_AUTO_REFRESH_CREDS, which re-assumes CANARY_STS_ROLE_ARN using
 #      the node's instance profile as base credentials. Fails closed.
-#   5. Three DEDICATED nodes. The soak holds one executor forever; sharing with
+#   4. Three DEDICATED nodes. The soak holds one executor forever; sharing with
 #      the periodic gamma jobs makes those queue indefinitely, which is the
 #      gamma-pileup failure mode already seen once. The master node also needs
 #      its own label because framesrc flips ~/webrtc-c-storage-master/build/
 #      .build-flags to gst=ON, and alternating with a disk-mode job forces a
 #      full rebuild every single run.
-#   6. Cleanup crons on all three nodes (cleanup-master.sh, cleanup-viewer.sh,
+#   5. Cleanup crons on all three nodes (cleanup-master.sh, cleanup-viewer.sh,
 #      cleanup-consumer.sh, cleanup-common.sh). A soak node without them fills
 #      its disk.
 #

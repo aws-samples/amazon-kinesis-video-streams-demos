@@ -143,21 +143,49 @@ These determine most of the checklist, so confirm they still hold before plannin
 - [ ] **[B]** One KVS stream per channel, same name.
 - [ ] **[B]** `UpdateMediaStorageConfiguration` on each channel to associate its stream —
       without it the master connects but nothing persists, and the consumer sees an empty stream.
-- [ ] **[B] TWCC shadow-mode allowlist for the gamma account + region.** Per `twcc_cron.txt`,
-      the channel-owner account (232283333863) must be on the media-service `twcc-shadow-mode`
-      allowlist *for the region in use*, or TWCC never negotiates and the bitrate metrics are
-      meaningless-but-green. The current allowlisting is for `us-east-1`; gamma is `us-west-2`
-      with a custom control-plane URI. **External dependency — start this first, it has the
-      longest lead time.**
+- [x] **[B] TWCC shadow-mode allowlist — no longer required. TWCC has gone GA** (confirmed by the
+      canary owner, 2026-09-13), so there is no per-account, per-region `twcc-shadow-mode`
+      allowlist to wait on and no external dependency here. This was previously the longest-lead
+      item on the whole checklist; it is now simply gone. Any comment in `twcc_cron.txt` or the
+      TWCC docs that still tells the reader to request allowlisting is stale and should be removed
+      the next time that file is touched — leaving it in place costs the next person a support
+      request that will be answered with "that is GA now".
 - [ ] **[B]** Set data retention on the new streams. The soak ingests continuously
       (~1617 kbps measured), so an unbounded retention is a standing cost.
-- [ ] **[R]** Set `retentionInDays` on the `WebrtcSDK` log group before adding a 24/7 producer.
-      This now matters more than when it was written: `WebrtcSDK` gains **two new writers** on
-      every run — the Java consumer's appender and the JS viewer — on top of the C master, and a
-      soak writes to all three continuously. Size the retention for three streams per run.
-      (`JSSDK`: no retention and ~109,602 streams in us-east-1, ~1.75 GB in us-west-2 — but note
-      `JSSDK` appears nowhere in this repo, so it is not written by these canaries; confirm what
-      owns it before changing it.)
+- [ ] **[B] Set `retentionInDays` on `WebrtcSDK` — measured 2026-09-13, account 232283333863,
+      ReadOnly:**
+
+      | Region | Group | Stored | Retention |
+      |---|---|---|---|
+      | us-west-2 | `WebrtcSDK` | **294 GB** (created 2020-10-06) | **None** |
+      | us-east-1 | `WebrtcSDK` | **18.3 GB** | **None** |
+      | us-east-1 | `JSSDK` | 1.49 GB | **None** |
+
+      Promoted from `[R]` to `[B]`: 294 GB of unbounded growth since 2020, and `WebrtcSDK` gains
+      **two new writers per run** — the Java consumer's appender and the JS viewer — on top of the
+      C master, with a soak writing all three continuously.
+
+      **Setting retention deletes every event older than the threshold, irreversibly.** Six years
+      of history in us-west-2 is the thing being traded away, so the number is a decision, not a
+      default. A 30-day soak needs >30 days to survive its own run plus analysis time; 60 days is
+      the smallest number that does.
+
+      Stream naming is confirmed live and matches what the new code assumes:
+      `StorageWithViewer-StorageMaster-<ts>`, `StorageThreeViewers-StorageMaster-<ts>`,
+      `StoragePeriodic-StorageMaster-<ts>`, plus non-storage canaries as
+      `WebrtcPeriodic*-Master-<ts>` / `-Viewer-<ts>`. The new `-StorageConsumer-<ts>` and
+      `-JSViewer-<ts>` slot in alongside.
+
+      **Correction to two earlier claims in this document.** (1) An earlier revision said
+      us-east-1 had no `WebrtcSDK` and that the us-west-2 group held only ~4.8 MB. Both readings
+      came from the wrong AWS account: `AWS_ACCESS_KEY_ID`/`AWS_SECRET_ACCESS_KEY` were set in the
+      environment, which silently overrides `AWS_PROFILE`, so the queries hit a personal account
+      that happens to have a same-named group. Always `env -u` those variables before using a
+      profile against this account. (2) `JSSDK` was dismissed as "not written by these canaries
+      since the name appears nowhere in the repo". The name is indeed absent from the code, but
+      the group exists with 1.49 GB and no retention — so something writes it, and it is a
+      candidate holder of the historical credential exposure. Identify the writer before deciding
+      whether that group needs purging as well as retention.
 - [ ] **[R] Confirm the consumer node's role can write logs.** The appender calls
       `CreateLogGroup` / `CreateLogStream` / `PutLogEvents`. The C master already makes exactly
       these three calls against the same group (`src/CloudwatchLogs.cpp:20-24`,
