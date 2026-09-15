@@ -108,6 +108,12 @@ teardown 成功 → exit 0。所以 wrapper 吞不吞都一样，它拿到的是
    形式的返回（哪怕真的是 exit 0）都意味着 soak 已经不在测任何东西。用户 abort 走的是
    `FlowInterruptedException`，不会到这一行，所以不会和人抢。这一条不依赖二进制退出码正确，
    是对第 1、2 条的兜底 —— 没有它，1、2 对 master 这个组件从未真正生效过。
+4. **viewer 的 catch 也要在 soak 下重抛（2026-09-14）。** `runViewerSessions` 有自己的
+   try/catch，**不经过** `withRunnerWrapper`，所以第 1 条对 viewer 从未生效：viewer 进程死了
+   （未捕获异常、OOM、`run-storage-viewer.sh` 非零退出）会被吞成 UNSTABLE，master 和 consumer
+   继续跑，build 仍是 BUILDING，egress 覆盖归零而 cron 看不见 —— 正是 §1 表格里 viewer 那一行
+   描述的静默死亡，也是 §9.2 决定要重启的那种情况。现在 `SOAK_MODE` 下该 catch 直接 `throw`。
+   viewer 自己的 recycle 循环已经吸收了单段失败，这一条只在 node 进程整体消失时触发。
 
 于是「任一组件失败 → 整个 build 迅速结束」成立，watchdog 才有一个明确的信号可用。
 

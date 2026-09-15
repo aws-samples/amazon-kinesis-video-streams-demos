@@ -367,6 +367,19 @@ def runViewerSessions(viewerId = "", waitMinutes = 2, viewerCount = "1", stagger
                 IS_ABORTED = true
                 throw err
             } catch (err) {
+                // This catch is NOT inside withRunnerWrapper, so the SOAK_MODE rethrow there
+                // never applied to the viewer: a viewer process that died (uncaught exception,
+                // OOM, run-storage-viewer.sh failing) was swallowed into UNSTABLE, the master
+                // and consumer kept running, and the build stayed BUILDING with no egress
+                // coverage -- invisible to the soak cron's isBuilding() dedup. The soak design
+                // (soak-self-recovery-design.md section 9.2) requires viewer death to restart
+                // the whole pipeline, so under SOAK_MODE propagate and let failFast do that.
+                // Bounded runs keep swallowing so one viewer cannot stop the others reporting.
+                // Note the viewer's own recycle loop already absorbs per-segment failures; this
+                // only fires when the node process itself is gone.
+                if (params.SOAK_MODE?.toString() == 'true') {
+                    throw err
+                }
                 HAS_ERROR = true
                 unstable err.toString()
             }
