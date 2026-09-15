@@ -180,10 +180,14 @@ def withRunnerWrapper(envs, fn) {
     // In SOAK_MODE a component failure must end the whole build, because a soak's
     // recovery lives in the orchestration layer (the watchdog) and that can only act on
     // a build that actually finished. Swallowing every failure into `unstable` leaves the
-    // build BUILDING with dead components inside it: on soak #5281 the master exited
-    // 0x0000000f at 01:29:15, this wrapper turned that into UNSTABLE, and the pipeline
-    // kept "running" -- consumer and viewer span uselessly for 8h43m until a human
-    // aborted. It also means failFast can never fire, since that triggers on FAILURE.
+    // build BUILDING with dead components inside it, and it also means failFast can never
+    // fire, since that triggers on FAILURE. (Soak #5281 -- master logged 0x0000000f at
+    // 01:29:15, consumer and viewer spun for 8h43m -- was originally blamed on this
+    // swallowing. The logs say otherwise: the binary exited 0, because its CleanUp
+    // overwrote the failure status, so `sh` never failed and there was nothing to swallow.
+    // That case is closed by the explicit SOAK_MODE error() after the master launch in
+    // buildStorageCanary and by the exit-code fix in kvsWebRTCClientMaster.cpp; this
+    // rethrow is what lets that error(), and any genuine non-zero exit, reach failFast.)
     //
     // Bounded runs keep the old behaviour deliberately: there, one viewer failing should
     // still let the rest of the run finish and report its own per-run metrics.
@@ -617,6 +621,19 @@ def buildStorageCanary(isConsumer, params) {
                         cd ${buildDir} &&
                         ./kvsWebrtcStorageSample"""
                 }
+            }
+            // A soak master never exits on its own: CANARY_CONTINUOUS sets sampleDuration=0,
+            // so the only in-process ways out are a signal (a Jenkins abort, which surfaces as
+            // FlowInterruptedException and never reaches this line) or a failure. Reaching
+            // here therefore means the master is dead and the soak is not measuring anything,
+            // whatever the exit code says. Fail the build explicitly so failFast tears down the
+            // viewer and consumer and the soak cron's next tick can start a fresh run. This is
+            // deliberately independent of the binary's exit status: on soaks #5281 and #5282
+            // the master logged "Terminated with status code 0x0000000f" and still exited 0
+            // (its CleanUp overwrote retStatus with the teardown result), so `sh` succeeded,
+            // nothing was rethrown, and consumer + viewer spun for 8h43m with no master.
+            if (params.SOAK_MODE?.toString() == 'true') {
+                error("Storage master exited during a soak run; failing the build so the soak restarts")
             }
         }
         pushKeepAlive('MasterFinished')

@@ -28,7 +28,7 @@
 |---|---|---|---|
 | **L1** 单段/单会话失败 | 指标出现 0 | BUILDING | ✅ viewer 有 `while(true)` 循环，2 秒后重试 |
 | **L2** 媒体停了但进程活着 | RTP 计数器冻结 | **BUILDING** | ❌ **#5281 就是这层** |
-| **L3** 进程死了 | 无 | BUILDING（其他 stage 还在） | ❌ |
+| **L3** 进程死了 | 无 | BUILDING（其他 stage 还在） | ❌ → ✅ 经 §2.5（含 master 以 0 退出的情况） |
 | **L4** pipeline 崩了 / 被 abort | FAILURE/ABORTED | 已结束 | ❌ |
 | **L5** 节点掉线 | agent offline | stage 挂起 | ❌ |
 
@@ -79,11 +79,20 @@ catch (FlowInterruptedException err) { HAS_ERROR = true; unstable err.toString()
 catch (err)                          { HAS_ERROR = true; unstable err.toString() }
 ```
 
-后果链：master 二进制以 0x0f 退出 → `sh` 失败 → 抛异常 → **被吞** → build 继续 →
-永远不会变成 FAILURE → **`failFast` 永不触发**（它只对 FAILURE 生效）→ 其他组件继续跑。
-这就是 #5281 里 master 明明退出了、日志却还接着推 `MasterFinished` 心跳的原因。
+后果链（本文最初的读法）：master 二进制以 0x0f 退出 → `sh` 失败 → 抛异常 → **被吞** →
+build 继续 → 永远不会变成 FAILURE → **`failFast` 永不触发**（它只对 FAILURE 生效）→
+其他组件继续跑。
 
-改动（`storage_runner.groovy` + `gamma_runner.groovy`）：
+**这个读法漏了一层，2026-09-14 对照 #5281 / #5282 的 master 日志才发现。** 两次 soak 里
+master 都记了 `Terminated with status code 0x0000000f` → `Exiting with 0x0000000f`，但
+`Cleanup done` 之后紧接着就是 `MasterFinished` 的 put-metric-data，日志里**没有任何**
+`script returned exit code` / `AbortException`。也就是说 `sh` 根本没失败 —— 二进制**以 0
+退出了**。原因在 `kvsWebRTCClientMaster.cpp` 的 `CleanUp`：`retStatus = freeSignalingClient(...)`
+和 `retStatus = freeSampleConfiguration(...)` 把 run 的失败状态**覆盖**成了 teardown 的返回值，
+teardown 成功 → exit 0。所以 wrapper 吞不吞都一样，它拿到的是一个成功的 `sh`。
+（`ExitStatus` 指标在覆盖之前推送，所以 CloudWatch 上一直是对的；错的只是进程退出码。）
+
+改动（`storage_runner.groovy` + `gamma_runner.groovy` + `kvsWebRTCClientMaster.cpp`）：
 
 1. `withRunnerWrapper` 在 `SOAK_MODE=true` 时**重新抛出**，包括
    `FlowInterruptedException`（不重抛中断的话 failFast 无法中止兄弟分支，用户也无法
@@ -92,6 +101,13 @@ catch (err)                          { HAS_ERROR = true; unstable err.toString()
 2. 四个 continuous-master 的 parallel 块加 `failFast true`。对有界 run 是**休眠的**：
    它们的失败仍被吞成 UNSTABLE，永远到不了 FAILURE，所以 failFast 不会触发。只有
    SOAK_MODE 下才活起来。
+3. **master 退出码修正 + soak 下「master 退出即失败」（2026-09-14）。** `main()` 的 CleanUp
+   改用独立的 `cleanupStatus`，run 的 `retStatus` 不再被覆盖（teardown 失败只在 run 本身成功
+   时才计入）。同时两个 runner 在 master 的 `sh` 返回后、仍在 `withRunnerWrapper` 内，
+   `SOAK_MODE` 下直接 `error(...)`：soak 的 master 是 `sampleDuration=0` 的无界进程，它**任何**
+   形式的返回（哪怕真的是 exit 0）都意味着 soak 已经不在测任何东西。用户 abort 走的是
+   `FlowInterruptedException`，不会到这一行，所以不会和人抢。这一条不依赖二进制退出码正确，
+   是对第 1、2 条的兜底 —— 没有它，1、2 对 master 这个组件从未真正生效过。
 
 于是「任一组件失败 → 整个 build 迅速结束」成立，watchdog 才有一个明确的信号可用。
 
@@ -203,10 +219,11 @@ abort 要能**及时**完成。在 `b30f9daa` 之前，master 的 teardown 可�
 
 ## 8. 实施顺序
 
-0. ✅ **§2.5 的两项**（`withRunnerWrapper` 在 SOAK_MODE 下重抛 + 四个 parallel 块加
-   `failFast true`）。做完这一步，L3/L4/L5 已经会让 build **干净地结束** —— 还不会自动
-   重启，但失效从"静默继续"变成"可见地失败"，这本身就消掉了 #5281 那种 12 小时无人察觉
-   的情况。**建议在这里停一下观察一段时间**：`b30f9daa` 把 teardown 压到 ~16 秒之后，
+0. ✅ **§2.5 的三项**（`withRunnerWrapper` 在 SOAK_MODE 下重抛 + 四个 parallel 块加
+   `failFast true` + master 退出码修正与 soak 下「master 退出即失败」）。做完这一步，
+   L3/L4/L5 已经会让 build **干净地结束** —— 还不会自动重启，但失效从"静默继续"变成
+   "可见地失败"，这本身就消掉了 #5281 那种 12 小时无人察觉的情况。注意前两项单独并**不**
+   覆盖 master 的 L3（它以 0 退出），第三项才是让这句话对 master 也成立的那一条。**建议在这里停一下观察一段时间**：`b30f9daa` 把 teardown 压到 ~16 秒之后，
    #5281 那类 L2 会在 16 秒内变成 L3，所以真正剩下的 L2 可能比想象的罕见得多。先看数据
    再决定 watchdog 的判据要多灵敏。
 1. **watchdog job 的骨架**：只查指标、只记录判断结果、**不做任何 abort/重启**（`DRY_RUN` 模式）。跑几天，确认判据不误报

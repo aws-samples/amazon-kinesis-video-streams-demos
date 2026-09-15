@@ -8,10 +8,16 @@
 # The tick only does something after the soak has actually died.
 #
 # WHAT THIS RECOVERS (verified against the code, not assumed):
-#   yes - master process exits / build error. SOAK_MODE makes withRunnerWrapper
-#         rethrow instead of swallowing into `unstable` (:180-190), so the build
-#         goes FAILURE, failFast tears down the other stages, and the next tick
-#         starts a fresh soak.
+#   yes - master process exits, WITH ANY EXIT CODE. Under SOAK_MODE the runner
+#         calls error() as soon as the master's `sh` returns (buildStorageCanary,
+#         right after the launch): a soak master is sampleDuration=0 and only a
+#         Jenkins abort should ever end it, so any return means it is dead. This
+#         does not depend on the exit code -- it must not, because on #5281/#5282
+#         the master exited 0 after logging 0x0000000f (CleanUp overwrote the
+#         status; since fixed in kvsWebRTCClientMaster.cpp). withRunnerWrapper
+#         rethrows under SOAK_MODE (:180-205), so the build goes FAILURE, failFast
+#         tears down the other stages, and the next tick starts a fresh soak.
+#   yes - consumer process exits (set -eo pipefail makes tee pass java's status).
 #   yes - node reboot, SSH drop, Jenkins agent lost -> build fails -> next tick.
 #   NO  - any "alive but not working" failure. All three components are
 #         deliberately built never to exit: the viewer's no-video watchdog

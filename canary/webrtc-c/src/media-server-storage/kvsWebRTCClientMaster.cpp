@@ -13,6 +13,7 @@ extern UINT32 gCMasterUnexpectedDisconnectionCount;
 INT32 main(INT32 argc, CHAR* argv[])
 {
     STATUS retStatus = STATUS_SUCCESS;
+    STATUS cleanupStatus = STATUS_SUCCESS;
     UINT32 frameSize;
     PSampleConfiguration pSampleConfiguration = NULL;
     PCHAR pChannelName;
@@ -208,17 +209,30 @@ CleanUp:
         if (pSampleConfiguration->mediaSenderTid != INVALID_TID_VALUE) {
             THREAD_JOIN(pSampleConfiguration->mediaSenderTid, NULL);
         }
-        retStatus = freeSignalingClient(&pSampleConfiguration->signalingClientHandle);
-        if (retStatus != STATUS_SUCCESS) {
-            DLOGE("[KVS Master] freeSignalingClient(): operation returned status code: 0x%08x", retStatus);
+        // Cleanup results go to their own variable. They used to be assigned straight into
+        // retStatus, so a successful teardown REPLACED the run's failure status and the
+        // process exited 0 after logging "Terminated with status code 0x0000000f". Soaks
+        // #5281 and #5282 both did exactly that: the runner's `sh` step saw exit 0, the
+        // SOAK_MODE rethrow in withRunnerWrapper had nothing to rethrow, failFast never
+        // fired, and the build sat BUILDING with a dead master for 8h43m. The exit code
+        // must reflect the run; a cleanup failure only matters when the run itself passed.
+        cleanupStatus = freeSignalingClient(&pSampleConfiguration->signalingClientHandle);
+        if (cleanupStatus != STATUS_SUCCESS) {
+            DLOGE("[KVS Master] freeSignalingClient(): operation returned status code: 0x%08x", cleanupStatus);
+            if (retStatus == STATUS_SUCCESS) {
+                retStatus = cleanupStatus;
+            }
         }
 
-        retStatus = freeSampleConfiguration(&pSampleConfiguration);
-        if (retStatus != STATUS_SUCCESS) {
-            DLOGE("[KVS Master] freeSampleConfiguration(): operation returned status code: 0x%08x", retStatus);
+        cleanupStatus = freeSampleConfiguration(&pSampleConfiguration);
+        if (cleanupStatus != STATUS_SUCCESS) {
+            DLOGE("[KVS Master] freeSampleConfiguration(): operation returned status code: 0x%08x", cleanupStatus);
+            if (retStatus == STATUS_SUCCESS) {
+                retStatus = cleanupStatus;
+            }
         }
     }
-    DLOGI("[KVS Master] Cleanup done");
+    DLOGI("[KVS Master] Cleanup done, exit status 0x%08x", retStatus);
     CHK_LOG_ERR(retStatus);
 
     RESET_INSTRUMENTED_ALLOCATORS();
