@@ -104,28 +104,74 @@ install_system_deps() {
 
 # ---------------------------------------------------------------------------
 # 2. npm install for Puppeteer / AWS SDK (in the workspace scripts dir)
+#
+#    The Jenkins viewer stage checks out into a fresh per-build workspace
+#    (storage_runner.groovy: ws("${JOB_NAME}-${viewerId}-${BUILD_NUMBER}")), so a
+#    node_modules living inside the workspace is never there on the next build and
+#    the old "skip if node_modules exists" check never fired -- every build hit the
+#    public npm registry. During the Sep 3-4 2026 registry degradation that install
+#    took 1-7 minutes instead of ~10 s, the viewer joined after the master had
+#    already finished, and UnexpectedDisconnectCount spiked fleet-wide.
+#
+#    Fix: install once per (package.json, package-lock.json) content hash into the
+#    persistent ~/JS-viewer-build/scripts-node_modules/<hash>/ and symlink it into
+#    the workspace. Repeat builds never touch the network. Same pattern as
+#    ensure_js_sdk() below, which is why the JS SDK clone was already cached.
 # ---------------------------------------------------------------------------
 install_npm_deps() {
-    cd ./canary/webrtc-c/scripts || { echo "ERROR: cd to scripts failed"; exit 1; }
+    local scripts_dir="${PWD}/canary/webrtc-c/scripts"
+    [ -f "$scripts_dir/package.json" ] || { echo "ERROR: $scripts_dir/package.json not found"; exit 1; }
 
-    # Only run npm install if node_modules is missing or package.json changed
-    if [ -d "node_modules" ] && [ -f ".package-json-hash" ]; then
-        local current_hash
-        current_hash=$(md5sum package.json 2>/dev/null | cut -d' ' -f1)
-        local cached_hash
-        cached_hash=$(cat .package-json-hash 2>/dev/null)
-        if [ "$current_hash" = "$cached_hash" ]; then
-            echo "npm dependencies up to date (package.json unchanged)"
-            cd - > /dev/null
-            return 0
+    local cache_root="${VIEWER_BUILD_HOME}/scripts-node_modules"
+    local hash
+    hash=$(cat "$scripts_dir/package.json" "$scripts_dir/package-lock.json" 2>/dev/null | md5sum | cut -d' ' -f1)
+    local cache_dir="${cache_root}/${hash}"
+    local lock_file="${cache_root}/.install.lock"
+
+    mkdir -p "$cache_root"
+
+    # Serialize installs on this node: multi-viewer scenarios run several viewers
+    # in parallel and they must not race on the same cache dir.
+    exec 9>"$lock_file"
+    echo "Acquiring npm deps lock..."
+    flock 9
+    echo "npm deps lock acquired"
+
+    if [ -f "$cache_dir/.complete" ] && [ -d "$cache_dir/node_modules" ]; then
+        echo "npm dependencies up to date (cache ${hash:0:8})"
+    else
+        echo "Running npm install into cache ${hash:0:8}..."
+        rm -rf "$cache_dir"
+        mkdir -p "$cache_dir"
+        cp "$scripts_dir/package.json" "$cache_dir/"
+        if [ -f "$scripts_dir/package-lock.json" ]; then
+            cp "$scripts_dir/package-lock.json" "$cache_dir/"
+            # npm ci: exact lockfile versions, no packument resolution, fails loudly if
+            # package.json and the lockfile disagree.
+            (cd "$cache_dir" && npm ci --no-audit --no-fund) \
+                || { echo "ERROR: npm ci failed"; flock -u 9; exit 1; }
+        else
+            (cd "$cache_dir" && npm install --no-audit --no-fund) \
+                || { echo "ERROR: npm install failed"; flock -u 9; exit 1; }
         fi
+        touch "$cache_dir/.complete"
+
+        # Keep the two most recent caches so a package.json revert is instant; drop older.
+        # shellcheck disable=SC2012
+        ls -1dt "$cache_root"/*/ 2>/dev/null | tail -n +3 | while read -r old; do
+            echo "Pruning old npm cache $(basename "$old")"
+            rm -rf "$old"
+        done
     fi
+    flock -u 9
 
-    echo "Running npm install..."
-    npm install || { echo "ERROR: npm install failed"; exit 1; }
-    md5sum package.json | cut -d' ' -f1 > .package-json-hash
-
-    cd - > /dev/null
+    # Point the workspace at the cache. node resolves modules through symlinks, so
+    # `node chrome-headless.js` and require('puppeteer') work unchanged.
+    if [ -e "$scripts_dir/node_modules" ] && [ ! -L "$scripts_dir/node_modules" ]; then
+        rm -rf "$scripts_dir/node_modules"
+    fi
+    ln -sfn "$cache_dir/node_modules" "$scripts_dir/node_modules"
+    echo "node_modules -> $cache_dir/node_modules"
 }
 
 # ---------------------------------------------------------------------------
