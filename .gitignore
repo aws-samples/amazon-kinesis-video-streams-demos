@@ -22,3 +22,14 @@ canary/webrtc-c/firstFrameSentTimeStamp.txt
 canary/consumer-java/target/*
 canary/Testing.txt
 .DS_Store
+canary/webrtc-c/scripts/.venv
+canary/webrtc-c/assets
+
+# Master logs recovered from CloudWatch are ~100MB for an 11h soak, over GitHub's
+# hard limit. Keep them on disk for auditing; commit the analysis, not the log.
+canary/webrtc-c/docs/*-from-cw.log
+# Agent SOPs/context live outside the repo (~/Documents/kvs-canary-agent). Never commit them:
+# they reference internal accounts, hosts and tooling and this repo is public.
+agent-sops/
+.kiro/
+.claude/
