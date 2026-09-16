@@ -17,7 +17,7 @@
 #      and you can `ssh <user@ip>` to it. Confirm 64-bit: `uname -m` = aarch64.
 #      Use NVMe/quality-SSD boot media, NOT a cheap SD card (silent bit-rot has
 #      bricked a Pi here before - see the incident log in the roadmap).
-#   2. AWS temporary creds for account 232283333863 are exported and working
+#   2. AWS temporary creds for the canary account are exported and working
 #      (`aws sts get-caller-identity` succeeds). Needed for SSM + IoT calls.
 #   3. Jump SSH key at $JKEY lets you reach the jump host $JUMP.
 #   4. The SHARED IoT layer exists (created once by the first Pi's
@@ -100,7 +100,9 @@ fi
 
 # ---- shared / fixed config -------------------------------------------------
 REGION=us-west-2
-JUMP="ubuntu@54.185.49.98"
+# Jump host (user@host) that fronts the Pi fleet. Deliberately not committed to this public
+# repo: pass it in the environment, e.g. RPI_JUMP_HOST=ubuntu@<jump-host-ip> zsh rpi-onboard.sh ...
+JUMP="${RPI_JUMP_HOST:?set RPI_JUMP_HOST=user@host (the Jenkins jump host)}"
 JKEY=~/Desktop/keys/ec2-key.pem
 RK=/home/ubuntu/.ssh/rpi-key
 SSM_ROLE=service-role/AmazonEC2RunCommandRoleForManagedInstances
@@ -219,10 +221,10 @@ echo "$PW" | sudo -S -p '' -u jenkins bash -c "
   grep -qF '$KEYB' /home/jenkins/.ssh/authorized_keys || echo '$KEYB' >> /home/jenkins/.ssh/authorized_keys"
 EOF
 # 4d. autossh tunnel service (single-line autossh; only PORT varies)
-ssh "$PITARGET" "PW='$PW' PORT='$PORT' bash -s" <<'EOF'
+ssh "$PITARGET" "PW='$PW' PORT='$PORT' JUMP='$JUMP' bash -s" <<'EOF'
 set -e
 S(){ echo "$PW" | sudo -S -p '' "$@"; }
-S bash -c "printf '%s\n' '#!/bin/bash' 'exec /usr/bin/autossh -M 0 -N -o ServerAliveInterval=30 -o ServerAliveCountMax=3 -o ExitOnForwardFailure=yes -o StrictHostKeyChecking=accept-new -R ${PORT}:localhost:22 ubuntu@54.185.49.98' > /usr/local/bin/rpi-tunnel.sh"
+S bash -c "printf '%s\n' '#!/bin/bash' 'exec /usr/bin/autossh -M 0 -N -o ServerAliveInterval=30 -o ServerAliveCountMax=3 -o ExitOnForwardFailure=yes -o StrictHostKeyChecking=accept-new -R ${PORT}:localhost:22 ${JUMP}' > /usr/local/bin/rpi-tunnel.sh"
 S chmod +x /usr/local/bin/rpi-tunnel.sh
 echo "$PW" | sudo -S -p '' tee /etc/systemd/system/rpi-jenkins-tunnel.service >/dev/null <<UNIT
 [Unit]
@@ -306,7 +308,7 @@ Jenkins node (the only step not automatable over SSH):
 
 import hudson.model.*; import hudson.slaves.*; import jenkins.model.Jenkins
 def j = Jenkins.instance
-def cmd = "ssh -o StrictHostKeyChecking=no -i /local/jenkins/.ssh/ec2-key.pem ubuntu@54.185.49.98 ssh -o StrictHostKeyChecking=no -i /home/ubuntu/.ssh/rpi-key -p ${PORT} jenkins@localhost java -jar /home/jenkins/agent/agent.jar"
+def cmd = "ssh -o StrictHostKeyChecking=no -i /local/jenkins/.ssh/ec2-key.pem ${JUMP} ssh -o StrictHostKeyChecking=no -i /home/ubuntu/.ssh/rpi-key -p ${PORT} jenkins@localhost java -jar /home/jenkins/agent/agent.jar"
 def s = new DumbSlave("${NODE}", "/home/jenkins/Jenkins", new hudson.slaves.CommandLauncher(cmd))
 s.nodeDescription = "Raspberry Pi 5 canary node ${IDX} (tunnel port ${PORT})"
 s.numExecutors = 1; s.labelString = "${LABEL}"; s.mode = Node.Mode.EXCLUSIVE

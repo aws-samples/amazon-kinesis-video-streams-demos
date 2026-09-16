@@ -19,7 +19,7 @@
 # Prerequisites (see docs/rpi5-setup-sop.md "Phase 10"):
 #   - Node onboarded via rpi-onboard.sh (installs /usr/local/bin/twcc-net +
 #     /etc/sudoers.d/twcc-canary + iptables + gstreamer1.0-plugins-ugly).
-#   - Channel-owner account (232283333863) on the media-service twcc-shadow-mode
+#   - Channel-owner (canary) account on the media-service twcc-shadow-mode
 #     allowlist for AWS_DEFAULT_REGION (else TWCC won't negotiate).
 #   - A dedicated node label (rpi5-twcc) — all 4 jobs share one gst=ON build
 #     (same CANARY_MEDIA_SOURCE=testsrc -> same .build-flags -> cached), so they
