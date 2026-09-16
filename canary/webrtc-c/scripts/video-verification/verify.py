@@ -43,6 +43,7 @@ import json
 import math
 import os
 import shutil
+import signal
 import subprocess
 import sys
 import tempfile
@@ -456,6 +457,17 @@ def main():
             print(f"Recording not found (skipping): {rec}", file=sys.stderr)
     if not recordings:
         emit_failure("No recordings found", args.json_output, segments=0)
+
+    # Every caller bounds this script with a timeout that ends in SIGTERM: chrome-headless.js
+    # (execFile timeout), the consumer's runVerifyScript, and a Jenkins abort of the enclosing
+    # stage. Python's default SIGTERM disposition terminates the interpreter immediately, so
+    # the `finally` below never runs and the scratch dir (reference.mp4 + extracted frames,
+    # 150-300MB) is orphaned. On the gamma viewer that added up to 2,232 dirs / 222GB in five
+    # days and a full disk. Turn the signal into SystemExit so the cleanup path is taken;
+    # SIGKILL still cannot be caught, which is what the cron sweep is for.
+    def _terminate(signum, _frame):
+        raise SystemExit(128 + signum)
+    signal.signal(signal.SIGTERM, _terminate)
 
     work_dir = tempfile.mkdtemp(prefix='video-verify-')
     try:

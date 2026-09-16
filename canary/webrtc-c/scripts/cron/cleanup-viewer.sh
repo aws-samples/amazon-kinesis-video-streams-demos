@@ -85,6 +85,27 @@ for pid in $(pgrep -i 'chrome|chromium' 2>/dev/null || true); do
     fi
 done
 
+# Orphan JS SDK dev servers. run-storage-viewer.sh starts `npm run develop` in a
+# backgrounded subshell and later kills $DEV_SERVER_PID -- which is the subshell, not
+# the npm -> webpack-dev-server -> fork-ts-checker worker tree under it, so a normal
+# exit leaves the tree running, and an aborted stage never reaches the kill at all.
+# Found on the gamma viewer 2026-09-16: six webpack-dev-server trees (18 node
+# processes, each worker capped at 2GB heap) alive for 9 days. They are keyed on the
+# same age as the browsers: nothing legitimate outlives a run, and a soak's dev server
+# is restarted with every 2400s segment, so CHROME_MAX_AGE_SEC bounds both.
+for pid in $(pgrep -f 'webpack-dev-server|npm run develop|fork-ts-checker-webpack-plugin' 2>/dev/null || true); do
+    etimes=$(ps -o etimes= -p "$pid" 2>/dev/null | tr -d ' ')
+    [ -n "${etimes:-}" ] || continue
+    if [ "$etimes" -gt "$CHROME_MAX_AGE_SEC" ]; then
+        if [ "${DRY_RUN:-0}" = "1" ]; then
+            log "DRY_RUN would kill orphan dev-server pid $pid (age ${etimes}s)"
+        else
+            log "Killing orphan dev-server pid $pid (age ${etimes}s)"
+            kill -9 "$pid" 2>/dev/null || true
+        fi
+    fi
+done
+
 # Stale Chrome shared memory in /dev/shm (tmpfs = RAM). Only when no Chrome is
 # running, so we never unlink a segment a live viewer still has open (which frees
 # nothing and could break it). earlyoom handles live pressure; this reclaims tmpfs
