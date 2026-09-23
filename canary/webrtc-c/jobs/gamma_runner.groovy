@@ -45,15 +45,9 @@ MASTER_READY = false
 // The master waits for this before starting the C binary (used in VO Mixed Viewers).
 VIEWER_STARTED = false
 
-// @NonCPS prevents Jenkins CPS from trying to serialize local variables in this
-// method.  java.util.regex.Matcher is NOT serializable — holding one across a CPS
-// step boundary (sh, sleep, echo …) causes NotSerializableException and kills the
-// pipeline thread.
-@NonCPS
-def extractViewerStats(String output) {
-    def m = (output =~ /VIEWER_STATS:(\{.*?\})/)
-    return m.find() ? m.group(1) : null
-}
+// Minimum headroom (seconds) between the master stream length and the viewer's kill window;
+// see the viewerSessionDuration floor in the viewer stage.
+VIEWER_KILL_WINDOW_MARGIN_SECONDS = 60
 
 def buildWebRTCProject(thing_prefix) {
     def repoDir = "${env.HOME}/webrtc-c-storage-master/repo"
@@ -236,6 +230,19 @@ def runViewerSessions(viewerId = "", waitMinutes = 2, viewerCount = "1", stagger
             def viewerSessionDuration = (params.VIEWER_SESSION_DURATION_SECONDS != null && params.VIEWER_SESSION_DURATION_SECONDS.toString().trim() != '') 
                 ? params.VIEWER_SESSION_DURATION_SECONDS 
                 : '600'
+            // The viewer monitors the session for MASTER_DURATION (= DURATION_IN_SECONDS) starting
+            // from the moment it joins, but its cleanup/kill timers count from process start. A
+            // kill window equal to the master duration therefore cuts the monitor short (or, before
+            // chrome-headless.js bounded the monitor by its cleanup timer, ended every run in a
+            // "Test timeout" exit 1). Keep the window at least VIEWER_KILL_WINDOW_MARGIN_SECONDS
+            // beyond the master duration so the viewer can watch the whole stream and still run
+            // getTestResults/cleanup/verify inside it.
+            def masterDurationSeconds = (params.DURATION_IN_SECONDS ?: '153').toString().trim().toInteger()
+            def minViewerSessionDuration = masterDurationSeconds + VIEWER_KILL_WINDOW_MARGIN_SECONDS
+            if (viewerSessionDuration.toString().trim().toInteger() < minViewerSessionDuration) {
+                echo "VIEWER_SESSION_DURATION_SECONDS=${viewerSessionDuration} is shorter than DURATION_IN_SECONDS=${masterDurationSeconds} + ${VIEWER_KILL_WINDOW_MARGIN_SECONDS}s; raising the viewer kill window to ${minViewerSessionDuration}s"
+                viewerSessionDuration = minViewerSessionDuration.toString()
+            }
 
             // Run prepare while master is still building
             echo "Preparing viewer dependencies (parallel with master build)..."
@@ -270,7 +277,12 @@ def runViewerSessions(viewerId = "", waitMinutes = 2, viewerCount = "1", stagger
             echo "=========================================="
             
             def viewerKey = viewerId ?: 'viewer'
-            VIEWER_SESSION_RESULTS[viewerKey] = [attempts: 1, successes: 0]
+            // Register this viewer as expected. It stays null until its stats file is read; a
+            // null entry means "no data", which publishViewerConnectionSuccessRate treats as
+            // "publish nothing" -- never as a failed connection. The old default of
+            // [attempts: 1, successes: 0] turned every lost stats read into a 0% data point.
+            VIEWER_SESSION_RESULTS[viewerKey] = null
+            def viewerStatsFile = "${env.WORKSPACE}/viewer-stats-${viewerKey}.json"
 
             if (staggerDelaySeconds > 0) {
                 echo "Stagger delay: waiting ${staggerDelaySeconds} seconds before starting viewer..."
@@ -307,6 +319,10 @@ def runViewerSessions(viewerId = "", waitMinutes = 2, viewerCount = "1", stagger
                         export CANARY_LOG_STREAM_NAME="${params.RUNNER_LABEL}${viewerId ? '-' + viewerId : ''}-JSViewer-${START_TIMESTAMP}"
                         export DURATION_IN_SECONDS="${viewerSessionDuration}"
                         export MASTER_DURATION="${params.DURATION_IN_SECONDS ?: '153'}"
+                        # chrome-headless.js writes {attempts, successes} here; read below in a
+                        # finally block so a non-zero exit cannot lose the stats.
+                        export VIEWER_STATS_FILE="${viewerStatsFile}"
+                        rm -f "${viewerStatsFile}"
                         export FORCE_TURN="${params.FORCE_TURN ?: 'false'}"
                         export VIEWER_COUNT="${viewerCount}"
                         export VIEWER_ID="${viewerId}"
@@ -351,16 +367,14 @@ def runViewerSessions(viewerId = "", waitMinutes = 2, viewerCount = "1", stagger
                         ./canary/webrtc-c/scripts/run-storage-viewer.sh
                     """
                 }
-                def output = sh(script: viewerScript, returnStdout: true).trim()
-                
-                echo output
-                
-                // Parse VIEWER_STATS from output
-                def statsJson = extractViewerStats(output)
-                if (statsJson != null) {
-                    def stats = readJSON text: statsJson
-                    VIEWER_SESSION_RESULTS[viewerKey] = [attempts: stats.attempts, successes: stats.successes]
-                    echo "${viewerKey} stats: ${stats.attempts} attempts, ${stats.successes} successes"
+                // No returnStdout: sh() throws before returning any output when the script
+                // exits non-zero, which is exactly when the stats used to be lost. The viewer's
+                // console output streams to the build log directly, and the stats are read from
+                // the file in the finally block whatever the exit code was.
+                try {
+                    sh(script: viewerScript)
+                } finally {
+                    readViewerStatsFile(viewerKey, viewerStatsFile)
                 }
             } catch (FlowInterruptedException err) {
                 echo 'Aborted due to cancellation'
@@ -392,9 +406,40 @@ def runViewerSessions(viewerId = "", waitMinutes = 2, viewerCount = "1", stagger
     }
 }
 
+// Read the {attempts, successes} file chrome-headless.js wrote for one viewer. Missing or
+// unparseable means "no data" for that viewer, so its entry stays null and no rate is published
+// for the run; it is never turned into a failed connection.
+def readViewerStatsFile(viewerKey, viewerStatsFile) {
+    if (!fileExists(viewerStatsFile)) {
+        echo "${viewerKey}: no viewer stats file at ${viewerStatsFile}; ViewerConnectionSuccessRate will not be published for this run"
+        return
+    }
+    try {
+        def stats = readJSON file: viewerStatsFile
+        if (!(stats.attempts instanceof Number) || !(stats.successes instanceof Number)) {
+            echo "${viewerKey}: viewer stats file has no numeric attempts/successes (${stats}); ViewerConnectionSuccessRate will not be published for this run"
+            return
+        }
+        VIEWER_SESSION_RESULTS[viewerKey] = [attempts: stats.attempts as int, successes: stats.successes as int]
+        echo "${viewerKey} stats: ${stats.attempts} attempts, ${stats.successes} successes"
+    } catch (FlowInterruptedException err) {
+        throw err
+    } catch (err) {
+        echo "${viewerKey}: could not parse viewer stats file ${viewerStatsFile} (${err}); ViewerConnectionSuccessRate will not be published for this run"
+    }
+}
+
 def publishViewerConnectionSuccessRate(scenarioLabel) {
     if (VIEWER_SESSION_RESULTS.isEmpty()) {
         echo "No viewer session results to aggregate"
+        return
+    }
+    def missing = VIEWER_SESSION_RESULTS.findAll { viewerKey, stats -> stats == null }.keySet()
+    if (!missing.isEmpty()) {
+        // A partial rate over the viewers that did report would be misleading, and a default
+        // for the ones that did not would fabricate failures. Publish nothing for this run.
+        echo "ViewerConnectionSuccessRate not published: no stats from ${missing.join(', ')} (${VIEWER_SESSION_RESULTS})"
+        VIEWER_SESSION_RESULTS = [:]
         return
     }
 

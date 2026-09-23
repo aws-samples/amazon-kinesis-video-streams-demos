@@ -30,6 +30,12 @@ const VERIFY_TIMEOUT_MS = 600000;
 const verifyQueue = [];
 let verifyWorkerBusy = false;
 
+// How long before the cleanup timer the connection monitor must stop, so the normal completion
+// path (getTestResults -> cleanup -> verify) always wins the race against it. getTestResults
+// alone makes ~18 sequential PutMetricData calls before the race can settle. See
+// monitorConnection() for why the monitor is bounded by that timer and not by config.duration.
+const MONITOR_CLEANUP_MARGIN_MS = 20000;
+
 function enqueueVerification(job) {
   verifyQueue.push(job);
   // Backpressure: keep the newest jobs. Verification is a sample, not a ledger --
@@ -262,6 +268,9 @@ class ViewerCanaryTest {
     this.framesReceived = false;
     this.testCompleted = false;
     this.timerStarted = false;
+    // Absolute time (ms) at which runViewerCanary's cleanup timer fires; set by runViewerCanary
+    // before the browser starts so monitorConnection can bound itself against it.
+    this.cleanupDeadlineMs = null;
 
     // Comprehensive timing tracking for WebRTC connection stages
     this.joinSSCallTime = null;
@@ -1413,10 +1422,25 @@ class ViewerCanaryTest {
     // In continuous/soak mode each session is a recycle segment: monitor for the whole segment
     // (config.duration, set to the recycle interval) rather than the MASTER_DURATION cap, then this
     // segment ends cleanly and the outer loop starts a fresh one with refreshed credentials.
+    //
+    // The cap is measured against the cleanup deadline runViewerCanary armed at process start,
+    // not against config.duration: this monitor starts only once the session is joined (several
+    // seconds in, arbitrarily later when the master is slow), while the cleanup timer counts
+    // from process start. `Math.min(MASTER_DURATION, duration - 15)` with MASTER_DURATION ==
+    // duration therefore ended ~1s AFTER the cleanup timer on every gamma run, which rejected a
+    // finished, healthy session as "Test timeout" and made the process exit 1.
     const masterDurationSec = parseInt(process.env.MASTER_DURATION) || 156;
+    const remainingBeforeCleanupMs = this.cleanupDeadlineMs
+        ? this.cleanupDeadlineMs - Date.now() - MONITOR_CLEANUP_MARGIN_MS
+        : (this.config.duration - 15) * 1000;
     const monitorDurationMs = this.config.continuous
-        ? (this.config.duration - 15) * 1000
-        : Math.min(masterDurationSec, this.config.duration - 15) * 1000;
+        ? Math.max(remainingBeforeCleanupMs, 0)
+        : Math.max(Math.min(masterDurationSec * 1000, remainingBeforeCleanupMs), 0);
+    if (!this.config.continuous && monitorDurationMs < masterDurationSec * 1000) {
+      log(`Viewer kill window (${this.config.duration}s) leaves only ${Math.round(monitorDurationMs / 1000)}s ` +
+          `before cleanup; monitoring less than MASTER_DURATION=${masterDurationSec}s. ` +
+          `Raise VIEWER_SESSION_DURATION_SECONDS above DURATION_IN_SECONDS to cover the whole stream.`);
+    }
     log(`Storage session joined, monitoring connection for ${monitorDurationMs / 1000} seconds...`);
     setTimeout(() => {
       this.testCompleted = true;
@@ -1846,13 +1870,37 @@ class ViewerCanaryTest {
       ? (this.successfulConnections * 100.0) / this.connectionAttempts
       : 0;
     log(`Connection Attempt Summary: ${this.successfulConnections}/${this.connectionAttempts} successful (${joinPct.toFixed(1)}%)`);
-    log(`VIEWER_STATS:${JSON.stringify({attempts: this.connectionAttempts, successes: this.successfulConnections})}`);
+    log(`VIEWER_STATS:${JSON.stringify(this.connectionStats())}`);
+    this.writeViewerStatsFile();
     
     // Success is based on storage session joining, not frame reception
     const success = this.storageSessionJoined;
     log(success ? 'TEST PASSED: Storage session joined successfully' : 'TEST FAILED: Storage session not joined');
     
     return { ...metrics, success };
+  }
+
+  connectionStats() {
+    return { attempts: this.connectionAttempts, successes: this.successfulConnections };
+  }
+
+  // Hand the connection stats to the pipeline through a file (VIEWER_STATS_FILE) rather than only
+  // through stdout. The groovy used to scrape VIEWER_STATS: out of `sh(returnStdout: true)`, and
+  // that step throws before returning any output when the script exits non-zero -- so a run that
+  // had already printed attempts=2 successes=2 was reported as 0% the moment anything after the
+  // monitor (timeout race, verify failure, dev-server teardown) made the exit code 1. The file is
+  // written whenever the stats are known, including on the error path, and the pipeline reads it
+  // in a finally block. Best-effort: a write failure must not fail the run.
+  writeViewerStatsFile() {
+    const statsFile = process.env.VIEWER_STATS_FILE;
+    if (!statsFile) return;
+    try {
+      fs.mkdirSync(path.dirname(statsFile), { recursive: true });
+      fs.writeFileSync(statsFile, JSON.stringify(this.connectionStats()));
+      log(`Wrote viewer stats to ${statsFile}`);
+    } catch (error) {
+      log(`Failed to write viewer stats file ${statsFile}: ${error.message}`);
+    }
   }
 }
 
@@ -1958,9 +2006,18 @@ async function runViewerCanary(config) {
 
   const cleanupTimeout = (config.duration - 10) * 1000; // Start cleanup 10 seconds early
   const hardTimeout = config.duration * 1000; // Hard timeout
+  // Published so monitorConnection stops MONITOR_CLEANUP_MARGIN_MS before this fires.
+  test.cleanupDeadlineMs = Date.now() + cleanupTimeout;
 
   const cleanupPromise = new Promise((_, reject) => {
     setTimeout(async () => {
+      // The monitor already finished (or the normal path already completed): the run is on its
+      // way to getTestResults/cleanup and is not a timeout. Leave this promise pending so the
+      // normal path wins the race; hardTimeoutPromise still bounds a normal path that hangs.
+      if (cleanupCompleted || test.testCompleted) {
+        log('Cleanup timer fired after the monitor completed - ignoring (not a timeout)');
+        return;
+      }
       await performCleanup();
       reject(new Error('Test timeout - cleanup completed'));
     }, cleanupTimeout);
@@ -2020,6 +2077,10 @@ async function runViewerCanary(config) {
       await performCleanup();
     }
     
+    // The attempts/successes counted so far are real data even when the run ends in error;
+    // getTestResults did not run, so hand them to the pipeline here.
+    test.writeViewerStatsFile();
+
     const isTimeout = error.message.includes('timeout');
     await cleanup(isTimeout ? 'timeout' : 'error');
     throw error;
