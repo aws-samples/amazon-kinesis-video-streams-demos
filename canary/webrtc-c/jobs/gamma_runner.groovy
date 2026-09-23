@@ -85,6 +85,7 @@ def buildWebRTCProject(thing_prefix) {
         export CANARY_ASSET_PREFIX='${params.CANARY_ASSET_PREFIX ?: ''}'
         export CANARY_ASSET_REGION='${params.CANARY_ASSET_REGION ?: ''}'
         export AWS_DEFAULT_REGION='${params.AWS_DEFAULT_REGION ?: 'us-west-2'}'
+        export CANARY_MEDIA_SOURCE='${params.CANARY_MEDIA_SOURCE ?: ''}'
         chmod a+x '${repoDir}/canary/webrtc-c/scripts/build-storage-master.sh' &&
         '${repoDir}/canary/webrtc-c/scripts/build-storage-master.sh' '${params.GIT_URL}' '${params.GIT_HASH}'"""
 
@@ -363,7 +364,8 @@ def buildStorageCanary(isConsumer, params) {
         'CANARY_NO_LOOP_FRAMES': params.NO_LOOP_FRAMES ?: false,
         'CANARY_FRAME_RATE': params.STORAGE_FPS ?: '',
         'CANARY_ASSET_SET': params.STORAGE_ASSET_SET ?: '',
-        'CANARY_MEDIA_TYPE': env.CANARY_MEDIA_TYPE ?: ''
+        'CANARY_MEDIA_TYPE': env.CANARY_MEDIA_TYPE ?: '',
+        'CANARY_MEDIA_SOURCE': params.CANARY_MEDIA_SOURCE ?: ''
     ]
 
     def repoDir = "${env.HOME}/webrtc-c-storage-master/repo"
@@ -421,9 +423,14 @@ def buildStorageCanary(isConsumer, params) {
             // after CANARY_DURATION_IN_SECONDS, but if it hangs (e.g., ICE agent
             // threads not cleaned up after connection failure), Jenkins kills it.
             timeout(time: params.DURATION_IN_SECONDS.toInteger() + 900, unit: 'SECONDS') {
+                // stdbuf -oL: line-buffer stdout. Through a Jenkins pipe stdout is
+                // fully buffered, so if the binary segfaults (e.g. the SDK's ARM64
+                // signaling-teardown crash) every unflushed log line dies with the
+                // process and the console shows only garbage. Line buffering makes
+                // the pre-crash log lines reach the console.
                 sh """
                     cd ${buildDir} &&
-                    ./kvsWebrtcStorageSample"""
+                    stdbuf -oL ./kvsWebrtcStorageSample"""
             }
         }
         pushKeepAlive('MasterFinished')
@@ -557,10 +564,12 @@ pipeline {
         booleanParam(name: 'NO_LOOP_FRAMES', defaultValue: false, description: 'Stop after sending all frames once instead of looping')
         string(name: 'STORAGE_FPS', defaultValue: '', description: 'Override storage master frame rate (e.g., 10 for low FPS test). Empty uses default 30 fps.')
         string(name: 'STORAGE_ASSET_SET', defaultValue: '', description: 'Frame asset set: empty=default h264SampleFrames, or e.g. h264SampleFrames-500kbps / -1mbps / -5mbps')
+        string(name: 'CANARY_MEDIA_SOURCE', defaultValue: '', description: 'Master media source: empty/disk=pre-encoded frames, devicesrc=physical camera, testsrc=GStreamer test pattern, rtspsrc=RTSP. Non-disk values trigger a GStreamer-enabled build (requires libgstreamer1.0-dev on the master node).')
         string(name: 'CANARY_ASSET_BUCKET', defaultValue: '', description: 'S3 bucket hosting the frame-set tarballs (required when STORAGE_ASSET_SET is set)')
         string(name: 'CANARY_ASSET_PREFIX', defaultValue: '', description: 'S3 key prefix for frame-set tarballs, e.g. webrtc-canary/frame-sets/v1 (required when STORAGE_ASSET_SET is set)')
         string(name: 'CANARY_ASSET_REGION', defaultValue: '', description: 'Region of the S3 asset bucket. May differ from AWS_DEFAULT_REGION. Empty falls back to AWS_DEFAULT_REGION.')
         string(name: 'JS_BRANCH', defaultValue: 'master', description: 'JS SDK branch name to clone and serve locally (default: master)')
+        string(name: 'STS_DURATION_SECONDS', defaultValue: '43200', description: 'STS session duration. Use 3600 for nodes with role-chained credentials (e.g. rpi5-master, whose IoT-certificate base credentials cap chained sessions at 1 hour).')
     }
     
     options {
@@ -615,7 +624,11 @@ pipeline {
                     // Mark workspace as in-use to prevent cron cleanup
                     sh "touch '${env.WORKSPACE}/.in_use'"
 
-                    def assumeRoleOutput = sh(script: 'aws sts assume-role --role-arn $AWS_KVS_STS_ROLE_ARN --role-session-name roleSessionName --duration-seconds 43200 --output json',
+                    // Role-chained credentials (e.g. the Raspberry Pi node's IoT-certificate
+                    // base credentials) are hard-capped at 3600s by STS; EC2 instance-profile
+                    // nodes can use the full 43200s.
+                    def stsDuration = params.STS_DURATION_SECONDS ?: '43200'
+                    def assumeRoleOutput = sh(script: "aws sts assume-role --role-arn \$AWS_KVS_STS_ROLE_ARN --role-session-name roleSessionName --duration-seconds ${stsDuration} --output json",
                                                 returnStdout: true).trim()
                     def assumeRoleJson = readJSON text: assumeRoleOutput
 

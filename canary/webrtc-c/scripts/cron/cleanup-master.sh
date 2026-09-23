@@ -9,6 +9,7 @@
 set -euo pipefail
 
 MASTER_HOME="${HOME}/webrtc-c-storage-master"
+REPO_DIR="${MASTER_HOME}/repo"
 
 echo "$(date -u '+%Y-%m-%dT%H:%M:%SZ') [cleanup-master] Starting cleanup"
 
@@ -38,6 +39,11 @@ for dir in "${HOME}/Jenkins/workspace"/webrtc-* "${HOME}/Jenkins"/webrtc-*; do
     echo "$(date -u '+%Y-%m-%dT%H:%M:%SZ') [cleanup-master] Removing stale workspace: $dir"
     rm -rf "$dir"
 done
+
+# GetClip MP4s: the consumer/GetClip step runs on the master node in the
+# single-node topologies, so clips land here too. Each is ~26 MB and is never
+# re-read once verified, so keep only the last hour.
+find "${REPO_DIR}/canary/consumer-java" -name 'clip-*.mp4' -mmin +60 -delete 2>/dev/null || true
 
 # Core dumps if any
 find "${MASTER_HOME}" -name 'core.*' -mmin +60 -delete 2>/dev/null || true

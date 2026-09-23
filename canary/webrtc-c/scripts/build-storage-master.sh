@@ -98,6 +98,23 @@ echo "webrtc-c dependency version: $CURRENT_WEBRTC_VERSION"
 # ---------------------------------------------------------------------------
 # 3. Check if rebuild is needed
 # ---------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
+# Derive GStreamer support from the job's runtime media source: any non-disk
+# CANARY_MEDIA_SOURCE (devicesrc / testsrc / rtspsrc) requires the GStreamer
+# build. ENABLE_GST_MEDIA_SOURCE, if set explicitly, overrides the derivation.
+# ---------------------------------------------------------------------------
+if [ -z "${ENABLE_GST_MEDIA_SOURCE:-}" ]; then
+    MEDIA_SOURCE="${CANARY_MEDIA_SOURCE:-disk}"
+    if [ "$MEDIA_SOURCE" != "disk" ]; then
+        ENABLE_GST_MEDIA_SOURCE=ON
+    else
+        ENABLE_GST_MEDIA_SOURCE=OFF
+    fi
+fi
+echo "GStreamer media source: ${ENABLE_GST_MEDIA_SOURCE} (CANARY_MEDIA_SOURCE='${CANARY_MEDIA_SOURCE:-}')"
+CURRENT_BUILD_FLAGS="gst=${ENABLE_GST_MEDIA_SOURCE}"
+BUILD_FLAGS_FILE="${BUILD_HOME}/.build-flags"
+
 CACHED_COMMIT=$(cat "$COMMIT_FILE" 2>/dev/null || echo "")
 CACHED_WEBRTC_VERSION=$(cat "$WEBRTC_VERSION_FILE" 2>/dev/null || echo "")
 BINARY_PATH="${BUILD_DIR}/kvsWebrtcStorageSample"
@@ -115,6 +132,9 @@ elif [ "$CURRENT_COMMIT" != "$CACHED_COMMIT" ]; then
 elif [ "$CURRENT_WEBRTC_VERSION" != "$CACHED_WEBRTC_VERSION" ]; then
     echo "webrtc-c version changed ($CACHED_WEBRTC_VERSION -> $CURRENT_WEBRTC_VERSION), rebuild needed"
     NEED_REBUILD=true
+elif [ "$CURRENT_BUILD_FLAGS" != "$(cat "$BUILD_FLAGS_FILE" 2>/dev/null || echo "")" ]; then
+    echo "Build flags changed ($(cat "$BUILD_FLAGS_FILE" 2>/dev/null || echo "<none>") -> $CURRENT_BUILD_FLAGS), rebuild needed"
+    NEED_REBUILD=true
 else
     echo "No changes detected, skipping build"
 fi
@@ -128,6 +148,8 @@ if [ "$NEED_REBUILD" = "true" ]; then
     echo "Building... (log: $BUILD_LOG)"
 
     CMAKE_FLAGS="-DCMAKE_BUILD_TYPE=Debug -DCMAKE_INSTALL_PREFIX=${BUILD_DIR}"
+    # GStreamer media source, derived above from CANARY_MEDIA_SOURCE
+    CMAKE_FLAGS="$CMAKE_FLAGS -DENABLE_GST_MEDIA_SOURCE=${ENABLE_GST_MEDIA_SOURCE}"
     if [ "$TLS_BACKEND" = "mbedtls" ]; then
         CMAKE_FLAGS="$CMAKE_FLAGS -DCANARY_USE_OPENSSL=OFF -DCANARY_USE_MBEDTLS=ON"
     fi
@@ -135,10 +157,17 @@ if [ "$NEED_REBUILD" = "true" ]; then
     rm -rf "$BUILD_DIR"
     mkdir -p "$BUILD_DIR"
 
+    # Build only the storage master target. The canary signaling/webrtc
+    # executables are not used by the storage scenario, and building them
+    # pulls in symbols (writeFirstFrameSentTimeToFile,
+    # calculateDisconnectToFrameSentTime) that are only defined in the storage
+    # sample source — so a full `make` fails at link time on those two targets
+    # even though kvsWebrtcStorageSample links fine. Restrict the build to the
+    # one target we run.
     (
         cd "$BUILD_DIR"
         cmake "$REPO_DIR/canary/webrtc-c" $CMAKE_FLAGS
-        make -j"$(nproc)"
+        make -j"$(nproc)" kvsWebrtcStorageSample
     ) > "$BUILD_LOG" 2>&1
 
     BUILD_EXIT=$?
@@ -152,10 +181,50 @@ if [ "$NEED_REBUILD" = "true" ]; then
     fi
 
     # -----------------------------------------------------------------------
+    # 4b. Post-build smoke test — a build can "succeed" yet produce corrupt
+    #     artifacts (observed once: garbage pages inside libusrsctp.a made
+    #     initKvsWebRtc die with SIGILL, and the stamp cache then reused the
+    #     poisoned binary on every run). Launch the binary with dummy creds:
+    #     it must survive WebRTC/SCTP init. Signaling failures afterwards are
+    #     expected (creds are fake) and exit with a normal status; death by
+    #     signal (exit >= 128, e.g. 132=SIGILL, 139=SIGSEGV) means the
+    #     artifacts are corrupt. In that case we do NOT write the stamps, so
+    #     the next invocation rebuilds from scratch instead of caching junk.
+    # -----------------------------------------------------------------------
+    SMOKE_LOG="${LOGS_DIR}/smoke-$(date +%s).log"
+    echo "Running post-build smoke test... (log: $SMOKE_LOG)"
+    SMOKE_RC=0
+    (
+        cd "$BUILD_DIR"
+        env AWS_ACCESS_KEY_ID=smoke-test AWS_SECRET_ACCESS_KEY=smoke-test \
+            AWS_SESSION_TOKEN=smoke-test AWS_DEFAULT_REGION=us-east-1 \
+            CANARY_CHANNEL_NAME=smoke-test CANARY_LABEL=StorageWithViewer \
+            CANARY_LOG_GROUP_NAME=WebrtcSDK CANARY_DURATION_IN_SECONDS=5 \
+            CANARY_IS_MASTER=TRUE \
+            timeout 30 ./kvsWebrtcStorageSample
+    ) > "$SMOKE_LOG" 2>&1 || SMOKE_RC=$?
+    if [ "$SMOKE_RC" -ge 128 ]; then
+        echo "ERROR: smoke test died with signal $((SMOKE_RC - 128)) (exit $SMOKE_RC) — build artifacts look corrupt"
+        echo "Refusing to cache this build; next invocation will rebuild from scratch."
+        tail -20 "$SMOKE_LOG"
+        # Release lock
+        flock -u 9
+        exit 1
+    fi
+    echo "Smoke test passed (exit $SMOKE_RC)"
+
+    # -----------------------------------------------------------------------
     # 5. Update stamps
     # -----------------------------------------------------------------------
     echo "$CURRENT_COMMIT" > "$COMMIT_FILE"
     echo "$CURRENT_WEBRTC_VERSION" > "$WEBRTC_VERSION_FILE"
+    echo "$CURRENT_BUILD_FLAGS" > "$BUILD_FLAGS_FILE"
+
+    # Pin the fresh artifacts and stamps to disk immediately. Without this, a
+    # power loss during the kernel writeback window leaves "valid" stamps
+    # pointing at a binary with holes in it (metadata is journaled, file data
+    # is not).
+    sync
 
     # Clean up old logs (keep last 10)
     ls -1t "$LOGS_DIR"/build-*.log 2>/dev/null | tail -n +11 | xargs rm -f 2>/dev/null || true

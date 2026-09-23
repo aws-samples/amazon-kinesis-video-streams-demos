@@ -1,6 +1,10 @@
 #include "Samples.h"
 #include "../Include.h"
 
+#ifdef ENABLE_GST_MEDIA_SOURCE
+#include "GstMedia.h"
+#endif
+
 
 extern PSampleConfiguration gSampleConfiguration;
 extern UINT32 gJoinSSTimeoutCount;
@@ -51,9 +55,30 @@ INT32 main(INT32 argc, CHAR* argv[])
     remove((PCHAR)(std::string(FIRST_FRAME_TS_FILE_PATH) + pSampleConfiguration->fristFrameSentTSFileName).c_str());
     DLOGD("[Canary] Canary init time: %d [ms]", (GETTIME() / HUNDREDS_OF_NANOS_IN_A_MILLISECOND) - t1);
 
-    // Set the audio and video handlers
+    // Set the audio and video handlers. Default is the pre-encoded disk-frame
+    // path; CANARY_MEDIA_SOURCE selects a live GStreamer source instead
+    // (testsrc / devicesrc [physical camera] / rtspsrc) when the build was
+    // configured with -DENABLE_GST_MEDIA_SOURCE=ON.
     pSampleConfiguration->audioSource = sendAudioPackets;
     pSampleConfiguration->videoSource = sendVideoPackets;
+#ifdef ENABLE_GST_MEDIA_SOURCE
+    {
+        PCHAR pMediaSource = GETENV(CANARY_MEDIA_SOURCE_ENV_VAR);
+        if (pMediaSource != NULL && pMediaSource[0] != '\0' && STRCMP(pMediaSource, "disk") != 0) {
+            DLOGI("[KVS Master] %s='%s' set, using GStreamer media source instead of disk frames", CANARY_MEDIA_SOURCE_ENV_VAR, pMediaSource);
+            CHK_STATUS(useGstreamer(pSampleConfiguration));
+        }
+    }
+#else
+    {
+        PCHAR pMediaSource = GETENV("CANARY_MEDIA_SOURCE");
+        if (pMediaSource != NULL && pMediaSource[0] != '\0' && STRCMP(pMediaSource, "disk") != 0) {
+            DLOGW("[KVS Master] CANARY_MEDIA_SOURCE='%s' is set but this build has no GStreamer support. "
+                  "Rebuild with -DENABLE_GST_MEDIA_SOURCE=ON. Falling back to disk frames.",
+                  pMediaSource);
+        }
+    }
+#endif
     pSampleConfiguration->receiveAudioVideoSource = sampleReceiveAudioVideoFrame;
 
     // Set sample to use storage mode
@@ -95,14 +120,17 @@ INT32 main(INT32 argc, CHAR* argv[])
         DLOGI("[KVS Master] Using asset set '%s' (from %s)", pAssetSet, CANARY_ASSET_SET_ENV_VAR);
     }
 
-    // Check if the samples are present
-    SNPRINTF(videoProbePath, MAX_PATH_LEN, "./assets/%s/frame-0001.h264", pAssetSet);
-    DLOGI("[KVS Master] Checking sample video frame availability at %s ....", videoProbePath);
-    CHK_STATUS(readFrameFromDisk(NULL, &frameSize, videoProbePath));
-    DLOGI("[KVS Master] Checked sample video frame availability....available");
+    // Check if the samples are present. Skipped when a GStreamer media source is
+    // active (videoSource != sendVideoPackets), since no disk assets are needed then.
+    if (pSampleConfiguration->videoSource == sendVideoPackets) {
+        SNPRINTF(videoProbePath, MAX_PATH_LEN, "./assets/%s/frame-0001.h264", pAssetSet);
+        DLOGI("[KVS Master] Checking sample video frame availability at %s ....", videoProbePath);
+        CHK_STATUS(readFrameFromDisk(NULL, &frameSize, videoProbePath));
+        DLOGI("[KVS Master] Checked sample video frame availability....available");
 
-    CHK_STATUS(readFrameFromDisk(NULL, &frameSize, "./assets/opusSampleFrames/sample-0001.opus"));
-    DLOGI("[KVS Master] Checked sample audio frame availability....available");
+        CHK_STATUS(readFrameFromDisk(NULL, &frameSize, "./assets/opusSampleFrames/sample-0001.opus"));
+        DLOGI("[KVS Master] Checked sample audio frame availability....available");
+    }
 
     // Initialize KVS WebRTC. This must be done before anything else, and must only be done once.
     CHK_STATUS(initKvsWebRtc());

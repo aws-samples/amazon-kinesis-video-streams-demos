@@ -7,6 +7,7 @@ include(FetchContent)
 
 option(CANARY_USE_OPENSSL "OPenssl" ON)
 option(CANARY_USE_MBEDTLS "MBedtls" OFF)
+option(ENABLE_GST_MEDIA_SOURCE "Enable GStreamer media source (physical camera / RTSP / test source) for the storage canary" OFF)
 
 FetchContent_Declare(
   webrtc
@@ -58,6 +59,16 @@ include_directories(${cloudwatch_SOURCE_DIR}/aws-cpp-sdk-logs/include)
 include_directories(${webrtc_SOURCE_DIR}/src/include)
 include_directories(${webrtc_SOURCE_DIR}/open-source/include)
 link_directories(${webrtc_SOURCE_DIR}/open-source/lib)
+set(CANARY_GST_SOURCES "")
+if(ENABLE_GST_MEDIA_SOURCE)
+  find_package(PkgConfig REQUIRED)
+  pkg_check_modules(GST REQUIRED gstreamer-1.0 gstreamer-app-1.0)
+  include_directories(${GST_INCLUDE_DIRS})
+  link_directories(${GST_LIBRARY_DIRS})
+  add_definitions(-DENABLE_GST_MEDIA_SOURCE)
+  set(CANARY_GST_SOURCES src/media-server-storage/GstMedia.cpp)
+endif()
+
 add_library(
   kvsWebrtcCanary
   src/Config.cpp
@@ -65,7 +76,8 @@ add_library(
   src/CloudwatchMonitoring.cpp
   src/Cloudwatch.cpp
   src/Peer.cpp
-  src/media-server-storage/Common.cpp)
+  src/media-server-storage/Common.cpp
+  ${CANARY_GST_SOURCES})
 target_link_libraries(
   kvsWebrtcCanary
   PUBLIC
@@ -75,6 +87,10 @@ target_link_libraries(
   aws-cpp-sdk-core
   aws-cpp-sdk-monitoring
   aws-cpp-sdk-logs)
+
+if(ENABLE_GST_MEDIA_SOURCE)
+  target_link_libraries(kvsWebrtcCanary PUBLIC ${GST_LIBRARIES})
+endif()
 
 add_executable(
   kvsWebrtcCanaryWebrtc

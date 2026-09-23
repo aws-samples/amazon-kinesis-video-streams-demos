@@ -274,6 +274,10 @@ STATUS canaryMasterStreamingAvailability(UINT32, UINT64, UINT64);
 
 STATUS handleWriteFrameMetricIncrementation(PSampleStreamingSession pSampleStreamingSession, UINT32 frameSize);
 
+// Defined in kvsWebRTCClientMaster.cpp; shared with the GStreamer media source (GstMedia.cpp)
+VOID writeFirstFrameSentTimeToFile(PCHAR fileName);
+VOID calculateDisconnectToFrameSentTime(PSampleConfiguration pSampleConfiguration);
+
 
 // #ifdef __cplusplus
 // }
