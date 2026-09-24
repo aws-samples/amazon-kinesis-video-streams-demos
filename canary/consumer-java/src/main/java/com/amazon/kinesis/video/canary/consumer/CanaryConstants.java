@@ -92,7 +92,7 @@ public final class CanaryConstants {
     public static final String DEFAULT_CLIP_OUTPUT_PATH = "clip.mp4";
     // Set by the runner for a BOUNDED run whose duration exceeds what one GetClip can return (the
     // API caps a clip at the first 100 MB / 200 fragments, ~600 s of this canary's media). Such a
-    // run is verified with the soak's GetMedia segmenting path (SoakStreamVerifier) for its whole
+    // run is verified with the soak's GetMedia segmenting path (SegmentedStreamVerifier) for its whole
     // duration, publishing ConsumerStorageAvailability once per segment, and the end-of-run GetClip
     // is skipped: a 600 s clip judged against a 2700 s expectation can only ever score 0.
     public static final String SEGMENTED_VERIFY_ENV_VAR = "CANARY_SEGMENTED_VERIFY";

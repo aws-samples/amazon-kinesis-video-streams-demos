@@ -9,7 +9,7 @@
 #   0 * * * * $HOME/webrtc-c-storage-master/cleanup-consumer.sh >> $HOME/webrtc-c-storage-master/logs/cleanup.log 2>&1
 #
 # Install (soak-dedicated consumer node) — this is the node that actually needs a
-# high-frequency sweep. SoakStreamVerifier verifies one 60s segment per minute, and
+# high-frequency sweep. SegmentedStreamVerifier verifies one 60s segment per minute, and
 # each verify.py run leaves a 150-300MB /tmp/video-verify-* dir, so an hourly tick
 # can leave ~60 of them standing (9-18GB). Reaping off, sweep every 5 minutes:
 #   */5 * * * * REAP_WORKSPACES=0 $HOME/webrtc-c-storage-master/cleanup-consumer.sh >> $HOME/webrtc-c-storage-master/logs/cleanup.log 2>&1

@@ -86,11 +86,11 @@ public class WebrtcStorageCanaryConsumer {
     private static CloudWatchLogsAppender mLogsAppender;
     // Non-null while GetMedia segment verification is running (soak, or a bounded run under
     // CANARY_SEGMENTED_VERIFY); the bounded case stops and drains it in finishVideoVerification().
-    private static SoakStreamVerifier mSegmentVerifier;
+    private static SegmentedStreamVerifier mSegmentVerifier;
 
     // Bound on a single verify.py subprocess (see runVerifyScript); a slow/hung verify is killed
     // rather than piling up. Segmenting/cadence for continuous soak verification lives in
-    // SoakStreamVerifier (GetMedia -> ffmpeg segments -> per-segment verify).
+    // SegmentedStreamVerifier (GetMedia -> ffmpeg segments -> per-segment verify).
     static final long SOAK_VERIFY_TIMEOUT_SECONDS = 600;
 
     // Ceiling on how far behind wall clock the ListFragments cursor may sit (see
@@ -466,7 +466,7 @@ public class WebrtcStorageCanaryConsumer {
      *
      * Non-interference with the ListFragments continuity/heartbeat work is guaranteed three ways:
      *   1. It's a separate OS process (not JVM threads), launched from a single-threaded worker
-     *      (SoakStreamVerifier), so verifications never overlap and never block a ListFragments tick.
+     *      (SegmentedStreamVerifier), so verifications never overlap and never block a ListFragments tick.
      *   2. It runs under `nice -n 19`, so the CPU-heavy frame-extraction/OCR/SSIM work is
      *      deprioritized behind everything else (the ListFragments calls are network-bound anyway).
      *   3. It's bounded by SOAK_VERIFY_TIMEOUT — a slow/hung verify is killed, never piling up.
@@ -771,7 +771,7 @@ public class WebrtcStorageCanaryConsumer {
 
         // Soak video verification: the runner's end-of-run GetClip+verify.py stage never runs in
         // continuous mode (there is no end), so verify the ingested media CONTINUOUSLY instead:
-        // SoakStreamVerifier pulls the stream via GetMedia, an ffmpeg subprocess splits it into
+        // SegmentedStreamVerifier pulls the stream via GetMedia, an ffmpeg subprocess splits it into
         // fixed-length segments, and each finished segment is verified with verify.py (SSIM against
         // the sample frames for framesrc/disk, presence otherwise). Segments lost to reconnects,
         // boundary discards and skips are not verified and are not currently measured, so make no
@@ -790,7 +790,7 @@ public class WebrtcStorageCanaryConsumer {
         final boolean segmentedVerify = !runForever
                 && "true".equalsIgnoreCase(System.getenv(CanaryConstants.SEGMENTED_VERIFY_ENV_VAR));
         if (videoVerifyEnabled && (runForever || segmentedVerify)) {
-            mSegmentVerifier = new SoakStreamVerifier(mStreamName, mRegion, mCredentialsProvider, mAmazonKinesisVideo,
+            mSegmentVerifier = new SegmentedStreamVerifier(mStreamName, mRegion, mCredentialsProvider, mAmazonKinesisVideo,
                     runForever ? "SoakVideoDecodable" : "ConsumerStorageAvailability");
             mSegmentVerifier.start();
             if (segmentedVerify) {

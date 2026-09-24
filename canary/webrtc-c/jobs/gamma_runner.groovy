@@ -477,7 +477,7 @@ def publishViewerConnectionSuccessRate(scenarioLabel) {
 // (= DURATION_IN_SECONDS), so a service-capped 600 s clip of a 2700 s SubReconnect run fails the
 // duration and frame-count checks on every run (this is what pinned ConsumerStorageAvailability
 // at 0 for GammaStorageSubReconnect / GammaStorageSingleReconnect from the 2026-09-16 cutover).
-// Such runs use the soak's GetMedia segmenting path instead (SoakStreamVerifier in the consumer):
+// Such runs use the soak's GetMedia segmenting path instead (SegmentedStreamVerifier in the consumer):
 // verified for the whole run in 60 s segments, ConsumerStorageAvailability published once per
 // segment, and the end-of-run GetClip stage skipped. Soak runs are continuous and already on that
 // path via SOAK_MODE, so they are excluded here.

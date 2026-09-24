@@ -19,7 +19,7 @@ Consumer (Java), regardless of verification flags:
 |---|---|---|---|
 | **Bounded run, `VIDEO_VERIFY_ENABLED=false`** (most cron canaries) | none | — | ListFragments metrics only |
 | **Bounded run, `VIDEO_VERIFY_ENABLED=true`** | **end-of-run, once** | Consumer `downloadClip()` (GetClip, canary start→end, ≤100MB/~10min cap) → runner verify stage runs `verify.py` once | `ConsumerStorageAvailability` (0/1, pushed by runner shell `aws`) |
-| **Soak (`SOAK_MODE=true`) + `VIDEO_VERIFY_ENABLED=true`** | **continuous, every 60s of media** | Consumer `SoakStreamVerifier`: GetMedia 连续拉流 → ffmpeg(`-c:v copy`)切 60s 段 → 每段 `verify.py` | `SoakVideoDecodable` (per segment) + `FrameTimestampDriftSeconds`/`Max` + `SoakSegmentSkipped` |
+| **Soak (`SOAK_MODE=true`) + `VIDEO_VERIFY_ENABLED=true`** | **continuous, every 60s of media** | Consumer `SegmentedStreamVerifier`: GetMedia 连续拉流 → ffmpeg(`-c:v copy`)切 60s 段 → 每段 `verify.py` | `SoakVideoDecodable` (per segment) + `FrameTimestampDriftSeconds`/`Max` + `SoakSegmentSkipped` |
 | **Soak without `VIDEO_VERIFY_ENABLED`** | none | — | ListFragments metrics only |
 | **Viewer scenarios (`JS_STORAGE_VIEWER_JOIN=true`)** | egress side, end-of-session | chrome-headless MediaRecorder 录 `recordings/viewer-*.mp4`(重连分段)→ viewer 节点跑 `verify.py` | viewer availability 指标(egress 路径,和 consumer 的 ingest 验证互相独立) |
 

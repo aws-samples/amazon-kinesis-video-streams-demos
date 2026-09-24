@@ -285,7 +285,7 @@ public class CloudWatchLogsAppender extends AppenderSkeleton {
 
         // PutLogEvents requires events in ascending timestamp order. Appends arrive in order per
         // thread but not across threads, and the consumer logs from several (heartbeat timer,
-        // ListFragments, SoakStreamVerifier pull loop and segment workers).
+        // ListFragments, SegmentedStreamVerifier pull loop and segment workers).
         batch.sort(Comparator.comparingLong(InputLogEvent::getTimestamp));
 
         synchronized (putLock) {

@@ -182,7 +182,7 @@ reap_workspaces() {
 sweep_verify_scratch() {
     find /tmp -maxdepth 1 -name 'video-verify-*' -type d -mmin "+${SCRATCH_MAX_AGE_MIN}" -exec rm -rf {} + 2>/dev/null || true
     find /tmp -maxdepth 1 -name 'tess_*' -mmin "+${SCRATCH_MAX_AGE_MIN}" -exec rm -rf {} + 2>/dev/null || true
-    # SoakStreamVerifier's GetMedia segment spool (Files.createTempDirectory
+    # SegmentedStreamVerifier's GetMedia segment spool (Files.createTempDirectory
     # "soak-verify-spool"). It deletes each seg_*.mp4 after verifying and drops the
     # oldest when the backlog exceeds 5, so the live dir stays small -- but the dir
     # itself plus ffmpeg.log leaks on every consumer crash, and nothing else on the
