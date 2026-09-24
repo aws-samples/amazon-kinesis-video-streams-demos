@@ -471,6 +471,24 @@ def publishViewerConnectionSuccessRate(scenarioLabel) {
     VIEWER_SESSION_RESULTS = [:]
 }
 
+// GetClip returns at most the first 100 MB or the first 200 fragments after the start timestamp,
+// which for this canary's media is ~600 s. A bounded run longer than that cannot be judged from
+// the single end-of-run clip: verify.py compares the clip against --expected-duration
+// (= DURATION_IN_SECONDS), so a service-capped 600 s clip of a 2700 s SubReconnect run fails the
+// duration and frame-count checks on every run (this is what pinned ConsumerStorageAvailability
+// at 0 for GammaStorageSubReconnect / GammaStorageSingleReconnect from the 2026-09-16 cutover).
+// Such runs use the soak's GetMedia segmenting path instead (SoakStreamVerifier in the consumer):
+// verified for the whole run in 60 s segments, ConsumerStorageAvailability published once per
+// segment, and the end-of-run GetClip stage skipped. Soak runs are continuous and already on that
+// path via SOAK_MODE, so they are excluded here.
+SINGLE_GETCLIP_MAX_SECONDS = 600
+
+def segmentedVerifyEnabled(params) {
+    if (params.VIDEO_VERIFY_ENABLED?.toString() != 'true') { return false }
+    if (params.SOAK_MODE?.toString() == 'true') { return false }
+    return (params.DURATION_IN_SECONDS ?: '156').toString().toInteger() > SINGLE_GETCLIP_MAX_SECONDS
+}
+
 def buildStorageCanary(isConsumer, params) {
     def thing_prefix = "${env.JOB_NAME}-${params.RUNNER_LABEL}"
     def certsDir = "${env.HOME}/webrtc-c-storage-master/certs/${thing_prefix}"
@@ -591,7 +609,14 @@ def buildStorageCanary(isConsumer, params) {
     // script + reference frames on the consumer node, the mode (ssim for the deterministic
     // framesrc/disk sources with a burned-in counter, presence for camera/testsrc/etc.), and the
     // venv python the consumer ensure-step below creates.
-    if ((params.SOAK_MODE?.toString() == 'true') && (params.VIDEO_VERIFY_ENABLED?.toString() == 'true')) {
+    // The same inputs drive a bounded run that is too long for one GetClip (segmentedVerifyEnabled);
+    // CANARY_SEGMENTED_VERIFY is what tells the consumer to run the segmenter for the whole run and
+    // skip the end-of-run GetClip.
+    def segmentedVerify = segmentedVerifyEnabled(params)
+    if (segmentedVerify) {
+        consumerEnvs['CANARY_SEGMENTED_VERIFY'] = 'true'
+    }
+    if (((params.SOAK_MODE?.toString() == 'true') || segmentedVerify) && (params.VIDEO_VERIFY_ENABLED?.toString() == 'true')) {
         def _soakMediaSrc = params.CANARY_MEDIA_SOURCE ?: 'disk'
         def _soakAssetSet = params.STORAGE_ASSET_SET ?: 'h264SampleFrames'
         // Run-private copy (made in the ensure-step below), NOT the shared repo checkout: other
@@ -700,7 +725,9 @@ def buildStorageCanary(isConsumer, params) {
         // stage doesn't run in soak mode), so ensure its venv + system deps exist here -- the same
         // setup the verify stage uses (python3-venv, ffmpeg, tesseract-ocr, and the pip deps).
         // Guarded by the venv dir so it's a no-op (no apt-get/pip) on every subsequent run.
-        if ((params.SOAK_MODE?.toString() == 'true') && (params.VIDEO_VERIFY_ENABLED?.toString() == 'true')) {
+        // Also needed by a bounded run on the segmented path (segmentedVerifyEnabled), which runs
+        // verify.py from the consumer JVM exactly as a soak does.
+        if (((params.SOAK_MODE?.toString() == 'true') || segmentedVerifyEnabled(params)) && (params.VIDEO_VERIFY_ENABLED?.toString() == 'true')) {
             sh '''
                 VENV_DIR="${HOME}/.venv/video-verify"
                 if [ ! -x "$VENV_DIR/bin/python3" ]; then
@@ -748,6 +775,15 @@ def buildStorageCanary(isConsumer, params) {
                 # is ~170MB, one file); reaped by cleanup-consumer.sh.
                 java -Duser.timezone=UTC -classpath target/aws-kinesisvideo-producer-sdk-canary-consumer-1.0-SNAPSHOT.jar:\$(cat tmp_jar) com.amazon.kinesis.video.canary.consumer.WebrtcStorageCanaryConsumer 2>&1 | tee "\${HOME}/canary-logs/consumer-${env.BUILD_NUMBER}.log"
             """
+        }
+
+        // A run too long for one GetClip was verified per 60 s segment by the consumer itself
+        // (segmentedVerifyEnabled): ConsumerStorageAvailability is already published, and there is
+        // no clip file. Skipping here is what keeps the "no clip -> push 0" fallback below from
+        // reporting a false failure for such a run.
+        if (segmentedVerifyEnabled(params)) {
+            echo "Segmented verification: DURATION_IN_SECONDS=${params.DURATION_IN_SECONDS} exceeds one GetClip (${SINGLE_GETCLIP_MAX_SECONDS}s); ConsumerStorageAvailability was published per segment by the consumer, skipping the end-of-run GetClip verification"
+            return
         }
 
         // Run video verification on the GetClip MP4. sourceFrames points at the same

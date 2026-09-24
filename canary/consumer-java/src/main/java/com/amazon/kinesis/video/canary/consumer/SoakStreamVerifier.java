@@ -30,6 +30,9 @@ import org.apache.log4j.Logger;
  *
  * Unlike the old periodic GetClip probe (which sampled ~156s every 15min), this pulls the ingested
  * stream continuously, so verification is driven by what GetMedia delivers rather than by a timer.
+ * Two callers: a soak (CANARY_CONTINUOUS, runs until killed, metric SoakVideoDecodable) and a
+ * bounded run that is longer than one GetClip can cover (CANARY_SEGMENTED_VERIFY, stop() is called
+ * at the end of the run, metric ConsumerStorageAvailability -- see CanaryConstants).
  * How much of the wall clock that actually accounts for is NOT known: reconnects, boundary
  * discards (see boundarySegments) and skips all subtract from it, and nothing here measures the
  * total. Do not treat this path as complete coverage until a metric proves the accounted fraction.
@@ -80,10 +83,27 @@ public class SoakStreamVerifier {
     // 5 * SEGMENT_SECONDS leaves ~90s of headroom above the observed ceiling, and the fix below
     // (counting a boundary discard as a sign of life) keeps the real gap near one segment anyway.
     private static final long NO_SEGMENT_EMIT_MS = 5 * SEGMENT_SECONDS * 1000;
+    // Bound on stop(): how long to wait for the in-flight verify plus the final drain before giving
+    // up. The consumer runs DURATION + 120 s and its Jenkins stage allows DURATION + 900 s, so this
+    // fits comfortably; at the end of a bounded run there are at most one or two finished segments
+    // left to score anyway.
+    private static final long STOP_DRAIN_TIMEOUT_SECONDS = 180;
+
+    // The per-segment availability metric this verifier publishes. A soak emits SoakVideoDecodable;
+    // a bounded run that is too long for one GetClip (CANARY_SEGMENTED_VERIFY) emits
+    // ConsumerStorageAvailability, so it lands on the same dashboard line the end-of-run GetClip
+    // verdict used to feed, just with one datapoint per segment instead of one per run.
+    private final String availabilityMetricName;
 
     private File spoolDir;
     private volatile Process ffmpeg;
     private volatile long lastEmitMs;
+    private volatile boolean stopping;
+    private volatile ScheduledExecutorService worker;
+    private volatile Thread pullThread;
+    // The live GetMedia client, so stop() can abort a read that is blocked waiting on a stream
+    // the master has already stopped writing to.
+    private volatile AmazonKinesisVideoMedia currentMedia;
 
     // Segments at a generation boundary are structurally incomplete rather than undecodable
     // media, so they must not count as SoakVideoDecodable=0. Both used to be handed to verify.py:
@@ -112,10 +132,16 @@ public class SoakStreamVerifier {
 
     public SoakStreamVerifier(String streamName, String region, AWSCredentialsProvider credentialsProvider,
                               AmazonKinesisVideo kvsClient) {
+        this(streamName, region, credentialsProvider, kvsClient, "SoakVideoDecodable");
+    }
+
+    public SoakStreamVerifier(String streamName, String region, AWSCredentialsProvider credentialsProvider,
+                              AmazonKinesisVideo kvsClient, String availabilityMetricName) {
         this.streamName = streamName;
         this.region = region;
         this.credentialsProvider = credentialsProvider;
         this.kvsClient = kvsClient;
+        this.availabilityMetricName = availabilityMetricName;
     }
 
     public void start() {
@@ -127,32 +153,124 @@ public class SoakStreamVerifier {
         }
         lastEmitMs = System.currentTimeMillis(); // grace period before the first no-segment 0.0
         logger.info("SoakStreamVerifier: continuous verification started (segment=" + SEGMENT_SECONDS
-                + "s, spool=" + spoolDir.getAbsolutePath() + ")");
+                + "s, metric=" + availabilityMetricName + ", spool=" + spoolDir.getAbsolutePath() + ")");
 
-        final Thread pullThread = new Thread(this::pullLoop, "SoakStreamPull");
-        pullThread.setDaemon(true);
-        pullThread.start();
+        final Thread pull = new Thread(this::pullLoop, "SoakStreamPull");
+        pull.setDaemon(true);
+        pullThread = pull;
+        pull.start();
 
-        final ScheduledExecutorService worker = Executors.newSingleThreadScheduledExecutor(r -> {
+        final ScheduledExecutorService w = Executors.newSingleThreadScheduledExecutor(r -> {
             Thread t = new Thread(r, "SoakSegmentWorker");
             t.setDaemon(true);
             return t;
         });
-        worker.scheduleWithFixedDelay(this::processSegments, SEGMENT_SECONDS, WORKER_DELAY_SECONDS, TimeUnit.SECONDS);
+        worker = w;
+        w.scheduleWithFixedDelay(() -> processSegments(false), SEGMENT_SECONDS, WORKER_DELAY_SECONDS, TimeUnit.SECONDS);
+    }
+
+    /*
+     * End of a BOUNDED run: stop pulling, score whatever finished segments are still in the spool,
+     * and clean up. A soak never calls this (it is killed), which is why the pull loop reconnects
+     * forever by default. Order matters:
+     *   1. stopping=true so the pull loop does not reconnect after we cut it;
+     *   2. abort the GetMedia client and kill ffmpeg -- the master has stopped, so the pull thread
+     *      is most likely blocked in read() on a stream that will deliver nothing more, and only
+     *      tearing the connection down gets it out of there. pullOnce's finally then marks the
+     *      truncated tail segment as a boundary artefact exactly as it does on a reconnect;
+     *   3. stop the worker from starting new ticks and wait for an in-flight verify to finish, so
+     *      the drain below never scores a segment concurrently with it;
+     *   4. one synchronous drain pass over every remaining file (drain=true: the "newest is still
+     *      being written" rule no longer applies, nothing is writing).
+     * Bounded by STOP_DRAIN_TIMEOUT_SECONDS end to end; whatever is left after that is deleted with
+     * the spool dir and logged, never silently scored.
+     */
+    public void stop() {
+        if (spoolDir == null) {
+            return; // start() failed or was never called
+        }
+        final long deadlineMs = System.currentTimeMillis() + STOP_DRAIN_TIMEOUT_SECONDS * 1000;
+        stopping = true;
+        logger.info("SoakStreamVerifier: run ended, stopping pull and draining finished segments");
+
+        final AmazonKinesisVideoMedia media = currentMedia;
+        if (media != null) {
+            try {
+                media.shutdown();
+            } catch (Exception ignore) {
+            }
+        }
+        final Process proc = ffmpeg;
+        if (proc != null) {
+            proc.destroyForcibly();
+        }
+        final Thread pull = pullThread;
+        if (pull != null) {
+            try {
+                pull.join(Math.max(1000, remainingMs(deadlineMs) / 2));
+            } catch (InterruptedException ie) {
+                Thread.currentThread().interrupt();
+            }
+            if (pull.isAlive()) {
+                logger.warn("SoakStreamVerifier: pull thread did not exit in time; it is a daemon and dies with the JVM");
+            }
+        }
+
+        final ScheduledExecutorService w = worker;
+        if (w != null) {
+            w.shutdown();
+            try {
+                if (!w.awaitTermination(Math.max(1000, remainingMs(deadlineMs)), TimeUnit.MILLISECONDS)) {
+                    logger.warn("SoakStreamVerifier: in-flight verify did not finish within the stop budget");
+                    w.shutdownNow();
+                }
+            } catch (InterruptedException ie) {
+                Thread.currentThread().interrupt();
+            }
+        }
+
+        if (remainingMs(deadlineMs) > 0) {
+            processSegments(true);
+        }
+
+        final File[] leftover = spoolDir.listFiles((d, name) -> name.startsWith("seg_") && name.endsWith(".mp4"));
+        if (leftover != null && leftover.length > 0) {
+            logger.warn("SoakStreamVerifier: " + leftover.length + " segment(s) left unscored at stop (budget "
+                    + STOP_DRAIN_TIMEOUT_SECONDS + "s exhausted), discarding");
+            for (File f : leftover) {
+                f.delete();
+            }
+        }
+        new File(spoolDir, "ffmpeg.log").delete();
+        spoolDir.delete();
+        logger.info("SoakStreamVerifier: stopped");
+    }
+
+    private static long remainingMs(long deadlineMs) {
+        return deadlineMs - System.currentTimeMillis();
     }
 
     // ------------------------------------------------------------------ pull side
 
     private void pullLoop() {
-        while (true) {
+        while (!stopping) {
             final long startedMs = System.currentTimeMillis();
             boolean clean = false;
             try {
                 pullOnce();
                 clean = true;
             } catch (Exception e) {
+                if (stopping) {
+                    // Expected: stop() tore the connection down under us.
+                    logger.info("SoakStreamVerifier: GetMedia pull ended by stop() after "
+                            + ((System.currentTimeMillis() - startedMs) / 1000) + "s");
+                    return;
+                }
                 logger.error("SoakStreamVerifier: GetMedia pull failed after "
                         + ((System.currentTimeMillis() - startedMs) / 1000) + "s, reconnecting: " + e);
+            }
+            if (stopping) {
+                return;
             }
             final long genSeconds = (System.currentTimeMillis() - startedMs) / 1000;
             if (clean) {
@@ -198,6 +316,7 @@ public class SoakStreamVerifier {
                 .withEndpointConfiguration(
                         new com.amazonaws.client.builder.AwsClientBuilder.EndpointConfiguration(endpoint, region))
                 .build();
+        currentMedia = media;
         Process proc = null;
         try {
             final GetMediaResult result = media.getMedia(new GetMediaRequest()
@@ -226,6 +345,7 @@ public class SoakStreamVerifier {
                 }
                 markGenerationTailAsBoundary();
             }
+            currentMedia = null;
             media.shutdown();
         }
     }
@@ -292,23 +412,30 @@ public class SoakStreamVerifier {
 
     // ------------------------------------------------------------------ verify side
 
-    private void processSegments() {
+    /*
+     * drain=false is the periodic tick: the newest file is still being written by ffmpeg and is
+     * left alone. drain=true is the one pass stop() makes after ffmpeg is gone: every file is
+     * final (the truncated tail was already marked as a boundary artefact by pullOnce), so all of
+     * them are eligible, and the no-segment watchdog is skipped because silence is expected.
+     */
+    private void processSegments(boolean drain) {
         try {
             final File[] segs = spoolDir.listFiles((d, name) -> name.startsWith("seg_") && name.endsWith(".mp4"));
-            if (segs == null || segs.length < 2) {
+            final int finished = (segs == null) ? 0 : (drain ? segs.length : segs.length - 1);
+            if (finished < 1) {
                 // No finished segment. If this persists (media outage: GetMedia delivers nothing,
                 // ffmpeg writes nothing), emit an explicit 0.0 so the metric keeps flowing.
-                if (System.currentTimeMillis() - lastEmitMs > NO_SEGMENT_EMIT_MS) {
+                if (!drain && System.currentTimeMillis() - lastEmitMs > NO_SEGMENT_EMIT_MS) {
                     logger.warn("SoakStreamVerifier: no finished segment in "
                             + (NO_SEGMENT_EMIT_MS / 1000) + "s (media outage?), emitting 0");
-                    WebrtcStorageCanaryConsumer.publishMetricToCW("SoakVideoDecodable", 0.0, StandardUnit.None);
+                    WebrtcStorageCanaryConsumer.publishMetricToCW(availabilityMetricName, 0.0, StandardUnit.None);
                     lastEmitMs = System.currentTimeMillis();
                 }
                 return; // newest segment (if any) is still being written
             }
             Arrays.sort(segs);
             // All but the newest are finished (ffmpeg writes segments strictly in order).
-            int pending = segs.length - 1;
+            int pending = finished;
 
             // Backpressure: skip oldest segments if verification has fallen behind, so the spool
             // never grows unbounded. The pull side is unaffected.
@@ -325,7 +452,7 @@ public class SoakStreamVerifier {
                 logger.warn("SoakStreamVerifier: verification behind, skipped " + toSkip + " segment(s)");
             }
 
-            for (int i = skipFrom; i < segs.length - 1; i++) {
+            for (int i = skipFrom; i < finished; i++) {
                 final File seg = segs[i];
                 if (boundarySegments.remove(seg.getName())) {
                     headSegments.remove(seg.getName());
@@ -382,7 +509,7 @@ public class SoakStreamVerifier {
                 } finally {
                     seg.delete();
                 }
-                WebrtcStorageCanaryConsumer.publishMetricToCW("SoakVideoDecodable", ok ? 1.0 : 0.0, StandardUnit.None);
+                WebrtcStorageCanaryConsumer.publishMetricToCW(availabilityMetricName, ok ? 1.0 : 0.0, StandardUnit.None);
                 lastEmitMs = System.currentTimeMillis();
             }
         } catch (Exception e) {

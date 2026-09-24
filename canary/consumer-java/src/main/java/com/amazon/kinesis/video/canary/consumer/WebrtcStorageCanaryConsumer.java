@@ -84,6 +84,9 @@ public class WebrtcStorageCanaryConsumer {
     private static AmazonCloudWatch mCwClient;
     private static Timer mConnectionHeartbeatTimer;
     private static CloudWatchLogsAppender mLogsAppender;
+    // Non-null while GetMedia segment verification is running (soak, or a bounded run under
+    // CANARY_SEGMENTED_VERIFY); the bounded case stops and drains it in finishVideoVerification().
+    private static SoakStreamVerifier mSegmentVerifier;
 
     // Bound on a single verify.py subprocess (see runVerifyScript); a slow/hung verify is killed
     // rather than piling up. Segmenting/cadence for continuous soak verification lives in
@@ -351,8 +354,26 @@ public class WebrtcStorageCanaryConsumer {
     }
 
     /**
+     * End-of-run video verification for a bounded run with VIDEO_VERIFY_ENABLED. Two shapes:
+     *   - segmented (CANARY_SEGMENTED_VERIFY, run longer than one GetClip): the GetMedia segment
+     *     verifier has been scoring the whole run already; stop it and drain the last finished
+     *     segments. No clip file is produced, and the runner's GetClip verify stage knows to skip.
+     *   - otherwise: the classic single GetClip from canary start to now, verified by the runner.
+     */
+    private static void finishVideoVerification() {
+        if (mSegmentVerifier != null) {
+            mSegmentVerifier.stop();
+            mSegmentVerifier = null;
+            return;
+        }
+        downloadClip(mCanaryStartTime, new Date());
+    }
+
+    /**
      * Downloads an MP4 clip of the stream via the GetClip API for video verification.
-     * The clip covers from canary start time to now.
+     * The clip covers from canary start time to now -- but GetClip returns at most the first 100 MB
+     * / 200 fragments (~600 s here), so this only verifies a run that fits in one clip; longer runs
+     * take the segmented path (finishVideoVerification).
      */
     private static void downloadClip(Date startTime, Date endTime) {
         String outputPath = System.getenv().getOrDefault(
@@ -757,8 +778,25 @@ public class WebrtcStorageCanaryConsumer {
         // claim about what fraction of the media this covers.
         // All heavy work runs in niced subprocesses off dedicated threads, so it never blocks the
         // ListFragments continuity/heartbeat threads. Emits SoakVideoDecodable + drift per segment.
-        if (runForever && "true".equalsIgnoreCase(System.getenv(CanaryConstants.VIDEO_VERIFY_ENABLED_ENV_VAR))) {
-            new SoakStreamVerifier(mStreamName, mRegion, mCredentialsProvider, mAmazonKinesisVideo).start();
+        //
+        // The same path also serves a BOUNDED run that is too long for one GetClip (the runner sets
+        // CANARY_SEGMENTED_VERIFY when DURATION exceeds the ~600 s the API will return): it runs for
+        // the whole duration, publishes ConsumerStorageAvailability per segment, and is drained by
+        // stop() at the end of the run in place of the GetClip download. Without this the reconnect
+        // scenarios scored 0 on every run, because verify.py judged a service-capped 600 s clip
+        // against a 2700 s / 3900 s expectation.
+        final boolean videoVerifyEnabled =
+                "true".equalsIgnoreCase(System.getenv(CanaryConstants.VIDEO_VERIFY_ENABLED_ENV_VAR));
+        final boolean segmentedVerify = !runForever
+                && "true".equalsIgnoreCase(System.getenv(CanaryConstants.SEGMENTED_VERIFY_ENV_VAR));
+        if (videoVerifyEnabled && (runForever || segmentedVerify)) {
+            mSegmentVerifier = new SoakStreamVerifier(mStreamName, mRegion, mCredentialsProvider, mAmazonKinesisVideo,
+                    runForever ? "SoakVideoDecodable" : "ConsumerStorageAvailability");
+            mSegmentVerifier.start();
+            if (segmentedVerify) {
+                logger.info("Segmented verification: run of " + canaryRunTime + "s exceeds one GetClip; "
+                        + "ConsumerStorageAvailability is published per segment and the end-of-run GetClip is skipped");
+            }
         }
 
         switch (mCanaryLabel) {
@@ -838,10 +876,9 @@ public class WebrtcStorageCanaryConsumer {
                 periodicFragmentTimer.cancel();
 
                 // Download clip for video verification if enabled
-                String videoVerifyEnabled = System.getenv(CanaryConstants.VIDEO_VERIFY_ENABLED_ENV_VAR);
-                logger.info("Periodic path: VIDEO_VERIFY_ENABLED='" + videoVerifyEnabled + "', canaryRunTime=" + canaryRunTime);
-                if ("true".equalsIgnoreCase(videoVerifyEnabled)) {
-                    downloadClip(mCanaryStartTime, new Date());
+                logger.info("Periodic path: VIDEO_VERIFY_ENABLED=" + videoVerifyEnabled + ", canaryRunTime=" + canaryRunTime);
+                if (videoVerifyEnabled) {
+                    finishVideoVerification();
                 }
 
                 shutdownCanaryResources();
@@ -892,10 +929,9 @@ public class WebrtcStorageCanaryConsumer {
                 Thread.sleep(canaryRunTime * CanaryConstants.MILLISECONDS_IN_A_SECOND);
                 intervalMetricsTimer.cancel();
 
-                // Download clip for video verification if enabled
-                String videoVerifyEnabled = System.getenv(CanaryConstants.VIDEO_VERIFY_ENABLED_ENV_VAR);
-                if ("true".equalsIgnoreCase(videoVerifyEnabled)) {
-                    downloadClip(mCanaryStartTime, new Date());
+                // End-of-run video verification if enabled
+                if (videoVerifyEnabled) {
+                    finishVideoVerification();
                 }
 
                 shutdownCanaryResources();
