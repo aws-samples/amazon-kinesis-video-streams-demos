@@ -327,6 +327,31 @@ public class WebrtcStorageCanaryConsumer {
     }
 
     /**
+     * Publishes one datum carrying BOTH dimensions together ([StreamName, Label]), which is the
+     * dimension set the runner's shell `aws cloudwatch put-metric-data` uses for the end-of-run
+     * ConsumerStorageAvailability verdict. publishMetricToCW above emits two single-dimension
+     * series instead, so a run-level metric published through it would not land on the same
+     * CloudWatch line as the runner's. Used only for run-level roll-ups that must stay on that line.
+     */
+    protected static void publishRunMetricToCW(String metricName, double value, StandardUnit cwUnit) {
+        try {
+            logger.info("Emitting the following run-level metric: " + metricName + " - " + value);
+            final MetricDatum datum = new MetricDatum()
+                    .withMetricName(metricName)
+                    .withUnit(cwUnit)
+                    .withValue(value)
+                    .withDimensions(
+                            new Dimension().withName(CanaryConstants.CW_DIMENSION_INDIVIDUAL).withValue(mStreamName),
+                            new Dimension().withName(CanaryConstants.CW_DIMENSION_AGGREGATE).withValue(mCanaryLabel));
+            mCwClient.putMetricData(new PutMetricDataRequest()
+                    .withNamespace("KinesisVideoSDKCanary")
+                    .withMetricData(datum));
+        } catch (Exception e) {
+            logger.error("Failed while publishing run-level metric to CW, " + e);
+        }
+    }
+
+    /**
      * Blocks the calling (main) thread forever so the consumer runs until the process is killed,
      * used for continuous/soak runs. The metric timers (fragment continuity + persistence
      * heartbeat) are non-daemon and keep emitting for the life of the JVM; the finite
@@ -781,21 +806,26 @@ public class WebrtcStorageCanaryConsumer {
         //
         // The same path also serves a BOUNDED run that is too long for one GetClip (the runner sets
         // CANARY_SEGMENTED_VERIFY when DURATION exceeds the ~600 s the API will return): it runs for
-        // the whole duration, publishes ConsumerStorageAvailability per segment, and is drained by
-        // stop() at the end of the run in place of the GetClip download. Without this the reconnect
-        // scenarios scored 0 on every run, because verify.py judged a service-capped 600 s clip
-        // against a 2700 s / 3900 s expectation.
+        // the whole duration, publishes ConsumerStorageSegmentAvailability per segment, rolls those
+        // up into one ConsumerStorageAvailability datapoint at stop() (so the one-point-per-run line
+        // the end-of-run GetClip used to feed keeps flowing), and is drained by stop() at the end of
+        // the run in place of the GetClip download. Without this the reconnect scenarios scored 0 on
+        // every run, because verify.py judged a service-capped 600 s clip against a 2700 s / 3900 s
+        // expectation.
         final boolean videoVerifyEnabled =
                 "true".equalsIgnoreCase(System.getenv(CanaryConstants.VIDEO_VERIFY_ENABLED_ENV_VAR));
         final boolean segmentedVerify = !runForever
                 && "true".equalsIgnoreCase(System.getenv(CanaryConstants.SEGMENTED_VERIFY_ENV_VAR));
         if (videoVerifyEnabled && (runForever || segmentedVerify)) {
-            mSegmentVerifier = new SegmentedStreamVerifier(mStreamName, mRegion, mCredentialsProvider, mAmazonKinesisVideo,
-                    runForever ? "SoakVideoDecodable" : "ConsumerStorageAvailability");
+            mSegmentVerifier = runForever
+                    ? new SegmentedStreamVerifier(mStreamName, mRegion, mCredentialsProvider, mAmazonKinesisVideo)
+                    : new SegmentedStreamVerifier(mStreamName, mRegion, mCredentialsProvider, mAmazonKinesisVideo,
+                            "ConsumerStorageSegmentAvailability", "ConsumerStorageAvailability");
             mSegmentVerifier.start();
             if (segmentedVerify) {
                 logger.info("Segmented verification: run of " + canaryRunTime + "s exceeds one GetClip; "
-                        + "ConsumerStorageAvailability is published per segment and the end-of-run GetClip is skipped");
+                        + "ConsumerStorageSegmentAvailability is published per segment, ConsumerStorageAvailability "
+                        + "once at the end as the roll-up, and the end-of-run GetClip is skipped");
             }
         }
 

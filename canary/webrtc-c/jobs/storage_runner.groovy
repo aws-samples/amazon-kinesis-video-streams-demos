@@ -478,9 +478,10 @@ def publishViewerConnectionSuccessRate(scenarioLabel) {
 // duration and frame-count checks on every run (this is what pinned ConsumerStorageAvailability
 // at 0 for GammaStorageSubReconnect / GammaStorageSingleReconnect from the 2026-09-16 cutover).
 // Such runs use the soak's GetMedia segmenting path instead (SegmentedStreamVerifier in the consumer):
-// verified for the whole run in 60 s segments, ConsumerStorageAvailability published once per
-// segment, and the end-of-run GetClip stage skipped. Soak runs are continuous and already on that
-// path via SOAK_MODE, so they are excluded here.
+// verified for the whole run in 60 s segments, ConsumerStorageSegmentAvailability published once per
+// segment, one ConsumerStorageAvailability roll-up published by the consumer when the run ends (so
+// the one-point-per-run line keeps flowing), and the end-of-run GetClip stage skipped. Soak runs are
+// continuous and already on that path via SOAK_MODE, so they are excluded here.
 SINGLE_GETCLIP_MAX_SECONDS = 600
 
 def segmentedVerifyEnabled(params) {
@@ -778,11 +779,12 @@ def buildStorageCanary(isConsumer, params) {
         }
 
         // A run too long for one GetClip was verified per 60 s segment by the consumer itself
-        // (segmentedVerifyEnabled): ConsumerStorageAvailability is already published, and there is
-        // no clip file. Skipping here is what keeps the "no clip -> push 0" fallback below from
-        // reporting a false failure for such a run.
+        // (segmentedVerifyEnabled): ConsumerStorageSegmentAvailability was published per segment and
+        // the consumer already pushed the run's ConsumerStorageAvailability roll-up at stop(), and
+        // there is no clip file. Skipping here is what keeps the "no clip -> push 0" fallback below
+        // from reporting a false failure for such a run.
         if (segmentedVerifyEnabled(params)) {
-            echo "Segmented verification: DURATION_IN_SECONDS=${params.DURATION_IN_SECONDS} exceeds one GetClip (${SINGLE_GETCLIP_MAX_SECONDS}s); ConsumerStorageAvailability was published per segment by the consumer, skipping the end-of-run GetClip verification"
+            echo "Segmented verification: DURATION_IN_SECONDS=${params.DURATION_IN_SECONDS} exceeds one GetClip (${SINGLE_GETCLIP_MAX_SECONDS}s); ConsumerStorageSegmentAvailability was published per segment and ConsumerStorageAvailability rolled up by the consumer, skipping the end-of-run GetClip verification"
             return
         }
 

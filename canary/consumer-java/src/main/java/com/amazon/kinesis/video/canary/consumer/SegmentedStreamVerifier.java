@@ -10,6 +10,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import com.amazonaws.auth.AWSCredentialsProvider;
 import com.amazonaws.services.kinesisvideo.AmazonKinesisVideo;
@@ -30,9 +31,10 @@ import org.apache.log4j.Logger;
  *
  * Unlike the old periodic GetClip probe (which sampled ~156s every 15min), this pulls the ingested
  * stream continuously, so verification is driven by what GetMedia delivers rather than by a timer.
- * Two callers: a soak (CANARY_CONTINUOUS, runs until killed, metric SoakVideoDecodable) and a
- * bounded run that is longer than one GetClip can cover (CANARY_SEGMENTED_VERIFY, stop() is called
- * at the end of the run, metric ConsumerStorageAvailability -- see CanaryConstants).
+ * Two callers: a soak (CANARY_CONTINUOUS, runs until killed, per-segment metric SoakVideoDecodable)
+ * and a bounded run that is longer than one GetClip can cover (CANARY_SEGMENTED_VERIFY, stop() is
+ * called at the end of the run; per-segment metric ConsumerStorageSegmentAvailability plus one
+ * run-level ConsumerStorageAvailability roll-up at stop() -- see CanaryConstants).
  * How much of the wall clock that actually accounts for is NOT known: reconnects, boundary
  * discards (see boundarySegments) and skips all subtract from it, and nothing here measures the
  * total. Do not treat this path as complete coverage until a metric proves the accounted fraction.
@@ -89,11 +91,21 @@ public class SegmentedStreamVerifier {
     // left to score anyway.
     private static final long STOP_DRAIN_TIMEOUT_SECONDS = 180;
 
-    // The per-segment availability metric this verifier publishes. A soak emits SoakVideoDecodable;
-    // a bounded run that is too long for one GetClip (CANARY_SEGMENTED_VERIFY) emits
-    // ConsumerStorageAvailability, so it lands on the same dashboard line the end-of-run GetClip
-    // verdict used to feed, just with one datapoint per segment instead of one per run.
+    // The per-segment verdict metric this verifier publishes: one 0/1 datapoint per verified
+    // segment (plus the no-segment watchdog's explicit 0s). A soak emits SoakVideoDecodable; a
+    // bounded run that is too long for one GetClip (CANARY_SEGMENTED_VERIFY) emits
+    // ConsumerStorageSegmentAvailability. It deliberately does NOT reuse ConsumerStorageAvailability:
+    // that name means "one verdict per run" everywhere else (the runner's end-of-run GetClip
+    // verdict, the dashboards, any alarm on N consecutive 0s), and one datapoint per minute under
+    // the same name would silently change what an Average or a consecutive-0 count means.
     private final String availabilityMetricName;
+    // Optional run-level roll-up published once from stop(): 1 iff every segment verdict of the
+    // run was 1 (and there was at least one). Bounded runs pass ConsumerStorageAvailability here so
+    // the existing one-point-per-run line keeps flowing for scenarios that moved to the segmented
+    // path; a soak passes null (there is no end of run to roll up to).
+    private final String runMetricName;
+    private final AtomicInteger segmentVerdicts = new AtomicInteger();
+    private final AtomicInteger segmentFailures = new AtomicInteger();
 
     private File spoolDir;
     private volatile Process ffmpeg;
@@ -132,16 +144,17 @@ public class SegmentedStreamVerifier {
 
     public SegmentedStreamVerifier(String streamName, String region, AWSCredentialsProvider credentialsProvider,
                               AmazonKinesisVideo kvsClient) {
-        this(streamName, region, credentialsProvider, kvsClient, "SoakVideoDecodable");
+        this(streamName, region, credentialsProvider, kvsClient, "SoakVideoDecodable", null);
     }
 
     public SegmentedStreamVerifier(String streamName, String region, AWSCredentialsProvider credentialsProvider,
-                              AmazonKinesisVideo kvsClient, String availabilityMetricName) {
+                              AmazonKinesisVideo kvsClient, String availabilityMetricName, String runMetricName) {
         this.streamName = streamName;
         this.region = region;
         this.credentialsProvider = credentialsProvider;
         this.kvsClient = kvsClient;
         this.availabilityMetricName = availabilityMetricName;
+        this.runMetricName = runMetricName;
     }
 
     public void start() {
@@ -234,6 +247,7 @@ public class SegmentedStreamVerifier {
         if (remainingMs(deadlineMs) > 0) {
             processSegments(true);
         }
+        publishRunRollup();
 
         final File[] leftover = spoolDir.listFiles((d, name) -> name.startsWith("seg_") && name.endsWith(".mp4"));
         if (leftover != null && leftover.length > 0) {
@@ -430,7 +444,7 @@ public class SegmentedStreamVerifier {
                 if (!drain && System.currentTimeMillis() - lastEmitMs > NO_SEGMENT_EMIT_MS) {
                     logger.warn("SegmentedStreamVerifier: no finished segment in "
                             + (NO_SEGMENT_EMIT_MS / 1000) + "s (media outage?), emitting 0");
-                    WebrtcStorageCanaryConsumer.publishMetricToCW(availabilityMetricName, 0.0, StandardUnit.None);
+                    publishSegmentVerdict(false);
                     lastEmitMs = System.currentTimeMillis();
                 }
                 return; // newest segment (if any) is still being written
@@ -511,12 +525,46 @@ public class SegmentedStreamVerifier {
                 } finally {
                     seg.delete();
                 }
-                WebrtcStorageCanaryConsumer.publishMetricToCW(availabilityMetricName, ok ? 1.0 : 0.0, StandardUnit.None);
+                publishSegmentVerdict(ok);
                 lastEmitMs = System.currentTimeMillis();
             }
         } catch (Exception e) {
             // Never let the worker die -- the next tick retries.
             logger.error("SegmentedStreamVerifier: segment worker error, " + e);
         }
+    }
+
+    /**
+     * Publishes one per-segment 0/1 datapoint and counts it towards the run-level roll-up. Every
+     * datapoint of availabilityMetricName goes through here (scored segments and the no-segment
+     * watchdog's explicit 0s) so the roll-up sees exactly what the dashboard sees. Boundary
+     * discards and skips publish their own counters and are not verdicts.
+     */
+    private void publishSegmentVerdict(boolean ok) {
+        segmentVerdicts.incrementAndGet();
+        if (!ok) {
+            segmentFailures.incrementAndGet();
+        }
+        WebrtcStorageCanaryConsumer.publishMetricToCW(availabilityMetricName, ok ? 1.0 : 0.0, StandardUnit.None);
+    }
+
+    /**
+     * Run-level roll-up for a bounded run, published once from stop(): 1 iff at least one segment
+     * was scored and none failed. Same strictness as the single end-of-run GetClip verdict it
+     * replaces (one bad clip meant 0), applied to every minute of the run instead of the first
+     * ~600 s. No verdicts at all (nothing ever pulled or scored) is 0, matching the runner's
+     * "no clip -> push 0" fallback. Published with the runner's [StreamName, Label] dimension
+     * pair so it lands on the existing ConsumerStorageAvailability line.
+     */
+    private void publishRunRollup() {
+        if (runMetricName == null) {
+            return;
+        }
+        final int verdicts = segmentVerdicts.get();
+        final int failures = segmentFailures.get();
+        final boolean ok = verdicts > 0 && failures == 0;
+        logger.info("SegmentedStreamVerifier: run roll-up " + runMetricName + "=" + (ok ? 1 : 0)
+                + " (" + verdicts + " segment verdict(s), " + failures + " failure(s))");
+        WebrtcStorageCanaryConsumer.publishRunMetricToCW(runMetricName, ok ? 1.0 : 0.0, StandardUnit.None);
     }
 }
