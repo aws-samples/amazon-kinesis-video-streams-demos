@@ -85,6 +85,7 @@ def buildWebRTCProject(thing_prefix) {
         export CANARY_ASSET_REGION='${params.CANARY_ASSET_REGION ?: ''}'
         export AWS_DEFAULT_REGION='${params.AWS_DEFAULT_REGION ?: 'us-west-2'}'
         export CANARY_MEDIA_SOURCE='${params.CANARY_MEDIA_SOURCE ?: ''}'
+        export WEBRTC_C_SDK_REF='${params.WEBRTC_C_SDK_REF ?: ''}'
         chmod a+x '${repoDir}/canary/webrtc-c/scripts/build-storage-master.sh' &&
         '${repoDir}/canary/webrtc-c/scripts/build-storage-master.sh' '${params.GIT_URL}' '${params.GIT_HASH}'"""
 
@@ -901,6 +902,7 @@ pipeline {
         string(name: 'DURATION_IN_SECONDS', defaultValue: '156')
         string(name: 'GIT_URL', defaultValue: 'https://github.com/aws-samples/amazon-kinesis-video-streams-demos.git')
         string(name: 'GIT_HASH', defaultValue: 'reschedule-logic')
+        string(name: 'WEBRTC_C_SDK_REF', defaultValue: '', description: 'webrtc-c SDK branch, tag or commit to build the C master against. Empty = the GIT_TAG pinned in canary/webrtc-c/CMakeLists.txt (today: develop). Resolved to a SHA per build and keyed into the per-node build cache, so a change here rebuilds.')
         string(name: 'AWS_DEFAULT_REGION', defaultValue: 'us-west-2')
         string(name: 'ENDPOINT', defaultValue: '', description: 'Custom endpoint URL (e.g., gamma endpoint)')
         string(name: 'METRIC_SUFFIX', defaultValue: '')

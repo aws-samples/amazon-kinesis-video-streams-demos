@@ -10,11 +10,15 @@
 #   build/  — cmake output including the binary and FetchContent deps
 #   logs/   — build logs (last 10 kept)
 #   .last-commit       — canary repo commit hash of last build
-#   .webrtc-c-version  — webrtc-c GIT_TAG from CMakeLists.txt
+#   .webrtc-c-version  — resolved webrtc-c commit built last (from CMakeLists GIT_TAG or WEBRTC_C_SDK_REF)
 #   .build.lock        — flock target
 #
 # Usage:
 #   ./build-storage-master.sh <git_url> <git_hash> [openssl|mbedtls]
+#
+# Env:
+#   WEBRTC_C_SDK_REF   — optional webrtc-c branch / tag / commit to build against
+#                        instead of the GIT_TAG pinned in CMakeLists.txt
 #
 # Outputs the path to the built binary on stdout (last line).
 
@@ -69,12 +73,34 @@ CURRENT_CODE_FP=$(cd "$REPO_DIR" && git rev-parse "HEAD:canary/webrtc-c/src" "HE
 echo "Build-relevant code fingerprint: ${CURRENT_CODE_FP}"
 
 # ---------------------------------------------------------------------------
-# 2. Extract webrtc-c dependency version from CMakeLists.txt
+# 2. Determine the webrtc-c dependency ref
+#    WEBRTC_C_SDK_REF (job parameter, exported by the pipeline) overrides the
+#    GIT_TAG pinned in CMakeLists.txt, so one canary branch can be built against
+#    any SDK branch / tag / commit without a commit to this repo. Empty keeps
+#    the CMakeLists value. Either way the ref is resolved to a SHA, pinned into
+#    CMakeLists for this build, and stamped so a ref change triggers a rebuild.
 # ---------------------------------------------------------------------------
-WEBRTC_GIT_TAG=$(grep 'GIT_TAG' "$REPO_DIR/canary/webrtc-c/CMakeLists.txt" \
-    | head -1 \
-    | sed 's/.*GIT_TAG\s*//' | tr -d '[:space:]') || true
-echo "Parsed webrtc-c GIT_TAG: '${WEBRTC_GIT_TAG}'"
+CML="${REPO_DIR}/canary/webrtc-c/CMakeLists.txt"
+# Pin a SHA into the first GIT_TAG of CMakeLists (the webrtc one, not the
+# cloudwatch dep) so FetchContent checks out exactly that commit. Transient:
+# section 1's `git checkout -f` / `git reset --hard` restores the committed
+# value next build, so an upstream ref like develop is re-resolved fresh.
+pin_cmakelists_webrtc_tag() {
+    sed -i "0,/GIT_TAG/s|\(GIT_TAG[[:space:]]*\).*|\1$1|" "$CML"
+    echo "Pinned CMakeLists webrtc GIT_TAG -> ${1:0:12} for this build"
+}
+
+WEBRTC_REF_SOURCE="CMakeLists.txt"
+if [ -n "${WEBRTC_C_SDK_REF:-}" ]; then
+    WEBRTC_GIT_TAG="$WEBRTC_C_SDK_REF"
+    WEBRTC_REF_SOURCE="WEBRTC_C_SDK_REF"
+    echo "webrtc-c ref overridden by WEBRTC_C_SDK_REF: '${WEBRTC_GIT_TAG}'"
+else
+    WEBRTC_GIT_TAG=$(grep 'GIT_TAG' "$CML" \
+        | head -1 \
+        | sed 's/.*GIT_TAG\s*//' | tr -d '[:space:]') || true
+    echo "Parsed webrtc-c GIT_TAG from CMakeLists.txt: '${WEBRTC_GIT_TAG}'"
+fi
 
 if [ -z "$WEBRTC_GIT_TAG" ]; then
     echo "WARNING: Could not parse webrtc-c version from CMakeLists.txt, forcing rebuild"
@@ -90,15 +116,16 @@ else
     #      network blip during ls-remote OR the clone once left us passing the
     #      unresolved name "develop" straight through, which failed the checkout
     #      with a confusing "fatal: invalid reference: develop".
-    CML="${REPO_DIR}/canary/webrtc-c/CMakeLists.txt"
     WEBRTC_REPO_URL=$(grep 'GIT_REPOSITORY' "$CML" \
         | head -1 \
         | sed 's/.*GIT_REPOSITORY\s*//' | tr -d '[:space:]') || true
 
     if [[ "$WEBRTC_GIT_TAG" =~ ^[0-9a-fA-F]{40}$ ]]; then
-        # Already a full commit SHA — nothing to resolve or rewrite.
+        # Already a full commit SHA — nothing to resolve. Only an overridden SHA
+        # needs writing into CMakeLists; one read from there is already in place.
         CURRENT_WEBRTC_VERSION="$WEBRTC_GIT_TAG"
-        echo "webrtc-c GIT_TAG is already a commit SHA, using as-is"
+        echo "webrtc-c ref is already a commit SHA, using as-is"
+        [ "$WEBRTC_REF_SOURCE" = "WEBRTC_C_SDK_REF" ] && pin_cmakelists_webrtc_tag "$WEBRTC_GIT_TAG"
     elif [ -z "$WEBRTC_REPO_URL" ]; then
         echo "ERROR: could not parse GIT_REPOSITORY URL from CMakeLists.txt"
         flock -u 9
@@ -114,19 +141,14 @@ else
             sleep $((attempt * 3))
         done
         if [ -z "$RESOLVED_SHA" ]; then
-            echo "ERROR: could not resolve webrtc-c ref '${WEBRTC_GIT_TAG}' via ls-remote after 5 attempts."
-            echo "       Refusing to build against an unresolved branch name (would fail the FetchContent checkout)."
+            echo "ERROR: could not resolve webrtc-c ref '${WEBRTC_GIT_TAG}' (from ${WEBRTC_REF_SOURCE}) via ls-remote after 5 attempts."
+            echo "       Refusing to build against an unresolved ref (would fail the FetchContent checkout)."
             flock -u 9
             exit 1
         fi
         CURRENT_WEBRTC_VERSION="$RESOLVED_SHA"
-        echo "Resolved webrtc-c '${WEBRTC_GIT_TAG}' to commit: ${RESOLVED_SHA:0:12}"
-        # Pin the resolved SHA into CMakeLists (first GIT_TAG = the webrtc one, not
-        # the cloudwatch dep) for a deterministic FetchContent checkout. Transient:
-        # section 1's `git checkout -f` / `git reset --hard` restores the branch
-        # name next build, so an upstream ref like develop is re-resolved fresh.
-        sed -i "0,/GIT_TAG/s|\(GIT_TAG[[:space:]]*\).*|\1${RESOLVED_SHA}|" "$CML"
-        echo "Pinned CMakeLists webrtc GIT_TAG -> ${RESOLVED_SHA:0:12} for this build"
+        echo "Resolved webrtc-c '${WEBRTC_GIT_TAG}' (from ${WEBRTC_REF_SOURCE}) to commit: ${RESOLVED_SHA:0:12}"
+        pin_cmakelists_webrtc_tag "$RESOLVED_SHA"
     fi
 fi
 echo "webrtc-c dependency version: $CURRENT_WEBRTC_VERSION"
