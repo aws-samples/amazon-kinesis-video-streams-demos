@@ -44,15 +44,30 @@ VOID determineCredentials(GstElement *kvssink, CanaryConfig* config) {
     }
 }
 
-VOID updateFragmentEndTimes(UINT64 curKeyFrameTime, UINT64 &lastKeyFrameTime, std::map<UINT64, UINT64> *mapPtr)
+// Records when each fragment was fully handed to the SDK, so that fragmentAckReceivedHandler() can measure
+// ack latency from that moment.
+//
+// A fragment starts at a key frame and ends when the next key frame arrives. The map is keyed by the fragment
+// start timecode in milliseconds (the key frame PTS, which is what FragmentAck.timestamp carries back) and the
+// value is the wall-clock time in milliseconds since epoch at which the key frame that CLOSED the fragment was
+// put to the SDK.
+//
+// The value is deliberately a wall-clock reading and not the closing key frame's PTS. kvssink converts pipeline
+// running time to absolute time once per process using the wall clock at the moment the FIRST frame reached it
+// (gstkvssink.cpp: buf->pts += producer_start_time - first_pts), so every PTS in a process carries the first
+// frame's encoder start-up delay as a constant offset. Measuring "now - PTS" therefore under-reported the
+// latency by that per-process offset, and when the offset exceeded the real latency the unsigned subtraction
+// wrapped to ~1.8e19 ms and was pushed to CloudWatch as is.
+VOID updateFragmentEndTimes(UINT64 curKeyFramePts, UINT64 curKeyFrameWallClockMs, UINT64 &lastKeyFramePts, std::map<UINT64, UINT64> *mapPtr)
 {
-    if (lastKeyFrameTime != 0)
+    if (lastKeyFramePts != 0)
     {
-        (*mapPtr)[lastKeyFrameTime / HUNDREDS_OF_NANOS_IN_A_MILLISECOND] = curKeyFrameTime / HUNDREDS_OF_NANOS_IN_A_MILLISECOND;
+        (*mapPtr)[lastKeyFramePts / HUNDREDS_OF_NANOS_IN_A_MILLISECOND] = curKeyFrameWallClockMs;
+        // clean up map: removing fragments that were closed more than 5 min ago. Keys and values both increase
+        // monotonically, so the oldest entries are at the front and the scan can stop at the first live one.
         auto iter = mapPtr->begin();
         while (iter != mapPtr->end()) {
-            // clean up map: removing timestamps older than 5 min from now
-            if (iter->first < (std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count() - (300000)))
+            if (iter->second < curKeyFrameWallClockMs - 300000)
             {
                 iter = mapPtr->erase(iter);
             } else {
@@ -60,7 +75,34 @@ VOID updateFragmentEndTimes(UINT64 curKeyFrameTime, UINT64 &lastKeyFrameTime, st
             }
         }
     }
-    lastKeyFrameTime = curKeyFrameTime;
+    lastKeyFramePts = curKeyFramePts;
+}
+
+// Pushes one ack latency sample (PersistedAckLatency / ReceivedAckLatency) measured from the wall-clock time at
+// which the fragment was fully handed to the SDK. The subtraction is done in signed arithmetic and a negative
+// result is logged and dropped rather than wrapped to a huge unsigned value.
+VOID pushAckLatencyMetric(CustomData *cusData, const char *metricName, UINT64 timeOfFragmentEndSentMs)
+{
+    INT64 currentTimestamp = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
+    INT64 ackLatency = currentTimestamp - (INT64) timeOfFragmentEndSentMs; // [milliseconds]
+    if (ackLatency < 0)
+    {
+        LOG_WARN(metricName << " is negative (" << ackLatency << " ms), fragment end sent at " << timeOfFragmentEndSentMs
+                            << ", now " << currentTimestamp << "; sample dropped");
+        return;
+    }
+
+    Aws::CloudWatch::Model::MetricDatum ackLatencyDatum;
+    Aws::CloudWatch::Model::PutMetricDataRequest cwRequest;
+    cwRequest.SetNamespace("KinesisVideoSDKCanary");
+
+    pushMetric(metricName, (DOUBLE) ackLatency, Aws::CloudWatch::Model::StandardUnit::Milliseconds, ackLatencyDatum, cusData->pDimensionPerStream, cwRequest);
+    LOG_DEBUG(metricName << ": " << ackLatency);
+    if (cusData->pCanaryConfig->useAggMetrics)
+    {
+        pushMetric(metricName, (DOUBLE) ackLatency, Aws::CloudWatch::Model::StandardUnit::Milliseconds, ackLatencyDatum, cusData->pAggregatedDimension, cwRequest);
+    }
+    cusData->pCwClient->PutMetricDataAsync(cwRequest, onPutMetricDataResponseReceivedHandler);
 }
 
 
@@ -179,7 +221,10 @@ VOID pushStreamMetrics(CustomData *cusData, KinesisVideoStreamMetrics streamMetr
 VOID metricHandler(GstElement *kvssink, KvsSinkMetric *kvssinkMetric, CustomData *cusData)
 {
     LOG_DEBUG("put frame at canary");
-    updateFragmentEndTimes(kvssinkMetric->frame_pts, cusData->lastKeyFrameTime, cusData->timeOfNextKeyFrame);
+    // kvssink emits this signal synchronously from put_frame() right after the key frame was accepted by the SDK,
+    // so the wall clock read here is the time the fragment closed by this key frame was fully handed to the SDK.
+    UINT64 keyFrameWallClockMs = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
+    updateFragmentEndTimes(kvssinkMetric->frame_pts, keyFrameWallClockMs, cusData->lastKeyFrameTime, cusData->timeOfNextKeyFrame);
     pushStreamMetrics(cusData, kvssinkMetric->stream_metrics);
     pushClientMetrics(cusData, kvssinkMetric->client_metrics);
 
@@ -218,74 +263,50 @@ STATUS fragmentAckReceivedHandler(GstElement *kvssink, PFragmentAck pFragmentAck
     LOG_DEBUG("Fragment ack received handler canary cpp invoked " << pFragmentAck->timestamp);
     CustomData *cusData = reinterpret_cast<CustomData *>(data);
 
-    std::map<UINT64, UINT64>::iterator iter;
-    iter = cusData->timeOfNextKeyFrame->find(pFragmentAck->timestamp);
-    BOOL temp = (iter == cusData->timeOfNextKeyFrame->end());
-    LOG_DEBUG("Timestamp found(0) in map: "<<temp);
-
-    UINT64 timeOfFragmentEndSent;
-    timeOfFragmentEndSent = (temp == true) ? 0 : cusData->timeOfNextKeyFrame->find(pFragmentAck->timestamp)->second;
+    // FragmentAck.timestamp is the fragment start timecode in milliseconds, which is the key used by
+    // updateFragmentEndTimes(). The value is the wall-clock time the fragment was fully handed to the SDK.
+    std::map<UINT64, UINT64>::iterator iter = cusData->timeOfNextKeyFrame->find(pFragmentAck->timestamp);
+    if (iter == cusData->timeOfNextKeyFrame->end())
+    {
+        // Either the fragment is still open (no closing key frame yet, e.g. the last fragment of a run) or it
+        // was closed more than 5 min ago and has been cleaned up. No latency sample can be produced for it.
+        LOG_DEBUG("Fragment start timestamp " << pFragmentAck->timestamp << " not found in map, ack type " << pFragmentAck->ackType);
+        return STATUS_SUCCESS;
+    }
+    UINT64 timeOfFragmentEndSent = iter->second;
     LOG_DEBUG("Time of the fragment end sent "<<timeOfFragmentEndSent);
 
-    if (timeOfFragmentEndSent > pFragmentAck->timestamp)
+    switch (pFragmentAck->ackType)
     {
-        switch (pFragmentAck->ackType)
+        case FRAGMENT_ACK_TYPE_PERSISTED:
         {
-            case FRAGMENT_ACK_TYPE_PERSISTED:
-            {
-                Aws::CloudWatch::Model::MetricDatum persistedAckLatencyDatum;
-                Aws::CloudWatch::Model::PutMetricDataRequest cwRequest;
-                cwRequest.SetNamespace("KinesisVideoSDKCanary");
-
-                auto currentTimestamp = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
-                auto persistedAckLatency = (currentTimestamp - timeOfFragmentEndSent); // [milliseconds]
-                pushMetric("PersistedAckLatency", persistedAckLatency, Aws::CloudWatch::Model::StandardUnit::Milliseconds, persistedAckLatencyDatum, cusData->pDimensionPerStream, cwRequest);
-                LOG_DEBUG("Persisted Ack Latency: " << persistedAckLatency);
-                if (cusData->pCanaryConfig->useAggMetrics)
-                {
-                    pushMetric("PersistedAckLatency", persistedAckLatency, Aws::CloudWatch::Model::StandardUnit::Milliseconds, persistedAckLatencyDatum, cusData->pAggregatedDimension, cwRequest);
-
-                }
-                cusData->pCwClient->PutMetricDataAsync(cwRequest, onPutMetricDataResponseReceivedHandler);
-                break;
-            }
-            case FRAGMENT_ACK_TYPE_RECEIVED:
-            {
-                Aws::CloudWatch::Model::MetricDatum receivedAckLatencyDatum;
-                Aws::CloudWatch::Model::PutMetricDataRequest cwRequest;
-                cwRequest.SetNamespace("KinesisVideoSDKCanary");
-
-                auto currentTimestamp = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
-                auto receivedAckLatency = (currentTimestamp - timeOfFragmentEndSent); // [milliseconds]
-                pushMetric("ReceivedAckLatency", receivedAckLatency, Aws::CloudWatch::Model::StandardUnit::Milliseconds, receivedAckLatencyDatum, cusData->pDimensionPerStream, cwRequest);
-                LOG_DEBUG("Received Ack Latency: " << receivedAckLatency);
-                if (cusData->pCanaryConfig->useAggMetrics)
-                {
-                    pushMetric("ReceivedAckLatency", receivedAckLatency, Aws::CloudWatch::Model::StandardUnit::Milliseconds, receivedAckLatencyDatum, cusData->pAggregatedDimension, cwRequest);
-                }
-                cusData->pCwClient->PutMetricDataAsync(cwRequest, onPutMetricDataResponseReceivedHandler);
-                break;
-            }
-            case FRAGMENT_ACK_TYPE_BUFFERING:
-            {
-                LOG_DEBUG("FRAGMENT_ACK_TYPE_BUFFERING callback invoked");
-                break;
-            }
-            case FRAGMENT_ACK_TYPE_ERROR:
-            {
-                LOG_DEBUG("FRAGMENT_ACK_TYPE_ERROR callback invoked");
-                break;
-            }
-            case FRAGMENT_ACK_TYPE_UNDEFINED:
-            {
-                LOG_DEBUG("FRAGMENT_ACK_TYPE_UNDEFINED callback invoked");
-                break;
-            }
-            case  FRAGMENT_ACK_TYPE_IDLE:
-            {
-                LOG_DEBUG("FRAGMENT_ACK_TYPE_IDLE callback invoked");
-                break;
-            }
+            pushAckLatencyMetric(cusData, "PersistedAckLatency", timeOfFragmentEndSent);
+            break;
+        }
+        case FRAGMENT_ACK_TYPE_RECEIVED:
+        {
+            pushAckLatencyMetric(cusData, "ReceivedAckLatency", timeOfFragmentEndSent);
+            break;
+        }
+        case FRAGMENT_ACK_TYPE_BUFFERING:
+        {
+            LOG_DEBUG("FRAGMENT_ACK_TYPE_BUFFERING callback invoked");
+            break;
+        }
+        case FRAGMENT_ACK_TYPE_ERROR:
+        {
+            LOG_DEBUG("FRAGMENT_ACK_TYPE_ERROR callback invoked");
+            break;
+        }
+        case FRAGMENT_ACK_TYPE_UNDEFINED:
+        {
+            LOG_DEBUG("FRAGMENT_ACK_TYPE_UNDEFINED callback invoked");
+            break;
+        }
+        case  FRAGMENT_ACK_TYPE_IDLE:
+        {
+            LOG_DEBUG("FRAGMENT_ACK_TYPE_IDLE callback invoked");
+            break;
         }
     }
     return STATUS_SUCCESS;
