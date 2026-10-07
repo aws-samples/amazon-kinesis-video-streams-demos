@@ -168,7 +168,10 @@ STATUS canaryRtpOutboundStats(UINT32 timerId, UINT64 currentTime, UINT64 customD
                 Canary::Cloudwatch::getInstance().monitoring.pushOutboundRtpStats(pCanaryOutgoingRTPMetricsContext);
             }
 
-        // Extract RTT, packets sent/received rate, and bitrate from ICE candidate pair stats
+        // Extract RTT, packets sent/received rate, and bitrate from ICE candidate pair stats.
+        // Uses canaryIceMetricsHistory, NOT rtcMetricsHistory: the sample-inherited
+        // getIceCandidatePairStatsCallback() runs on its own 60 s timer ~0.6 s before this one
+        // and resets rtcMetricsHistory, which made these deltas cover 0.6 s instead of 60 s.
         {
             RtcStats rtcCandidatePairMetrics;
             rtcCandidatePairMetrics.requestedTypeOfStats = RTC_STATS_TYPE_CANDIDATE_PAIR;
@@ -177,28 +180,28 @@ STATUS canaryRtpOutboundStats(UINT32 timerId, UINT64 currentTime, UINT64 customD
                 DLOGD("[Canary] RoundTripTime: %lf ms", rttMs);
                 Canary::Cloudwatch::getInstance().monitoring.pushRoundTripTime(rttMs, Aws::CloudWatch::Model::StandardUnit::Milliseconds);
 
-                DOUBLE duration = (DOUBLE)(rtcCandidatePairMetrics.timestamp - pSampleStreamingSession->rtcMetricsHistory.prevTs) / HUNDREDS_OF_NANOS_IN_A_SECOND;
+                DOUBLE duration = (DOUBLE)(rtcCandidatePairMetrics.timestamp - pSampleStreamingSession->canaryIceMetricsHistory.prevTs) / HUNDREDS_OF_NANOS_IN_A_SECOND;
                 if (duration > 0) {
                     DOUBLE pktsSentPerSec = (DOUBLE)(rtcCandidatePairMetrics.rtcStatsObject.iceCandidatePairStats.packetsSent -
-                                                     pSampleStreamingSession->rtcMetricsHistory.prevNumberOfPacketsSent) / duration;
+                                                     pSampleStreamingSession->canaryIceMetricsHistory.prevNumberOfPacketsSent) / duration;
                     DOUBLE pktsRecvPerSec = (DOUBLE)(rtcCandidatePairMetrics.rtcStatsObject.iceCandidatePairStats.packetsReceived -
-                                                     pSampleStreamingSession->rtcMetricsHistory.prevNumberOfPacketsReceived) / duration;
+                                                     pSampleStreamingSession->canaryIceMetricsHistory.prevNumberOfPacketsReceived) / duration;
                     DOUBLE outBitrateKbps = ((DOUBLE)(rtcCandidatePairMetrics.rtcStatsObject.iceCandidatePairStats.bytesSent -
-                                                      pSampleStreamingSession->rtcMetricsHistory.prevNumberOfBytesSent) * 8.0) / duration / 1000.0;
+                                                      pSampleStreamingSession->canaryIceMetricsHistory.prevNumberOfBytesSent) * 8.0) / duration / 1000.0;
 
                     Canary::Cloudwatch::getInstance().monitoring.pushPacketsSentPerSecond(pktsSentPerSec);
                     Canary::Cloudwatch::getInstance().monitoring.pushPacketsReceivedPerSecond(pktsRecvPerSec);
                     Canary::Cloudwatch::getInstance().monitoring.pushOutgoingBitrate(outBitrateKbps);
 
                     // Update prev values for next interval
-                    pSampleStreamingSession->rtcMetricsHistory.prevTs = rtcCandidatePairMetrics.timestamp;
-                    pSampleStreamingSession->rtcMetricsHistory.prevNumberOfPacketsSent =
+                    pSampleStreamingSession->canaryIceMetricsHistory.prevTs = rtcCandidatePairMetrics.timestamp;
+                    pSampleStreamingSession->canaryIceMetricsHistory.prevNumberOfPacketsSent =
                         rtcCandidatePairMetrics.rtcStatsObject.iceCandidatePairStats.packetsSent;
-                    pSampleStreamingSession->rtcMetricsHistory.prevNumberOfPacketsReceived =
+                    pSampleStreamingSession->canaryIceMetricsHistory.prevNumberOfPacketsReceived =
                         rtcCandidatePairMetrics.rtcStatsObject.iceCandidatePairStats.packetsReceived;
-                    pSampleStreamingSession->rtcMetricsHistory.prevNumberOfBytesSent =
+                    pSampleStreamingSession->canaryIceMetricsHistory.prevNumberOfBytesSent =
                         rtcCandidatePairMetrics.rtcStatsObject.iceCandidatePairStats.bytesSent;
-                    pSampleStreamingSession->rtcMetricsHistory.prevNumberOfBytesReceived =
+                    pSampleStreamingSession->canaryIceMetricsHistory.prevNumberOfBytesReceived =
                         rtcCandidatePairMetrics.rtcStatsObject.iceCandidatePairStats.bytesReceived;
                 }
             }
@@ -1025,6 +1028,7 @@ STATUS createSampleStreamingSession(PSampleConfiguration pSampleConfiguration, P
 
     pSampleStreamingSession->pSampleConfiguration = pSampleConfiguration;
     pSampleStreamingSession->rtcMetricsHistory.prevTs = GETTIME();
+    pSampleStreamingSession->canaryIceMetricsHistory.prevTs = pSampleStreamingSession->rtcMetricsHistory.prevTs;
 
     pSampleStreamingSession->peerConnectionMetrics.version = PEER_CONNECTION_METRICS_CURRENT_VERSION;
     pSampleStreamingSession->iceMetrics.version = ICE_AGENT_METRICS_CURRENT_VERSION;

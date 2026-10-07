@@ -205,6 +205,7 @@ struct __SampleStreamingSession {
     TID receiveAudioVideoSenderTid;
     UINT64 startUpLatency;
     RtcMetricsHistory rtcMetricsHistory;
+    RtcMetricsHistory canaryIceMetricsHistory; // private to canaryRtpOutboundStats(); rtcMetricsHistory belongs to the sample stats callback
     BOOL remoteCanTrickleIce;
 
     RtcStats canaryMetrics;
