@@ -27,6 +27,9 @@ FetchContent_Declare(
 FetchContent_GetProperties(webrtc)
 if(NOT producerc_POPULATED)
   FetchContent_Populate(producerc)
+  # Build the canary against PIC develop instead of the version producer-c
+  # pins by default. producer-c reads this variable when it fetches PIC.
+  set(PIC_VERSION_OVERRIDE "develop")
   add_subdirectory(${producerc_SOURCE_DIR} ${producerc_BINARY_DIR} EXCLUDE_FROM_ALL)
 endif()
 
