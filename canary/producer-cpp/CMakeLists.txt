@@ -23,6 +23,11 @@ if(NOT producercpp_POPULATED)
   set(CMAKE_POLICY_DEFAULT_CMP0077 NEW)
   set(USE_OPENSSL ON)
   set(OPEN_SRC_INSTALL_PREFIX ${CMAKE_CURRENT_SOURCE_DIR})
+  # Build the canary against PIC develop. producer-sdk-cpp pins producer-c to
+  # a release tag whose PIC pin cannot be overridden, so hook producer-c's
+  # project() call and rewrite its PIC GIT_TAG before the fetch runs.
+  set(CMAKE_PROJECT_KinesisVideoProducerC_INCLUDE
+      ${CMAKE_CURRENT_SOURCE_DIR}/cmake/pin-pic-develop.cmake)
   add_subdirectory(${producercpp_SOURCE_DIR} ${producercpp_BINARY_DIR} EXCLUDE_FROM_ALL)
 endif()
 
