@@ -44,6 +44,27 @@ fi
 
 # Start JS SDK dev server if using a branch name
 DEV_SERVER_PID=""
+
+# Stop the dev server together with everything it spawned (npm -> sh -> node).
+# The server is started with setsid, so the whole tree is one process group and
+# one signal to the group reaches the node process; killing $DEV_SERVER_PID alone
+# only kills npm and leaves webpack-dev-server running forever (observed on the
+# TWCC egress viewer, where the script runs under sudo inside a netns and the
+# Jenkins process-tree killer cannot see the orphan).
+stop_dev_server() {
+    [ -n "$DEV_SERVER_PID" ] || return 0
+    echo "Stopping JS SDK dev server (PID $DEV_SERVER_PID)..."
+    local pgid
+    pgid=$(ps -o pgid= -p "$DEV_SERVER_PID" 2>/dev/null | tr -d ' ')
+    if [ -n "$pgid" ]; then
+        kill -TERM -- "-$pgid" 2>/dev/null || true
+    else
+        kill -TERM "$DEV_SERVER_PID" 2>/dev/null || true
+    fi
+    DEV_SERVER_PID=""
+}
+trap stop_dev_server EXIT
+
 if [ -n "${JS_PAGE_URL:-}" ]; then
     if [[ "${JS_PAGE_URL}" != *"://"* ]]; then
         JS_SDK_DIR="${VIEWER_BUILD_HOME}/${JS_PAGE_URL}/repo"
@@ -57,7 +78,7 @@ if [ -n "${JS_PAGE_URL:-}" ]; then
         # Dev server log with timestamp for debugging
         DEV_SERVER_LOG="${LOGS_DIR}/dev-server-$(date +%s).log"
         echo "Starting JS SDK dev server on port ${JS_PORT}..."
-        (cd "$JS_SDK_DIR" && npm run develop -- --port "$JS_PORT" --host 127.0.0.1 --allowed-hosts all --no-hot --no-live-reload > "$DEV_SERVER_LOG" 2>&1) &
+        setsid bash -c 'cd "$1" && exec npm run develop -- --port "$2" --host 127.0.0.1 --allowed-hosts all --no-hot --no-live-reload' _ "$JS_SDK_DIR" "$JS_PORT" > "$DEV_SERVER_LOG" 2>&1 &
         DEV_SERVER_PID=$!
 
         # Wait for webpack to finish compiling and the server to start
@@ -77,7 +98,6 @@ if [ -n "${JS_PAGE_URL:-}" ]; then
         if ! grep -q "$READY_MSG" "$DEV_SERVER_LOG" 2>/dev/null; then
             echo "ERROR: Dev server failed to start within 120 seconds. Log output:"
             cat "$DEV_SERVER_LOG"
-            kill "$DEV_SERVER_PID" 2>/dev/null
             exit 1
         fi
 
@@ -101,8 +121,5 @@ fi
 # Run storage viewer test
 node chrome-headless.js || { echo "ERROR: Chrome headless test failed"; exit 1; }
 
-# Clean up the dev server if we started one
-if [ -n "$DEV_SERVER_PID" ]; then
-    echo "Stopping JS SDK dev server (PID $DEV_SERVER_PID)..."
-    kill "$DEV_SERVER_PID" 2>/dev/null || true
-fi
+# Clean up the dev server if we started one (the EXIT trap also covers failure paths)
+stop_dev_server
