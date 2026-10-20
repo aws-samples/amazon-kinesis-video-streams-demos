@@ -116,6 +116,41 @@ STATUS populateOutgoingRtpMetricsContext(PSampleStreamingSession pSampleStreamin
     return STATUS_SUCCESS;
 }
 
+// Upper bounds for a believable candidate-pair rate sample. The master never sends more than a
+// few Mbps (the TWCC cycles cap it at 3 Mbps), so anything near these bounds is a stale or
+// garbage counter, not traffic. One such sample (1.29e16 kbps on 2026-10-19 10:55 UTC) is enough
+// to rescale a 14-day CloudWatch graph so every real value reads as zero.
+#define CANARY_MAX_SANE_BITRATE_KBPS       1000000.0 // 1 Gbps
+#define CANARY_MAX_SANE_PACKETS_PER_SECOND 1000000.0 // ~8 Gbps at 1000 B/packet; real traffic is < 1000 pkts/s
+
+// Fetches the data-sending ICE candidate pair stats into a zeroed struct and returns TRUE only if
+// the SDK actually filled it. rtcPeerConnectionGetMetrics(CANDIDATE_PAIR) returns STATUS_SUCCESS
+// WITHOUT touching the struct when no data-sending pair exists yet (SDK Metrics.c,
+// getIceCandidatePairStats: `CHK(pIceAgent->pDataSendingIceCandidatePair != NULL, STATUS_SUCCESS)`),
+// which is the state right after a reconnect and at FAILED/CLOSED. Reading an unzeroed stack
+// struct in that window produced the 1e16 kbps / 1.6e18 pkts/s datapoints.
+// The SDK only ever assigns a nominated+SUCCEEDED pair as the data-sending pair, and it writes
+// localCandidateId first when it does, so a non-empty localCandidateId is the proof the copy ran.
+static BOOL canaryGetCandidatePairStats(PRtcPeerConnection pPeerConnection, PRtcStats pStats)
+{
+    MEMSET(pStats, 0x00, SIZEOF(RtcStats));
+    pStats->requestedTypeOfStats = RTC_STATS_TYPE_CANDIDATE_PAIR;
+
+    if (pPeerConnection == NULL || STATUS_FAILED(rtcPeerConnectionGetMetrics(pPeerConnection, NULL, pStats))) {
+        return FALSE;
+    }
+    if (pStats->rtcStatsObject.iceCandidatePairStats.localCandidateId[0] == '\0') {
+        DLOGD("[Canary] No data-sending ICE candidate pair yet, skipping candidate-pair metrics");
+        return FALSE;
+    }
+    if (!pStats->rtcStatsObject.iceCandidatePairStats.nominated) {
+        // The diagnostics copy of the flag can lag the pair's own flag after an ICE restart;
+        // the pair itself is nominated by construction, so log rather than drop the sample.
+        DLOGD("[Canary] Data-sending ICE candidate pair reports nominated=false");
+    }
+    return TRUE;
+}
+
 STATUS canaryRtpOutboundStats(UINT32 timerId, UINT64 currentTime, UINT64 customData)
 {
     DLOGD("[Canary] canaryRtpOutboundStats(...) invoked");
@@ -175,24 +210,41 @@ STATUS canaryRtpOutboundStats(UINT32 timerId, UINT64 currentTime, UINT64 customD
         // and resets rtcMetricsHistory, which made these deltas cover 0.6 s instead of 60 s.
         {
             RtcStats rtcCandidatePairMetrics;
-            rtcCandidatePairMetrics.requestedTypeOfStats = RTC_STATS_TYPE_CANDIDATE_PAIR;
-            if (STATUS_SUCCEEDED(rtcPeerConnectionGetMetrics(pSampleStreamingSession->pPeerConnection, NULL, &rtcCandidatePairMetrics))) {
-                DOUBLE rttMs = rtcCandidatePairMetrics.rtcStatsObject.iceCandidatePairStats.currentRoundTripTime * 1000.0;
+            if (canaryGetCandidatePairStats(pSampleStreamingSession->pPeerConnection, &rtcCandidatePairMetrics)) {
+                PRtcIceCandidatePairStats pPair = &rtcCandidatePairMetrics.rtcStatsObject.iceCandidatePairStats;
+                PRtcMetricsHistory pHist = &pSampleStreamingSession->canaryIceMetricsHistory;
+
+                DOUBLE rttMs = pPair->currentRoundTripTime * 1000.0;
                 DLOGD("[Canary] RoundTripTime: %lf ms", rttMs);
                 Canary::Cloudwatch::getInstance().monitoring.pushRoundTripTime(rttMs, Aws::CloudWatch::Model::StandardUnit::Milliseconds);
 
-                DOUBLE duration = (DOUBLE)(rtcCandidatePairMetrics.timestamp - pSampleStreamingSession->canaryIceMetricsHistory.prevTs) / HUNDREDS_OF_NANOS_IN_A_SECOND;
-                if (duration > 0) {
-                    DOUBLE pktsSentPerSec = (DOUBLE)(rtcCandidatePairMetrics.rtcStatsObject.iceCandidatePairStats.packetsSent -
-                                                     pSampleStreamingSession->canaryIceMetricsHistory.prevNumberOfPacketsSent) / duration;
-                    DOUBLE pktsRecvPerSec = (DOUBLE)(rtcCandidatePairMetrics.rtcStatsObject.iceCandidatePairStats.packetsReceived -
-                                                     pSampleStreamingSession->canaryIceMetricsHistory.prevNumberOfPacketsReceived) / duration;
-                    DOUBLE outBitrateKbps = ((DOUBLE)(rtcCandidatePairMetrics.rtcStatsObject.iceCandidatePairStats.bytesSent -
-                                                      pSampleStreamingSession->canaryIceMetricsHistory.prevNumberOfBytesSent) * 8.0) / duration / 1000.0;
+                DOUBLE duration = (DOUBLE)(rtcCandidatePairMetrics.timestamp - pHist->prevTs) / HUNDREDS_OF_NANOS_IN_A_SECOND;
+                // The counters belong to the data-sending pair; after an ICE restart that pair
+                // (and its counters) can be replaced by a fresh one, so a cumulative value below
+                // the previous sample is a reset, not traffic. Reseed and skip this interval
+                // instead of pushing the UINT64-wrapped delta.
+                BOOL counterReset = pPair->packetsSent < pHist->prevNumberOfPacketsSent ||
+                    pPair->packetsReceived < pHist->prevNumberOfPacketsReceived || pPair->bytesSent < pHist->prevNumberOfBytesSent;
+                if (counterReset) {
+                    DLOGW("[Canary] Candidate-pair counters went backwards (pair replaced?), reseeding interval baseline");
+                }
 
-                    Canary::Cloudwatch::getInstance().monitoring.pushPacketsSentPerSecond(pktsSentPerSec);
-                    Canary::Cloudwatch::getInstance().monitoring.pushPacketsReceivedPerSecond(pktsRecvPerSec);
-                    Canary::Cloudwatch::getInstance().monitoring.pushOutgoingBitrate(outBitrateKbps);
+                if (duration > 0) {
+                    if (!counterReset) {
+                        DOUBLE pktsSentPerSec = (DOUBLE)(pPair->packetsSent - pHist->prevNumberOfPacketsSent) / duration;
+                        DOUBLE pktsRecvPerSec = (DOUBLE)(pPair->packetsReceived - pHist->prevNumberOfPacketsReceived) / duration;
+                        DOUBLE outBitrateKbps = ((DOUBLE)(pPair->bytesSent - pHist->prevNumberOfBytesSent) * 8.0) / duration / 1000.0;
+
+                        if (pktsSentPerSec > CANARY_MAX_SANE_PACKETS_PER_SECOND || pktsRecvPerSec > CANARY_MAX_SANE_PACKETS_PER_SECOND ||
+                            outBitrateKbps > CANARY_MAX_SANE_BITRATE_KBPS) {
+                            DLOGW("[Canary] Dropping implausible candidate-pair sample: %lf pkts/s sent, %lf pkts/s recv, %lf kbps over %lf s",
+                                  pktsSentPerSec, pktsRecvPerSec, outBitrateKbps, duration);
+                        } else {
+                            Canary::Cloudwatch::getInstance().monitoring.pushPacketsSentPerSecond(pktsSentPerSec);
+                            Canary::Cloudwatch::getInstance().monitoring.pushPacketsReceivedPerSecond(pktsRecvPerSec);
+                            Canary::Cloudwatch::getInstance().monitoring.pushOutgoingBitrate(outBitrateKbps);
+                        }
+                    }
 
                     // TWCC metrics (Module 3): DelayTrend is meaningful whenever TWCC feedback
                     // arrives; EstimatedBitrate reflects the live encoder target and is only
@@ -222,17 +274,15 @@ STATUS canaryRtpOutboundStats(UINT32 timerId, UINT64 currentTime, UINT64 customD
                             fclose(bwFp);
                         }
                     }
+                }
 
-                    // Update prev values for next interval
-                    pSampleStreamingSession->canaryIceMetricsHistory.prevTs = rtcCandidatePairMetrics.timestamp;
-                    pSampleStreamingSession->canaryIceMetricsHistory.prevNumberOfPacketsSent =
-                        rtcCandidatePairMetrics.rtcStatsObject.iceCandidatePairStats.packetsSent;
-                    pSampleStreamingSession->canaryIceMetricsHistory.prevNumberOfPacketsReceived =
-                        rtcCandidatePairMetrics.rtcStatsObject.iceCandidatePairStats.packetsReceived;
-                    pSampleStreamingSession->canaryIceMetricsHistory.prevNumberOfBytesSent =
-                        rtcCandidatePairMetrics.rtcStatsObject.iceCandidatePairStats.bytesSent;
-                    pSampleStreamingSession->canaryIceMetricsHistory.prevNumberOfBytesReceived =
-                        rtcCandidatePairMetrics.rtcStatsObject.iceCandidatePairStats.bytesReceived;
+                // Update prev values for next interval (also on a reset, to reseed the baseline)
+                if (duration > 0) {
+                    pHist->prevTs = rtcCandidatePairMetrics.timestamp;
+                    pHist->prevNumberOfPacketsSent = pPair->packetsSent;
+                    pHist->prevNumberOfPacketsReceived = pPair->packetsReceived;
+                    pHist->prevNumberOfBytesSent = pPair->bytesSent;
+                    pHist->prevNumberOfBytesReceived = pPair->bytesReceived;
                 }
             }
         }
@@ -597,15 +647,18 @@ VOID onConnectionStateChange(UINT64 customData, RTC_PEER_CONNECTION_STATE newSta
 
             // Push end-of-session totals before the session terminates
             if (ATOMIC_LOAD_BOOL(&pSampleConfiguration->connected)) {
-                // Get final candidate pair stats for total packets
+                // Get final candidate pair stats for total packets. At FAILED the data-sending
+                // pair may already be gone; then the SDK leaves the struct untouched and we
+                // skip the push rather than emit garbage or a false zero.
                 RtcStats finalCandidatePairStats;
-                finalCandidatePairStats.requestedTypeOfStats = RTC_STATS_TYPE_CANDIDATE_PAIR;
-                if (STATUS_SUCCEEDED(rtcPeerConnectionGetMetrics(pSampleStreamingSession->pPeerConnection, NULL, &finalCandidatePairStats))) {
+                if (canaryGetCandidatePairStats(pSampleStreamingSession->pPeerConnection, &finalCandidatePairStats)) {
                     UINT64 totalPktsSent = finalCandidatePairStats.rtcStatsObject.iceCandidatePairStats.packetsSent;
                     UINT64 totalPktsRecv = finalCandidatePairStats.rtcStatsObject.iceCandidatePairStats.packetsReceived;
                     DLOGI("[Canary] End-of-session TotalPacketsSent: %" PRIu64 ", TotalPacketsReceived: %" PRIu64, totalPktsSent, totalPktsRecv);
                     Canary::Cloudwatch::getInstance().monitoring.pushTotalPacketsSent(totalPktsSent);
                     Canary::Cloudwatch::getInstance().monitoring.pushTotalPacketsReceived(totalPktsRecv);
+                } else {
+                    DLOGW("[Canary] No data-sending ICE candidate pair at state %u, skipping TotalPacketsSent/Received", newState);
                 }
 
                 // Get final outbound RTP stats for total NACK, PLI, frames discarded
