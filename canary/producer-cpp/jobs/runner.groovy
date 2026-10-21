@@ -207,11 +207,11 @@ pipeline {
                             parameters: [
                                 string(name: 'CANARY_STREAM_NAME', value: params.CANARY_STREAM_NAME),
                                 string(name: 'AWS_KVS_LOG_LEVEL', value: params.AWS_KVS_LOG_LEVEL),
-                                booleanParam(name: 'CANARY_USE_IOT', value: params.USE_IOT),
+                                booleanParam(name: 'USE_IOT', value: params.USE_IOT),
                                 string(name: 'PRODUCER_NODE_LABEL', value: params.PRODUCER_NODE_LABEL),
                                 string(name: 'GIT_URL', value: params.GIT_URL),
                                 string(name: 'GIT_HASH', value: params.GIT_HASH),
-                                string(name: 'CANARY_STREAM_TYPE', value: params.CANARY_TYPE),
+                                string(name: 'CANARY_TYPE', value: params.CANARY_TYPE),
                                 string(name: 'FRAGMENT_SIZE_IN_BYTES', value: params.FRAGMENT_SIZE_IN_BYTES),
                                 string(name: 'CANARY_DURATION_IN_SECONDS', value: params.CANARY_DURATION_IN_SECONDS),
                                 string(name: 'MIN_RETRY_DELAY_IN_SECONDS', value: params.MIN_RETRY_DELAY_IN_SECONDS),
