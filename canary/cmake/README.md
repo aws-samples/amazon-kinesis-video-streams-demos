@@ -22,7 +22,7 @@ Individual refs can be overridden on the develop track: `-DKVS_PIC_REF=`, `-DKVS
 
 ## Jenkins
 
-The runner jobs take a `KVS_SDK_TRACK` parameter (default `release`) and pass it to `cmake`. On the develop track the build directory is wiped first so `FetchContent` re-resolves the branch heads on every iteration instead of reusing the sources cached by the previous one.
+The runner jobs take a `KVS_SDK_TRACK` parameter (default `release`) and pass it to `cmake`. On the develop track the build directory is wiped first so `FetchContent` re-resolves the branch heads on every iteration instead of reusing the sources cached by the previous one. Release builds are not wiped, and concurrent builds of one runner job share its `@2`, `@3` workspaces, so a release configure can land in a build directory a develop configure used. A release configure therefore clears `LOCAL_KVSPIC_PATH` / `LOCAL_KVSC_PATH`, and `kvs_sdk_verify_layers()` fails it if PIC or Producer C still resolves to a develop checkout.
 
 The orchestrators schedule the develop track as extra jobs with their own `RUNNER_LABEL`s, `LongrunDevelop` and `PeriodicDevelop`. The label is the `ProducerSDKCanaryType` / `ProducerCppCanaryType` CloudWatch dimension, so develop numbers land in separate time series. Dashboards and alarms keyed on those dimension values are configured separately from this repo; until they exist, the develop numbers are only visible directly in CloudWatch.
 
