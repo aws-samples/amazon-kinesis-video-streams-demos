@@ -6,15 +6,19 @@ HAS_ERROR = false
 
 RUNNING_NODES=0
 
-def buildProducer() {
+def buildProducer(params) {
+  // A develop-track build always starts from a clean build dir so FetchContent re-resolves the branch heads
+  // instead of reusing the SDK sources cached by the previous iteration.
+  def cleanBuildDir = params.KVS_SDK_TRACK == 'develop' ? 'rm -rf build &&' : ''
   sh  """
     cd ./canary/producer-cpp/scripts &&
     chmod a+x cert_setup.sh &&
     ./cert_setup.sh ${NODE_NAME} &&
     cd .. &&
+    ${cleanBuildDir}
     mkdir -p build &&
     cd build && 
-    cmake .. &&
+    cmake .. -DKVS_SDK_TRACK=${params.KVS_SDK_TRACK} &&
     make -j4
   """
 }
@@ -59,7 +63,7 @@ def runClient(isProducer, params) {
     RUNNING_NODES++
     echo "Number of running nodes: ${RUNNING_NODES}"
     if(isProducer) {
-        buildProducer()
+        buildProducer(params)
     }
 
     RUNNING_NODES--
@@ -128,6 +132,8 @@ pipeline {
         string(name: 'MIN_RETRY_DELAY_IN_SECONDS')
         string(name: 'AWS_DEFAULT_REGION')
         string(name: 'CANARY_RUN_SCENARIO')
+        // release: Producer CPP master with its pinned Producer C / PIC tags. develop: all three from develop.
+        choice(name: 'KVS_SDK_TRACK', choices: ["release", "develop"])
         booleanParam(name: 'FIRST_ITERATION', defaultValue: true)
         booleanParam(name: 'USE_IOT')
     }
@@ -162,7 +168,7 @@ pipeline {
             steps {
                 script {
                     currentBuild.displayName = "${params.RUNNER_LABEL} [#${BUILD_NUMBER}]"
-                    currentBuild.description = "Executed on: ${NODE_NAME}\n"
+                    currentBuild.description = "Executed on: ${NODE_NAME}\nSDK track: ${params.KVS_SDK_TRACK}\n"
                 }
             }
         }
@@ -218,6 +224,7 @@ pipeline {
                                 string(name: 'AWS_DEFAULT_REGION', value: params.AWS_DEFAULT_REGION),
                                 string(name: 'RUNNER_LABEL', value: params.RUNNER_LABEL),
                                 string(name: 'CANARY_RUN_SCENARIO', value: params.CANARY_RUN_SCENARIO),
+                                string(name: 'KVS_SDK_TRACK', value: params.KVS_SDK_TRACK),
                                 booleanParam(name: 'FIRST_ITERATION', value: false)
                             ],
                     wait: false
