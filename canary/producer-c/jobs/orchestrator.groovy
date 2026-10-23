@@ -3,7 +3,8 @@ import jenkins.model.*
 WORKSPACE_PRODUCER="canary/producer-c"
 WORKSPACE_CONSUMER="canary/consumer-java"
 GIT_URL='https://github.com/aws-samples/amazon-kinesis-video-streams-demos.git'
-GIT_HASH='master'
+// Deployed from this branch until the develop IoT isolation merges; set back to 'master' when it does.
+GIT_HASH='producer-c-develop-iot'
 RUNNER_JOB_NAME_PREFIX = "producer-runner"
 
 // TODO: Set up configurability to run different parameter combinations
@@ -200,7 +201,25 @@ pipeline {
                         // Develop track: same Longrun / Periodic scenarios built from the develop branches of
                         // PIC and Producer C. The *Develop labels are separate ProducerSDKCanaryType dimension
                         // values, so they get their own dashboard section and alarms and never mix with the
-                        // release numbers above.
+                        // release numbers above. Credentials mirror release: Longrun runs one static and one IoT
+                        // job, Periodic runs IoT. Develop IoT jobs use their own things (see runner iotPrefix).
+                        build(
+                            job: NEXT_AVAILABLE_RUNNER,
+                            parameters: COMMON_PARAMS + [
+                                booleanParam(name: 'USE_IOT', value: false),
+                                string(name: 'KVS_SDK_TRACK', value: "develop"),
+                                string(name: 'CANARY_DURATION_IN_SECONDS', value: LONG_RUN_DURATION_IN_SECONDS.toString()),
+                                string(name: 'PRODUCER_NODE_LABEL', value: "producer-uw2"),
+                                string(name: 'CONSUMER_NODE_LABEL', value: "consumer-uw2"),
+                                string(name: 'CANARY_TYPE', value: "RealtimeStatic"),
+                                string(name: 'RUNNER_LABEL', value: "LongrunDevelop"),
+                                string(name: 'FRAGMENT_SIZE_IN_BYTES', value: FRAGMENT_SIZE_IN_BYTES.toString()),
+                                string(name: 'AWS_DEFAULT_REGION', value: AWS_DEFAULT_REGION),
+                                string(name: 'CANARY_RUN_SCENARIO', value: "Continuous"),
+                                string(name: 'TRACK_TYPE', value: "SingleTrack"),
+                            ],
+                            wait: false
+                        )
                         build(
                             job: NEXT_AVAILABLE_RUNNER,
                             parameters: COMMON_PARAMS + [
