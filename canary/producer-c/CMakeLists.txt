@@ -12,10 +12,15 @@ set(BUILD_ONLY "monitoring;logs" CACHE STRING "Tell AWS SDK to only build monito
 set(BUILD_COMMON_CURL ON CACHE BOOL "Curl" FORCE)
 set(BUILD_DEPENDENCIES OFF CACHE BOOL "Deps in kvs" FORCE)
 
+# -DKVS_SDK_TRACK=develop builds PIC and Producer C from their develop branches. See ../cmake/KvsSdkSource.cmake.
+include(${CMAKE_CURRENT_SOURCE_DIR}/../cmake/KvsSdkSource.cmake)
+kvs_sdk_top_level_ref(${KVS_PRODUCER_C_REF} PRODUCER_C_GIT_TAG)
+kvs_sdk_prepare_layers(PIC)
+
 FetchContent_Declare(
         producerc
         GIT_REPOSITORY https://github.com/awslabs/amazon-kinesis-video-streams-producer-c.git
-        GIT_TAG        master
+        GIT_TAG        ${PRODUCER_C_GIT_TAG}
 )
 
 FetchContent_Declare(
@@ -24,11 +29,12 @@ FetchContent_Declare(
         GIT_TAG        1.11.92
 )
 
-FetchContent_GetProperties(webrtc)
+FetchContent_GetProperties(producerc)
 if(NOT producerc_POPULATED)
   FetchContent_Populate(producerc)
   add_subdirectory(${producerc_SOURCE_DIR} ${producerc_BINARY_DIR} EXCLUDE_FROM_ALL)
 endif()
+kvs_sdk_verify_layers()
 
 FetchContent_GetProperties(cloudwatch)
 if(NOT cloudwatch_POPULATED)

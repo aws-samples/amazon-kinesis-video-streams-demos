@@ -196,6 +196,45 @@ pipeline {
                             ],
                             wait: false
                         )
+
+                        // Develop track: same Longrun / Periodic scenarios built from the develop branches of
+                        // PIC and Producer C. The *Develop labels are separate ProducerSDKCanaryType dimension
+                        // values, so they get their own dashboard section and alarms and never mix with the
+                        // release numbers above.
+                        build(
+                            job: NEXT_AVAILABLE_RUNNER,
+                            parameters: COMMON_PARAMS + [
+                                booleanParam(name: 'USE_IOT', value: true),
+                                string(name: 'KVS_SDK_TRACK', value: "develop"),
+                                string(name: 'CANARY_DURATION_IN_SECONDS', value: LONG_RUN_DURATION_IN_SECONDS.toString()),
+                                string(name: 'PRODUCER_NODE_LABEL', value: "producer-uw2"),
+                                string(name: 'CONSUMER_NODE_LABEL', value: "consumer-uw2"),
+                                string(name: 'CANARY_TYPE', value: "Realtime"),
+                                string(name: 'RUNNER_LABEL', value: "LongrunDevelop"),
+                                string(name: 'FRAGMENT_SIZE_IN_BYTES', value: FRAGMENT_SIZE_IN_BYTES.toString()),
+                                string(name: 'AWS_DEFAULT_REGION', value: AWS_DEFAULT_REGION),
+                                string(name: 'CANARY_RUN_SCENARIO', value: "Continuous"),
+                                string(name: 'TRACK_TYPE', value: "SingleTrack"),
+                            ],
+                            wait: false
+                        )
+                        build(
+                            job: NEXT_AVAILABLE_RUNNER,
+                            parameters: COMMON_PARAMS + [
+                                booleanParam(name: 'USE_IOT', value: true),
+                                string(name: 'KVS_SDK_TRACK', value: "develop"),
+                                string(name: 'CANARY_DURATION_IN_SECONDS', value: SHORT_RUN_DURATION_IN_SECONDS.toString()),
+                                string(name: 'PRODUCER_NODE_LABEL', value: "producer-uw2"),
+                                string(name: 'CONSUMER_NODE_LABEL', value: "consumer-uw2"),
+                                string(name: 'CANARY_TYPE', value: "Realtime"),
+                                string(name: 'RUNNER_LABEL', value: "PeriodicDevelop"),
+                                string(name: 'FRAGMENT_SIZE_IN_BYTES', value: FRAGMENT_SIZE_IN_BYTES.toString()),
+                                string(name: 'AWS_DEFAULT_REGION', value: AWS_DEFAULT_REGION),
+                                string(name: 'CANARY_RUN_SCENARIO', value: "Continuous"),
+                                string(name: 'TRACK_TYPE', value: "SingleTrack"),
+                            ],
+                            wait: false
+                        )
                     }
                 }
 

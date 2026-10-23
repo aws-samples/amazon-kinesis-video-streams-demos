@@ -5,10 +5,15 @@ project(KinesisVideoProducerCloudwatch)
 
 set(CMAKE_CXX_STANDARD 17)
 
+# -DKVS_SDK_TRACK=develop builds PIC, Producer C and Producer CPP from their develop branches. See ../cmake/KvsSdkSource.cmake.
+include(${CMAKE_CURRENT_SOURCE_DIR}/../cmake/KvsSdkSource.cmake)
+kvs_sdk_top_level_ref(${KVS_PRODUCER_CPP_REF} PRODUCER_CPP_GIT_TAG)
+kvs_sdk_prepare_layers(PIC PRODUCER_C)
+
 FetchContent_Declare(
         producercpp
         GIT_REPOSITORY https://github.com/awslabs/amazon-kinesis-video-streams-producer-sdk-cpp.git
-        GIT_TAG        master
+        GIT_TAG        ${PRODUCER_CPP_GIT_TAG}
 )
 
 FetchContent_Declare(
@@ -25,6 +30,7 @@ if(NOT producercpp_POPULATED)
   set(OPEN_SRC_INSTALL_PREFIX ${CMAKE_CURRENT_SOURCE_DIR})
   add_subdirectory(${producercpp_SOURCE_DIR} ${producercpp_BINARY_DIR} EXCLUDE_FROM_ALL)
 endif()
+kvs_sdk_verify_layers()
 
 FetchContent_GetProperties(cloudwatch)
 if(NOT cloudwatch_POPULATED)
