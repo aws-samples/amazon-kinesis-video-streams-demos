@@ -18,7 +18,7 @@ Thresholds (matching VideoVerificationComponent.java):
   - Max SSIM > 0.99
   - Avg SSIM > 0.85
   - Min SSIM > 0.03
-  - Clip frame count >= TOTAL_SOURCE_FRAMES - 1500
+  - Clip frame count >= TOTAL_SOURCE_FRAMES - 480
 
 Usage:
   python verify.py --recording clip.mp4 --source-frames ../../assets/h264SampleFrames --json
@@ -39,10 +39,10 @@ from PIL import Image
 from skimage.metrics import structural_similarity as ssim
 
 
-FPS = 30
-TOTAL_SOURCE_FRAMES = 4676
-EXPECTED_DURATION = TOTAL_SOURCE_FRAMES / FPS  # ~155.87s
-DROPPED_FRAME_THRESHOLD = 1500
+FPS = 25
+TOTAL_SOURCE_FRAMES = 1500
+EXPECTED_DURATION = TOTAL_SOURCE_FRAMES / FPS  # 60s
+DROPPED_FRAME_THRESHOLD = 480  # ~32% of the source set, same ratio as 1500/4676 before
 
 # Sync box crop coordinates for 1280x720 frames
 TIMER_CROP = (25, 20, 145, 90)
