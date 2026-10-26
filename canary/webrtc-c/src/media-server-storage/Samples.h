@@ -17,7 +17,7 @@ Shared include file for the samples
 #include <com/amazonaws/kinesis/video/webrtcclient/Include.h>
 
 #define NUMBER_OF_H264_FRAME_FILES               4676
-#define NUMBER_OF_OPUS_FRAME_FILES               618
+#define NUMBER_OF_OPUS_FRAME_FILES               7798
 #define DEFAULT_FPS_VALUE                        30
 #define DEFAULT_MAX_CONCURRENT_STREAMING_SESSION 10
 
@@ -207,6 +207,7 @@ struct __SampleStreamingSession {
     std::atomic<BOOL> recorded;
     volatile ATOMIC_BOOL firstIceSent;
     volatile ATOMIC_BOOL firstIceReceived;
+    volatile ATOMIC_BOOL firstInboundFrameReceived;
     std::mutex countUpdateMutex;
     std::thread pushProfilingThread;
 
