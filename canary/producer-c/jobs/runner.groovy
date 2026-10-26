@@ -6,6 +6,12 @@ HAS_ERROR = false
 
 RUNNING_NODES=0
 
+// IoT identity prefix. With IoT the stream is named after the thing (p<prefix>_thing), so develop builds use
+// their own per-node things to stay off the release streams. Create them once with generate-iot-credentials.sh.
+def iotPrefix(params) {
+  return params.KVS_SDK_TRACK == 'develop' ? "dev${env.NODE_NAME}" : "${env.NODE_NAME}"
+}
+
 def buildProducer(params) {
   // A develop-track build always starts from a clean build dir so FetchContent re-resolves the branch heads
   // instead of reusing the SDK sources cached by the previous iteration.
@@ -13,7 +19,7 @@ def buildProducer(params) {
   sh  """
     cd ./canary/producer-c &&
     chmod a+x cert_setup.sh &&
-    ./cert_setup.sh ${NODE_NAME} &&
+    ./cert_setup.sh ${iotPrefix(params)} &&
     ${cleanBuildDir}
     mkdir -p build &&
     cd build && 
@@ -97,10 +103,11 @@ def runClient(isProducer, params) {
 
     def scripts_dir = "$WORKSPACE/canary/producer-c"
     def endpoint = "${scripts_dir}/iot-credential-provider.txt"
-    def core_cert_file = "${scripts_dir}/p${env.NODE_NAME}_certificate.pem"
-    def private_key_file = "${scripts_dir}/p${env.NODE_NAME}_private.key"
-    def role_alias = "p${env.NODE_NAME}_role_alias"
-    def thing_name = "p${env.NODE_NAME}_thing"
+    def prefix = iotPrefix(params)
+    def core_cert_file = "${scripts_dir}/p${prefix}_certificate.pem"
+    def private_key_file = "${scripts_dir}/p${prefix}_private.key"
+    def role_alias = "p${prefix}_role_alias"
+    def thing_name = "p${prefix}_thing"
 
     def envs = [
         'JAVA_HOME': "/opt/jdk-13.0.1",
