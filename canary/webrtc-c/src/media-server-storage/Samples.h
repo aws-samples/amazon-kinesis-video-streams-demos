@@ -207,6 +207,7 @@ struct __SampleStreamingSession {
     std::atomic<BOOL> recorded;
     volatile ATOMIC_BOOL firstIceSent;
     volatile ATOMIC_BOOL firstIceReceived;
+    volatile ATOMIC_BOOL firstInboundFrameReceived;
     std::mutex countUpdateMutex;
     std::thread pushProfilingThread;
 
