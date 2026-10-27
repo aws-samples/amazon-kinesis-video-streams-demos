@@ -341,7 +341,7 @@ STATUS computeStreamMetricsFromCanary(STREAM_HANDLE streamHandle, PCanaryStreamC
     STATUS retStatus = STATUS_SUCCESS;
     StreamMetrics canaryStreamMetrics;
     canaryStreamMetrics.version = STREAM_METRICS_CURRENT_VERSION;
-    Aws::CloudWatch::Model::MetricDatum streamDatum, aggStreamDatum, currentViewDatum, aggCurrentViewDatum;
+    Aws::CloudWatch::Model::MetricDatum streamDatum, currentViewDatum, streamApiCallRetryCountDatum;
     CHK_STATUS(getKinesisVideoStreamMetrics(streamHandle, &canaryStreamMetrics));
 
     streamDatum.SetMetricName("FrameRate");
@@ -353,8 +353,13 @@ STATUS computeStreamMetricsFromCanary(STREAM_HANDLE streamHandle, PCanaryStreamC
     pushMetric(pCanaryStreamCallbacks, currentViewDatum, Aws::CloudWatch::Model::StandardUnit::Milliseconds,
                canaryStreamMetrics.currentViewDuration / HUNDREDS_OF_NANOS_IN_A_MILLISECOND);
 
+    streamApiCallRetryCountDatum.SetMetricName("StreamRetryCount");
+    streamApiCallRetryCountDatum.AddDimensions(pCanaryStreamCallbacks->dimensionPerStream);
+    pushMetric(pCanaryStreamCallbacks, streamApiCallRetryCountDatum, Aws::CloudWatch::Model::StandardUnit::Count,
+               canaryStreamMetrics.streamApiCallRetryCount);
+
     if (pCanaryStreamCallbacks->aggregateMetrics) {
-        Aws::CloudWatch::Model::MetricDatum aggStreamDatum, aggCurrentViewDatum;
+        Aws::CloudWatch::Model::MetricDatum aggStreamDatum, aggCurrentViewDatum, aggStreamApiCallRetryCountDatum;
         aggStreamDatum.SetMetricName("FrameRate");
         aggStreamDatum.AddDimensions(pCanaryStreamCallbacks->aggregatedDimension);
         pushMetric(pCanaryStreamCallbacks, aggStreamDatum, Aws::CloudWatch::Model::StandardUnit::Count_Second, canaryStreamMetrics.currentFrameRate);
@@ -363,6 +368,11 @@ STATUS computeStreamMetricsFromCanary(STREAM_HANDLE streamHandle, PCanaryStreamC
         aggCurrentViewDatum.AddDimensions(pCanaryStreamCallbacks->aggregatedDimension);
         pushMetric(pCanaryStreamCallbacks, aggCurrentViewDatum, Aws::CloudWatch::Model::StandardUnit::Milliseconds,
                    canaryStreamMetrics.currentViewDuration / HUNDREDS_OF_NANOS_IN_A_MILLISECOND);
+
+        aggStreamApiCallRetryCountDatum.SetMetricName("StreamRetryCount");
+        aggStreamApiCallRetryCountDatum.AddDimensions(pCanaryStreamCallbacks->aggregatedDimension);
+        pushMetric(pCanaryStreamCallbacks, aggStreamApiCallRetryCountDatum, Aws::CloudWatch::Model::StandardUnit::Count,
+                   canaryStreamMetrics.streamApiCallRetryCount);
 
     }
 CleanUp:
@@ -374,20 +384,30 @@ STATUS computeClientMetricsFromCanary(CLIENT_HANDLE clientHandle, PCanaryStreamC
     STATUS retStatus = STATUS_SUCCESS;
     ClientMetrics canaryClientMetrics;
     canaryClientMetrics.version = CLIENT_METRICS_CURRENT_VERSION;
-    Aws::CloudWatch::Model::MetricDatum clientDatum, aggClientDatum;
+    Aws::CloudWatch::Model::MetricDatum storageSizeDatum, avgApiRetryCountDatum;
     CHK_STATUS(getKinesisVideoMetrics(clientHandle, &canaryClientMetrics));
 
-    clientDatum.SetMetricName("StorageSizeAvailable");
-    clientDatum.AddDimensions(pCanaryStreamCallbacks->dimensionPerStream);
-    pushMetric(pCanaryStreamCallbacks, clientDatum, Aws::CloudWatch::Model::StandardUnit::Kilobytes,
+    storageSizeDatum.SetMetricName("StorageSizeAvailable");
+    storageSizeDatum.AddDimensions(pCanaryStreamCallbacks->dimensionPerStream);
+    pushMetric(pCanaryStreamCallbacks, storageSizeDatum, Aws::CloudWatch::Model::StandardUnit::Kilobytes,
                canaryClientMetrics.contentStoreAvailableSize / 1024);
 
+    avgApiRetryCountDatum.SetMetricName("AvgClientApiCallRetryCount");
+    avgApiRetryCountDatum.AddDimensions(pCanaryStreamCallbacks->dimensionPerStream);
+    pushMetric(pCanaryStreamCallbacks, avgApiRetryCountDatum, Aws::CloudWatch::Model::StandardUnit::Count,
+               canaryClientMetrics.clientAvgApiCallRetryCount);
+
     if (pCanaryStreamCallbacks->aggregateMetrics) {
-        Aws::CloudWatch::Model::MetricDatum aggClientDatum;
-        aggClientDatum.SetMetricName("StorageSizeAvailable");
-        aggClientDatum.AddDimensions(pCanaryStreamCallbacks->aggregatedDimension);
-        pushMetric(pCanaryStreamCallbacks, aggClientDatum, Aws::CloudWatch::Model::StandardUnit::Kilobytes,
+        Aws::CloudWatch::Model::MetricDatum aggStorageSizeDatum, aggAvgApiRetryCountDatum;
+        aggStorageSizeDatum.SetMetricName("StorageSizeAvailable");
+        aggStorageSizeDatum.AddDimensions(pCanaryStreamCallbacks->aggregatedDimension);
+        pushMetric(pCanaryStreamCallbacks, aggStorageSizeDatum, Aws::CloudWatch::Model::StandardUnit::Kilobytes,
                    canaryClientMetrics.contentStoreAvailableSize / 1024);
+
+        aggAvgApiRetryCountDatum.SetMetricName("AvgClientApiCallRetryCount");
+        aggAvgApiRetryCountDatum.AddDimensions(pCanaryStreamCallbacks->aggregatedDimension);
+        pushMetric(pCanaryStreamCallbacks, aggAvgApiRetryCountDatum, Aws::CloudWatch::Model::StandardUnit::Count,
+                   canaryClientMetrics.clientAvgApiCallRetryCount);
     }
 CleanUp:
     return retStatus;
