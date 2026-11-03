@@ -19,7 +19,9 @@ FetchContent_Declare(
 FetchContent_Declare(
         cloudwatch
         GIT_REPOSITORY https://github.com/aws/aws-sdk-cpp
-        GIT_TAG        1.10.9
+        # 1.11.248 or later is needed: older versions fail the CURL_HAS_H2 configure check when curl is the
+        # CURL::libcurl alias target that curl 8.x installs (Producer C 1.6.5 and later build curl 8.17).
+        GIT_TAG        1.11.921
 )
 
 FetchContent_GetProperties(producercpp)
@@ -49,9 +51,9 @@ file(GLOB producerc_HEADERS "${KinesisVideoProducerC_SOURCE_DIR}/src/include")
 file(GLOB CANARY_SOURCE_FILES "src/*.cpp")
 file(GLOB PIC_HEADERS "${pic_project_SOURCE_DIR}/src/*/include")
 
-include_directories(${cloudwatch_SOURCE_DIR}/aws-cpp-sdk-core/include)
-include_directories(${cloudwatch_SOURCE_DIR}/aws-cpp-sdk-monitoring/include)
-include_directories(${cloudwatch_SOURCE_DIR}/aws-cpp-sdk-logs/include)
+include_directories(${cloudwatch_SOURCE_DIR}/src/aws-cpp-sdk-core/include)
+include_directories(${cloudwatch_SOURCE_DIR}/generated/src/aws-cpp-sdk-monitoring/include)
+include_directories(${cloudwatch_SOURCE_DIR}/generated/src/aws-cpp-sdk-logs/include)
 
 include_directories(${PIC_HEADERS})
 include_directories(${producerc_HEADERS})
