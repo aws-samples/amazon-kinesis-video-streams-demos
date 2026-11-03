@@ -41,6 +41,9 @@ if(NOT cloudwatch_POPULATED)
   set(ENABLE_TESTING OFF)
   set(BUILD_ONLY "monitoring;logs")
   set(CMAKE_PREFIX_PATH ${CMAKE_CURRENT_SOURCE_DIR}/lib)
+  # Use the headers of the OpenSSL that the Producer SDK built into lib/. Without this, s2n finds the system
+  # OpenSSL 3 headers in /usr/include but links the OpenSSL 1.1 lib/libcrypto, and s2n_init() aborts at start.
+  set(crypto_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/include CACHE PATH "" FORCE)
   add_subdirectory(${cloudwatch_SOURCE_DIR} ${cloudwatch_BINARY_DIR} EXCLUDE_FROM_ALL)
 endif()
 
