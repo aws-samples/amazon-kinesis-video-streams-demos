@@ -185,7 +185,14 @@ pipeline {
                 stage('Producer') {
                     steps {
                         script {
-                            runClient(true, params)
+                            // Each SDK track builds in its own workspace. Jenkins shares the default workspace slots
+                            // (<job>@2, @3, ...) between all jobs of this runner on a node, and the build reuses
+                            // build/ plus the SDK's install dirs (lib/, include/) between iterations. Without this, a
+                            // release iteration could reuse files a develop iteration built, and the reverse. ws()
+                            // still adds @2, @3, ... when two jobs of the same track run on one node.
+                            ws("workspace/${env.JOB_NAME}-${params.KVS_SDK_TRACK}") {
+                                runClient(true, params)
+                            }
                         }
                     }
                 }
