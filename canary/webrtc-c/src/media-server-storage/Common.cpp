@@ -381,6 +381,9 @@ VOID onConnectionStateChange(UINT64 customData, RTC_PEER_CONNECTION_STATE newSta
                 UINT64 joinSSCallToSessionJoined = (GETTIME() - pSampleConfiguration->joinSSCallStartTime) / HUNDREDS_OF_NANOS_IN_A_MILLISECOND;
                 DLOGI("[Canary] JoinSSCallToSessionJoined: %" PRIu64 " ms", joinSSCallToSessionJoined);
                 Canary::Cloudwatch::getInstance().monitoring.pushJoinSSCallToSessionJoined(joinSSCallToSessionJoined, Aws::CloudWatch::Model::StandardUnit::Milliseconds);
+
+                DLOGI("[Canary] TimeToPeerConnection: %" PRIu64 " ms", joinSSCallToSessionJoined);
+                Canary::Cloudwatch::getInstance().monitoring.pushTimeToPeerConnection(joinSSCallToSessionJoined, Aws::CloudWatch::Model::StandardUnit::Milliseconds);
             }
             
             pSampleStreamingSession->canaryOutgoingRTPMetricsContext.prevTs = GETTIME();
@@ -656,6 +659,13 @@ STATUS sendSignalingMessage(PSampleStreamingSession pSampleStreamingSession, PSi
         CHK_STATUS(signalingClientGetMetrics(pSampleConfiguration->signalingClientHandle, &pSampleConfiguration->signalingClientMetrics));
         DLOGP("[Signaling offer received to answer sent time] %" PRIu64 " ms",
               pSampleConfiguration->signalingClientMetrics.signalingClientStats.offerToAnswerTime);
+
+        // Push TimeToSendAnswer — time from JoinStorageSession call to answer sent
+        if (pSampleConfiguration->joinSSCallStartTime != 0) {
+            UINT64 timeToSendAnswer = (GETTIME() - pSampleConfiguration->joinSSCallStartTime) / HUNDREDS_OF_NANOS_IN_A_MILLISECOND;
+            DLOGI("[Canary] TimeToSendAnswer: %" PRIu64 " ms", timeToSendAnswer);
+            Canary::Cloudwatch::getInstance().monitoring.pushTimeToSendAnswer(timeToSendAnswer, Aws::CloudWatch::Model::StandardUnit::Milliseconds);
+        }
     }
 
 CleanUp:
@@ -899,6 +909,7 @@ STATUS createSampleStreamingSession(PSampleConfiguration pSampleConfiguration, P
 
     ATOMIC_STORE_BOOL(&pSampleStreamingSession->firstIceSent, FALSE);
     ATOMIC_STORE_BOOL(&pSampleStreamingSession->firstIceReceived, FALSE);
+    ATOMIC_STORE_BOOL(&pSampleStreamingSession->firstInboundFrameReceived, FALSE);
 
     // if we're the viewer, we control the trickle ice mode
     pSampleStreamingSession->remoteCanTrickleIce = !isMaster && pSampleConfiguration->trickleIce;
@@ -934,7 +945,13 @@ STATUS createSampleStreamingSession(PSampleConfiguration pSampleConfiguration, P
     // Add a SendRecv Transceiver of type audio
     audioTrack.kind = MEDIA_STREAM_TRACK_KIND_AUDIO;
     audioTrack.codec = RTC_CODEC_OPUS;
-    audioRtpTransceiverInit.direction = RTC_RTP_TRANSCEIVER_DIRECTION_SENDRECV;
+    if (pSampleConfiguration->mediaType == SAMPLE_STREAMING_VIDEO_ONLY) {
+        // Video-only mode: still add audio transceiver but set direction to recvonly
+        // The media server requires an audio m-line with a valid direction (not inactive)
+        audioRtpTransceiverInit.direction = RTC_RTP_TRANSCEIVER_DIRECTION_RECVONLY;
+    } else {
+        audioRtpTransceiverInit.direction = RTC_RTP_TRANSCEIVER_DIRECTION_SENDRECV;
+    }
     STRCPY(audioTrack.streamId, "myKvsVideoStream");
     STRCPY(audioTrack.trackId, "myAudioTrack");
     CHK_STATUS(addTransceiver(pSampleStreamingSession->pPeerConnection, &audioTrack, &audioRtpTransceiverInit,
@@ -1044,14 +1061,32 @@ CleanUp:
 
 VOID sampleVideoFrameHandler(UINT64 customData, PFrame pFrame)
 {
-    UNUSED_PARAM(customData);
+    PSampleStreamingSession pSampleStreamingSession = (PSampleStreamingSession) customData;
     DLOGV("Video Frame received. TrackId: %" PRIu64 ", Size: %u, Flags %u", pFrame->trackId, pFrame->size, pFrame->flags);
+
+    if (pSampleStreamingSession != NULL && !ATOMIC_EXCHANGE_BOOL(&pSampleStreamingSession->firstInboundFrameReceived, TRUE)) {
+        PSampleConfiguration pConfig = pSampleStreamingSession->pSampleConfiguration;
+        if (pConfig != NULL && pConfig->joinSSCallStartTime != 0) {
+            UINT64 timeToReceiveInbound = (GETTIME() - pConfig->joinSSCallStartTime) / HUNDREDS_OF_NANOS_IN_A_MILLISECOND;
+            DLOGI("[Canary] TimeToReceiveInboundMedia: %" PRIu64 " ms", timeToReceiveInbound);
+            Canary::Cloudwatch::getInstance().monitoring.pushTimeToReceiveInboundMedia(timeToReceiveInbound, Aws::CloudWatch::Model::StandardUnit::Milliseconds);
+        }
+    }
 }
 
 VOID sampleAudioFrameHandler(UINT64 customData, PFrame pFrame)
 {
-    UNUSED_PARAM(customData);
+    PSampleStreamingSession pSampleStreamingSession = (PSampleStreamingSession) customData;
     DLOGV("Audio Frame received. TrackId: %" PRIu64 ", Size: %u, Flags %u", pFrame->trackId, pFrame->size, pFrame->flags);
+
+    if (pSampleStreamingSession != NULL && !ATOMIC_EXCHANGE_BOOL(&pSampleStreamingSession->firstInboundFrameReceived, TRUE)) {
+        PSampleConfiguration pConfig = pSampleStreamingSession->pSampleConfiguration;
+        if (pConfig != NULL && pConfig->joinSSCallStartTime != 0) {
+            UINT64 timeToReceiveInbound = (GETTIME() - pConfig->joinSSCallStartTime) / HUNDREDS_OF_NANOS_IN_A_MILLISECOND;
+            DLOGI("[Canary] TimeToReceiveInboundMedia: %" PRIu64 " ms (audio)", timeToReceiveInbound);
+            Canary::Cloudwatch::getInstance().monitoring.pushTimeToReceiveInboundMedia(timeToReceiveInbound, Aws::CloudWatch::Model::StandardUnit::Milliseconds);
+        }
+    }
 }
 
 VOID sampleFrameHandler(UINT64 customData, PFrame pFrame)
