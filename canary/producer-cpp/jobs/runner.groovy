@@ -16,16 +16,32 @@ def buildProducer(params) {
   // A develop-track build always starts from a clean build dir so FetchContent re-resolves the branch heads
   // instead of reusing the SDK sources cached by the previous iteration.
   def cleanBuildDir = params.KVS_SDK_TRACK == 'develop' ? 'rm -rf build &&' : ''
+  // A release-track build reuses build/ and the SDK's install dirs (lib/, include/, bin/, share/) between
+  // iterations, and a workspace is only wiped on the first iteration that lands in it. When the canary commit or
+  // Producer CPP master (which pins Producer C and PIC) moves, the new sources would build on top of files from
+  // the old ones, so wipe them whenever that pair differs from the one recorded by the last successful build.
+  def wipeStaleRelease = params.KVS_SDK_TRACK != 'release' ? '' : '''
+    sdk_head=$(git ls-remote https://github.com/awslabs/amazon-kinesis-video-streams-producer-sdk-cpp.git refs/heads/master | cut -f1) &&
+    build_key="$(git rev-parse HEAD) ${sdk_head}" &&
+    if [ -n "${sdk_head}" ] && [ "$(cat .sdk-build-key 2>/dev/null)" != "${build_key}" ]; then
+      echo "Canary or Producer CPP master changed since the last build, wiping build/ lib/ include/ bin/ share/" &&
+      rm -rf build lib include bin share .sdk-build-key
+    fi &&
+  '''
+  def recordBuildKey = params.KVS_SDK_TRACK != 'release' ? '' : '''&&
+    if [ -n "${sdk_head}" ]; then echo "${build_key}" > ../.sdk-build-key; fi
+  '''
   sh  """
     cd ./canary/producer-cpp/scripts &&
     chmod a+x cert_setup.sh &&
     ./cert_setup.sh ${iotPrefix(params)} &&
     cd .. &&
     ${cleanBuildDir}
+    ${wipeStaleRelease}
     mkdir -p build &&
     cd build && 
     cmake .. -DKVS_SDK_TRACK=${params.KVS_SDK_TRACK} &&
-    make -j4
+    make -j4 ${recordBuildKey}
   """
 }
   

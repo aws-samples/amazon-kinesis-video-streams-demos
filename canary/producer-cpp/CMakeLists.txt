@@ -39,7 +39,9 @@ if(NOT cloudwatch_POPULATED)
   FetchContent_Populate(cloudwatch)
   set(CUSTOM_MEMORY_MANAGEMENT OFF)
   set(ENABLE_TESTING OFF)
-  set(BUILD_ONLY "monitoring;logs")
+  # Must be a cache entry: aws-sdk-cpp declares BUILD_ONLY with set(... CACHE ...), which on a fresh configure
+  # drops a plain variable of the same name, so every service would be built. Same as canary/producer-c.
+  set(BUILD_ONLY "monitoring;logs" CACHE STRING "Tell AWS SDK to only build monitoring and logs" FORCE)
   set(CMAKE_PREFIX_PATH ${CMAKE_CURRENT_SOURCE_DIR}/lib)
   # Use the headers of the OpenSSL that the Producer SDK built into lib/. Without this, s2n finds the system
   # OpenSSL 3 headers in /usr/include but links the OpenSSL 1.1 lib/libcrypto, and s2n_init() aborts at start.
