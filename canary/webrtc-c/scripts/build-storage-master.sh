@@ -140,6 +140,29 @@ else
 fi
 
 # ---------------------------------------------------------------------------
+# 3b. Ensure the media assets are present in the repo checkout
+#     The sample frames are not in git. They live in S3 and are fetched once
+#     into ${REPO_DIR}/canary/webrtc-c/assets (gitignored, survives
+#     `git checkout -f` / `git reset --hard`, so later builds skip the
+#     download). This must happen BEFORE cmake: CMakeLists.txt copies the
+#     assets dir into ${BUILD_DIR} at configure time.
+#       - video: CANARY_ASSET_SET if set (bitrate variant), else h264SampleFrames
+#       - audio: opusSampleFrames (always, the master sends audio in every scenario)
+# ---------------------------------------------------------------------------
+FETCH_SCRIPT="${REPO_DIR}/canary/webrtc-c/scripts/fetch-asset-set.sh"
+REPO_ASSETS_DIR="${REPO_DIR}/canary/webrtc-c/assets"
+VIDEO_ASSET_SET="${CANARY_ASSET_SET:-h264SampleFrames}"
+chmod +x "$FETCH_SCRIPT" 2>/dev/null || true
+for asset in "$VIDEO_ASSET_SET" opusSampleFrames; do
+    if ! "$FETCH_SCRIPT" "$asset" "$REPO_ASSETS_DIR"; then
+        echo "ERROR: fetch-asset-set.sh failed for '$asset' (CANARY_ASSET_BUCKET/CANARY_ASSET_PREFIX set?)"
+        # Release lock
+        flock -u 9
+        exit 1
+    fi
+done
+
+# ---------------------------------------------------------------------------
 # 4. Build (clean rebuild to avoid stale CMake cache / FetchContent artifacts)
 #    Only runs when NEED_REBUILD=true; otherwise fall through to asset fetch.
 # ---------------------------------------------------------------------------
@@ -233,27 +256,20 @@ if [ "$NEED_REBUILD" = "true" ]; then
 fi
 
 # ---------------------------------------------------------------------------
-# 6. Fetch optional bitrate-variant asset set (idempotent, runs every invocation)
-#    - Default set ("h264SampleFrames") ships in the git checkout; the fetch
-#      script no-ops for it.
-#    - A CMake rebuild wipes ${BUILD_DIR}, so previously fetched sets need
-#      re-fetching; that's why this runs unconditionally, not only on rebuild.
+# 6. Make sure the binary's working dir has the assets (runs every invocation)
+#    The binary reads ./assets/<set>/... relative to ${BUILD_DIR}. A rebuild
+#    copies the repo assets dir there at configure time (CMakeLists.txt), but
+#    on a skipped build a newly requested bitrate variant only exists in the
+#    repo assets dir, so copy any set that is missing from the build dir.
+#    No S3 traffic here: the repo copy was already fetched/verified in 3b.
 # ---------------------------------------------------------------------------
-FETCH_SCRIPT="${REPO_DIR}/canary/webrtc-c/scripts/fetch-asset-set.sh"
-REQUESTED_ASSET_SET="${CANARY_ASSET_SET:-}"
-if [ -n "$REQUESTED_ASSET_SET" ]; then
-    if [ ! -x "$FETCH_SCRIPT" ]; then
-        chmod +x "$FETCH_SCRIPT" 2>/dev/null || true
+mkdir -p "${BUILD_DIR}/assets"
+for asset in "$VIDEO_ASSET_SET" opusSampleFrames; do
+    if [ ! -d "${BUILD_DIR}/assets/${asset}" ]; then
+        echo "Copying asset set '${asset}' into ${BUILD_DIR}/assets"
+        cp -a "${REPO_ASSETS_DIR}/${asset}" "${BUILD_DIR}/assets/${asset}"
     fi
-    if ! "$FETCH_SCRIPT" "$REQUESTED_ASSET_SET" "${BUILD_DIR}/assets"; then
-        echo "ERROR: fetch-asset-set.sh failed for '$REQUESTED_ASSET_SET'"
-        # Release lock
-        flock -u 9
-        exit 1
-    fi
-else
-    echo "No CANARY_ASSET_SET requested, using default asset set from git checkout"
-fi
+done
 
 echo "Binary ready at: $BINARY_PATH"
 

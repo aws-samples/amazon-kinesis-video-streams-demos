@@ -9,6 +9,27 @@ To download, run the following command:
 
 You will also need to install `pkg-config` and `CMake` and a build environment
 
+### Sample media
+The H.264 frames, Opus frames and the viewer's microphone WAV that the canary streams are not
+part of this repository. They are stored in an S3 bucket you control and fetched once per
+machine by `scripts/fetch-asset-set.sh`, which skips the download when the files are already
+present and complete:
+
+```sh
+export CANARY_ASSET_BUCKET=<your-bucket>
+export CANARY_ASSET_PREFIX=<key-prefix>          # e.g. webrtc-canary/frame-sets/v1
+export CANARY_ASSET_REGION=<bucket-region>       # optional
+scripts/fetch-asset-set.sh h264SampleFrames assets   # 4676 x assets/h264SampleFrames/frame-NNNN.h264
+scripts/fetch-asset-set.sh opusSampleFrames assets   # 7798 x assets/opusSampleFrames/sample-NNNN.opus
+scripts/fetch-asset-set.sh audio-source.wav assets   # viewer fake-mic source (audio-sending viewers only)
+```
+
+Expected S3 layout under the prefix: `<set-name>.tar.gz` whose single top-level entry is the
+`<set-name>/` directory (also used for bitrate variants such as `h264SampleFrames-500kbps`), and
+`audio-source.wav` as a plain object. The Jenkins pipelines pass the bucket, prefix and region as
+the `CANARY_ASSET_BUCKET` / `CANARY_ASSET_PREFIX` / `CANARY_ASSET_REGION` job parameters. CMake
+refuses to configure while `assets/h264SampleFrames` or `assets/opusSampleFrames` is missing.
+
 ### Configure
 Create a build directory in the newly checked out repository, and execute CMake from it.
 
