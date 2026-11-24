@@ -85,7 +85,7 @@ INT32 main(INT32 argc, CHAR* argv[])
     CHK_STATUS(readFrameFromDisk(NULL, &frameSize, "./assets/h264SampleFrames/frame-0001.h264"));
     DLOGI("[KVS Master] Checked sample video frame availability....available");
 
-    CHK_STATUS(readFrameFromDisk(NULL, &frameSize, "./assets/opusSampleFrames/sample-001.opus"));
+    CHK_STATUS(readFrameFromDisk(NULL, &frameSize, "./assets/opusSampleFrames/sample-0001.opus"));
     DLOGI("[KVS Master] Checked sample audio frame availability....available");
 
     // Initialize KVS WebRTC. This must be done before anything else, and must only be done once.
@@ -354,7 +354,7 @@ PVOID sendAudioPackets(PVOID args)
 
     while (!ATOMIC_LOAD_BOOL(&pSampleConfiguration->appTerminateFlag)) {
         fileIndex = fileIndex % NUMBER_OF_OPUS_FRAME_FILES + 1;
-        SNPRINTF(filePath, MAX_PATH_LEN, "./assets/opusSampleFrames/sample-%03d.opus", fileIndex);
+        SNPRINTF(filePath, MAX_PATH_LEN, "./assets/opusSampleFrames/sample-%04d.opus", fileIndex);
 
         CHK_STATUS(readFrameFromDisk(NULL, &frameSize, filePath));
 
