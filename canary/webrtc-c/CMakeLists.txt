@@ -97,4 +97,16 @@ target_link_libraries(
   kvsWebrtcStorageSample
   kvsWebrtcCanary)
 
+# The sample media (assets/h264SampleFrames, assets/opusSampleFrames) is not in git.
+# scripts/fetch-asset-set.sh downloads it from S3 into assets/ before this configure
+# step runs (see scripts/build-storage-master.sh). Fail early with a clear message
+# instead of letting the binary die at runtime on a missing frame-0001.h264.
+foreach(asset_set h264SampleFrames opusSampleFrames)
+  if(NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/assets/${asset_set}")
+    message(FATAL_ERROR
+      "Missing ${CMAKE_CURRENT_SOURCE_DIR}/assets/${asset_set}. The sample media is not in git; "
+      "fetch it with: CANARY_ASSET_BUCKET=<bucket> CANARY_ASSET_PREFIX=<prefix> "
+      "scripts/fetch-asset-set.sh ${asset_set} ${CMAKE_CURRENT_SOURCE_DIR}/assets")
+  endif()
+endforeach()
 file(COPY "${CMAKE_CURRENT_SOURCE_DIR}/assets" DESTINATION .)

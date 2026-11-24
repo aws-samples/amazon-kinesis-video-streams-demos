@@ -96,7 +96,47 @@ fi
 echo "webrtc-c dependency version: $CURRENT_WEBRTC_VERSION"
 
 # ---------------------------------------------------------------------------
-# 3. Check if rebuild is needed
+# 3. Ensure the media assets are present in the repo checkout
+#    The sample frames are not in git. They live in S3 and are fetched once
+#    into ${REPO_DIR}/canary/webrtc-c/assets (gitignored, survives
+#    `git checkout -f` / `git reset --hard`, so later builds skip the
+#    download). This must happen BEFORE cmake: CMakeLists.txt copies the
+#    assets dir into ${BUILD_DIR} at configure time.
+#      - video: CANARY_ASSET_SET if set (bitrate variant), else h264SampleFrames
+#      - audio: opusSampleFrames (always, the master sends audio in every scenario)
+#    Needs CANARY_ASSET_BUCKET / CANARY_ASSET_PREFIX (and optionally
+#    CANARY_ASSET_REGION) in the environment; the Jenkins runners export them.
+# ---------------------------------------------------------------------------
+FETCH_SCRIPT="${REPO_DIR}/canary/webrtc-c/scripts/fetch-asset-set.sh"
+REPO_ASSETS_DIR="${REPO_DIR}/canary/webrtc-c/assets"
+VIDEO_ASSET_SET="${CANARY_ASSET_SET:-h264SampleFrames}"
+chmod +x "$FETCH_SCRIPT" 2>/dev/null || true
+for asset in "$VIDEO_ASSET_SET" opusSampleFrames; do
+    if ! "$FETCH_SCRIPT" "$asset" "$REPO_ASSETS_DIR"; then
+        echo "ERROR: fetch-asset-set.sh failed for '$asset' (CANARY_ASSET_BUCKET/CANARY_ASSET_PREFIX set?)"
+        # Release lock
+        flock -u 9
+        exit 1
+    fi
+done
+
+# Make sure the binary's working dir has every set it may read. A rebuild
+# copies the whole repo assets dir at configure time, but on a skipped build a
+# newly requested bitrate variant only exists in the repo assets dir. No S3
+# traffic here: the repo copy was fetched/verified above.
+sync_build_assets() {
+    mkdir -p "${BUILD_DIR}/assets"
+    local asset
+    for asset in "$VIDEO_ASSET_SET" opusSampleFrames; do
+        if [ ! -d "${BUILD_DIR}/assets/${asset}" ]; then
+            echo "Copying asset set '${asset}' into ${BUILD_DIR}/assets"
+            cp -a "${REPO_ASSETS_DIR}/${asset}" "${BUILD_DIR}/assets/${asset}"
+        fi
+    done
+}
+
+# ---------------------------------------------------------------------------
+# 4. Check if rebuild is needed
 # ---------------------------------------------------------------------------
 CACHED_COMMIT=$(cat "$COMMIT_FILE" 2>/dev/null || echo "")
 CACHED_WEBRTC_VERSION=$(cat "$WEBRTC_VERSION_FILE" 2>/dev/null || echo "")
@@ -117,6 +157,7 @@ elif [ "$CURRENT_WEBRTC_VERSION" != "$CACHED_WEBRTC_VERSION" ]; then
     NEED_REBUILD=true
 else
     echo "No changes detected, skipping build"
+    sync_build_assets
     echo "Binary ready at: $BINARY_PATH"
     # Release lock
     flock -u 9
@@ -125,7 +166,7 @@ else
 fi
 
 # ---------------------------------------------------------------------------
-# 4. Build (clean rebuild to avoid stale CMake cache / FetchContent artifacts)
+# 5. Build (clean rebuild to avoid stale CMake cache / FetchContent artifacts)
 # ---------------------------------------------------------------------------
 BUILD_LOG="${LOGS_DIR}/build-$(date +%s).log"
 echo "Building... (log: $BUILD_LOG)"
@@ -155,7 +196,7 @@ if [ $BUILD_EXIT -ne 0 ]; then
 fi
 
 # ---------------------------------------------------------------------------
-# 5. Update stamps
+# 6. Update stamps
 # ---------------------------------------------------------------------------
 echo "$CURRENT_COMMIT" > "$COMMIT_FILE"
 echo "$CURRENT_WEBRTC_VERSION" > "$WEBRTC_VERSION_FILE"
@@ -164,6 +205,7 @@ echo "$CURRENT_WEBRTC_VERSION" > "$WEBRTC_VERSION_FILE"
 ls -1t "$LOGS_DIR"/build-*.log 2>/dev/null | tail -n +11 | xargs rm -f 2>/dev/null || true
 
 echo "Build successful"
+sync_build_assets
 echo "Binary ready at: $BINARY_PATH"
 
 # Release lock

@@ -77,8 +77,16 @@ def buildWebRTCProject(thing_prefix) {
         cmp -s '${repoDir}/canary/webrtc-c/scripts/cron/cleanup-master.sh' '${env.HOME}/webrtc-c-storage-master/cleanup-master.sh' \
             || cp '${repoDir}/canary/webrtc-c/scripts/cron/cleanup-master.sh' '${env.HOME}/webrtc-c-storage-master/cleanup-master.sh'"""
 
-    // Build the binary (handles git fetch, skip-rebuild, and flock internally)
+    // Build the binary (handles git fetch, skip-rebuild, and flock internally).
+    // The sample media is not in git: build-storage-master.sh fetches the requested
+    // video set and the Opus set from S3 into the persistent repo checkout (once per
+    // node, skipped when already present), so it needs the asset parameters.
     sh """
+        export CANARY_ASSET_SET='${params.STORAGE_ASSET_SET ?: ''}'
+        export CANARY_ASSET_BUCKET='${params.CANARY_ASSET_BUCKET ?: ''}'
+        export CANARY_ASSET_PREFIX='${params.CANARY_ASSET_PREFIX ?: ''}'
+        export CANARY_ASSET_REGION='${params.CANARY_ASSET_REGION ?: ''}'
+        export AWS_DEFAULT_REGION='${params.AWS_DEFAULT_REGION ?: 'us-west-2'}'
         chmod a+x '${repoDir}/canary/webrtc-c/scripts/build-storage-master.sh' &&
         '${repoDir}/canary/webrtc-c/scripts/build-storage-master.sh' '${params.GIT_URL}' '${params.GIT_HASH}'"""
 
@@ -141,6 +149,17 @@ def buildConsumerProject() {
     sh """
         cmp -s '${repoDir}/canary/webrtc-c/scripts/cron/cleanup-consumer.sh' '${env.HOME}/webrtc-c-storage-master/cleanup-consumer.sh' \
             || cp '${repoDir}/canary/webrtc-c/scripts/cron/cleanup-consumer.sh' '${env.HOME}/webrtc-c-storage-master/cleanup-consumer.sh'"""
+
+    // Fetch the video frame set verify.py uses as the SSIM reference (the same set the
+    // master streams). The frames are not in git: fetch-asset-set.sh downloads them from
+    // S3 once into the persistent repo checkout and skips the download when present.
+    sh """
+        export CANARY_ASSET_BUCKET='${params.CANARY_ASSET_BUCKET ?: ''}'
+        export CANARY_ASSET_PREFIX='${params.CANARY_ASSET_PREFIX ?: ''}'
+        export CANARY_ASSET_REGION='${params.CANARY_ASSET_REGION ?: ''}'
+        export AWS_DEFAULT_REGION='${params.AWS_DEFAULT_REGION ?: 'us-west-2'}'
+        chmod +x '${repoDir}/canary/webrtc-c/scripts/fetch-asset-set.sh' 2>/dev/null || true
+        '${repoDir}/canary/webrtc-c/scripts/fetch-asset-set.sh' '${params.STORAGE_ASSET_SET ?: 'h264SampleFrames'}' '${repoDir}/canary/webrtc-c/assets'"""
 }
 
 def withRunnerWrapper(envs, fn) {
@@ -183,6 +202,26 @@ def runViewerSessions(viewerId = "", waitMinutes = 2, viewerCount = "1", stagger
             sh """
                 export JS_PAGE_URL="${params.JS_BRANCH ?: 'master'}"
                 ./canary/webrtc-c/scripts/prepare-storage-viewer.sh
+            """
+
+            // Fake-microphone WAV for audio-sending viewers. Not in git: fetched from S3
+            // once into the node's persistent viewer cache (the per-build workspace is
+            // reaped hourly), skipped when already present. Only fatal when this viewer
+            // actually sends audio; chrome-headless.js ignores a missing file otherwise.
+            def viewerAudioFile = "${env.HOME}/JS-viewer-build/assets/audio-source.wav"
+            sh """
+                export CANARY_ASSET_BUCKET='${params.CANARY_ASSET_BUCKET ?: ''}'
+                export CANARY_ASSET_PREFIX='${params.CANARY_ASSET_PREFIX ?: ''}'
+                export CANARY_ASSET_REGION='${params.CANARY_ASSET_REGION ?: ''}'
+                export AWS_DEFAULT_REGION='${params.AWS_DEFAULT_REGION ?: 'us-west-2'}'
+                chmod +x ./canary/webrtc-c/scripts/fetch-asset-set.sh 2>/dev/null || true
+                if ! ./canary/webrtc-c/scripts/fetch-asset-set.sh audio-source.wav '${env.HOME}/JS-viewer-build/assets'; then
+                    if [ '${sendAudio}' = 'true' ]; then
+                        echo "ERROR: audio-source.wav is required for an audio-sending viewer"
+                        exit 1
+                    fi
+                    echo "WARNING: audio-source.wav not available; this viewer does not send audio, continuing"
+                fi
             """
             pushKeepAlive('ViewerPrepareComplete')
 
@@ -240,7 +279,7 @@ def runViewerSessions(viewerId = "", waitMinutes = 2, viewerCount = "1", stagger
                         export KEEP_RECORDING="${params.KEEP_RECORDING}"
                         export JS_PAGE_URL="${params.JS_BRANCH ?: 'master'}"
                         export VIEWER_SEND_AUDIO="${sendAudio}"
-                        export VIEWER_AUDIO_FILE="\${WORKSPACE}/canary/webrtc-c/assets/audio-source.wav"
+                        export VIEWER_AUDIO_FILE="${viewerAudioFile}"
                         
                         ./canary/webrtc-c/scripts/run-storage-viewer.sh
                     """,
@@ -340,7 +379,8 @@ def buildStorageCanary(isConsumer, params) {
         'CONTROL_PLANE_URI': params.ENDPOINT ?: '',
         'CANARY_NO_LOOP_FRAMES': params.NO_LOOP_FRAMES ?: false,
         'CANARY_FRAME_RATE': params.STORAGE_FPS ?: '',
-        'CANARY_MEDIA_TYPE': env.CANARY_MEDIA_TYPE ?: ''
+        'CANARY_MEDIA_TYPE': env.CANARY_MEDIA_TYPE ?: '',
+        'CANARY_ASSET_SET': params.STORAGE_ASSET_SET ?: ''
     ]
 
     def repoDir = "${env.HOME}/webrtc-c-storage-master/repo"
@@ -416,7 +456,8 @@ def buildStorageCanary(isConsumer, params) {
         // Run video verification on the GetClip MP4
         def clipPath = "${repoDir}/canary/consumer-java/clip-${START_TIMESTAMP}.mp4"
         def verifyScript = "${repoDir}/canary/webrtc-c/scripts/video-verification/verify.py"
-        def sourceFrames = "${repoDir}/canary/webrtc-c/assets/h264SampleFrames"
+        def assetSet = params.STORAGE_ASSET_SET ?: 'h264SampleFrames'
+        def sourceFrames = "${repoDir}/canary/webrtc-c/assets/${assetSet}"
         def streamName = "${env.JOB_NAME}-${params.RUNNER_LABEL}"
         def scenarioLabel = params.SCENARIO_LABEL
 
@@ -520,6 +561,10 @@ pipeline {
         booleanParam(name: 'FORCE_TURN', defaultValue: false)
         booleanParam(name: 'NO_LOOP_FRAMES', defaultValue: false, description: 'Stop after sending all frames once instead of looping')
         string(name: 'STORAGE_FPS', defaultValue: '', description: 'Override storage master frame rate (e.g., 10 for low FPS test). Empty uses default 30 fps.')
+        string(name: 'STORAGE_ASSET_SET', defaultValue: '', description: 'Video frame set to stream and verify against: empty=default h264SampleFrames, or e.g. h264SampleFrames-500kbps / -1mbps / -5mbps. All sets are fetched from S3 (see CANARY_ASSET_BUCKET).')
+        string(name: 'CANARY_ASSET_BUCKET', defaultValue: '', description: 'S3 bucket hosting the media assets (frame-set tarballs, opusSampleFrames.tar.gz, audio-source.wav). REQUIRED: the media is not in git; nodes fetch it once into a persistent cache.')
+        string(name: 'CANARY_ASSET_PREFIX', defaultValue: '', description: 'S3 key prefix of the media assets, e.g. webrtc-canary/frame-sets/v1. REQUIRED (see CANARY_ASSET_BUCKET).')
+        string(name: 'CANARY_ASSET_REGION', defaultValue: '', description: 'Region of the S3 asset bucket. May differ from AWS_DEFAULT_REGION. Empty falls back to AWS_DEFAULT_REGION.')
         string(name: 'JS_BRANCH', defaultValue: 'master', description: 'JS SDK branch name to clone and serve locally (default: master)')
     }
     

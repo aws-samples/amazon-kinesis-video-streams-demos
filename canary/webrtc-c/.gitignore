@@ -2,3 +2,6 @@ build
 .idea
 cmake-build-debug
 cmake-build-release
+# Sample media (H.264/Opus frames, viewer WAV) is fetched from S3 by
+# scripts/fetch-asset-set.sh into assets/; never commit it.
+assets/
